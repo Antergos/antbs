@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block styles %}{{ super() }}
+    <link href="/static/css/prism.css" rel="stylesheet"/>{% endblock styles %}
+{% block pagetitle -%}Build Record{%- endblock pagetitle %}
+{% block stats %}{% endblock stats %}
+{%- block topcontent -%}
+    <div class="row">
+        <div class="col-md-4">
+            <div id="summary"
+                 class="block no-padding block-color {% if res == "completed" %}success{% else %}danger{% endif %}">
+                <div class="header">
+                    <div class="actions">
+                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
+                    </div>
+                    <h3>{% if res == "completed" %}
+                        <i class="glyphicon glyphicon-thumbs-up"></i>
+                    {% else %}
+                        <i class="glyphicon glyphicon-thumbs-down"></i>
+                    {% endif %}
+                        Build Number: {{ bnum }}</h3>
+                </div>
+                <div class="content no-padding">
+                    <table class="table no-border hover">
+                        <tbody class="no-border-y">
+                        <tr>
+                            <td>Package:</td>
+                            <td>{{ pkg }}</td>
+                        </tr>
+                        <tr>
+                            <td>Version:</td>
+                            <td>{{ ver }}</td>
+                        </tr>
+                        <tr>
+                            <td>Start:</td>
+                            <td>{{ start }}</td>
+                        </tr>
+                        <tr>
+                            <td>Finish:</td>
+                            <td>{{ end }}</td>
+                        </tr>
+                        <tr>
+                            <td>Result:</td>
+                            <td>{{ res }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+{%- endblock topcontent -%}
+
+{%- block bottomcontent %}
+    <div class="row">
+        <div class="col-md-10">
+            <div id="" class="block">
+                <div class="header dark">
+                    <h4>Build Log</h4>
+                </div>
+                <div class="content no-padding">
+
+                    <div id="data" class="no-padding">{{ log|safe() }}</div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock bottomcontent -%}
+{% block scripts %}
+    {{ super() }}
+    {#{%- if not log or log == "" %}None
+    {% else %}{%- for line in log %}
+        <script type="text/javascript">
+            $('#data').append('{{ line }}<br/>');
+            $('#data').scrollTop($('#data')[0].scrollHeight);
+            {% if loop.last %}
+                prettyPrint();
+            {% endif %}
+        </script>
+
+    {% endfor -%}#}
+    <script type="text/javascript">
+        $(window).load(
+                function () {
+
+                    $('pre').addClass('pre-scrollable');
+        {#sse = new EventSource('/get_log?num={{ bnum }}');
+        var noBuilds = false;
+        sse.onmessage = function (message) {
+            //var msg = data.message;
+            if (message.data.indexOf('ENDOFLOG') >= 0) {
+                sse.close();
+                prettyPrint();
+                return;
+            }
+            $('#data').append(message.data + '<br/>');
+            $('#data').scrollTop($('#data')[0].scrollHeight);
+            if (message.data.indexOf("Unable to retrieve build log.") >= 0) {
+                sse.close();
+                prettyPrint();
+                return;
+            }
+        };#}
+    });
+</script>
+    {#{% endif -%}#}
+{% endblock scripts %}

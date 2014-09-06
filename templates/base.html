@@ -1,0 +1,344 @@
+{% block doc -%}
+    <!DOCTYPE html>
+    <html{% block html_attribs %} lang="en"{% endblock html_attribs %}>
+    {%- block html %}
+        <head>
+            {%- block head %}
+                <meta charset="utf-8">
+                <meta name="description" content="Antergos Automated Build Server">
+                <meta name="author" content="Antergos Developers">
+                <link rel="shortcut icon" href="/static/img/fav.png">
+                <title>{% block title %}AntBS{% endblock title %}</title>
+
+                {%- block metas %}
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                {%- endblock metas %}
+
+                {%- block styles %}
+                    <link href='//fonts.googleapis.com/css?family=Open+Sans:400,300,600,400italic,700,800'
+                          rel='stylesheet' type='text/css'>
+                    <link href='//fonts.googleapis.com/css?family=Raleway:400,300,200,100,700' rel='stylesheet'
+                          type='text/css'>
+                    <!-- Bootstrap core CSS -->
+                    <link href="/static/js/bootstrap/dist/css/bootstrap.css" rel="stylesheet">
+                    <link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
+                    <link rel="stylesheet" type="text/css" href="/static/js/jquery.datatables/bootstrap-adapter/css/datatables.css"/>
+
+                    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+                    <!--[if lt IE 9]>
+                      <script src="../../assets/js/html5shiv.js"></script>
+                      <script src="../../assets/js/respond.min.js"></script>
+                    <![endif]-->
+
+                    <link href="/static/css/skin-blue.css" rel="stylesheet"/>
+                    <!--<link href="//maxcdn.bootstrapcdn.com/bootswatch/3.2.0/flatly/bootstrap.min.css" rel="stylesheet">-->
+                    {#                    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+                    <link href="/static/css/bootstrap.min.css" rel="stylesheet">#}
+                    <link href="/static/css/monokai.css" rel="stylesheet">
+                    <style type="text/css">
+
+                        .animated {
+                            -webkit-animation-duration: 2s;
+                            animation-duration: 2s;
+                            -webkit-animation-fill-mode: both;
+                            animation-fill-mode: both;
+                            -webkit-animation-timing-function: ease-in;
+                            animation-timing-function: ease-in-out;
+                            animation-iteration-count: infinite;
+                            -webkit-animation-iteration-count: infinite;
+                        }
+
+                        @-webkit-keyframes pulse {
+                            0% {
+                                -webkit-transform: scale(1);
+                                opacity: 0;
+                            }
+                            50% {
+                                -webkit-transform: scale(1.2);
+                                opacity: 1;
+                            }
+                            100% {
+                                -webkit-transform: scale(1);
+                                opacity: 0;
+                            }
+                        }
+
+                        @keyframes pulse {
+                            0% {
+                                transform: scale(1);
+                                opacity: 0;
+                            }
+                            50% {
+                                transform: scale(1.2);
+                                opacity: 1;
+                            }
+                            100% {
+                                transform: scale(1);
+                                opacity: 0;
+                            }
+                        }
+
+                        .pulse {
+                            -webkit-animation-name: pulse;
+                            animation-name: pulse;
+                        }
+
+                        .sidebar-logo {
+                            background: #4aa3df url(/static/images/logo.png) no-repeat -5px 12px;
+                        }
+
+                        .sb-collapsed .sidebar-logo {
+
+                            background: url("/static/images/logo.png") no-repeat scroll 15px -39px #4aa3df;
+                        }
+
+                        /* #bottom-wrap {
+                             text-align: center;
+                         }
+
+                         .table {
+                             text-align: left;
+                         }
+                         #main {
+                             min-height: 785px;
+                         }
+                     #footer {
+                         margin-bottom: 0px;
+                         padding-top: 16px;
+                         margin-top: 50px;}*/
+                    </style>
+                {%- endblock styles %}
+            {%- endblock head %}
+        </head>
+        <body{% block body_attribs %} class="animated"{% endblock body_attribs %}>
+        {% block body -%}
+            {% block sidebar %}
+
+                <div id="cl-wrapper">
+
+                <div class="cl-sidebar">
+                    <div class="cl-toggle"><i class="fa fa-bars"></i></div>
+                    <div class="cl-navblock">
+                        <div class="menu-space">
+                            <div class="content">
+                                <div class="sidebar-logo">
+                                    <div class="logo">
+                                        <a href="/"></a>
+                                    </div>
+                                </div>
+                                <div class="side-user">
+                                    <dl style="color:rgba(255, 255, 255, 0.6);">
+                                        <dt>Antergos Build Server</dt>
+                                        <dd>Automated repo management application that builds packages and iso
+                                            images.
+                                        </dd>
+                                    </dl>
+                                    {# <div class="avatar"><img class="" src="/static/img/antergos2.png" alt="Idle"/>
+                                    </div>
+                                    <div class="info">
+                                        <p>Current Status: Idle
+                                        </p>
+
+                                        <div class="progress extra-small" style="position: relative;">
+                                                <div id="busy" class="progress-bar progress-bar-default"
+                                                     style="width:40%;height:5px;float:none;position:absolute;"></div>
+                                            </div>
+
+
+                                    </div>#}
+                                </div>
+                                <ul class="cl-vnavigation">
+                                    <li {% if request.path == "/" %}class="active"{% endif %}><a href="/"><i
+                                            class="fa fa-home"></i><span>Overview</span></a>
+
+                                    </li>
+                                    <li class="parent"><a href="#"><i
+                                            class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
+                                        <ul class="sub-menu">
+                                            <li {% if request.path == "/scheduled" %}class="active"{% endif %}><a
+                                                    href="/scheduled"><i
+                                                    class="fa  fa-clock-o"></i><span>Scheduled</span></a>
+
+                                            </li>
+                                            <li {% if request.path == "/completed" %}class="active"{% endif %}><a
+                                                    href="/completed"><i
+                                                    class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
+
+                                            </li>
+                                            <li {% if request.path == "/failed" %}class="active"{% endif %}><a
+                                                    href="/failed"><i
+                                                    class="fa fa-exclamation-circle"></i><span>Failed</span></a>
+                                        </ul>
+                                    </li>
+
+
+                                    <li><a href="#"><i class="fa  fa-archive"></i><span>Packages</span></a>
+
+                                    </li>
+                                    <li><a href="#"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
+
+                                    </li>
+                                    <li><a href="typography.html"><i
+                                            class="fa fa-wrench"></i><span>Testing</span></a></li>
+
+
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right collapse-button" style="padding:7px 9px;">
+                        <input type="text" class="form-control search" placeholder="Search..."/>
+                        <button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
+                                                                                          class="fa fa-angle-left"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="container-fluid" id="pcont">
+            {% endblock sidebar %}
+        {% block topbar %}
+            <!-- TOP BAR -->
+            <div id="head-nav" class="navbar navbar-default">
+                <div class="container-fluid">
+                    <div class="navbar-collapse">
+                        <ul class="nav navbar-nav navbar-right user-nav">
+                            <li class="dropdown">
+                                <a href="#" class="dropdown-toggle" data-toggle="dropdown"> Login
+                                    <b class="caret"></b></a>
+
+                                <ul class="dropdown-menu">
+                                    <li class="disabled"><a href="#">Not Implemented</a></li>
+                                </ul>
+
+                            </li>
+                        </ul>
+                        <ul class="nav navbar-nav not-nav">
+                            <!-- Menu Notification Items -->
+                        </ul>
+
+                    </div>
+                </div>
+            </div>
+
+            <!-- /Header -->
+        {%- endblock topbar %}
+
+            <!-- Main -->
+            <div id="main" class="cl-mcont">
+            {% block subheader %}
+                {% if request.path != "/" %}
+                    <div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+                        <ol class="breadcrumb">
+                            <li><a href="/">Home</a></li>
+
+                            <li class="active">{{ self.pagetitle() }}</li>
+                        </ol>
+                    </div>
+                {% endif %}
+            {% endblock subheader %}
+
+            <!-- upper section -->
+            <div class="row">
+        {% block topcontent -%}
+
+
+        {%- endblock topcontent %}
+
+        {% block bottomcontent -%}
+
+
+        {%- endblock bottomcontent %}
+        </div><!--/row-->
+        <!-- /upper section -->
+
+        </div><!--/container-->
+        </div> <!-- /Main -->
+        </div>
+
+
+            {% block scripts %}
+                <script src="/static/js/jquery.js"></script>
+                <script src="/static/js/jquery.cookie/jquery.cookie.js"></script>
+                <script src="/static/js/jquery.pushmenu/js/jPushMenu.js"></script>
+
+                <script type="text/javascript" src="/static/js/jquery.ui/jquery-ui.js"></script>
+                <script type="text/javascript" src="/static/js/behaviour/core.js"></script>
+
+                <!-- Bootstrap core JavaScript
+                ================================================== -->
+                <!-- Placed at the end of the document so the pages load faster -->
+                <script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
+                {#<script type="text/javascript" src="/static/js/prettify/prettify.js"></script>#}
+
+                {#<script type="text/javascript">
+                    jQuery(window).load(function () {
+                        function busy1() {
+                            jQuery('#busy').animate({left: "61%"}, 750);
+                            busy2();
+                        }
+
+                        function busy2() {
+                            jQuery('#busy').animate({left: "-3px"}, 750);
+                            busy1();
+                        }
+
+                        busy1();
+                    });
+                </script>#}
+
+
+                <script type="text/javascript" src="/static/js/jquery.datatables/jquery.datatables.min.js"></script>
+                <script type="text/javascript"
+                        src="/static/js/jquery.datatables/bootstrap-adapter/js/datatables.js"></script>
+                <script type="text/javascript"
+                        src="//cdn.datatables.net/plug-ins/725b2a2115b/type-detection/num-html.js"></script>
+                <script type="text/javascript">
+                    //sets up numeric sorting of links
+
+                    $(window).load(function () {
+                    if ($('table').length && ($('#summary').length)) {
+                    
+                        if ($('#summary').length) {
+                             console.log('Building output element detected.');
+                        } else if ($('pre').attr('id') == 'data') {
+                            console.log('Building output element detected.');
+                        } else {
+                            jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
+                        var x = a.replace(/<.*?>/g, "");
+                        var y = b.replace(/<.*?>/g, "");
+                        x = parseFloat(x);
+                        y = parseFloat(y);
+                        return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
+                    };
+
+                    jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
+                        var x = a.replace(/<.*?>/g, "");
+                        var y = b.replace(/<.*?>/g, "");
+                        x = parseFloat(x);
+                        y = parseFloat(y);
+                        return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
+                    };
+                            $('table').dataTable({
+                                "aoColumns": [
+                                    { "sType": "num-html" },
+                                    null,
+                                    null,
+                                    null,
+                                    null
+                                ],
+                                "aaSorting": [
+                                    [ 0, "desc" ]
+                                ]
+                            });
+                        }
+                        }
+                    });
+                   
+
+                </script>
+            {%- endblock scripts %}
+        {%- endblock body %}
+        </body>
+    {%- endblock html %}
+    </html>
+{% endblock doc -%}

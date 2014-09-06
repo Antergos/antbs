@@ -1,0 +1,10 @@
+ipaddress
+requests
+Flask>=0.10.1
+Jinja2>=2.7.2
+MarkupSafe>=0.19
+Werkzeug>=0.9.4
+itsdangerous>=0.24
+gunicorn
+docker-py
+rq

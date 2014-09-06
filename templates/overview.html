@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block pagetitle -%} Overview{%- endblock pagetitle %}
+{% block topcontent %}
+    <div class="col-md-3 col-sm-6">
+        <div class="fd-tile detail clean tile-purple">
+            <div class="content"><h1 class="text-left">{{ stats.queue }}</h1>
+
+                <p>Scheduled Builds</p></div>
+            <div class="icon"><i class="fa fa-flag"></i></div>
+            <a class="details" href="/scheduled">Details <span><i
+                    class="fa fa-arrow-circle-right pull-right"></i></span></a>
+        </div>
+    </div>
+
+
+    <div class="col-md-3 col-sm-6">
+        <div class="fd-tile detail clean tile-lemon">
+            <div class="content"><h1 class="text-left">{{ stats.completed }}</h1>
+
+                <p>Completed Builds &lt; 72hrs</p></div>
+            <div class="icon"><i class="fa fa-comments"></i></div>
+            <a class="details" href="/completed">Details <span><i
+                    class="fa fa-arrow-circle-right pull-right"></i></span></a>
+        </div>
+    </div>
+
+
+    <div class="col-md-3 col-sm-6">
+        <div class="fd-tile detail clean tile-red">
+            <div class="content"><h1 class="text-left">{{ stats.failed }}</h1>
+
+                <p>Failed Builds &lt; 72hrs</p></div>
+            <div class="icon"><i class="fa fa-heart"></i></div>
+            <a class="details" href="/failed">Details <span><i
+                    class="fa fa-arrow-circle-right pull-right"></i></span></a>
+        </div>
+    </div>
+
+    <div class="col-md-3 col-sm-6">
+        <div class="fd-tile detail clean tile-prusia">
+            <div class="content"><h1 class="text-left">{{ stats.repo }}</h1>
+
+                <p>Total Packages Available</p></div>
+            <div class="icon"><i class="fa fa-eye"></i></div>
+            <a class="details" href="//repo.antergos.info/antergos/testing/uefi/antergos">Details <span><i
+                    class="fa fa-arrow-circle-right pull-right"></i></span></a>
+        </div>
+    </div>
+{% endblock topcontent %}
