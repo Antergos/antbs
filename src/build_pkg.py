@@ -35,6 +35,9 @@ from pygments import highlight
 from pygments.lexers import BashLexer
 from pygments.formatters import HtmlFormatter
 from pygments.styles import get_style_by_name
+import re
+from dateutil import parser
+import time
 
 logger = logging.getLogger(__name__)
 logging.config.dictConfig(logconf.log_config)
@@ -65,19 +68,23 @@ def get_pkgver(package):
 
 def get_deps(package):
     pkg = package
-    depends = None
+    depends = []
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     with open(pbfile) as PKGBUILD:
         for line in PKGBUILD:
             if line.startswith("depends") or line.startswith("makedepends"):
-                deps = line.split('=')
-                depends = deps[1].rstrip()
+                dep_line = line.split('=')
+                dep_str = dep_line[1].rstrip()
+                dep_str = dep_str.replace('(', '')
+                dep_str = dep_str.replace(')', '')
+                dep_str = dep_str.replace("'", '')
+                deps = dep_str.split(' ')
+                for dep in deps:
+                    depends.append(dep)
             else:
                 continue
-        try:
-            return list(depends)
-        except Exception:
-            return [depends]
+    return depends
+
 
 
 def check_deps(packages):
@@ -135,7 +142,6 @@ def handle_hook():
         logger.info('Check deps complete. Starting build_pkgs')
         build_pkgs()
 
-
 def db_filter_and_add(output=None, this_log=None):
     if output is None or this_log is None:
         return
@@ -150,7 +156,13 @@ def db_filter_and_add(output=None, this_log=None):
         if end not in nodup:
             nodup.add(end)
             line = line.replace("can't", "can not")
-            #line = line.replace('"', '\\"')
+            bad_date = re.search(r"\d{4}-.+Z(?=\s)", line)
+            if bad_date:
+                logger.info('The bad_date is %s' % bad_date)
+                py_date = parser.parse(bad_date.group(0))
+                logger.info('The py_date is %s' % py_date)
+                good_date = py_date.strftime("%m/%d/%Y %I:%M%p")
+                line = line.replace(bad_date.group(0), good_date)
             if len(line) > 210:
                 part1 = line[:210]
                 part2 = line[211:]
@@ -185,7 +197,7 @@ def build_pkgs():
     for d in [repo, cache]:
         if not os.path.exists(d):
             os.mkdir(d, 0o777)
-    db.set('pkg_count', 0)
+    db.set('pkg_count', '0')
     pkglist = db.lrange('queue', 0, -1)
     pkglist = list(set(pkglist))
     for i in range(len(pkglist)):
@@ -207,9 +219,11 @@ def build_pkgs():
         db.set('%s:pkg' % this_log, pkg)
         db.set('building', pkg)
         pkgdir = os.path.join(REPO_DIR, pkg)
-        pkg_deps = list(db.lrange('pkg:%s:deps', 0, -1))
+        pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
+        pkg_deps_str = ' '.join(pkg_deps)
+        logger.info('pkg_deps_str is %s' % pkg_deps_str)
         try:
-            container = doc.create_container("lots0logs/makepkg", command=["/makepkg/build.sh", pkg_deps], name=pkg,
+            container = doc.create_container("lots0logs/makepkg", command=["/makepkg/build.sh", pkg_deps_str], name=pkg,
                                              volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg', '/root/.gnupg',
                                                       '/staging'])
         except Exception as err:
@@ -272,7 +286,6 @@ def build_pkgs():
             logger.error('No package found after container exit.')
             failed = True
             db.set('%s:result' % this_log, 'failed')
-        if failed:
             db.rpush('failed', build_id)
         doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -318,7 +331,7 @@ def build_pkgs():
         doc.wait(repo_container)
     except Exception as err:
         logger.error('Start container failed. Error Msg: %s' % err)
-    # doc.remove_container(container)
+    doc.remove_container(repo_container)
     try:
         shutil.rmtree(repo)
         shutil.rmtree(cache)

@@ -22,7 +22,7 @@
                         Build Number: {{ bnum }}</h3>
                 </div>
                 <div class="content no-padding">
-                    <table class="table no-border hover">
+                    <table id="noDt" class="table no-border hover">
                         <tbody class="no-border-y">
                         <tr>
                             <td>Package:</td>
@@ -82,12 +82,12 @@
         </script>
 
     {% endfor -%}#}
-    <script type="text/javascript">
+    {# <script type="text/javascript">
         $(window).load(
                 function () {
 
                     $('pre').addClass('pre-scrollable');
-        {#sse = new EventSource('/get_log?num={{ bnum }}');
+        sse = new EventSource('/get_log?num={{ bnum }}');
         var noBuilds = false;
         sse.onmessage = function (message) {
             //var msg = data.message;
@@ -103,8 +103,8 @@
                 prettyPrint();
                 return;
             }
-        };#}
+        };
     });
-</script>
+</script>#}
     {#{% endif -%}#}
 {% endblock scripts %}

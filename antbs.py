@@ -16,7 +16,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-#  along with this program; if not, write to the Free Software
+# along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
@@ -31,7 +31,7 @@ import json
 import subprocess
 import time
 import os
-from rq import Queue
+from rq import Queue, Connection, Worker
 from flask import Flask, request, Response, abort, render_template
 from werkzeug.contrib.fixers import ProxyFix
 import requests
@@ -43,6 +43,7 @@ import logging.config
 import logging.handlers
 import src.logging_config as logconf
 import glob
+import shutil
 from datetime import datetime, timedelta
 import gevent
 import gevent.monkey
@@ -58,8 +59,6 @@ app = Flask(__name__)
 app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
-queue = Queue('build_queue', connection=db)
-
 
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -67,6 +66,30 @@ app.wsgi_app = ProxyFix(app.wsgi_app)
 # Setup logging
 logger = logging.getLogger('')
 logging.config.dictConfig(logconf.log_config)
+
+
+def handle_worker_exception(job, *exc_info):
+    doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
+    container = db.get('container')
+    doc.remove_container(container)
+    repo = os.path.join("/tmp", "staging")
+    cache = os.path.join("/tmp", "pkg_cache")
+    try:
+        shutil.rmtree(repo)
+        shutil.rmtree(cache)
+        shutil.rmtree('/opt/antergos-packages')
+    except Exception:
+        pass
+    db.set('idle', "True")
+    db.set('building', 'Idle')
+    db.set('container', '')
+    db.set('building_num', '')
+    db.set('building_start', '')
+
+
+with Connection(db):
+    queue = Queue('build_queue')
+    w = Worker([queue], exc_handler=handle_worker_exception)
 
 
 def stream_template(template_name, **context):
@@ -92,25 +115,43 @@ def get_log_stream(bnum=None):
                 yield line
             yield 'data: ENDOFLOG\n\n'
         else:
-            last_line = False
             for line in log:
                 yield 'data: %s\n\n' % line
             yield 'data: ENDOFLOG\n\n'
-
-
     else:
         nodata = ['data: There are no active builds.\n\n']
         if is_idle == "True" or now_building == "Idle" or now_building == 'Initializing...':
             app.logger.debug("No active container detected")
             for line in nodata:
                 yield line
+            yield 'data: ENDOFLOG\n\n'
         else:
             #doclog = doc.logs(container, stdout=True, stderr=True, stream=True, timestamps=True)
             proc = subprocess.Popen(['docker', 'logs', '--follow', '-t', container], stdout=subprocess.PIPE)
             stream = iter(proc.stdout.readline, '')
+            nodup = set()
+            part2 = None
             for line in stream:
-                gevent.sleep(.05)
-                yield 'data: %s\n\n' % line
+                if not line or line == '':
+                    continue
+                line = line.rstrip()
+                end = line[20:]
+                if end not in nodup:
+                    gevent.sleep(.05)
+                    nodup.add(end)
+                    line = line.replace("can't", "can not")
+                    if len(line) > 210:
+                        part1 = line[:210]
+                        part2 = line[211:]
+                        yield 'data: %s\n\n' % part1
+                        continue
+                    elif part2:
+                        yield 'data: %s\n\n' % part2
+                        part2 = None
+                        continue
+                    else:
+                        yield 'data: %s\n\n' % line
+            yield 'data: ENDOFLOG\n\n'
 
 
 def get_paginated(pkg_list, per_page, page):
@@ -225,24 +266,31 @@ def hooked():
 
     payload = json.loads(request.data)
     repo = payload['repository']['name']
-    changes = payload['head_commit']['modified']
-    added = payload['head_commit']['added']
+    commits = payload['commits']
+    changes = []
+    added = []
+    for commit in commits:
+        changes.append(commit['modified'])
+        added.append(commit['added'])
     if repo == "antergos-packages":
         db.set('idle', 'False')
         db.set('building', "Initializing...")
         logger.info(changes)
         has_pkgs = False
         all_changes = changes + added
+        no_dups = []
 
-        for item in all_changes:
-            pak = os.path.dirname(item)
-            if pak is not None and pak != '':
-                logger.info('Adding %s to the build queue' % pak)
-                has_pkgs = True
-                db.rpush('queue', pak)
+        for changed in all_changes:
+            for item in changed:
+                pak = os.path.dirname(item)
+                if pak is not None and pak != '' and pak not in no_dups:
+                    logger.info('Adding %s to the build queue' % pak)
+                    no_dups.append(pak)
+                    has_pkgs = True
+                    db.rpush('queue', pak)
 
         if has_pkgs:
-            queue.enqueue_call(builder.handle_hook, timeout=7200)
+            queue.enqueue_call(builder.handle_hook, timeout=9600)
 
     elif repo == "antergos-iso":
         db.set('idle', 'False')

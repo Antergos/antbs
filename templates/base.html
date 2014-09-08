@@ -296,13 +296,9 @@
                     //sets up numeric sorting of links
 
                     $(window).load(function () {
-                    if ($('table').length && ($('#summary').length)) {
-                    
-                        if ($('#summary').length) {
-                             console.log('Building output element detected.');
-                        } else if ($('pre').attr('id') == 'data') {
-                            console.log('Building output element detected.');
-                        } else {
+                    if ($('table').length && ! $('#noDt').length) {
+
+
                             jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
                         var x = a.replace(/<.*?>/g, "");
                         var y = b.replace(/<.*?>/g, "");
@@ -331,7 +327,7 @@
                                 ]
                             });
                         }
-                        }
+
                     });
                    
 
