@@ -1,10 +1,17 @@
 {% extends "base.html" %}
-{% block styles %}{{ super() }}
-    <link href="/static/css/prism.css" rel="stylesheet"/>{% endblock styles %}
 {% block pagetitle -%}Build Record{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
+{% block subheader %}
+<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+    <ol class="breadcrumb">
+        <li><a href="/">Home</a></li>
+        <li><a href="#">Build Reports</a></li>
+        <li><a href="/{{ res }}">{{ res|capitalize() }}</a></li>
+        <li class="active">{{ self.pagetitle() }}</li>
+    </ol>
+</div>
+{% endblock subheader %}
 {%- block topcontent -%}
-    <div class="row">
         <div class="col-md-4">
             <div id="summary"
                  class="block no-padding block-color {% if res == "completed" %}success{% else %}danger{% endif %}">
@@ -49,15 +56,20 @@
                 </div>
             </div>
         </div>
-    </div>
+ 
 {%- endblock topcontent -%}
 
 {%- block bottomcontent %}
     <div class="row">
         <div class="col-md-10">
-            <div id="" class="block">
-                <div class="header dark">
-                    <h4>Build Log</h4>
+            <div id="" class="block block-color">
+                <div class="header">
+                <div class="actions">
+                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
+                    </div>
+                    <h3>Build Log</h3>
                 </div>
                 <div class="content no-padding">
 
@@ -71,22 +83,10 @@
 {% endblock bottomcontent -%}
 {% block scripts %}
     {{ super() }}
-    {#{%- if not log or log == "" %}None
-    {% else %}{%- for line in log %}
-        <script type="text/javascript">
-            $('#data').append('{{ line }}<br/>');
-            $('#data').scrollTop($('#data')[0].scrollHeight);
-            {% if loop.last %}
-                prettyPrint();
-            {% endif %}
-        </script>
-
-    {% endfor -%}#}
+        
     {# <script type="text/javascript">
         $(window).load(
                 function () {
-
-                    $('pre').addClass('pre-scrollable');
         sse = new EventSource('/get_log?num={{ bnum }}');
         var noBuilds = false;
         sse.onmessage = function (message) {

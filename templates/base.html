@@ -31,58 +31,8 @@
                     <![endif]-->
 
                     <link href="/static/css/skin-blue.css" rel="stylesheet"/>
-                    <!--<link href="//maxcdn.bootstrapcdn.com/bootswatch/3.2.0/flatly/bootstrap.min.css" rel="stylesheet">-->
-                    {#                    <link rel="stylesheet" href="//netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
-                    <link href="/static/css/bootstrap.min.css" rel="stylesheet">#}
                     <link href="/static/css/monokai.css" rel="stylesheet">
                     <style type="text/css">
-
-                        .animated {
-                            -webkit-animation-duration: 2s;
-                            animation-duration: 2s;
-                            -webkit-animation-fill-mode: both;
-                            animation-fill-mode: both;
-                            -webkit-animation-timing-function: ease-in;
-                            animation-timing-function: ease-in-out;
-                            animation-iteration-count: infinite;
-                            -webkit-animation-iteration-count: infinite;
-                        }
-
-                        @-webkit-keyframes pulse {
-                            0% {
-                                -webkit-transform: scale(1);
-                                opacity: 0;
-                            }
-                            50% {
-                                -webkit-transform: scale(1.2);
-                                opacity: 1;
-                            }
-                            100% {
-                                -webkit-transform: scale(1);
-                                opacity: 0;
-                            }
-                        }
-
-                        @keyframes pulse {
-                            0% {
-                                transform: scale(1);
-                                opacity: 0;
-                            }
-                            50% {
-                                transform: scale(1.2);
-                                opacity: 1;
-                            }
-                            100% {
-                                transform: scale(1);
-                                opacity: 0;
-                            }
-                        }
-
-                        .pulse {
-                            -webkit-animation-name: pulse;
-                            animation-name: pulse;
-                        }
-
                         .sidebar-logo {
                             background: #4aa3df url(/static/images/logo.png) no-repeat -5px 12px;
                         }
@@ -91,21 +41,12 @@
 
                             background: url("/static/images/logo.png") no-repeat scroll 15px -39px #4aa3df;
                         }
-
-                        /* #bottom-wrap {
-                             text-align: center;
-                         }
-
-                         .table {
-                             text-align: left;
-                         }
-                         #main {
-                             min-height: 785px;
-                         }
-                     #footer {
-                         margin-bottom: 0px;
-                         padding-top: 16px;
-                         margin-top: 50px;}*/
+                        .pre-scrollable {
+                        white-space: pre-wrap;
+                        margin-top: 0px;
+                        border: none;
+                        
+                        }
                     </style>
                 {%- endblock styles %}
             {%- endblock head %}
@@ -133,24 +74,10 @@
                                             images.
                                         </dd>
                                     </dl>
-                                    {# <div class="avatar"><img class="" src="/static/img/antergos2.png" alt="Idle"/>
-                                    </div>
-                                    <div class="info">
-                                        <p>Current Status: Idle
-                                        </p>
-
-                                        <div class="progress extra-small" style="position: relative;">
-                                                <div id="busy" class="progress-bar progress-bar-default"
-                                                     style="width:40%;height:5px;float:none;position:absolute;"></div>
-                                            </div>
-
-
-                                    </div>#}
                                 </div>
                                 <ul class="cl-vnavigation">
                                     <li {% if request.path == "/" %}class="active"{% endif %}><a href="/"><i
                                             class="fa fa-home"></i><span>Overview</span></a>
-
                                     </li>
                                     <li class="parent"><a href="#"><i
                                             class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
@@ -158,16 +85,16 @@
                                             <li {% if request.path == "/scheduled" %}class="active"{% endif %}><a
                                                     href="/scheduled"><i
                                                     class="fa  fa-clock-o"></i><span>Scheduled</span></a>
-
                                             </li>
-                                            <li {% if request.path == "/completed" %}class="active"{% endif %}><a
+                                            <li {% if request.path == "/completed" or res == "completed" %}class="active"{% endif %}><a
                                                     href="/completed"><i
                                                     class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
-
                                             </li>
-                                            <li {% if request.path == "/failed" %}class="active"{% endif %}><a
+                                            <li {% if request.path == "/failed" or res == "failed" %}
+                                                class="active"{% endif %}><a
                                                     href="/failed"><i
                                                     class="fa fa-exclamation-circle"></i><span>Failed</span></a>
+                                             </li>
                                         </ul>
                                     </li>
 
@@ -178,7 +105,7 @@
                                     <li><a href="#"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
                                     </li>
-                                    <li><a href="typography.html"><i
+                                    <li><a href="#"><i
                                             class="fa fa-wrench"></i><span>Testing</span></a></li>
 
 
@@ -193,9 +120,9 @@
                         </button>
                     </div>
                 </div>
-
+ {% endblock sidebar %}
                 <div class="container-fluid" id="pcont">
-            {% endblock sidebar %}
+           
         {% block topbar %}
             <!-- TOP BAR -->
             <div id="head-nav" class="navbar navbar-default">
@@ -219,10 +146,7 @@
                     </div>
                 </div>
             </div>
-
-            <!-- /Header -->
-        {%- endblock topbar %}
-
+{%- endblock topbar %}
             <!-- Main -->
             <div id="main" class="cl-mcont">
             {% block subheader %}
@@ -243,12 +167,14 @@
 
 
         {%- endblock topcontent %}
-
+</div>
+<div class="row">
         {% block bottomcontent -%}
 
 
         {%- endblock bottomcontent %}
         </div><!--/row-->
+        
         <!-- /upper section -->
 
         </div><!--/container-->
@@ -268,25 +194,6 @@
                 ================================================== -->
                 <!-- Placed at the end of the document so the pages load faster -->
                 <script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
-                {#<script type="text/javascript" src="/static/js/prettify/prettify.js"></script>#}
-
-                {#<script type="text/javascript">
-                    jQuery(window).load(function () {
-                        function busy1() {
-                            jQuery('#busy').animate({left: "61%"}, 750);
-                            busy2();
-                        }
-
-                        function busy2() {
-                            jQuery('#busy').animate({left: "-3px"}, 750);
-                            busy1();
-                        }
-
-                        busy1();
-                    });
-                </script>#}
-
-
                 <script type="text/javascript" src="/static/js/jquery.datatables/jquery.datatables.min.js"></script>
                 <script type="text/javascript"
                         src="/static/js/jquery.datatables/bootstrap-adapter/js/datatables.js"></script>
@@ -294,10 +201,11 @@
                         src="//cdn.datatables.net/plug-ins/725b2a2115b/type-detection/num-html.js"></script>
                 <script type="text/javascript">
                     //sets up numeric sorting of links
-
+$(document).ready(function () {
+	$('pre').addClass('pre-scrollable');
+});
                     $(window).load(function () {
                     if ($('table').length && ! $('#noDt').length) {
-
 
                             jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
                         var x = a.replace(/<.*?>/g, "");

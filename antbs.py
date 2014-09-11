@@ -205,8 +205,8 @@ def homepage():
         stats[stat] = res
         if stat is not "queue":
             builds = db.lrange(stat, 0, -1)
+            within = []
             for build in builds:
-                within = []
                 end = db.get('build_log:%s:start' % build)
                 end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
                 if (datetime.now() - end_fmt) < timedelta(hours=72):
@@ -252,12 +252,14 @@ def hooked():
 
     elif request.method == 'POST':
         # Check if the POST request if from github.com
-        for block in hook_blocks:
-            ip = ipaddress.ip_address(u'%s' % request.remote_addr)
-            if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
-                break  # the remote_addr is within the network range of github
-        else:
-            abort(403)
+        if not request.headers.get('X-Phab-Event') == "push":
+            for block in hook_blocks:
+                ip = ipaddress.ip_address(u'%s' % request.remote_addr)
+                if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
+                    break  # the remote_addr is within the network range of github
+            else:
+                abort(403)
+
 
         if request.headers.get('X-GitHub-Event') == "ping":
             return json.dumps({'msg': 'Hi!'})

@@ -199,14 +199,12 @@ def build_pkgs():
             os.mkdir(d, 0o777)
     db.set('pkg_count', '0')
     pkglist = db.lrange('queue', 0, -1)
-    pkglist = list(set(pkglist))
     for i in range(len(pkglist)):
         failed = False
-        pkg = pkglist[i]
+        pkg = db.lpop('queue')
         if pkg is None or pkg == '':
             continue
         logger.info('Building %s' % pkg)
-        db.lrem('queue', 0, pkg)
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
@@ -223,7 +221,7 @@ def build_pkgs():
         pkg_deps_str = ' '.join(pkg_deps)
         logger.info('pkg_deps_str is %s' % pkg_deps_str)
         try:
-            container = doc.create_container("lots0logs/makepkg", command=["/makepkg/build.sh", pkg_deps_str], name=pkg,
+            container = doc.create_container("antergos/makepkg", command=["/makepkg/build.sh", pkg_deps_str], name=pkg,
                                              volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg', '/root/.gnupg',
                                                       '/staging'])
         except Exception as err:
