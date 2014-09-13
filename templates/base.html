@@ -47,6 +47,12 @@
                         border: none;
                         
                         }
+
+                        .block .header h3 {
+                            margin: 3px 0;
+                            font-family: "Raleway", Helvetica, sans-serif;
+                            font-weight: 400;
+                        }
                     </style>
                 {%- endblock styles %}
             {%- endblock head %}
@@ -79,6 +85,9 @@
                                     <li {% if request.path == "/" %}class="active"{% endif %}><a href="/"><i
                                             class="fa fa-home"></i><span>Overview</span></a>
                                     </li>
+                                    <li {% if request.path == "/building" %}class="active"{% endif %}><a href="/building"><i
+                                            class="fa fa-eye"></i><span>Live Build Output</span></a>
+                                    </li>
                                     <li class="parent"><a href="#"><i
                                             class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
                                         <ul class="sub-menu">
@@ -99,7 +108,7 @@
                                     </li>
 
 
-                                    <li><a href="#"><i class="fa  fa-archive"></i><span>Packages</span></a>
+                                    <li><a href="//repo.antergos.info/iso/testing/uefi/antergos"><i class="fa  fa-archive"></i><span>Packages</span></a>
 
                                     </li>
                                     <li><a href="#"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>

@@ -43,6 +43,7 @@ import logging.config
 import logging.handlers
 import src.logging_config as logconf
 import glob
+import re
 import shutil
 from datetime import datetime, timedelta
 import gevent
@@ -131,7 +132,15 @@ def get_log_stream(bnum=None):
             stream = iter(proc.stdout.readline, '')
             nodup = set()
             part2 = None
+            random = os.urandom(12)
+            db.set('stream:%s' % random, 'True')
+            db.expire('stream:%s' % random, 22)
+            session = db.exists('stream:%s' % random)
             for line in stream:
+                if not session:
+                    yield 'data: PINGPING\n\n'
+                    db.set('stream:%s' % random, 'True')
+                    db.expire('stream:%s' % random, 22)
                 if not line or line == '':
                     continue
                 line = line.rstrip()
@@ -140,19 +149,25 @@ def get_log_stream(bnum=None):
                     gevent.sleep(.05)
                     nodup.add(end)
                     line = line.replace("can't", "can not")
-                    if len(line) > 210:
-                        part1 = line[:210]
-                        part2 = line[211:]
-                        yield 'data: %s\n\n' % part1
-                        continue
-                    elif part2:
-                        yield 'data: %s\n\n' % part2
-                        part2 = None
-                        continue
-                    else:
-                        yield 'data: %s\n\n' % line
+                    #if len(line) > 210:
+                    #    part1 = line[:210]
+                    #    part2 = line[211:]
+                    #    yield 'data: %s\n\n' % part1
+                    #   continue
+                    #elif part2:
+                    #   yield 'data: %s\n\n' % part2
+                    #   part2 = None
+                    #   continue
+                    #else:
+                    yield 'data: %s\n\n' % line
             yield 'data: ENDOFLOG\n\n'
 
+def get_live_build_ouput():
+    pubsub = db.pubsub()
+    pubsub.subscribe('build-output')
+    for message in pubsub.listen():
+        gevent.sleep(.05)
+        yield 'data: %s\n\n' % message['data']
 
 def get_paginated(pkg_list, per_page, page):
     pkg_list.reverse()
@@ -212,10 +227,26 @@ def homepage():
                 if (datetime.now() - end_fmt) < timedelta(hours=72):
                     within.append(build)
                 stats[stat] = len(within)
-
-    x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/x86_64/*.pkg.tar.xz')
-    i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/i686/*.pkg.tar.xz')
-    stats['repo'] = len(set(x86_64 + i686))
+    
+    x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/x86_64/*.*.pkg.tar.xz')
+    i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/i686/*.*.pkg.tar.xz')
+    all_p = x86_64 + i686
+    the_path = '/srv/antergos.info/repo/iso/testing/uefi/antergos/'
+    filtered = []
+    cached = db.exists('repo-count')
+    if cached:
+        stats['repo'] = db.get('repo-count')
+    else:
+        for fp in all_p:
+            new_fp = os.path.basename(fp)
+            new_fp = new_fp.split('.')
+            new_fp = new_fp[0]
+            logger.info('new_fp is %s' % new_fp)
+            filtered.append(new_fp)
+        stats['repo'] = len(set(filtered))
+        db.set('repo-count', stats['repo'])
+        db.expire('repo-count', 86400)
+        
     return render_template("overview.html", idle=is_idle, stats=stats)
 
 
@@ -233,13 +264,16 @@ def build():
 
     #return render_template("building.html", idle=is_idle, building=now_building, container=container)
     return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
-                                    container=container, data=get_log_stream()))
+                                    container=container))
 
 
 @app.route('/get_log')
 def get_log():
-    bid = request.args.get('num')
-    return Response(get_log_stream(bid), mimetype='text/event-stream')
+    is_idle = db.get('idle')
+    if is_idle == "True":
+        abort(404)
+
+    return Response(get_live_build_ouput(), direct_passthrough=True, mimetype='text/event-stream')
 
 
 @app.route('/hook', methods=['POST', 'GET'])
@@ -252,7 +286,7 @@ def hooked():
 
     elif request.method == 'POST':
         # Check if the POST request if from github.com
-        if not request.headers.get('X-Phab-Event') == "push":
+        if not request.headers.get('X-Phabricator-Sent-This-Message') == "Yes":
             for block in hook_blocks:
                 ip = ipaddress.ip_address(u'%s' % request.remote_addr)
                 if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
@@ -260,29 +294,34 @@ def hooked():
             else:
                 abort(403)
 
-
         if request.headers.get('X-GitHub-Event') == "ping":
             return json.dumps({'msg': 'Hi!'})
         if request.headers.get('X-GitHub-Event') != "push":
             return json.dumps({'msg': "wrong event type"})
 
     payload = json.loads(request.data)
-    repo = payload['repository']['name']
-    commits = payload['commits']
     changes = []
-    added = []
-    for commit in commits:
-        changes.append(commit['modified'])
-        added.append(commit['added'])
+    if request.headers.get('X-Phabricator-Sent-This-Message') == "Yes":
+        repo = 'antergos-packages'
+        subject = request.headers.get('Subject')
+        if subject.startswith('[Diffusion] [Commit] rNXSQ'):
+            changes = ['numix-icon-theme-square', 'numix-icon-theme-square-kde']
+        elif subject.startswith('[Diffusion] [Commit] rNX'):
+            changes = ['numix-icon-theme', 'numix-icon-theme-kde']
+    else:
+        repo = payload['repository']['name']
+        commits = payload['commits']
+        for commit in commits:
+            changes.append(commit['modified'])
+            changes.append(commit['added'])
     if repo == "antergos-packages":
         db.set('idle', 'False')
         db.set('building', "Initializing...")
         logger.info(changes)
         has_pkgs = False
-        all_changes = changes + added
         no_dups = []
 
-        for changed in all_changes:
+        for changed in changes:
             for item in changed:
                 pak = os.path.dirname(item)
                 if pak is not None and pak != '' and pak not in no_dups:

@@ -12,9 +12,9 @@
                 <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
                 <a class="close-down" href="#"><i class="fa fa-times"></i></a>
             </div>
-            <h3><strong><i class="glyphicon glyphicon-list-alt"></i> Live Build Output </strong></h3>
+            <h3><i class="glyphicon glyphicon-list-alt"></i> Live Build Output</h3>
             {%- if idle != "True" %}
-                <h5><strong>Docker Container ID:</strong> {{ container }} <strong>Build Number:</strong> {{ bnum }}<strong>Start Time: {{ start }}</strong></h5>
+                <h5><strong>Docker Container ID:</strong> {{ container }} <strong> Build Number:</strong> {{ bnum }}<strong> Start Time: {{ start }}</strong></h5>
             {% endif -%}
 
         </div>
@@ -43,10 +43,12 @@
                 function () {
                     var editor = ace.edit("data");
                     editor.getSession().setMode("ace/mode/sh");
-                    editor.setValue("Loading stream...");
+                    editor.setValue("{% if idle == "True" %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
                     editor.setTheme("ace/theme/monokai");
+                    editor.setShowPrintMargin(false);
                     sse = new EventSource('/get_log');
                     var noBuilds = false;
+                    {% if idle == "True" %}editor.setReadOnly(true);{% endif %}
                     sse.onmessage = function (message) {
 
                         if (message.data.indexOf('ENDOFLOG') >= 0) {

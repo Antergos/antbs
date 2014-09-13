@@ -38,6 +38,7 @@ from pygments.styles import get_style_by_name
 import re
 from dateutil import parser
 import time
+from multiprocessing import Process
 
 logger = logging.getLogger(__name__)
 logging.config.dictConfig(logconf.log_config)
@@ -45,6 +46,15 @@ SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'docker')
 REPO_DIR = "/opt/antergos-packages"
+
+
+# Initiate communication with docker daemon
+try:
+    doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
+    # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
+except Exception as err:
+    logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+
 
 
 def get_pkgver(package):
@@ -158,9 +168,9 @@ def db_filter_and_add(output=None, this_log=None):
             line = line.replace("can't", "can not")
             bad_date = re.search(r"\d{4}-.+Z(?=\s)", line)
             if bad_date:
-                logger.info('The bad_date is %s' % bad_date)
+                #logger.info('The bad_date is %s' % bad_date)
                 py_date = parser.parse(bad_date.group(0))
-                logger.info('The py_date is %s' % py_date)
+                #logger.info('The py_date is %s' % py_date)
                 good_date = py_date.strftime("%m/%d/%Y %I:%M%p")
                 line = line.replace(bad_date.group(0), good_date)
             if len(line) > 210:
@@ -182,15 +192,30 @@ def db_filter_and_add(output=None, this_log=None):
                                                                    prestyles="background:#272822;color:#fff;"))
     db.set('%s:content' % this_log, pretty)
 
+def publish_build_ouput(container=None):
+    if not container:
+        logging.error('Unable to publish build output. (Container is None)')
+        return
+    proc = subprocess.Popen(['docker', 'logs', '--follow', '-t', container], stdout=subprocess.PIPE)
+    output = iter(proc.stdout.readline, '')
+    nodup = set()
 
+    for line in output:
+        time.sleep(.02)
+        if line not in nodup and line is not 1:
+            nodup.add(line)
+            line = line.replace("can't", "can not")
+            bad_date = re.search(r"\d{4}-.+Z(?=\])", line)
+            if bad_date:
+                # logger.info('The bad_date is %s' % bad_date)
+                py_date = parser.parse(bad_date.group(0))
+                #logger.info('The py_date is %s' % py_date)
+                good_date = py_date.strftime("%m/%d/%Y %I:%M%p")
+                line = line.replace(bad_date.group(0), good_date)
+            db.publish('build-output', line)
 
 def build_pkgs():
-    # Initiate communication with docker daemon
-    try:
-        doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
-        # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
-    except Exception as err:
-        logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+
     # Create our tmp directories
     repo = os.path.join("/tmp", "staging")
     cache = os.path.join("/tmp", "pkg_cache")
@@ -221,7 +246,12 @@ def build_pkgs():
         pkg_deps_str = ' '.join(pkg_deps)
         logger.info('pkg_deps_str is %s' % pkg_deps_str)
         try:
-            container = doc.create_container("antergos/makepkg", command=["/makepkg/build.sh", pkg_deps_str], name=pkg,
+            doc.remove_container(pkg)
+        except Exception:
+            pass
+        try:
+            container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
+                                             name=pkg,
                                              volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg', '/root/.gnupg',
                                                       '/staging'])
         except Exception as err:
@@ -262,12 +292,15 @@ def build_pkgs():
                         'ro': False
                     }
             })
+            cont = db.get('container')
+            stream_process = Process(target=publish_build_ouput, args=(cont,))
+            stream_process.start()
             doc.wait(container)
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
             failed = True
             continue
-
+        db.publish('build-ouput', 'ENDOFLOG')
         stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
         log_stream = stream.split('\n')
         db_filter_and_add(log_stream, this_log)
@@ -292,7 +325,7 @@ def build_pkgs():
 
     logger.info('Moving pkgs into repo and updating repo database')
     try:
-        repo_container = doc.create_container("lots0logs/makepkg", command="/makepkg/repo_expect.sh",
+        repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh",
                                               volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
                                                        '/staging'])
     except Exception as err:
@@ -329,7 +362,7 @@ def build_pkgs():
         doc.wait(repo_container)
     except Exception as err:
         logger.error('Start container failed. Error Msg: %s' % err)
-    doc.remove_container(repo_container)
+    #doc.remove_container(repo_container)
     try:
         shutil.rmtree(repo)
         shutil.rmtree(cache)
