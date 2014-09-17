@@ -7,15 +7,19 @@
     <div class="col-md-10">
     <div id="" class="block">
         <div class="header dark">
+
+            <h3 class="hfloat"><i class="glyphicon glyphicon-list-alt"></i> Live Build Output</h3>
+            {%- if idle != "True" %}
+                <h5 class="hfloat"><strong>Docker Container ID:</strong> {{ container }} <strong>&nbsp;&#124;&nbsp; Build Number:</strong> {{ bnum }}<strong>&nbsp;&#124;&nbsp; Start Time: {{ start }}</strong></h5>
+                {% else %}
+                <h5 class="hfloat">&nbsp;</h5>
+            {% endif -%}
             <div class="actions">
                 <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
                 <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
                 <a class="close-down" href="#"><i class="fa fa-times"></i></a>
             </div>
-            <h3><i class="glyphicon glyphicon-list-alt"></i> Live Build Output</h3>
-            {%- if idle != "True" %}
-                <h5><strong>Docker Container ID:</strong> {{ container }} <strong> Build Number:</strong> {{ bnum }}<strong> Start Time: {{ start }}</strong></h5>
-            {% endif -%}
+        <div class="clearfix"></div>
 
         </div>
         <div class="content no-padding">

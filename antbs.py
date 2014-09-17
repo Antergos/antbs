@@ -301,6 +301,11 @@ def hooked():
 
     payload = json.loads(request.data)
     changes = []
+    full_name = payload['repository']['full_name']
+    if 'lots0logs' in full_name:
+        db.set('pullFrom', 'lots0logs')
+    else:
+        db.set('pullFrom', 'antergos')
     if request.headers.get('X-Phabricator-Sent-This-Message') == "Yes":
         repo = 'antergos-packages'
         subject = request.headers.get('Subject')

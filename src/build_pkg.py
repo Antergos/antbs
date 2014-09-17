@@ -114,6 +114,7 @@ def check_deps(packages):
 def handle_hook():
 
     iso_flag = db.get('isoFlag')
+    pull_from = db.get('pullFrom')
     if iso_flag == 'True':
         archs = ['x86_64', 'i686']
         for arch in archs:
@@ -125,12 +126,18 @@ def handle_hook():
             db.set('pkg:antergos-iso-%s:version' % arch, version)
         build_iso()
     else:
+        gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
-        subprocess.call(['git', 'clone', 'http://github.com/lots0logs/antergos-packages.git'], cwd='/opt')
-        subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
+        subprocess.call(['git', 'clone', gh_repo], cwd='/opt')
+
         # Check database to see if packages exist and add them if necessary.
         packages = db.lrange('queue', 0, -1)
         logger.info('Checking database for packages.')
+        nxsq = 'numix-icon-theme-square'
+        if nxsq in packages:
+            subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq], cwd='/opt/antergos-packages/numix-icon-theme-square')
+        subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
+        subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq], cwd='/opt/antergos-packages/numix-icon-theme-square')
         for package in packages:
             version = get_pkgver(package)
             depends = get_deps(package)
@@ -201,7 +208,7 @@ def publish_build_ouput(container=None):
     nodup = set()
 
     for line in output:
-        time.sleep(.02)
+        time.sleep(.05)
         if line not in nodup and line is not 1:
             nodup.add(line)
             line = line.replace("can't", "can not")
