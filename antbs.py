@@ -412,6 +412,12 @@ def build_info(num):
     return Response(stream_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
                                     bnum=bnum, container=container, log=log))
 
+@app.route('/browse')
+def repo_browser():
+    is_idle = db.get('idle')
+    building = db.get('building')
+    return render_template("repo_browser.html", idle=is_idle, building=building)
+
 
 # Some boilerplate code that just says "if you're running this from the command
 # line, start here." It's not critical to know what this means yet.
