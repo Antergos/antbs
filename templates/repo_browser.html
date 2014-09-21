@@ -11,15 +11,15 @@
                         <h2 style="font-family: Raleway;font-size: 24px;font-weight: 400;">Repository Browser</h2>
                     </div>
                     <ul class="nav nav-list treeview">
-                        <li class="open"><label class="tree-toggler nav-header"><i class="fa fa-folder-open-o"></i> repo</label>
+                        <li class="open"><label id="repo" class="tree-toggler nav-header"><i class="fa fa-folder-open-o"></i> repo</label>
                             <ul class="nav nav-list tree">
-                                <li class="open"><label class="tree-toggler nav-header"><i class="fa fa-folder-open-o"></i>
+                                <li class="open"><label id="antergos" class="tree-toggler nav-header"><i class="fa fa-folder-open-o"></i>
                                     antergos</label>
                                     <ul class="nav nav-list tree">
-                                        <li>
-                                            <a href="#" onclick="goToi686()"><i class="fa fa-folder-o"></i> i686</a>
+                                        <li class="file-li">
+                                            <a id="i686" href="#" onclick="//goToi686()"><i class="fa fa-folder-o"></i> i686</a>
                                         </li>
-                                        <li><a href="#" onclick="goTox86_64()"><i class="fa fa-folder-o"></i> x86_64
+                                        <li class="file-li"><a id="x86_64" href="#" onclick="//goTox86_64()"><i class="fa fa-folder-o"></i> x86_64
                                         </a></li>
                                     </ul>
                                 </li>
@@ -58,15 +58,10 @@
                     //jQuery(".tree .nscroller").nanoScroller({preventPageScrolling: true});
                 });
 
-                if (jQuery(this).text() == 'i686') {
-                    jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/i686');
-                } else if (jQuery(this).text() == 'x86_64') {
-                    jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/x86_64');
-                }
-                else if (jQuery(this).text() == 'antergos') {
+                if (jQuery(this).attr('id') == 'antergos') {
                     jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos');
                 }
-                else if (jQuery(this).text() == 'repo') {
+                else if (jQuery(this).attr('id') == 'repo') {
                     jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos');
                 }
 
@@ -74,6 +69,34 @@
 
 
         });
+        jQuery('.file-li').on('click', function (e) {
+
+            var icon = jQuery(this).find("a .fa");
+            var sibicon = jQuery(this).siblings('li').find("a .fa");
+            if (jQuery(icon).hasClass("fa-folder-o")) {
+                jQuery(icon).removeClass("fa-folder-o").addClass("fa-folder-open-o");
+                jQuery(sibicon).removeClass("fa-folder-open-o").addClass("fa-folder-o");
+            } else {
+                jQuery(icon).removeClass("fa-folder-open-o").addClass("fa-folder-o");
+
+            }
+
+            jQuery(this).toggleClass("open");
+            if (jQuery(this).siblings('.open').length ) {
+                console.log('matched');
+                jQuery(this).siblings('li').toggleClass("open");
+            }
+                //jQuery(".tree .nscroller").nanoScroller({preventPageScrolling: true})
+
+            if (jQuery(this).children('#i686') ) {
+
+                jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/i686');
+            } else if (jQuery(this).children('#x86_64') ) {
+                jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/x86_64');
+            }
+        });
+
+
         function goToi686() {
             jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/i686');
         }
