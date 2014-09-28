@@ -32,7 +32,7 @@
         </div>
 
         <div class="content">
-            <iframe id="filesFrame" style="border:none; background: #F0F0F0;" src="//repo.antergos.info/iso/testing/uefi/antergos/" width="100%" height="100%"
+            <iframe id="filesFrame" style="border:none; background: #F0F0F0;" src="{%  if release %}//repo.antergos.info/iso/release{% elif testing %}//repo.antergos.info/iso/testing{% else %}//repo.antergos.info/iso/testing/uefi/antergos/{% endif %}" width="100%" height="100%"
                     seamless="seamless" sandbox="allow-scripts allow-same-origin"></iframe>
         </div>
     </div>

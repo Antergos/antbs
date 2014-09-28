@@ -131,10 +131,10 @@
                                         <!--<li><a href="#" class="md-trigger" data-modal="md-3dSign"><i class="fa  fa-archive"></i><span>Packages</span></a>-->
 
                                     </li>
-                                    <li><a href="#"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
+                                    <li {% if request.path == "/browse/releases" %}class="active"{% endif %}><a href="/browse/releases"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
                                     </li>
-                                    <li><a href="#"><i
+                                    <li {% if request.path == "/browse/testing" %}class="active"{% endif %}><a href="/browse/testing"><i
                                             class="fa fa-wrench"></i><span>Testing</span></a></li>
 
 

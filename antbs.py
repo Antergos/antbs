@@ -412,11 +412,18 @@ def build_info(num):
     return Response(stream_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
                                     bnum=bnum, container=container, log=log))
 
+@app.route('/browse/<goto>')
 @app.route('/browse')
-def repo_browser():
+def repo_browser(goto=None):
     is_idle = db.get('idle')
     building = db.get('building')
-    return render_template("repo_browser.html", idle=is_idle, building=building)
+    release = False
+    testing = False
+    if goto == 'release':
+        release = True
+    elif goto == 'testing':
+        testing = True
+    return render_template("repo_browser.html", idle=is_idle, building=building, release=release, testing=testing)
 
 
 # Some boilerplate code that just says "if you're running this from the command
