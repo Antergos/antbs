@@ -5,3 +5,4 @@
 build.sh
 repo*.sh
 *pycache
+*expect*.conf
