@@ -46,6 +46,7 @@ import glob
 import re
 import shutil
 from datetime import datetime, timedelta
+import newrelic
 import gevent
 import gevent.monkey
 
@@ -61,6 +62,9 @@ app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
 
+settings = newrelic.agent.global_settings()
+settings.app_name = 'AntBS'
+
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
@@ -72,6 +76,7 @@ logging.config.dictConfig(logconf.log_config)
 def handle_worker_exception(job, *exc_info):
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
     container = db.get('container')
+    doc.kill(container)
     doc.remove_container(container)
     repo = os.path.join("/tmp", "staging")
     cache = os.path.join("/tmp", "pkg_cache")
@@ -86,6 +91,7 @@ def handle_worker_exception(job, *exc_info):
     db.set('container', '')
     db.set('building_num', '')
     db.set('building_start', '')
+    db.ltrim('queue', 0, 0)
 
 
 with Connection(db):
@@ -278,47 +284,56 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
-    # Store the IP address blocks that github uses for hook requests.
-    hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
-
+    is_phab = None
     if request.method == 'GET':
         return ' Nothing to see here, move along ...'
 
     elif request.method == 'POST':
         # Check if the POST request if from github.com
-        if not request.headers.get('X-Phabricator-Sent-This-Message') == "Yes":
+        phab = int(request.args.get('phab', '0'))
+        is_phab = False
+        if phab and phab > 0:
+            is_phab = True
+        else:
+            # Store the IP address blocks that github uses for hook requests.
+            hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
             for block in hook_blocks:
                 ip = ipaddress.ip_address(u'%s' % request.remote_addr)
                 if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
                     break  # the remote_addr is within the network range of github
             else:
                 abort(403)
-
-        if request.headers.get('X-GitHub-Event') == "ping":
-            return json.dumps({'msg': 'Hi!'})
-        if request.headers.get('X-GitHub-Event') != "push":
-            return json.dumps({'msg': "wrong event type"})
-
-    payload = json.loads(request.data)
+            if request.headers.get('X-GitHub-Event') == "ping":
+                return json.dumps({'msg': 'Hi!'})
+            if request.headers.get('X-GitHub-Event') != "push":
+                return json.dumps({'msg': "wrong event type"})
     changes = []
-    full_name = payload['repository']['full_name']
-    if 'lots0logs' in full_name:
-        db.set('pullFrom', 'lots0logs')
-    else:
-        db.set('pullFrom', 'antergos')
-    if request.headers.get('X-Phabricator-Sent-This-Message') == "Yes":
+    if is_phab:
         repo = 'antergos-packages'
-        subject = request.headers.get('Subject')
-        if subject.startswith('[Diffusion] [Commit] rNXSQ'):
-            changes = ['numix-icon-theme-square', 'numix-icon-theme-square-kde']
-        elif subject.startswith('[Diffusion] [Commit] rNX'):
-            changes = ['numix-icon-theme', 'numix-icon-theme-kde']
+        db.set('pullFrom', 'lots0logs')
+        if request.args['repo'] == "NX":
+            last = db.get('pkg:numix-icon-theme:last_commit')
+            if last and (datetime.now() - last) > timedelta(minutes=30):
+                changes.append(['numix-icon-theme'])
+                db.set('pkg:numix-icon-theme:last_commit', datetime.now())
+        elif request.args['repo'] == "NXSQ":
+            last = db.get('pkg:numix-icon-theme-square:last_commit')
+            if last and (datetime.now() - last) > timedelta(minutes=30):
+                changes.append(['numix-icon-theme-square', 'numix-icon-theme-square-kde'])
+                db.set('pkg:numix-icon-theme:last_commit', datetime.now())
     else:
+        payload = json.loads(request.data)
+        full_name = payload['repository']['full_name']
+        if 'lots0logs' in full_name:
+            db.set('pullFrom', 'lots0logs')
+        else:
+            db.set('pullFrom', 'antergos')
         repo = payload['repository']['name']
         commits = payload['commits']
         for commit in commits:
             changes.append(commit['modified'])
             changes.append(commit['added'])
+
     if repo == "antergos-packages":
         db.set('idle', 'False')
         db.set('building', "Initializing...")
@@ -328,21 +343,29 @@ def hooked():
 
         for changed in changes:
             for item in changed:
-                pak = os.path.dirname(item)
-                if pak is not None and pak != '' and pak not in no_dups:
+                if is_phab:
+                    pak = item
+                else:
+                    pak = os.path.dirname(item)
+                if pak is not None and pak != '':
                     logger.info('Adding %s to the build queue' % pak)
                     no_dups.append(pak)
                     has_pkgs = True
-                    db.rpush('queue', pak)
 
         if has_pkgs:
+            the_pkgs = list(set(no_dups))
+            for p in the_pkgs:
+                db.rpush('queue', p)
             queue.enqueue_call(builder.handle_hook, timeout=9600)
 
     elif repo == "antergos-iso":
-        db.set('idle', 'False')
-        db.set('building', "Initializing...")
-        db.set('isoFlag', 'True')
-        queue.enqueue_call(builder.handle_hook, timeout=10000)
+        last = db.get('pkg:antergos-iso:last_commit')
+        if last and (datetime.now() - last) > timedelta(hours=1):
+            db.set('idle', 'False')
+            db.set('building', "Initializing...")
+            db.set('isoFlag', 'True')
+            db.set('pkg:antergos-iso:last_commit', datetime.now())
+            queue.enqueue_call(builder.handle_hook, timeout=10000)
 
     return json.dumps({'msg': 'OK!'})
 

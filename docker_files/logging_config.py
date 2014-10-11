@@ -76,9 +76,9 @@ log_config = {
         },
         'redis': {
             'level': 'INFO',
-            'class': 'src.logging_config.RedisHandler',
+            'class': 'logging_config.RedisHandler',
             'channel': 'log_stream',
-            'conn': 'src.redis_connection.db()',
+            'conn': 'redis_connection.db()',
             'formatter': 'file'
         },
         'email': {

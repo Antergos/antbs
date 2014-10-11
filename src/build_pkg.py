@@ -23,6 +23,9 @@
 """ Build packages when triggered by /hook """
 
 import os
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from src.redis_connection import db
 import docker
 import subprocess
@@ -44,11 +47,11 @@ logger = logging.getLogger(__name__)
 logging.config.dictConfig(logconf.log_config)
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
-DOC_DIR = os.path.join(BASE_DIR, 'docker')
+DOC_DIR = os.path.join(BASE_DIR, 'docker_files')
 REPO_DIR = "/opt/antergos-packages"
 
 
-# Initiate communication with docker daemon
+# Initiate communication with docker_files daemon
 try:
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
     # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
@@ -61,18 +64,42 @@ def get_pkgver(package):
     pkg = package
     pkgver = None
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
+    pkgdir = os.path.join(REPO_DIR, pkg)
+    logger.info('pkgdir is %s' % pkgdir)
+    parse = open(pbfile).read()
+    if 'git+' in parse or 'numix-icon-theme-square' in pkg:
+        epoch = 'epoch=' in parse
+        logger.info('parse is %s' % parse)
+        giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+        if not giturl:
+            giturl = '/var/repo/NXSQ'
+        else:
+            giturl = giturl.group(0)
+        subprocess.check_call(['git', 'clone', giturl, pkg], cwd=pkgdir)
+        rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
+        short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
+        pkgver = '0.r%s.%s' % (rev, short)
+        if pkgver and pkgver != '0.r.':
+            if epoch:
+                epoch = re.search('(?<=epoch\\=)\d{1,2}', parse)
+                pkgver = epoch.group(0) + ':' + pkgver
+            logger.info('pkgver is %s' % pkgver)
+            return pkgver
+    epoch_num = None
     with open(pbfile) as PKGBUILD:
         for line in PKGBUILD:
+            if line.startswith('epoch='):
+                epoch = line.split('=')
+                epoch_num = epoch[1].strip('\n')
+                continue
             if line.startswith("pkgver") and not line.startswith("pkgver()"):
                 l = line.split('=')
                 logging.info('line is %s' % l)
                 pkgver = l[1].strip('\n')
-            elif line.startswith("pkgver()"):
-                proc = subprocess.Popen(['bash', '-c', '. ' + pbfile + '; pkgver'], stdout=subprocess.PIPE)
-                getver = proc.communicate()
-                pkgver = getver[0]
-            else:
-                continue
+                break
+    if epoch_num:
+        pkgver = epoch_num + ':' + pkgver
+
     return pkgver
 
 
@@ -125,22 +152,45 @@ def handle_hook():
                 db.set('pkg:antergos-iso-%s:name' % arch, 'antergos-iso-%s' % arch)
             db.set('pkg:antergos-iso-%s:version' % arch, version)
         build_iso()
+        db.set('isoFlag', 'False')
     else:
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
-        subprocess.call(['git', 'clone', gh_repo], cwd='/opt')
+        if os.path.exists(REPO_DIR):
+            shutil.rmtree(REPO_DIR)
+        try:
+            subprocess.check_call(['git', 'clone', gh_repo], cwd='/opt')
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
 
         # Check database to see if packages exist and add them if necessary.
         packages = db.lrange('queue', 0, -1)
         logger.info('Checking database for packages.')
         nxsq = 'numix-icon-theme-square'
-        if nxsq in packages:
-            subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq], cwd='/opt/antergos-packages/numix-icon-theme-square')
+
         subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
         subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq], cwd='/opt/antergos-packages/numix-icon-theme-square')
         for package in packages:
+            # if 'numix-icon-theme' == package:
+            # logger.info('cloning repo for %s' % package)
+            #     subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
+            #                           cwd='/opt/antergos-packages/numix-icon-theme')
+            #     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
+            #                           cwd='/opt/antergos-packages/numix-icon-theme')
             version = get_pkgver(package)
             depends = get_deps(package)
+            try:
+                if 'numix-icon-theme-square' == package:
+                    logger.info('Creating tar archive for %s' % package)
+                    subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
+                                          cwd='/opt/antergos-packages/numix-icon-theme-square')
+                if 'numix-icon-theme-square-kde' == package:
+                    logger.info('Creating tar archive for %s' % package)
+                    subprocess.check_call(['tar', '-cf', nxsq + '-kde.tar', nxsq + '-kde'],
+                                          cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
+            except subprocess.CalledProcessError as err:
+                logger.error(err.output)
+
             if not db.exists('pkg:%s' % package):
                 logger.info('%s not found in database, adding entry..' % package)
                 db.set('pkg:%s' % package, True)
@@ -159,6 +209,7 @@ def handle_hook():
         logger.info('Check deps complete. Starting build_pkgs')
         build_pkgs()
 
+
 def db_filter_and_add(output=None, this_log=None):
     if output is None or this_log is None:
         return
@@ -172,29 +223,21 @@ def db_filter_and_add(output=None, this_log=None):
         end = line[20:]
         if end not in nodup:
             nodup.add(end)
-            line = line.replace("can't", "can not")
-            bad_date = re.search(r"\d{4}-.+Z(?=\s)", line)
+            line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
+            bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
             if bad_date:
-                #logger.info('The bad_date is %s' % bad_date)
-                py_date = parser.parse(bad_date.group(0))
-                #logger.info('The py_date is %s' % py_date)
-                good_date = py_date.strftime("%m/%d/%Y %I:%M%p")
-                line = line.replace(bad_date.group(0), good_date)
+                line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             if len(line) > 210:
                 part1 = line[:210]
                 part2 = line[211:]
                 filtered.append(part1)
-                #db.rpush('%s:content' % this_log, part1)
-                continue
-            elif part2:
-                #db.rpush('%s:content' % this_log, part2)
-                filtered.append(part2)
-                part2 = None
-                continue
+                filtered.append(datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p") + ' ' + part2)
+                # db.rpush('%s:content' % this_log, part1)
             else:
                 filtered.append(line)
+
     filtered_string = '\n '.join(filtered)
-                #db.rpush('%s:content' % this_log, line)
+    # db.rpush('%s:content' % this_log, line)
     pretty = highlight(filtered_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
                                                                    prestyles="background:#272822;color:#fff;"))
     db.set('%s:content' % this_log, pretty)
@@ -209,17 +252,18 @@ def publish_build_ouput(container=None):
 
     for line in output:
         time.sleep(.05)
-        if line not in nodup and line is not 1:
-            nodup.add(line)
-            line = line.replace("can't", "can not")
-            bad_date = re.search(r"\d{4}-.+Z(?=\])", line)
+        if not line or line == '' or line == '1' or line is 1:
+            continue
+        line = line.rstrip()
+        end = line[20:]
+        if end not in nodup:
+            nodup.add(end)
+            line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
+            bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
             if bad_date:
-                # logger.info('The bad_date is %s' % bad_date)
-                py_date = parser.parse(bad_date.group(0))
-                #logger.info('The py_date is %s' % py_date)
-                good_date = py_date.strftime("%m/%d/%Y %I:%M%p")
-                line = line.replace(bad_date.group(0), good_date)
+                line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             db.publish('build-output', line)
+
 
 def build_pkgs():
 
@@ -298,7 +342,7 @@ def build_pkgs():
                         'bind': '/repo',
                         'ro': False
                     }
-            })
+            }, privileged=True)
             cont = db.get('container')
             stream_process = Process(target=publish_build_ouput, args=(cont,))
             stream_process.start()
@@ -328,11 +372,11 @@ def build_pkgs():
         doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
-        
+
 
     logger.info('Moving pkgs into repo and updating repo database')
     try:
-        repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh",
+        repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
                                               volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
                                                        '/staging'])
     except Exception as err:
@@ -369,7 +413,7 @@ def build_pkgs():
         doc.wait(repo_container)
     except Exception as err:
         logger.error('Start container failed. Error Msg: %s' % err)
-    #doc.remove_container(repo_container)
+    # doc.remove_container(repo_container)
     try:
         shutil.rmtree(repo)
         shutil.rmtree(cache)
@@ -419,6 +463,7 @@ def build_iso():
             db.set('container', iso_container.get('Id'))
         except Exception as err:
             logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+            break
 
         try:
             doc.start(iso_container, privileged=True, binds={
@@ -449,10 +494,16 @@ def build_iso():
                     }
             })
 
+            cont = db.get('container')
+            stream_process = Process(target=publish_build_ouput, args=(cont,))
+            stream_process.start()
+            doc.wait(iso_container)
+
         except Exception as err:
             logger.error("Cant start container. Error msg: %s", err)
+            break
 
-        doc.wait(iso_container)
+        db.publish('build-ouput', 'ENDOFLOG')
 
         stream = doc.logs(iso_container, stdout=True, stderr=True, timestamps=True)
         log_stream = stream.split('\n')
@@ -468,6 +519,9 @@ def build_iso():
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
+
+
+
     try:
         shutil.rmtree('/opt/antergos-packages')
     except Exception:
