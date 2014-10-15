@@ -233,25 +233,37 @@ def homepage():
                 if (datetime.now() - end_fmt) < timedelta(hours=72):
                     within.append(build)
                 stats[stat] = len(within)
-    
-    x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/x86_64/*.*.pkg.tar.xz')
-    i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/i686/*.*.pkg.tar.xz')
-    all_p = x86_64 + i686
-    the_path = '/srv/antergos.info/repo/iso/testing/uefi/antergos/'
-    filtered = []
-    cached = db.exists('repo-count')
-    if cached:
-        stats['repo'] = db.get('repo-count')
-    else:
-        for fp in all_p:
-            new_fp = os.path.basename(fp)
-            new_fp = new_fp.split('.')
-            new_fp = new_fp[0]
-            logger.info('new_fp is %s' % new_fp)
-            filtered.append(new_fp)
-        stats['repo'] = len(set(filtered))
-        db.set('repo-count', stats['repo'])
-        db.expire('repo-count', 86400)
+
+    repos = ['main', 'staging']
+    x86_64 = None
+    i686 = None
+    cached = None
+    for repo in repos:
+        if repo == 'main':
+            x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.*.pkg.tar.xz')
+            i686 = glob.glob('/srv/antergos.info/repo/antergos/i686/*.*.pkg.tar.xz')
+            cached = db.exists('repo-count-main')
+            if cached:
+                stats['repo_main'] = db.get('repo-count-main')
+        elif repo == 'staging':
+            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/x86_64/*.*.pkg.tar.xz')
+            i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/i686/*.*.pkg.tar.xz')
+            cached = db.exists('repo-count-staging')
+            if cached:
+                stats['repo_staging'] = db.get('repo-count-staging')
+
+        all_p = x86_64 + i686
+        filtered = []
+
+        if not cached:
+            for fp in all_p:
+                new_fp = os.path.basename(fp)
+                new_fp = new_fp.split('.')
+                new_fp = new_fp[0]
+                filtered.append(new_fp)
+            stats['repo_' + repo] = len(set(filtered))
+            db.set('repo-count-' + repo, stats['repo'])
+            db.expire('repo-count-' + repo, 21600)
         
     return render_template("overview.html", idle=is_idle, stats=stats)
 
@@ -442,11 +454,17 @@ def repo_browser(goto=None):
     building = db.get('building')
     release = False
     testing = False
+    main = False
+    template = "repo_browser.html"
     if goto == 'release':
         release = True
     elif goto == 'testing':
         testing = True
-    return render_template("repo_browser.html", idle=is_idle, building=building, release=release, testing=testing)
+    elif goto == 'main':
+        main = True
+        template = "repo_browser_main.html"
+
+    return render_template(template, idle=is_idle, building=building, release=release, testing=testing, main=main)
 
 
 # Some boilerplate code that just says "if you're running this from the command

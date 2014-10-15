@@ -2,7 +2,8 @@
 
 {% block pagetitle -%} Overview{%- endblock pagetitle %}
 {% block topcontent %}
-    <div class="col-md-3 col-sm-6">
+    <div class="col-md-1 col-sm-1"></div>
+    <div class="col-md-2 col-sm-2">
         <div class="fd-tile detail clean tile-purple">
             <div class="content"><h1 class="text-left">{{ stats.queue }}</h1>
 
@@ -14,7 +15,7 @@
     </div>
 
 
-    <div class="col-md-3 col-sm-6">
+    <div class="col-md-2 col-sm-2">
         <div class="fd-tile detail clean tile-lemon">
             <div class="content"><h1 class="text-left">{{ stats.completed }}</h1>
 
@@ -26,7 +27,7 @@
     </div>
 
 
-    <div class="col-md-3 col-sm-6">
+    <div class="col-md-2 col-sm-2">
         <div class="fd-tile detail clean tile-red">
             <div class="content"><h1 class="text-left">{{ stats.failed }}</h1>
 
@@ -37,14 +38,27 @@
         </div>
     </div>
 
-    <div class="col-md-3 col-sm-6">
+    <div class="col-md-2 col-sm-2">
         <div class="fd-tile detail clean tile-prusia">
-            <div class="content"><h1 class="text-left">{{ stats.repo }}</h1>
+            <div class="content"><h1 class="text-left">{{ stats.repo_staging }}</h1>
 
-                <p>Total Packages Available</p></div>
+                <p>Packages In Staging Repo</p></div>
             <div class="icon"><i class="fa fa-eye"></i></div>
             <a class="details" href="/browse">Details <span><i
                     class="fa fa-arrow-circle-right pull-right"></i></span></a>
         </div>
     </div>
+
+    <div class="col-md-2 col-sm-2">
+            <div class="fd-tile detail clean tile-orange">
+                <div class="content"><h1 class="text-left">{{ stats.repo_main }}</h1>
+
+                    <p>Packages In Main Repo</p></div>
+                <div class="icon"><i class="fa fa-eye"></i></div>
+                <a class="details" href="/browse">Details <span><i
+                        class="fa fa-arrow-circle-right pull-right"></i></span></a>
+            </div>
+        </div>
+
+    <div class="col-md-1 col-sm-1"></div>
 {% endblock topcontent %}
