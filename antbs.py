@@ -262,7 +262,7 @@ def homepage():
                 new_fp = new_fp[0]
                 filtered.append(new_fp)
             stats['repo_' + repo] = len(set(filtered))
-            db.set('repo-count-' + repo, stats['repo'])
+            db.set('repo-count-' + repo, stats['repo_' + repo])
             db.expire('repo-count-' + repo, 21600)
         
     return render_template("overview.html", idle=is_idle, stats=stats)
@@ -372,7 +372,7 @@ def hooked():
 
     elif repo == "antergos-iso":
         last = db.get('pkg:antergos-iso:last_commit')
-        if last and (datetime.now() - last) > timedelta(hours=1):
+        if (last and (datetime.now() - last) > timedelta(hours=1)) or (last and (last is None or last == '0')):
             db.set('idle', 'False')
             db.set('building', "Initializing...")
             db.set('isoFlag', 'True')
@@ -401,7 +401,7 @@ def scheduled():
     return render_template("scheduled.html", idle=is_idle, building=building, queue=the_queue)
 
 
-#@app.route('/completed/<int:page>')
+@app.route('/completed/<int:page>')
 @app.route('/completed')
 def completed(page=None):
     is_idle = db.get('idle')
@@ -431,7 +431,11 @@ def failed(page=None):
 
 @app.route('/build/<int:num>')
 def build_info(num):
+    if not num:
+        abort(404)
     pkg = db.get('build_log:%s:pkg' % num)
+    if not pkg:
+        abort(404)
     ver = db.get('pkg:%s:version' % pkg)
     res = db.get('build_log:%s:result' % num)
     start = db.get('build_log:%s:start' % num)
@@ -439,13 +443,14 @@ def build_info(num):
     bnum = num
     cont = db.get('container')
     log = db.get('build_log:%s:content' % bnum)
+    log = log.decode("utf8")
     if cont:
         container = cont[:20]
     else:
         container = None
 
-    return Response(stream_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
-                                    bnum=bnum, container=container, log=log))
+    return render_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
+                           bnum=bnum, container=container, log=log)
 
 @app.route('/browse/<goto>')
 @app.route('/browse')

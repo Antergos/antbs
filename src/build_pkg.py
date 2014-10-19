@@ -24,6 +24,7 @@
 
 import os
 import sys
+import __builtin__
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from src.redis_connection import db
@@ -195,8 +196,9 @@ def handle_hook():
                 logger.info('%s not found in database, adding entry..' % package)
                 db.set('pkg:%s' % package, True)
                 db.set('pkg:%s:name' % package, package)
-                for dep in depends:
-                    db.rpush('pkg:%s:deps' % package, dep)
+            db.delete('pkg:%s:deps' % package)
+            for dep in depends:
+                db.rpush('pkg:%s:deps' % package, dep)
             logger.info('Updating pkgver in databse for %s to %s' % (package, version))
             db.set('pkg:%s:version' % package, version)
         logger.info('All queued packages are in the database, checking deps to determine build order.')
@@ -217,7 +219,7 @@ def db_filter_and_add(output=None, this_log=None):
     part2 = None
     filtered = []
     for line in output:
-        if not line or line == '':
+        if not line or line == '' or "Antergos Build Server" in line:
             continue
         line = line.rstrip()
         end = line[20:]
@@ -238,9 +240,11 @@ def db_filter_and_add(output=None, this_log=None):
 
     filtered_string = '\n '.join(filtered)
     # db.rpush('%s:content' % this_log, line)
+    #filtered_string = filtered_string.decode('utf-8')
     pretty = highlight(filtered_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                   prestyles="background:#272822;color:#fff;"))
-    db.set('%s:content' % this_log, pretty)
+                                                                   prestyles="background:#272822;color:#fff;",
+                                                                   encoding='utf-8'))
+    db.set('%s:content' % this_log, pretty.decode('utf-8'))
 
 def publish_build_ouput(container=None):
     if not container:

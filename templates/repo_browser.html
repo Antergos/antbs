@@ -9,6 +9,7 @@
                 <div class="content">
                     <div class="title">
                         <h2 style="font-family: Raleway;font-size: 24px;font-weight: 400;">Repository Browser</h2>
+                        <h3 style="font-family: Raleway;font-size: 18px;font-weight: 400;">Staging</h3>
                     </div>
                     <ul class="nav nav-list treeview">
                         <li class="open"><label id="repo" class="tree-toggler nav-header"><i class="fa fa-folder-open-o"></i> repo</label>
@@ -88,10 +89,10 @@
             }
                 //jQuery(".tree .nscroller").nanoScroller({preventPageScrolling: true})
 
-            if (jQuery(this).children('#i686') ) {
+            if (jQuery(this).children('#i686').length ) {
 
                 jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/i686');
-            } else if (jQuery(this).children('#x86_64') ) {
+            } else if (jQuery(this).children('#x86_64').length ) {
                 jQuery('#filesFrame').attr('src', '//repo.antergos.info/iso/testing/uefi/antergos/x86_64');
             }
         });
