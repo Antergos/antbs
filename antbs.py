@@ -17,7 +17,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
-#  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 #  MA 02110-1301, USA.
 
 """Import the main class from the "Flask" library that we need to create our
@@ -45,6 +45,7 @@ import src.logging_config as logconf
 import glob
 import re
 import shutil
+from flask.ext.stormpath import StormpathManager, groups_required, user
 from datetime import datetime, timedelta
 import newrelic
 import gevent
@@ -58,6 +59,17 @@ SRC_DIR = os.path.dirname(__file__) or '.'
 # Create the variable `app` which is an instance of the Flask class that
 # we just imported.
 app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('STORMPATH_SESSION_KEY')
+app.config['STORMPATH_API_KEY_ID'] = os.environ.get('STORMPATH_API_KEY_ID')
+app.config['STORMPATH_API_KEY_SECRET'] = os.environ.get('STORMPATH_API_KEY_SECRET')
+app.config['STORMPATH_APPLICATION'] = os.environ.get('STORMPATH_APPLICATION')
+app.config['STORMPATH_ENABLE_USERNAME'] = True
+app.config['STORMPATH_REQUIRE_USERNAME'] = True
+app.config['STORMPATH_ENABLE_REGISTRATION'] = False
+app.config['STORMPATH_REDIRECT_URL'] = '/pkg_review'
+app.config['STORMPATH_LOGIN_TEMPLATE'] = 'login.html'
+app.config['STORMPATH_COOKIE_DURATION'] = timedelta(days=14)
+stormpath_manager = StormpathManager(app)
 app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
@@ -168,12 +180,14 @@ def get_log_stream(bnum=None):
                     yield 'data: %s\n\n' % line
             yield 'data: ENDOFLOG\n\n'
 
+
 def get_live_build_ouput():
     pubsub = db.pubsub()
     pubsub.subscribe('build-output')
     for message in pubsub.listen():
         gevent.sleep(.05)
         yield 'data: %s\n\n' % message['data']
+
 
 def get_paginated(pkg_list, per_page, page):
     pkg_list.reverse()
@@ -203,17 +217,37 @@ def get_build_info(page=None, status=None):
             try:
                 pkg = db.get('build_log:%s:pkg' % build)
             except Exception:
-                pass
+                continue
             name = db.get('pkg:%s:name' % pkg)
             bnum = build
             version = db.get('pkg:%s:version' % pkg)
             start = db.get('build_log:%s:start' % bnum)
             end = db.get('build_log:%s:end' % bnum)
-            all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end)
+            review_stat = db.get('build_log:%s:review_stat' % bnum)
+            review_stat = db.get('review_stat:%s:string' % review_stat)
+            review_dev = db.get('build_log:%s:review_dev' % bnum)
+            review_date = db.get('build_log:%s:review_date' % bnum)
+            all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end, review_stat=review_stat,
+                            review_dev=review_dev, review_date=review_date)
             pkg_info = {bnum: all_info}
             pkg_list.append(pkg_info)
     logger.info(pkg_list)
     return pkg_list, all_pages
+
+
+def set_pkg_review_result(bnum=None, dev=None, result=None):
+    if not all(i is not None for i in (bnum, dev, result)):
+        abort(500)
+    errmsg = dict(error=False, msg=None)
+    dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
+    try:
+        db.set('build_log:%s:review_stat' % bnum, result)
+        db.set('build_log:%s:review_dev' % bnum, dev)
+        db.set('build_log:%s:review_date' % bnum, dt)
+    except Exception as err:
+        errmsg = dict(error=True, msg=err)
+
+    return errmsg
 
 
 @app.route("/")
@@ -264,7 +298,7 @@ def homepage():
             stats['repo_' + repo] = len(set(filtered))
             db.set('repo-count-' + repo, stats['repo_' + repo])
             db.expire('repo-count-' + repo, 21600)
-        
+
     return render_template("overview.html", idle=is_idle, stats=stats)
 
 
@@ -452,6 +486,7 @@ def build_info(num):
     return render_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
                            bnum=bnum, container=container, log=log)
 
+
 @app.route('/browse/<goto>')
 @app.route('/browse')
 def repo_browser(goto=None):
@@ -470,6 +505,29 @@ def repo_browser(goto=None):
         template = "repo_browser_main.html"
 
     return render_template(template, idle=is_idle, building=building, release=release, testing=testing, main=main)
+
+
+@app.route('/pkg_review')
+@app.route('/pkg_review/<bnum>/<dev>/<result>')
+@groups_required(['admin'])
+def dev_pkg_check(page=None, bnum=None, dev=None, result=None):
+    is_idle = db.get('idle')
+    status = 'completed'
+    set_rev_error = False
+    set_rev_error_msg = None
+    uname = user.username
+    if page is None:
+        page = 1
+    if all(i is not None for i in (bnum, dev, result)):
+        set_review = set_pkg_review_result(bnum, dev, result)
+        if set_review.get('error'):
+            set_rev_error = True
+            set_rev_error_msg = set_review.get('msg')
+
+    completed, all_pages = get_build_info(page, status)
+
+    return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages, page=page,
+                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, user=uname)
 
 
 # Some boilerplate code that just says "if you're running this from the command

@@ -1,14 +1,24 @@
 {% extends "base.html" %}
 
-{% block pagetitle -%}Completed{%- endblock pagetitle %}
+{% block pagetitle -%}Package Review{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
+{% block login %}
+    <li class="dropdown">
+        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><i class="fa fa-user"></i> {{ user }}
+            <b class="caret"></b></a>
 
+        <ul class="dropdown-menu">
+            <li><a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a></li>
+        </ul>
+
+    </li>
+{% endblock login %}
 {% block bottomcontent -%}
     <div class="row">
         <div class="col-md-10">
             <div id="bottom-wrap" class="block-flat">
                 <div class="header">
-                    <h3>Completed Builds</h3>
+                    <h3>Package Review</h3>
                 </div>
                 <div class="content">
                     {% if not completed or completed == "0" %}

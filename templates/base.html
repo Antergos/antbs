@@ -170,16 +170,19 @@
                     <div class="container-fluid">
                         <div class="navbar-collapse">
                             <ul class="nav navbar-nav navbar-right user-nav">
+                                {% block login %}
                                 <li class="dropdown">
-                                    <a href="#" class="dropdown-toggle" data-toggle="dropdown"> Login
-                                        <b class="caret"></b></a>
+                                    <a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
+                                        {#<b class="caret"></b></a>
 
                                     <ul class="dropdown-menu">
                                         <li class="disabled"><a href="#">Not Implemented</a></li>
-                                    </ul>
+                                    </ul>#}
 
                                 </li>
+                                {% endblock login %}
                             </ul>
+
                             <ul class="nav navbar-nav not-nav">
                                 <!-- Menu Notification Items -->
                             </ul>
