@@ -59,8 +59,8 @@
                         if (message.data.indexOf('ENDOFLOG') >= 0) {
                             sse.close();
                             editor.setReadOnly(true);
-                            $('#header_dark i').removeClass('fa-spin');
-                            $('#header_dark h5').css('color', 'transparent');
+                            $('.header_dark h3 i').removeClass('fa-spin');
+                            $('.header_dark h5').css('color', 'transparent');
                             return;
                         }
                         if (message.data.indexOf("There are no active builds") >= 0) {

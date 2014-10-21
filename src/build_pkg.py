@@ -87,17 +87,36 @@ def get_pkgver(package):
             logger.info('pkgver is %s' % pkgver)
             return pkgver
     epoch_num = None
+    epoch_done = None
+    arch_done = None
+    pkgver_done = None
     with open(pbfile) as PKGBUILD:
         for line in PKGBUILD:
+            if line.startswith('arch='):
+                if 'i686' in line:
+                    shutil.copyfile(pbfile, os.path.join(pkgdir, 'PKGBUILD32'))
+                arch_done = True
+                if epoch_done and pkgver_done:
+                    break
+                else:
+                    continue
             if line.startswith('epoch='):
                 epoch = line.split('=')
                 epoch_num = epoch[1].strip('\n')
-                continue
+                epoch_done = True
+                if arch_done and pkgver_done:
+                    break
+                else:
+                    continue
             if line.startswith("pkgver") and not line.startswith("pkgver()"):
                 l = line.split('=')
-                logging.info('line is %s' % l)
+                logger.info('line is %s' % l)
                 pkgver = l[1].strip('\n')
-                break
+                pkgver_done = True
+                if epoch_done and arch_done:
+                    break
+                else:
+                    continue
     if epoch_num:
         pkgver = epoch_num + ':' + pkgver
 
