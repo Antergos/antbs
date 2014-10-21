@@ -186,6 +186,8 @@ def get_live_build_ouput():
     pubsub.subscribe('build-output')
     for message in pubsub.listen():
         gevent.sleep(.05)
+        if message['data'] == '1' or message['data'] == 1:
+            message['data'] = '...'
         yield 'data: %s\n\n' % message['data']
 
 
@@ -314,9 +316,9 @@ def build():
     bnum = db.get('building_num')
     start = db.get('building_start')
 
-    #return render_template("building.html", idle=is_idle, building=now_building, container=container)
-    return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
-                                    container=container))
+    return render_template("building.html", idle=is_idle, building=now_building, container=container, bnum=bnum, start=start)
+    #return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
+    #                                container=container))
 
 
 @app.route('/get_log')

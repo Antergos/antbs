@@ -140,7 +140,7 @@ def check_deps(packages):
 
 
 def handle_hook():
-
+    db.set('idle', 'False')
     iso_flag = db.get('isoFlag')
     pull_from = db.get('pullFrom')
     if iso_flag == 'True':
@@ -185,10 +185,14 @@ def handle_hook():
                     logger.info('Creating tar archive for %s' % package)
                     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square')
-                if 'numix-icon-theme-square-kde' == package:
+                elif 'numix-icon-theme-square-kde' == package:
                     logger.info('Creating tar archive for %s' % package)
                     subprocess.check_call(['tar', '-cf', nxsq + '-kde.tar', nxsq + '-kde'],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
+                elif 'numix-frost-themes' == package:
+                    logger.info('Copying numix-frost source file into build directory.')
+                    subprocess.check_call(['cp', '/opt/numix/numix-frost.zip', os.path.join(REPO_DIR, 'numix-frost-themes')],
+                                          cwd='/opt/numix')
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
@@ -219,7 +223,9 @@ def db_filter_and_add(output=None, this_log=None):
     part2 = None
     filtered = []
     for line in output:
-        if not line or line == '' or "Antergos Build Server" in line:
+        if "Antergos Automated Build Server" in line:
+            line = None
+        if not line or line == '':
             continue
         line = line.rstrip()
         end = line[20:]
@@ -256,7 +262,7 @@ def publish_build_ouput(container=None):
 
     for line in output:
         time.sleep(.05)
-        if not line or line == '' or line == '1' or line is 1:
+        if not line or line == '' or "Antergos Automated Build Server" in line:
             continue
         line = line.rstrip()
         end = line[20:]
@@ -267,6 +273,7 @@ def publish_build_ouput(container=None):
             if bad_date:
                 line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             db.publish('build-output', line)
+    db.publish('build-putput', 'ENDOFLOG')
 
 
 def build_pkgs():
@@ -341,7 +348,7 @@ def build_pkgs():
                         'bind': '/root/.gnupg',
                         'ro': False
                     },
-                '/srv/antergos.info/repo/iso/testing/uefi/antergos/':
+                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
                     {
                         'bind': '/repo',
                         'ro': False
@@ -377,7 +384,11 @@ def build_pkgs():
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
 
-
+    db.set('idle', "True")
+    db.set('building', 'Idle')
+    db.set('container', '')
+    db.set('building_num', '')
+    db.set('building_start', '')
     logger.info('Moving pkgs into repo and updating repo database')
     try:
         repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
@@ -408,7 +419,7 @@ def build_pkgs():
                     'bind': '/root/.gnupg',
                     'ro': False
                 },
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos/':
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
                 {
                     'bind': '/repo',
                     'ro': False
@@ -424,11 +435,7 @@ def build_pkgs():
         shutil.rmtree('/opt/antergos-packages')
     except Exception:
         pass
-    db.set('idle', "True")
-    db.set('building', 'Idle')
-    db.set('container', '')
-    db.set('building_num', '')
-    db.set('building_start', '')
+
     logger.info('All builds completed. Repo has been updated.')
 
 

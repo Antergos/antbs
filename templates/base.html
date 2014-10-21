@@ -37,12 +37,12 @@
                     <link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
                     <style type="text/css">
                         .sidebar-logo {
-                            background: #4aa3df url(/static/images/logo.png) no-repeat -5px 12px;
+                            background: #4aa3df;
                         }
 
                         .sb-collapsed .sidebar-logo {
 
-                            background: url("/static/images/logo.png") no-repeat scroll 15px -39px #4aa3df;
+                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #4aa3df;
                         }
 
                         .pre-scrollable {
@@ -69,6 +69,44 @@
                         .hclear {
                             clear: right;
                         }
+                        .sidebar-logo {
+                            padding: 8px 20px;
+                        }
+                        .sidebar-logo .logo {
+                            display: block;
+                            margin: 0 auto;
+                        }
+                        .sb-collapsed .sidebar-logo .logo {
+                            display: initial;
+                            margin: initial;
+                        }
+                        .sb-collapsed .sidebar-logo {
+                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 12px 5px #4aa3df;
+                            background-size: 300%;
+                            }
+
+                        .sidebar-logo .logo a img {
+                            max-width:65%;
+                            height: auto;
+                            display: block;
+                            margin: 0 auto;
+                            position: relative;
+                            right: 8px;
+                        }
+                        .sb-collapsed .sidebar-logo .logo a img {
+                            display: none;
+                        }
+                        .sb-collapsed .logo:after {
+                        content: "";
+                        display: block;
+                        position: absolute;
+                        right: 0;
+                        height: 35px;
+                        width: 10px;
+                        background: #4aa3df;
+                        z-index: 99999;
+                        top: 8px;
+                        }
 
                     </style>
                 {%- endblock styles %}
@@ -87,7 +125,7 @@
                             <div class="content">
                                 <div class="sidebar-logo">
                                     <div class="logo">
-                                        <a href="/"></a>
+                                        <a href="/"><img src="/static/images/antergos-everyone.png" /></a>
                                     </div>
                                 </div>
                                 <div class="side-user">
@@ -279,7 +317,10 @@
                                     null,
                                     null,
                                     null,
-                                    null
+                                    null{% if request.path == '/completed' or request.path == '/pkg_review' %},
+                                    null,
+                                    null,
+                                    null{% endif %}
                                 ],
                                 "aaSorting": [
                                     [0, "desc"]

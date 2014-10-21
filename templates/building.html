@@ -8,7 +8,7 @@
     <div id="" class="block">
         <div class="header dark">
 
-            <h3 class="hfloat"><i class="glyphicon glyphicon-list-alt"></i> Live Build Output</h3>
+            <h3 class="hfloat">{% if idle != "True" %}<i class="fa fa-cog fa-spin" style="font-size:26px;"></i>{% else %}<i class="fa fa-cog"></i>{% endif %} Live Build Output</h3>
             {%- if idle != "True" %}
                 <h5 class="hfloat"><strong>Docker Container ID:</strong> {{ container }} <strong>&nbsp;&#124;&nbsp; Build Number:</strong> {{ bnum }}<strong>&nbsp;&#124;&nbsp; Start Time: {{ start }}</strong></h5>
                 {% else %}
@@ -50,6 +50,7 @@
                     editor.setValue("{% if idle == "True" %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
                     editor.setTheme("ace/theme/monokai");
                     editor.setShowPrintMargin(false);
+                    editor.getSession().setUseWrapMode(true);
                     sse = new EventSource('/get_log');
                     var noBuilds = false;
                     {% if idle == "True" %}editor.setReadOnly(true);{% endif %}
@@ -58,6 +59,8 @@
                         if (message.data.indexOf('ENDOFLOG') >= 0) {
                             sse.close();
                             editor.setReadOnly(true);
+                            $('#header_dark i').removeClass('fa-spin');
+                            $('#header_dark h5').css('color', 'transparent');
                             return;
                         }
                         if (message.data.indexOf("There are no active builds") >= 0) {
