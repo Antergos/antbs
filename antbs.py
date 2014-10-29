@@ -279,27 +279,26 @@ def homepage():
             x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.*.pkg.tar.xz')
             i686 = glob.glob('/srv/antergos.info/repo/antergos/i686/*.*.pkg.tar.xz')
             cached = db.exists('repo-count-main')
-            if cached:
+            if cached and cached is not None:
                 stats['repo_main'] = db.get('repo-count-main')
         elif repo == 'staging':
-            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/x86_64/*.*.pkg.tar.xz')
-            i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos/i686/*.*.pkg.tar.xz')
+            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.*.pkg.tar.xz')
+            i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/*.*.pkg.tar.xz')
             cached = db.exists('repo-count-staging')
-            if cached:
+            if cached and cached is not None:
                 stats['repo_staging'] = db.get('repo-count-staging')
 
         all_p = x86_64 + i686
         filtered = []
 
-        if not cached:
+        if not cached or cached is None:
             for fp in all_p:
                 new_fp = os.path.basename(fp)
                 new_fp = new_fp.split('.')
                 new_fp = new_fp[0]
                 filtered.append(new_fp)
             stats['repo_' + repo] = len(set(filtered))
-            db.set('repo-count-' + repo, stats['repo_' + repo])
-            db.expire('repo-count-' + repo, 21600)
+            db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
 
     return render_template("overview.html", idle=is_idle, stats=stats)
 
@@ -359,16 +358,25 @@ def hooked():
     if is_phab:
         repo = 'antergos-packages'
         db.set('pullFrom', 'lots0logs')
+        the_queue = list(db.lrange('queue', 0, -1))
+        building = db.get('building')
+        match = None
+        nx_pkg = None
         if request.args['repo'] == "NX":
-            last = db.get('pkg:numix-icon-theme:last_commit')
-            if last and (datetime.now() - last) > timedelta(minutes=30):
-                changes.append(['numix-icon-theme'])
-                db.set('pkg:numix-icon-theme:last_commit', datetime.now())
+            nx_pkg = 'numix-icon-theme'
         elif request.args['repo'] == "NXSQ":
-            last = db.get('pkg:numix-icon-theme-square:last_commit')
-            if last and (datetime.now() - last) > timedelta(minutes=30):
-                changes.append(['numix-icon-theme-square', 'numix-icon-theme-square-kde'])
-                db.set('pkg:numix-icon-theme:last_commit', datetime.now())
+            nx_pkg = 'numix-icon-theme-square'
+        if the_queue and nx_pkg:
+            for p in the_queue:
+                if p == nx_pkg or p == building:
+                    match = True
+                    break
+                else:
+                    continue
+            if match is None:
+                changes.append(list(nx_pkg))
+            else:
+                return json.dumps({'msg': 'OK!'})
     else:
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']

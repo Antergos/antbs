@@ -394,6 +394,7 @@ def build_pkgs():
             db.incr('pkg_count', (in_dir - last_count))
             db.rpush('completed', build_id)
             db.set('%s:result' % this_log, 'completed')
+            db.set('%s:review_stat' % this_log, '1')
         else:
             logger.error('No package found after container exit.')
             failed = True
@@ -456,6 +457,7 @@ def build_pkgs():
         pass
 
     logger.info('All builds completed. Repo has been updated.')
+    db.delete('repo-count-staging')
 
 
 def build_iso():
