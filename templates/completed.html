@@ -4,67 +4,75 @@
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
-    <div class="row">
-        <div class="col-md-10">
-            <div id="bottom-wrap" class="block-flat">
-                <div class="header">
-                    <h3>Completed Builds</h3>
-                </div>
-                <div class="content">
-                    {% if not completed or completed == "0" %}
-                        None
-                    {% else %}
-                        <table class="table no-border hover">
-                            <thead class="no-border">
-                            <tr>
-                                <th>Build</th>
-                                <th>Name</th>
-                                <th>Version</th>
-                                <th>Start</th>
-                                <th>End</th>
-                                <th>Review Status</th>
-                                <th>Reviewed By</th>
-                                <th>Review Date</th>
-                            </tr>
-                            </thead>
-                            <tbody class="no-border-y">
 
-                            {% for item in completed %}
-                                {% for pkg, info in item.items() %}
-                                    <tr>
-                                        <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                                        <td>{{ info['name'] }}</td>
-                                        <td>{{ info['version'] }}</td>
-                                        <td>{{ info['start'] }}</td>
-                                        <td>{{ info['end'] }}</td>
-                                        <td>{{ info['review_stat'] }}</td>
-                                        <td>{{ info['review_dev'] }}</td>
-                                        <td>{{ info['review_date'] }}</td>
-                                    </tr>
-                                {% endfor %}
+    <div class="col-md-10">
+        <div id="bottom-wrap" class="block-flat">
+            <div class="header">
+                <h3>Completed Builds</h3>
+            </div>
+            <div class="content">
+                {% if not completed or completed == "0" %}
+                    None
+                {% else %}
+                    <table class="table no-border hover">
+                        <thead class="no-border">
+                        <tr>
+                            <th>Build</th>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Start</th>
+                            <th>End</th>
+                            <th>Review Status</th>
+                            <th>Reviewed By</th>
+                            <th>Review Date</th>
+                        </tr>
+                        </thead>
+                        <tbody class="no-border-y">
+
+                        {% for item in completed %}
+                            {% for pkg, info in item.items() %}
+                                <tr>
+                                    <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
+                                    <td>{{ info['name'] }}</td>
+                                    <td>{{ info['version'] }}</td>
+                                    <td>{{ info['start'] }}</td>
+                                    <td>{{ info['end'] }}</td>
+                                    <td>{% if info['review_stat'] == 'pending' %}
+                                        <i class="fafa-clock-o" style="color:yellow;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
+                                        <i class="fa fa-check" style="color:green;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                        {{ info['review_stat'] }}{% endif %}</td>
+                                    <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+
+
+                        </tbody>
+                    </table>
+                    {% if all_pages > 1 %}
+                        <div class="btn-group">
+                            {% if page >= 2 %}
+                                <a href="/completed/{{ page - 1 }}" class="btn btn-primary">&laquo;</a>
+                            {% else %}
+                                <a href="#" class="btn btn-primary">&laquo;</a>
+                            {% endif %}
+                            {% for i in range(0, all_pages) %}
+                                <a href="/completed/{{ loop.index0 + 1 }}"
+                                   class="btn btn-primary">{{ loop.index0 + 1 }}</a>
                             {% endfor %}
 
-
-                            </tbody>
-                        </table>
-                        {% if all_pages > 1 %}
-                            <div class="btn-group">
-                                {% if page >= 2 %}
-                                    <a href="/completed/{{ page - 1 }}" class="btn btn-primary">&laquo;</a>
-                                {% else %}
-                                    <a href="#" class="btn btn-primary">&laquo;</a>
-                                {% endif %}
-                                {% for i in range(0, all_pages) %}
-                                    <a href="/completed/{{ loop.index0 + 1 }}"
-                                       class="btn btn-primary">{{ loop.index0 + 1 }}</a>
-                                {% endfor %}
-
-                                <a href="/completed/{{ page + 1 }}" class="btn btn-primary">&raquo;</a>
-                            </div>
-                        {% endif %}
+                            <a href="/completed/{{ page + 1 }}" class="btn btn-primary">&raquo;</a>
+                        </div>
                     {% endif %}
-                </div>
+                {% endif %}
             </div>
         </div>
+    </div>
 
 {%- endblock bottomcontent %}

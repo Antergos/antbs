@@ -290,11 +290,11 @@
                         src="//cdn.datatables.net/plug-ins/725b2a2115b/type-detection/num-html.js"></script>
                 <script type="text/javascript">
                     //sets up numeric sorting of links
-                    $(document).ready(function () {
-                        $('pre').addClass('pre-scrollable');
+                    jQuery(document).ready(function () {
+                        jQuery('pre').addClass('pre-scrollable');
                     });
-                    $(window).load(function () {
-                        if ($('table').length && !$('#noDt').length) {
+                    jQuery(window).load(function () {
+                        if (jQuery('table').length && !jQuery('#noDt').length) {
 
                             jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
                                 var x = a.replace(/<.*?>/g, "");
@@ -311,7 +311,7 @@
                                 y = parseFloat(y);
                                 return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
                             };
-                            $('table').dataTable({
+                            jQuery('table').dataTable({
                                 "aoColumns": [
                                     {"sType": "num-html"},
                                     null,

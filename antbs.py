@@ -517,22 +517,30 @@ def repo_browser(goto=None):
     return render_template(template, idle=is_idle, building=building, release=release, testing=testing, main=main)
 
 
-@app.route('/pkg_review')
-@app.route('/pkg_review/<bnum>/<dev>/<result>')
+@app.route('/pkg_review', methods=['POST', 'GET'])
 @groups_required(['admin'])
-def dev_pkg_check(page=None, bnum=None, dev=None, result=None):
+def dev_pkg_check():
     is_idle = db.get('idle')
     status = 'completed'
     set_rev_error = False
     set_rev_error_msg = None
     uname = user.username
-    if page is None:
-        page = 1
-    if all(i is not None for i in (bnum, dev, result)):
-        set_review = set_pkg_review_result(bnum, dev, result)
-        if set_review.get('error'):
-            set_rev_error = True
-            set_rev_error_msg = set_review.get('msg')
+    #if page is None:
+    page = 1
+    if request.method == 'POST':
+        payload = json.loads(request.data)
+        bnum = payload['bnum']
+        dev = payload['dev']
+        result = payload['result']
+        if all(i is not None for i in (bnum, dev, result)):
+            set_review = set_pkg_review_result(bnum, dev, result)
+            if set_review.get('error'):
+                set_rev_error = set_review.get('msg')
+                message = dict(error=set_rev_error)
+                return json.dumps(message)
+            else:
+                message = dict(msg='ok')
+                return json.dumps(message)
 
     completed, all_pages = get_build_info(page, status)
 
