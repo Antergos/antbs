@@ -202,39 +202,65 @@ def get_paginated(pkg_list, per_page, page):
     return this_page, all_pages
 
 
-def get_build_info(page=None, status=None):
+def get_build_info(page=None, status=None, logged_in=False, review=False):
     if page is None or status is None:
         abort(500)
-    try:
-        all_builds = db.lrange(status, 0, -1)
-    except Exception:
-        all_builds = None
-
-    pkg_list = []
+    pkg_info_cache = db.exists('pkg_info_cache:%s' % status)
+    rev_info_cache = not db.exists('rev_info_cache') and review and logged_in
+    pending_rev_cache = not db.exists('pending_rev_cache') and logged_in
+    logger.info('[GET_BUILD_INFO] - CALLED')
     all_pages = 1
+    if any(not i for i in(pkg_info_cache, rev_info_cache, pending_rev_cache)):
+        logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION SATISFIED')
+        try:
+            all_builds = db.lrange(status, 0, -1)
+        except Exception:
+            all_builds = None
 
-    if all_builds is not None:
-        #builds, all_pages = get_paginated(all_builds, 10, page)
-        for build in all_builds:
-            try:
-                pkg = db.get('build_log:%s:pkg' % build)
-            except Exception:
-                continue
-            name = db.get('pkg:%s:name' % pkg)
-            bnum = build
-            version = db.get('pkg:%s:version' % pkg)
-            start = db.get('build_log:%s:start' % bnum)
-            end = db.get('build_log:%s:end' % bnum)
-            review_stat = db.get('build_log:%s:review_stat' % bnum)
-            review_stat = db.get('review_stat:%s:string' % review_stat)
-            review_dev = db.get('build_log:%s:review_dev' % bnum)
-            review_date = db.get('build_log:%s:review_date' % bnum)
-            all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end, review_stat=review_stat,
-                            review_dev=review_dev, review_date=review_date)
-            pkg_info = {bnum: all_info}
-            pkg_list.append(pkg_info)
-    logger.info(pkg_list)
-    return pkg_list, all_pages
+        pkg_list = []
+        rev_pending = []
+
+        if all_builds is not None:
+            #builds, all_pages = get_paginated(all_builds, 10, page)
+            for build in all_builds:
+                try:
+                    pkg = db.get('build_log:%s:pkg' % build)
+                except Exception:
+                    continue
+                name = db.get('pkg:%s:name' % pkg)
+                bnum = build
+                version = db.get('pkg:%s:version' % pkg)
+                start = db.get('build_log:%s:start' % bnum)
+                end = db.get('build_log:%s:end' % bnum)
+                review_stat = db.get('build_log:%s:review_stat' % bnum)
+                review_stat = db.get('review_stat:%s:string' % review_stat)
+                review_dev = db.get('build_log:%s:review_dev' % bnum)
+                review_date = db.get('build_log:%s:review_date' % bnum)
+                if logged_in and review and review_stat != "pending":
+                    continue
+                all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end, review_stat=review_stat,
+                                review_dev=review_dev, review_date=review_date)
+                pkg_info = {bnum: all_info}
+                pkg_list.append(pkg_info)
+                if logged_in and review_stat == "pending" and len(rev_pending) < 5:
+                    rev_pending.append(pkg_info)
+                else:
+                    continue
+
+            if review:
+                db.setex('rev_info_cache', 10800, pkg_list)
+            else:
+                db.setex('pkg_info_cache:%s' % status,  10800, pkg_list)
+            db.setex('pending_rev_cache', 10800, rev_pending)
+    else:
+        logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION NOT SATISFIED')
+        if review:
+            pkg_list = list(db.get('rev_info_cache'))
+        else:
+            pkg_list = list(db.get('pkg_info_cache:%s' % status))
+        rev_pending = list(db.get('pending_rev_cache'))
+
+    return pkg_list, all_pages, rev_pending
 
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
@@ -442,7 +468,7 @@ def scheduled():
             all_info = dict(name=name, version=version)
             the_queue[pak] = all_info
 
-    return render_template("scheduled.html", idle=is_idle, building=building, queue=the_queue)
+    return render_template("scheduled.html", idle=is_idle, building=building, queue=the_queue, user=user)
 
 
 @app.route('/completed/<int:page>')
@@ -450,13 +476,14 @@ def scheduled():
 def completed(page=None):
     is_idle = db.get('idle')
     status = 'completed'
+    is_logged_in = user.is_authenticated()
     if page is None:
         page = 1
     building = db.get('building')
-    completed, all_pages = get_build_info(page, status)
+    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
 
     return render_template("completed.html", idle=is_idle, building=building, completed=completed, all_pages=all_pages,
-                           page=page)
+                           page=page, rev_pending=rev_pending, user=user)
 
 
 @app.route('/failed/<int:page>')
@@ -467,10 +494,12 @@ def failed(page=None):
     if page is None:
         page = 1
     building = db.get('building')
-    failed, all_pages = get_build_info(page, status)
+    is_logged_in = user.is_authenticated()
+
+    failed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
 
     return render_template("failed.html", idle=is_idle, building=building, failed=failed, all_pages=all_pages,
-                           page=page)
+                           page=page, rev_pending=rev_pending, user=user)
 
 
 @app.route('/build/<int:num>')
@@ -524,6 +553,7 @@ def dev_pkg_check():
     status = 'completed'
     set_rev_error = False
     set_rev_error_msg = None
+    review = True
     uname = user.username
     #if page is None:
     page = 1
@@ -540,12 +570,15 @@ def dev_pkg_check():
                 return json.dumps(message)
             else:
                 message = dict(msg='ok')
+                db.delete('rev_info_cache')
+                db.delete('pkg_info_cache:completed')
+                db.delete('pending_rev_cache')
                 return json.dumps(message)
 
-    completed, all_pages = get_build_info(page, status)
+    completed, all_pages, rev_pending = get_build_info(page, status, True, True)
 
     return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages, page=page,
-                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, user=uname)
+                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, uname=uname, rev_pending=rev_pending, user=user)
 
 
 # Some boilerplate code that just says "if you're running this from the command
