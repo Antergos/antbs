@@ -229,7 +229,9 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
                     continue
                 name = db.get('pkg:%s:name' % pkg)
                 bnum = build
-                version = db.get('pkg:%s:version' % pkg)
+                version = db.get('build_log:%s:version' % bnum)
+                if not version or version is None:
+                    version = db.get('pkg:%s:version' % pkg)
                 start = db.get('build_log:%s:start' % bnum)
                 end = db.get('build_log:%s:end' % bnum)
                 review_stat = db.get('build_log:%s:review_stat' % bnum)
@@ -277,6 +279,15 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
 
     return errmsg
 
+
+@app.errorhandler(404)
+def page_not_found():
+    return render_template('404.html'), 404
+
+
+@app.errorhandler(500)
+def internal_error():
+    return render_template('500.html'), 500
 
 @app.route("/")
 def homepage():

@@ -311,6 +311,7 @@ def build_pkgs():
         if pkg is None or pkg == '':
             continue
         logger.info('Building %s' % pkg)
+        version = db.get('pkg:%s:version' % pkg)
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
@@ -322,6 +323,7 @@ def build_pkgs():
         db.set('building_start', dt)
         db.set('%s:pkg' % this_log, pkg)
         db.set('building', pkg)
+        db.set('%s:version' % this_log, version)
         pkgdir = os.path.join(REPO_DIR, pkg)
         pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
         pkg_deps_str = ' '.join(pkg_deps)
