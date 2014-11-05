@@ -471,7 +471,7 @@ jQuery.extend({
 		}
 	},
 
-	// See test/unit/core.js for details concerning isFunction.
+	// See test.py/unit/core.js for details concerning isFunction.
 	// Since version 1.3, DOM methods and functions like alert
 	// aren't supported. They return false on IE (#2968).
 	isFunction: function( obj ) {
@@ -1105,7 +1105,7 @@ return jQuery;
 		opt = select.appendChild( document.createElement("option") ),
 		input = div.getElementsByTagName("input")[0];
 
-	// Can't get basic test support
+	// Can't get basic test.py support
 	if ( !all || !all.length || !a ) {
 		return;
 	}
@@ -1267,14 +1267,14 @@ return jQuery;
 		// determining if an element has been hidden directly using
 		// display:none (it is still safe to use offsets if a parent element is
 		// hidden; don safety goggles and see bug #4512 for more information).
-		// (only IE 8 fails this test)
+		// (only IE 8 fails this test.py)
 		jQuery.support.reliableHiddenOffsets = tds[0].offsetHeight === 0;
 
 		tds[0].style.display = "";
 		tds[1].style.display = "none";
 
 		// Check if empty table cells still have offsetWidth/Height
-		// (IE < 8 fail this test)
+		// (IE < 8 fail this test.py)
 		jQuery.support.reliableHiddenOffsets = jQuery.support.reliableHiddenOffsets && tds[0].offsetHeight === 0;
 		div.innerHTML = "";
 
@@ -3919,7 +3919,7 @@ var Expr = Sizzle.selectors = {
 
 		text: function( elem ) {
 			// IE6 and 7 will map elem.type to 'text' for new HTML5 types (search, etc) 
-			// use getAttribute instead to test this case
+			// use getAttribute instead to test.py this case
 			return "text" === elem.getAttribute( 'type' );
 		},
 		radio: function( elem ) {
@@ -7527,7 +7527,7 @@ jQuery.fn.extend({
 
 		return this[ optall.queue === false ? "each" : "queue" ](function() {
 			// XXX 'this' does not always have a nodeName when running the
-			// test suite
+			// test.py suite
 
 			var opt = jQuery.extend({}, optall), p,
 				isElement = this.nodeType === 1,

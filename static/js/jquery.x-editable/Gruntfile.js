@@ -148,7 +148,7 @@ module.exports = function(grunt) {
 //module = '&module=select';
 //module = '&module=text';
 
-//test on several jquery versions
+//test.py on several jquery versions
  var qunit_testover = [];
  ['bs3', 'bootstrap', 'jqueryui', 'plain'].forEach(function(f){
      ['popup', 'inline'].forEach(function(c){
@@ -215,7 +215,7 @@ module.exports = function(grunt) {
              ]
           }
       },
-      //test all builds under several versions of jquery                                   
+      //test.py all builds under several versions of jquery
       testover: {
           options: {
             urls:qunit_testover
@@ -296,7 +296,7 @@ module.exports = function(grunt) {
     }
   });
 
-  //test task
+  //test.py task
   grunt.registerTask('test', ['jshint', 'connect', 'qunit:bootstrap2']);
   grunt.registerTask('test3', ['jshint', 'connect', 'qunit:bootstrap3']);
   grunt.registerTask('testall', [

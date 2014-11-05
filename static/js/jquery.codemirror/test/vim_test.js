@@ -262,7 +262,7 @@ testJumplist('jumplist_skip_delted_mark<c-i>',
              ['*', 'n', 'n', 'k', 'd', 'k', '<C-o>', '<C-i>', '<C-i>'],
              [1,0], [0,2]);
 /**
- * @param name Name of the test
+ * @param name Name of the test.py
  * @param keys An array of keys or a string with a single key to simulate.
  * @param endPos The expected end position of the cursor.
  * @param startPos The position the cursor should start at, defaults to 0, 0.
@@ -333,7 +333,7 @@ testMotion('G', 'G',
     makeCursor(3, 1));
 testMotion('G_repeat', ['3', 'G'], makeCursor(lines[2].line,
     lines[2].textStart));
-// TODO: Make the test code long enough to test Ctrl-F and Ctrl-B.
+// TODO: Make the test.py code long enough to test.py Ctrl-F and Ctrl-B.
 testMotion('0', '0', makeCursor(0, 0), makeCursor(0, 8));
 testMotion('^', '^', makeCursor(0, lines[0].textStart), makeCursor(0, 8));
 testMotion('+', '+', makeCursor(1, lines[1].textStart), makeCursor(0, 8));
@@ -2318,7 +2318,7 @@ testVim('ex_noh_clearSearchHighlight', function(cm, vim, helpers) {
   helpers.doKeys('n');
   helpers.assertCursorAt(0, 11,'can\'t resume search after clearing highlighting');
 }, { value: 'match nope match \n nope Match' });
-// TODO: Reset key maps after each test.
+// TODO: Reset key maps after each test.py.
 testVim('ex_map_key2key', function(cm, vim, helpers) {
   helpers.doEx('map a x');
   helpers.doKeys('a');
@@ -2382,7 +2382,7 @@ testVim('ex_api_test', function(cm, vim, helpers) {
   helpers.doKeys('<C-CR>','<Space>');
   is(res,'Mapping to key failed');
 });
-// For now, this test needs to be last because it messes up : for future tests.
+// For now, this test.py needs to be last because it messes up : for future tests.
 testVim('ex_map_key2key_from_colon', function(cm, vim, helpers) {
   helpers.doEx('map : x');
   helpers.doKeys(':');

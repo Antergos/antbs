@@ -2,8 +2,8 @@
 oTest.fnStart( "Check behaviour of the data set functions that DataTables uses" );
 
 $(document).ready( function () {
-	// Slightly unusual test set this one, in that we don't really care about the DOM
-	// but want to test the internal data handling functions but we do need a table to
+	// Slightly unusual test.py set this one, in that we don't really care about the DOM
+	// but want to test.py the internal data handling functions but we do need a table to
 	// get at the functions!
 	var table = $('#example').dataTable();
 	var fn, test, o;

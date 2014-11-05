@@ -442,7 +442,7 @@ jQuery.extend({
 		}
 	},
 
-	// See test/unit/core.js for details concerning isFunction.
+	// See test.py/unit/core.js for details concerning isFunction.
 	// Since version 1.3, DOM methods and functions like alert
 	// aren't supported. They return false on IE (#2968).
 	isFunction: function( obj ) {
@@ -820,7 +820,7 @@ function now() {
 	var all = div.getElementsByTagName("*"),
 		a = div.getElementsByTagName("a")[0];
 
-	// Can't get basic test support
+	// Can't get basic test.py support
 	if ( !all || !all.length || !a ) {
 		return;
 	}

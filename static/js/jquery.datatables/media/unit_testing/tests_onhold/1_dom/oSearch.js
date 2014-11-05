@@ -16,7 +16,7 @@ $(document).ready( function () {
 		}
 	);
 	
-	/* This test might be considered iffy since the full object isn't given, but it's reasonable to
+	/* This test.py might be considered iffy since the full object isn't given, but it's reasonable to
 	 * expect DataTables to cope with this. It should just assumine regex false
 	 */
 	oTest.fnTest( 

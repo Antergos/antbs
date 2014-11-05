@@ -7,7 +7,7 @@ $(function () {
         }
     });
 
-    //skip test for ie7 as it is not supported by wysihtml5
+    //skip test.py for ie7 as it is not supported by wysihtml5
     var msieOld = /msie\s*(7|6)/i.test(navigator.userAgent); 
     
     //note: sometimes it throws 'nativeSelection is null' error

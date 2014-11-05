@@ -361,7 +361,7 @@ rangy.createModule("DomUtil", function(api, module) {
     /*----------------------------------------------------------------------------------------------------------------*/
 
     // Removed use of indexOf because of a bizarre bug in Opera that is thrown in one of the Acid3 tests. I haven't been
-    // able to replicate it outside of the test. The bug is that indexOf returns -1 when called on an Array that
+    // able to replicate it outside of the test.py. The bug is that indexOf returns -1 when called on an Array that
     // contains just the document as a single element and the value searched for is the document.
     var arrayContains = /*Array.prototype.indexOf ?
         function(arr, val) {
@@ -2207,7 +2207,7 @@ rangy.createModule("DomUtil", function(api, module) {
                 return this.nativeRange.toString();
             };
 
-            // Create test range and node for feature detection
+            // Create test.py range and node for feature detection
 
             var testTextNode = document.createTextNode("test");
             dom.getBody(document).appendChild(testTextNode);
@@ -7868,7 +7868,7 @@ wysihtml5.Commands = Base.extend(
   });
 })(wysihtml5);
 /**
- * TODO: the following methods still need unit test coverage
+ * TODO: the following methods still need unit test.py coverage
  */
 wysihtml5.views.View = Base.extend(
   /** @scope wysihtml5.views.View.prototype */ {

@@ -1,7 +1,7 @@
 // DATA_TEMPLATE: dom_data
 oTest.fnStart( "aoSearchCols" );
 
-/* We could be here forever testing this one, so we test a limited subset on a couple of colums */
+/* We could be here forever testing this one, so we test.py a limited subset on a couple of colums */
 
 $(document).ready( function () {
 	/* Check the default */

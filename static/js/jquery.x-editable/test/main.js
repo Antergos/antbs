@@ -12,7 +12,7 @@ require(["loader", jqurl], function(loader) {
     var config = loader.getConfig("../src"),
         params = loader.getParams();
     
-    //add test specific dependencies
+    //add test.py specific dependencies
     config.shim['test/mocks'] = ['element/editable-element', 'test/libs/mockjax/jquery.mockjax'];
         
     //as we need to keep order of tests, create shim dependencies automatically
@@ -57,7 +57,7 @@ require(["loader", jqurl], function(loader) {
                         'test/unit/date', 
                         'test/unit/datetimefield', 
                         'test/unit/datetime', 
-                        //'test/unit/wysihtml5'
+                        //'test.py/unit/wysihtml5'
                         'test/unit/typeaheadjs'
                        ];
               break;              

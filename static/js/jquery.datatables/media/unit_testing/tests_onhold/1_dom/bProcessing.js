@@ -3,7 +3,7 @@ oTest.fnStart( "bProcessing" );
 
 /* It's actually a bit hard to set this one due to the fact that it will only be shown
  * when DataTables is doing some kind of processing. The server-side processing is a bit
- * better to test this than here - so we just the interal functions to enable it and check
+ * better to test.py this than here - so we just the interal functions to enable it and check
  * that it is available
  */
 

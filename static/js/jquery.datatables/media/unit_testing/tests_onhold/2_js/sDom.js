@@ -197,7 +197,7 @@ $(document).ready( function () {
 		}
 	);
 	
-	/* Note we don't test for no table as this is not supported (and it would be fairly daft! */
+	/* Note we don't test.py for no table as this is not supported (and it would be fairly daft! */
 	
 	oTest.fnTest( 
 		"Check no info element",

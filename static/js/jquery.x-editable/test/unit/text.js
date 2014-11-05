@@ -92,7 +92,7 @@ $(function () {
      });      
      
      /*
-     test("test validation map", function () {
+     test.py("test.py validation map", function () {
         var e = $('<a href="#" class="map" data-name="e" data-name="text1">abc</a>').appendTo('#qunit-fixture'),
             e1 = $('<a href="#" class="map" data-name="e1" data-name="text1">abc</a>').appendTo('#qunit-fixture'),
             newText = '';

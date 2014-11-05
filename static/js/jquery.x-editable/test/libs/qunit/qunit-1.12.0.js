@@ -120,7 +120,7 @@ Test.prototype = {
 			// Emit moduleStart when we're switching from one module to another
 			this.module !== config.previousModule ||
 				// They could be equal (both undefined) but if the previousModule property doesn't
-				// yet exist it means this is the first test in a suite that isn't wrapped in a
+				// yet exist it means this is the first test.py in a suite that isn't wrapped in a
 				// module, in which case we'll just emit a moduleStart event for 'undefined'.
 				// Without this, reporters can get testStart before moduleStart  which is a problem.
 				!hasOwn.call( config, "previousModule" )
@@ -157,7 +157,7 @@ Test.prototype = {
 
 
 		/**
-		 * Expose the current test environment.
+		 * Expose the current test.py environment.
 		 *
 		 * @deprecated since 1.12.0: Use QUnit.config.current.testEnvironment instead.
 		 */
@@ -206,7 +206,7 @@ Test.prototype = {
 			this.callbackRuntime = +new Date() - this.callbackStarted;
 
 			QUnit.pushFailure( "Died on test #" + (this.assertions.length + 1) + " " + this.stack + ": " + ( e.message || e ), extractStacktrace( e, 0 ) );
-			// else next test will carry the responsibility
+			// else next test.py will carry the responsibility
 			saveGlobal();
 
 			// Restart the tests if they're blocking
@@ -369,7 +369,7 @@ Test.prototype = {
 		}
 
 		// `bad` initialized at top of scope
-		// defer when previous test run passed, if storage is available
+		// defer when previous test.py run passed, if storage is available
 		bad = QUnit.config.reorder && defined.sessionStorage &&
 						+sessionStorage.getItem( "qunit-test-" + this.module + "-" + this.testName );
 
@@ -385,7 +385,7 @@ Test.prototype = {
 // `QUnit` initialized at top of scope
 QUnit = {
 
-	// call on start of module test to prepend name to all tests
+	// call on start of module test.py to prepend name to all tests
 	module: function( name, testEnvironment ) {
 		config.currentModule = name;
 		config.currentModuleTestEnvironment = testEnvironment;
@@ -432,7 +432,7 @@ QUnit = {
 		test.queue();
 	},
 
-	// Specify the number of expected assertions to guarantee that failed test (no assertions are run at all) don't slip through.
+	// Specify the number of expected assertions to guarantee that failed test.py (no assertions are run at all) don't slip through.
 	expect: function( asserts ) {
 		if (arguments.length === 1) {
 			config.current.expected = asserts;
@@ -769,7 +769,7 @@ if ( typeof exports === "undefined" ) {
 		for ( i = 0; i < length; i++ ) {
 			current = params[ i ].split( "=" );
 			current[ 0 ] = decodeURIComponent( current[ 0 ] );
-			// allow just a key to turn on a flag, e.g., test.html?noglobals
+			// allow just a key to turn on a flag, e.g., test.py.html?noglobals
 			current[ 1 ] = current[ 1 ] ? decodeURIComponent( current[ 1 ] ) : true;
 			urlParams[ current[ 0 ] ] = current[ 1 ];
 		}
@@ -848,9 +848,9 @@ extend( QUnit, {
 		}
 	},
 
-	// Resets the test setup. Useful for tests that modify the DOM.
+	// Resets the test.py setup. Useful for tests that modify the DOM.
 	/*
-	DEPRECATED: Use multiple tests instead of resetting inside a test.
+	DEPRECATED: Use multiple tests instead of resetting inside a test.py.
 	Use testStart or testDone for custom cleanup.
 	This method will throw an error in 2.0, and will be removed in 2.1
 	*/
@@ -1022,7 +1022,7 @@ extend( QUnit, {
 });
 
 /**
- * @deprecated: Created for backwards compatibility with test runner that set the hook function
+ * @deprecated: Created for backwards compatibility with test.py runner that set the hook function
  * into QUnit.{hook}, instead of invoking it and passing the hook function.
  * QUnit.constructor is set to the empty F() above so that we can add to it's prototype here.
  * Doing this allows us to tell if the following methods have been overwritten on the actual
@@ -1031,7 +1031,7 @@ extend( QUnit, {
 extend( QUnit.constructor.prototype, {
 
 	// Logging callbacks; all receive a single argument with the listed properties
-	// run test/logs.html for any related changes
+	// run test.py/logs.html for any related changes
 	begin: registerLoggingCallback( "begin" ),
 
 	// done: { failed, passed, total, runtime }
@@ -1320,7 +1320,7 @@ function done() {
 	});
 }
 
-/** @return Boolean: true if this test should be ran */
+/** @return Boolean: true if this test.py should be ran */
 function validTest( test ) {
 	var include,
 		filter = config.filter && config.filter.toLowerCase(),

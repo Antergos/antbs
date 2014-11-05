@@ -1,9 +1,9 @@
 // DATA_TEMPLATE: empty_table
 oTest.fnStart( "bAutoWidth" );
 
-/* It's actually a little tricky to test this. We can't test absolute numbers because
+/* It's actually a little tricky to test.py this. We can't test.py absolute numbers because
  * different browsers and different platforms will render the width of the columns slightly
- * differently. However, we certainly can test the principle of what should happen (column 
+ * differently. However, we certainly can test.py the principle of what should happen (column
  * width doesn't change over pages)
  */
 
@@ -34,7 +34,7 @@ $(document).ready( function () {
 	);
 	
 	/*
-	This would seem like a better test - but there appear to be difficulties with tables
+	This would seem like a better test.py - but there appear to be difficulties with tables
 	which are bigger (calculated) than there is actually room for. I suspect this is actually
 	a bug in datatables
 	oTest.fnWaitTest( 

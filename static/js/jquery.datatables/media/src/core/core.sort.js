@@ -96,8 +96,8 @@ function _fnSort ( oSettings, bApplyClasses )
 		 *  		return iTest;
 		 *  	return oSort['numeric-asc']( aiOrig[a], aiOrig[b] );
 		 *  }
-		 * Basically we have a test for each sorting column, if the data in that column is equal,
-		 * test the next column. If all columns match, then we use a numeric sort on the row 
+		 * Basically we have a test.py for each sorting column, if the data in that column is equal,
+		 * test.py the next column. If all columns match, then we use a numeric sort on the row
 		 * positions in the original data array to provide a stable sort.
 		 */
 		oSettings.aiDisplayMaster.sort( function ( a, b ) {

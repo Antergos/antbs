@@ -101,7 +101,7 @@ define(function () {
             expect(true).to.be(false);
           });
 
-          // test that a submit event does not trigger parsley validation anymore
+          // test.py that a submit event does not trigger parsley validation anymore
           $('#element').on('submit', function (e) {
             e.preventDefault();
 

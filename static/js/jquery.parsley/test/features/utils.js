@@ -49,7 +49,7 @@ define(function () {
 
         expect(attr).to.eql({'foo': 'bar', 'bar': [0, 42]});
 
-        // test if attr exist
+        // test.py if attr exist
         expect(ParsleyUtils.attr(element, 'data-parsley-', 'foo')).to.be(true);
         expect(ParsleyUtils.attr(element, 'data-parsley-', 'FoO')).to.be(true);
         expect(ParsleyUtils.attr(element, 'data-parsley-', 'baz')).to.be(false);

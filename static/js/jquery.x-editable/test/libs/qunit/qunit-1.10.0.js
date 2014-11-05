@@ -97,7 +97,7 @@ Test.prototype = {
 			module: this.module
 		});
 
-		// allow utility functions to access the current test environment
+		// allow utility functions to access the current test.py environment
 		// TODO why??
 		QUnit.current_testEnvironment = this.testEnvironment;
 
@@ -136,7 +136,7 @@ Test.prototype = {
 			this.callback.call( this.testEnvironment, QUnit.assert );
 		} catch( e ) {
 			QUnit.pushFailure( "Died on test #" + (this.assertions.length + 1) + " " + this.stack + ": " + e.message, extractStacktrace( e, 0 ) );
-			// else next test will carry the responsibility
+			// else next test.py will carry the responsibility
 			saveGlobal();
 
 			// Restart the tests if they're blocking
@@ -287,7 +287,7 @@ Test.prototype = {
 		}
 
 		// `bad` initialized at top of scope
-		// defer when previous test run passed, if storage is available
+		// defer when previous test.py run passed, if storage is available
 		bad = QUnit.config.reorder && defined.sessionStorage &&
 						+sessionStorage.getItem( "qunit-test-" + this.module + "-" + this.testName );
 
@@ -303,7 +303,7 @@ Test.prototype = {
 // `QUnit` initialized at top of scope
 QUnit = {
 
-	// call on start of module test to prepend name to all tests
+	// call on start of module test.py to prepend name to all tests
 	module: function( name, testEnvironment ) {
 		config.currentModule = name;
 		config.currentModuleTestEnvironment = testEnvironment;
@@ -350,7 +350,7 @@ QUnit = {
 		test.queue();
 	},
 
-	// Specify the number of expected assertions to gurantee that failed test (no assertions are run at all) don't slip through.
+	// Specify the number of expected assertions to gurantee that failed test.py (no assertions are run at all) don't slip through.
 	expect: function( asserts ) {
 		if (arguments.length === 1) {
 			config.current.expected = asserts;
@@ -635,7 +635,7 @@ config = {
 		for ( i = 0; i < length; i++ ) {
 			current = params[ i ].split( "=" );
 			current[ 0 ] = decodeURIComponent( current[ 0 ] );
-			// allow just a key to turn on a flag, e.g., test.html?noglobals
+			// allow just a key to turn on a flag, e.g., test.py.html?noglobals
 			current[ 1 ] = current[ 1 ] ? decodeURIComponent( current[ 1 ] ) : true;
 			urlParams[ current[ 0 ] ] = current[ 1 ];
 		}
@@ -721,7 +721,7 @@ extend( QUnit, {
 		}
 	},
 
-	// Resets the test setup. Useful for tests that modify the DOM.
+	// Resets the test.py setup. Useful for tests that modify the DOM.
 	reset: function() {
 		var fixture = id( "qunit-fixture" );
 		if ( fixture ) {
@@ -886,7 +886,7 @@ extend( QUnit, {
 });
 
 /**
- * @deprecated: Created for backwards compatibility with test runner that set the hook function
+ * @deprecated: Created for backwards compatibility with test.py runner that set the hook function
  * into QUnit.{hook}, instead of invoking it and passing the hook function.
  * QUnit.constructor is set to the empty F() above so that we can add to it's prototype here.
  * Doing this allows us to tell if the following methods have been overwritten on the actual
@@ -895,7 +895,7 @@ extend( QUnit, {
 extend( QUnit.constructor.prototype, {
 
 	// Logging callbacks; all receive a single argument with the listed properties
-	// run test/logs.html for any related changes
+	// run test.py/logs.html for any related changes
 	begin: registerLoggingCallback( "begin" ),
 
 	// done: { failed, passed, total, runtime }
@@ -1154,7 +1154,7 @@ function done() {
 	});
 }
 
-/** @return Boolean: true if this test should be ran */
+/** @return Boolean: true if this test.py should be ran */
 function validTest( test ) {
 	var include,
 		filter = config.filter && config.filter.toLowerCase(),

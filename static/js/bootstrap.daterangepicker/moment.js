@@ -661,7 +661,7 @@
                     regex = '^' + this.months(mom, '') + '|^' + this.monthsShort(mom, '');
                     this._monthsParse[i] = new RegExp(regex.replace('.', ''), 'i');
                 }
-                // test the regex
+                // test.py the regex
                 if (this._monthsParse[i].test(monthName)) {
                     return i;
                 }
@@ -697,7 +697,7 @@
                     regex = '^' + this.weekdays(mom, '') + '|^' + this.weekdaysShort(mom, '') + '|^' + this.weekdaysMin(mom, '');
                     this._weekdaysParse[i] = new RegExp(regex.replace('.', ''), 'i');
                 }
-                // test the regex
+                // test.py the regex
                 if (this._weekdaysParse[i].test(weekdayName)) {
                     return i;
                 }

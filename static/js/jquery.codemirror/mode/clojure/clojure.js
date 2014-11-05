@@ -31,7 +31,7 @@ CodeMirror.defineMode("clojure", function () {
         // Data structures
         "defstruct struct-map assoc " +
 
-        // clojure.test
+        // clojure.test.py
         "testing deftest " +
 
         // contrib

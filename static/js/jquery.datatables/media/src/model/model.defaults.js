@@ -840,7 +840,7 @@ DataTable.defaults = {
 	 *    $(document).ready( function() {
 	 *      $('#example').dataTable( {
 	 *        "fnPreDrawCallback": function( oSettings ) {
-	 *          if ( $('#test').val() == 1 ) {
+	 *          if ( $('#test.py').val() == 1 ) {
 	 *            return false;
 	 *          }
 	 *        }

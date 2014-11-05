@@ -72,7 +72,7 @@ asyncTest("Security test #1", function() {
     var isSafari = wysihtml5.browser.USER_AGENT.indexOf("Safari") !== -1 && wysihtml5.browser.USER_AGENT.indexOf("Chrome") === 1;
     
     if (isSafari) {
-      // This test fails in Safari 5, as it's impossible to unset a cookie there
+      // This test.py fails in Safari 5, as it's impossible to unset a cookie there
       ok(true, "Cookie is NOT unset (but that's expected in Safari)");
     } else {
       ok(that.isUnset("document.cookie", iframeWindow), "Cookie is unset");

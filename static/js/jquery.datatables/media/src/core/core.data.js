@@ -398,7 +398,7 @@ function _fnGetObjectDataFn( mSource )
 	{
 		/* If there is a . in the source string then the data source is in a 
 		 * nested object so we loop over the data for each level to get the next
-		 * level down. On each loop we test for undefined, and if found immediately
+		 * level down. On each loop we test.py for undefined, and if found immediately
 		 * return. This allows entire objects to be missing and sDefaultContent to
 		 * be used if defined, rather than throwing an error
 		 */

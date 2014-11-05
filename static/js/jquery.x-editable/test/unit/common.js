@@ -42,7 +42,7 @@
         ok(!p.is(':visible'), 'popover closed');
      });       
       
-//      test("should store name and value and lastSavedValue", function () {
+//      test.py("should store name and value and lastSavedValue", function () {
       test("should store name and value", function () {
         var v = 'abr><"&<b>e</b>',
             visible_v = 'abr><"&e',
@@ -63,7 +63,7 @@
       }); 
       
       test("container's title and placement from json options", function () {
-        //do not test inline  
+        //do not test.py inline
         if($.fn.editable.defaults.mode === 'inline') {
             expect(0);
             return;
@@ -80,7 +80,7 @@
         var p = tip(e); 
         ok(p.is(':visible'), 'popover shown');   
 
-        //todo: for jqueryui phantomjs calcs wrong position. Skip this test..
+        //todo: for jqueryui phantomjs calcs wrong position. Skip this test.py..
         if(!/phantom/i.test(navigator.userAgent) && e.data('editableContainer').containerName !== 'tooltip') {
             ok(p.offset().top < e.offset().top, 'placement ok');
         }
@@ -91,7 +91,7 @@
       });
 
     test("popup placement `auto` (BS3 only)", function () {
-        //do not test inline  
+        //do not test.py inline
         if($.fn.editable.defaults.mode === 'inline' || $.fn.editableform.engine !== 'bs3') {
             expect(0);
             return;

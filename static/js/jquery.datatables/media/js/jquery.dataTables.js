@@ -850,7 +850,7 @@
 			{
 				/* If there is a . in the source string then the data source is in a 
 				 * nested object so we loop over the data for each level to get the next
-				 * level down. On each loop we test for undefined, and if found immediately
+				 * level down. On each loop we test.py for undefined, and if found immediately
 				 * return. This allows entire objects to be missing and sDefaultContent to
 				 * be used if defined, rather than throwing an error
 				 */
@@ -4021,8 +4021,8 @@
 				 *  		return iTest;
 				 *  	return oSort['numeric-asc']( aiOrig[a], aiOrig[b] );
 				 *  }
-				 * Basically we have a test for each sorting column, if the data in that column is equal,
-				 * test the next column. If all columns match, then we use a numeric sort on the row 
+				 * Basically we have a test.py for each sorting column, if the data in that column is equal,
+				 * test.py the next column. If all columns match, then we use a numeric sort on the row
 				 * positions in the original data array to provide a stable sort.
 				 */
 				oSettings.aiDisplayMaster.sort( function ( a, b ) {
@@ -5575,7 +5575,7 @@
 		 *      var oTable = $('#example').dataTable();
 		 *      
 		 *      // Sometime later - filter...
-		 *      oTable.fnFilter( 'test string' );
+		 *      oTable.fnFilter( 'test.py string' );
 		 *    } );
 		 */
 		this.fnFilter = function( sInput, iColumn, bRegex, bSmart, bShowGlobal, bCaseInsensitive )
@@ -8663,7 +8663,7 @@
 		 *    $(document).ready( function() {
 		 *      $('#example').dataTable( {
 		 *        "fnPreDrawCallback": function( oSettings ) {
-		 *          if ( $('#test').val() == 1 ) {
+		 *          if ( $('#test.py').val() == 1 ) {
 		 *            return false;
 		 *          }
 		 *        }

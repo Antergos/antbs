@@ -1,6 +1,6 @@
 // Don't take these too seriously -- the expected results appear to be
 // based on the results of actual runs without any serious manual
-// verification. If a change you made causes them to fail, the test is
+// verification. If a change you made causes them to fail, the test.py is
 // as likely to wrong as the code.
 
 (function() {

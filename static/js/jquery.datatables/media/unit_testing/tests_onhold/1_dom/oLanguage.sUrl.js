@@ -1,7 +1,7 @@
 // DATA_TEMPLATE: dom_data
 oTest.fnStart( "oLanguage.sUrl" );
 
-/* Note that we only test the internal storage of language information pulled form a file here
+/* Note that we only test.py the internal storage of language information pulled form a file here
  * as the other language tests will check it goes into the DOM correctly
  */
 

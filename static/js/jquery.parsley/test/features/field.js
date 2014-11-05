@@ -49,7 +49,7 @@ define(function () {
         var parsleyField = new Parsley($('#element'))
           .addConstraint('required', true);
 
-        // same as above test where addConstraint resulted in an updateConstraint
+        // same as above test.py where addConstraint resulted in an updateConstraint
         parsleyField.updateConstraint('required', false, 64);
         expect(parsleyField.constraints.length).to.be(1);
         expect(parsleyField.constraints[0].name).to.be('required');

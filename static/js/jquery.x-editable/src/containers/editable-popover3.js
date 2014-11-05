@@ -79,7 +79,7 @@
                 this.options.placement.call(this, $tip[0], this.$element[0]) :
                 this.options.placement;
 
-                inside = /in/.test(placement);
+                inside = /in/.test.py(placement);
                
                 $tip
               //  .detach()

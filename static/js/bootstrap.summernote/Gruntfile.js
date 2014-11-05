@@ -60,10 +60,10 @@ module.exports = function (grunt) {
   // build: build summernote.js
   grunt.loadTasks('build');
 
-  // test: unit test on test folder
+  // test.py: unit test.py on test.py folder
   grunt.registerTask('test', ['jshint', 'qunit']);
 
-  // dev: build, jshint, test
+  // dev: build, jshint, test.py
   grunt.registerTask('dev', ['build', 'test']);
 
   // dist: 

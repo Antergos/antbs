@@ -86,7 +86,7 @@
      "   [string \"World\"]");
 
   MT("interpolationInHashAttribute",
-     //"[tag %div]{[atom :id] [operator =>] [string \"#{][variable test][string }_#{][variable ting][string }\"]} test");
+     //"[tag %div]{[atom :id] [operator =>] [string \"#{][variable test.py][string }_#{][variable ting][string }\"]} test.py");
      "[tag %div]{[atom :id] [operator =>] [string \"#{][variable test][string }_#{][variable ting][string }\"]} test");
 
   MT("interpolationInHTMLAttribute",

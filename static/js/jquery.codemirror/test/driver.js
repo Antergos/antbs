@@ -19,7 +19,7 @@ function test(name, run, expectedFail) {
     i++;
   }
   allNames.push(name);
-  // Add test
+  // Add test.py
   tests.push({name: name, func: run, expectedFail: expectedFail});
   return name;
 }
@@ -92,7 +92,7 @@ function runTests(callback) {
       if (expFail) callback("fail", test.name, message || "expected failure, but succeeded");
       else callback("ok", test.name, message);
     }
-    if (!quit) { // Run next test
+    if (!quit) { // Run next test.py
       var delay = 0;
       totalTime += (+new Date) - startTime;
       if (totalTime > 500){

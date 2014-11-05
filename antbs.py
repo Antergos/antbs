@@ -54,6 +54,12 @@ import gevent.monkey
 gevent.monkey.patch_all()
 
 SRC_DIR = os.path.dirname(__file__) or '.'
+STAGING_REPO = '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging'
+MAIN_REPO = '/srv/antergos.info/repo/antergos'
+STAGING_64 = os.path.join(STAGING_REPO, 'x86_64')
+STAGING_32 = os.path.join(STAGING_REPO, 'i686')
+MAIN_64 = os.path.join(MAIN_REPO, 'x86_64')
+MAIN_32 = os.path.join(MAIN_REPO, 'i686')
 
 
 # Create the variable `app` which is an instance of the Flask class that
@@ -265,6 +271,13 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
     return pkg_list, all_pages, rev_pending
 
 
+def copy(src, dst):
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst)
+    else:
+        shutil.copy(src, dst)
+
 def set_pkg_review_result(bnum=None, dev=None, result=None):
     if not all(i is not None for i in (bnum, dev, result)):
         abort(500)
@@ -274,19 +287,28 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('build_log:%s:review_stat' % bnum, result)
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
+        pkg = db.get('build_log:%s:pkg' % bnum)
+        pkg_files = glob.glob('%s/*/%s*.*' % (STAGING_REPO, pkg))
+        logger.info('[PKG_FILES]:')
+        if pkg_files and pkg_files is not None:
+            logger.info(pkg_files)
+            for file in pkg_files:
+                copy(file, MAIN_REPO)
     except Exception as err:
         errmsg = dict(error=True, msg=err)
+
+    queue.enqueue_call(builder.update_main_repo, timeout=9600)
 
     return errmsg
 
 
 @app.errorhandler(404)
-def page_not_found():
+def page_not_found(e):
     return render_template('404.html'), 404
 
 
 @app.errorhandler(500)
-def internal_error():
+def internal_error(e):
     return render_template('500.html'), 500
 
 @app.route("/")
@@ -447,9 +469,15 @@ def hooked():
 
         if has_pkgs:
             the_pkgs = list(set(no_dups))
+            first = True
+            last = False
+            last_pkg = the_pkgs[-1]
             for p in the_pkgs:
                 db.rpush('queue', p)
-            queue.enqueue_call(builder.handle_hook, timeout=9600)
+                if p == last_pkg:
+                    last = True
+                queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
+                first = False
 
     elif repo == "antergos-iso":
         last = db.get('pkg:antergos-iso:last_commit')

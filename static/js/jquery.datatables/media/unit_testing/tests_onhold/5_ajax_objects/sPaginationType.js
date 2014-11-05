@@ -57,7 +57,7 @@ $(document).ready( function () {
 		function () { return $('#example_next').hasClass('paginate_enabled_next'); }
 	);
 	
-	/* Don't test paging - that's done by the zero config test script. */
+	/* Don't test.py paging - that's done by the zero config test.py script. */
 	
 	
 	/* Two buttons paging */

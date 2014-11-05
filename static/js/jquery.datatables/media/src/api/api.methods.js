@@ -636,7 +636,7 @@ this.fnDraw = function( bComplete )
  *      var oTable = $('#example').dataTable();
  *      
  *      // Sometime later - filter...
- *      oTable.fnFilter( 'test string' );
+ *      oTable.fnFilter( 'test.py string' );
  *    } );
  */
 this.fnFilter = function( sInput, iColumn, bRegex, bSmart, bShowGlobal, bCaseInsensitive )

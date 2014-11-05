@@ -318,7 +318,7 @@ if ((supportsAccessors = owns(prototypeOfObject, "__defineGetter__"))) {
     lookupSetter = call.bind(prototypeOfObject.__lookupSetter__);
 }
 if ([1,2].splice(0).length != 2) {
-    if(function() { // test IE < 9 to splice bug - see issue #138
+    if(function() { // test.py IE < 9 to splice bug - see issue #138
         function makeArray(l) {
             var a = new Array(l+2);
             a[0] = a[1] = 0;

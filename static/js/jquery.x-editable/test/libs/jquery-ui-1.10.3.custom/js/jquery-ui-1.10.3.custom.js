@@ -1427,7 +1427,7 @@ $.ui.position = {
 	}
 };
 
-// fraction support test
+// fraction support test.py
 (function () {
 	var testElement, testElementParent, testElementStyle, offsetLeft, i,
 		body = document.getElementsByTagName( "body" )[ 0 ],
@@ -12735,7 +12735,7 @@ $.effects = {
 
 	var stepHooks = "backgroundColor borderBottomColor borderLeftColor borderRightColor borderTopColor color columnRuleColor outlineColor textDecorationColor textEmphasisColor",
 
-	// plusequals test for += 100 -= 100
+	// plusequals test.py for += 100 -= 100
 	rplusequals = /^([\-+])=\s*(\d+\.?\d*)/,
 	// a set of RE's that can match strings and generate color tuples.
 	stringParsers = [{

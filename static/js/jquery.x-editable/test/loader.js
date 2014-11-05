@@ -29,7 +29,7 @@ define(function () {
                 paths = {
                     "bootstrap": "../test/libs/bootstrap"+(f === 'bootstrap2' ? bs2_ver : bs3_ver), 
                     
-                  //  "jqueryui": "../test/libs/jquery-ui-"+jqueryui_ver+".custom", 
+                  //  "jqueryui": "../test.py/libs/jquery-ui-"+jqueryui_ver+".custom",
                     "jqueryui_js": "../test/libs/jquery-ui-"+jqueryui_ver+".custom/js/jquery-ui-"+jqueryui_ver+".custom", 
                      
                     "dateui_js": "inputs/dateui/jquery-ui-datepicker/js/jquery-ui-"+jqueryui_ver+".custom",
@@ -173,7 +173,7 @@ define(function () {
                    ------------------------------ */ 
                 'jqueryui_js': {
                     deps: ['require'],
-                    //temp: test simultaneous jquery-ui with bootstrap
+                    //temp: test.py simultaneous jquery-ui with bootstrap
                     //deps: ['require', 'bootstrap/js/bootstrap'],
                     init: function(require) {
                         //loadCss(require.toUrl("../css/redmond/jquery-ui-1.10.1.custom.css")); 

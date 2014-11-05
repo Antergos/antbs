@@ -25,10 +25,10 @@ var oTest = {
 	/* Block further tests from occuring - might be end of tests or due to async wait */
 	bBlock: false,
 	
-	/* Number of times to try retesting for a blocking test */
+	/* Number of times to try retesting for a blocking test.py */
 	iReTestLimit: 20,
 	
-	/* Amount of time to wait between trying for an async test */
+	/* Amount of time to wait between trying for an async test.py */
 	iReTestDelay: 150,
 	
 	/* End tests - external control */
@@ -46,10 +46,10 @@ var oTest = {
 	
 	/*
 	 * Function: fnTest
-	 * Purpose:  Add a test to the queue
+	 * Purpose:  Add a test.py to the queue
 	 * Returns:  -
-	 * Inputs:   string:sMessage - name of the test
-	 *           function:fnTest - function which will be evaludated to get the test result
+	 * Inputs:   string:sMessage - name of the test.py
+	 *           function:fnTest - function which will be evaludated to get the test.py result
 	 */
 	"fnTest": function ( sMessage, fnSetup, fnTest )
 	{
@@ -64,10 +64,10 @@ var oTest = {
 	
 	/*
 	 * Function: fnWaitTest
-	 * Purpose:  Add a test to the queue which has a re-test cycle
+	 * Purpose:  Add a test.py to the queue which has a re-test.py cycle
 	 * Returns:  -
-	 * Inputs:   string:sMessage - name of the test
-	 *           function:fnTest - function which will be evaludated to get the test result
+	 * Inputs:   string:sMessage - name of the test.py
+	 *           function:fnTest - function which will be evaludated to get the test.py result
 	 */
 	"fnWaitTest": function ( sMessage, fnSetup, fnTest )
 	{

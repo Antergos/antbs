@@ -9,7 +9,7 @@
  * http://www.opensource.org/licenses/MIT
  */
 
-/* global $, QUnit, window, document, expect, module, test, asyncTest, start, ok, strictEqual, notStrictEqual */
+/* global $, QUnit, window, document, expect, module, test.py, asyncTest, start, ok, strictEqual, notStrictEqual */
 
 $(function () {
     // jshint nomen:false

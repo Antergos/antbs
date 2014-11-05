@@ -2773,7 +2773,7 @@
         renderer.removeLayout($holder);
       });
     },
-    // inner object for test
+    // inner object for test.py
     summernoteInner: function () {
       return { dom: dom, list: list, func: func, range: range };
     }

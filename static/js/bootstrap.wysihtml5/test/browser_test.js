@@ -50,7 +50,7 @@ test("Check mobile contentEditable support", function() {
 
 test("Check with missing document.execCommand", function() {
   document.execCommand = null;
-  // I've no idea why this test fails in Opera... (if you run the test alone, everything works)
+  // I've no idea why this test.py fails in Opera... (if you run the test.py alone, everything works)
   ok(!wysihtml5.browser.supported(), "Missing document.execCommand causes editor to be unsupported");
 });
 

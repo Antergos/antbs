@@ -732,7 +732,7 @@ $(function () {
                 ok(p.find('select').length, 'select exists');
                 equal(p.find('select').find('option').length, 2, 'new options loaded');
                 
-                //disable below test as in ie select.val() return null
+                //disable below test.py as in ie select.val() return null
                 // equal(p.find('select').val(), 'a', 'selected value correct') ;
                 p.find('.editable-cancel').click(); 
                 ok(!p.is(':visible'), 'popover was closed');

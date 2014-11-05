@@ -10,7 +10,7 @@
 (function( jQuery, undefined ){
 	var stepHooks = "backgroundColor borderBottomColor borderLeftColor borderRightColor borderTopColor color outlineColor".split(" "),
 
-		// plusequals test for += 100 -= 100
+		// plusequals test.py for += 100 -= 100
 		rplusequals = /^([\-+])=\s*(\d+\.?\d*)/,
 		// a set of RE's that can match strings and generate color tuples.
 		stringParsers = [{
