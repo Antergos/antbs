@@ -46,11 +46,11 @@
                                                     <span class="caret"></span>
                                                     <span class="sr-only">Toggle Dropdown</span></button>
                                                 <ul role="menu" class="dropdown-menu set_result">
-                                                    <li><a href="#" id="2" class="{{ info['bnum'] }}"><i
+                                                    <li><a href="#" id="2" bnum="{{ info['bnum'] }}"><i
                                                             class="fa fa-check"
                                                             style="color:green;"></i>
                                                         Pass</a></li>
-                                                    <li><a href="#" id="3" class="{{ info['bnum'] }}"><i
+                                                    <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
                                                             class="fa fa-exclamation-circle" style="color:red;"></i>
                                                         Fail</a>
                                                     </li>
@@ -128,13 +128,13 @@
         jQuery(document).ready(function () {
             jQuery('.set_result').on('click', 'a', function (e) {
                 e.preventDefault();
-                $(this).addClass('clicked');
+                jQuery(this).addClass('clicked');
                 var data = {
-                    bnum: $(this).attr('class'),
-                    result: $(this).attr('id'),
+                    bnum: jQuery(this).attr('bnum'),
+                    result: jQuery(this).attr('id'),
                     dev: '{{ user.username }}'
                 };
-                $.ajax({
+                jQuery.ajax({
                     type: 'POST',
                     url: '/pkg_review',
                     data: JSON.stringify(data, null, '\t'),
@@ -144,8 +144,8 @@
                         console.log(result);
                         var res = $('.clicked').attr('id') == '2' ? 'span.passed' : 'span.failed';
                         if (result['msg'] == 'ok') {
-                            $('.clicked').parents('td').find(res).show();
-                            $('.clicked').removeClass('clicked').parents('.btn-group').hide();
+                            jQuery('.clicked').parents('td').find(res).show();
+                            jQuery('.clicked').removeClass('clicked').parents('.btn-group').hide();
                         } else {
                             alert('Unable to save result.')
                         }

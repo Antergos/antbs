@@ -44,10 +44,10 @@
                                                 <span class="caret"></span>
                                                 <span class="sr-only">Toggle Dropdown</span></button>
                                             <ul role="menu" class="dropdown-menu set_result">
-                                                <li><a href="#" id="2" class="{{ info['bnum'] }}"><i class="fa fa-check"
+                                                <li><a href="#" id="2" bnum="{{ info['bnum'] }}"><i class="fa fa-check"
                                                                                                      style="color:green;"></i>
                                                     Pass</a></li>
-                                                <li><a href="#" id="3" class="{{ info['bnum'] }}"><i
+                                                <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
                                                         class="fa fa-exclamation-circle" style="color:red;"></i>
                                                     Fail</a>
                                                 </li>
@@ -104,7 +104,7 @@
                 e.preventDefault();
                 $(this).addClass('clicked');
                 var data = {
-                    bnum: $(this).attr('class'),
+                    bnum: $(this).attr('bnum'),
                     result: $(this).attr('id'),
                     dev: '{{ user.username }}'
                 };

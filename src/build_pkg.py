@@ -38,9 +38,7 @@ import shutil
 from pygments import highlight
 from pygments.lexers import BashLexer
 from pygments.formatters import HtmlFormatter
-from pygments.styles import get_style_by_name
 import re
-from dateutil import parser
 import time
 from multiprocessing import Process
 
@@ -58,7 +56,6 @@ try:
     # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
 except Exception as err:
     logger.error("Cant connect to Docker daemon. Error msg: %s", err)
-
 
 
 def get_pkgver(package):
@@ -90,6 +87,7 @@ def get_pkgver(package):
     epoch_done = None
     arch_done = None
     pkgver_done = None
+    pkgrel_done = None
     with open(pbfile) as PKGBUILD:
         for line in PKGBUILD:
             if line.startswith('arch='):
@@ -100,25 +98,38 @@ def get_pkgver(package):
                     break
                 else:
                     continue
-            if line.startswith('epoch='):
+            elif line.startswith('epoch='):
                 epoch = line.split('=')
                 epoch_num = epoch[1].strip('\n')
                 epoch_done = True
-                if arch_done and pkgver_done:
+                if arch_done and pkgver_done and pkgrel_done:
                     break
                 else:
                     continue
-            if line.startswith("pkgver") and not line.startswith("pkgver()"):
+            elif line.startswith("pkgver") and not line.startswith("pkgver()"):
                 l = line.split('=')
                 logger.info('line is %s' % l)
                 pkgver = l[1].strip('\n')
                 pkgver_done = True
-                if epoch_done and arch_done:
+                if epoch_done and arch_done and pkgrel_done:
                     break
                 else:
                     continue
+            elif line.startswith('pkgrel='):
+                pkgrel = line.split('=')
+                pkgrel_num = pkgrel[1].strip('\n')
+                pkgrel_done = True
+                if arch_done and pkgver_done and epoch_done:
+                    break
+                else:
+                    continue
+
     if epoch_num:
         pkgver = epoch_num + ':' + pkgver
+    if pkgrel_num:
+        pkgver = pkgver + '-' + pkgrel_num
+    else:
+        pkgver += '-1'
 
     return pkgver
 
@@ -141,7 +152,6 @@ def get_deps(package):
             else:
                 continue
     return depends
-
 
 
 def check_deps(packages):
@@ -174,6 +184,8 @@ def handle_hook(first=False, last=False):
             db.set('pkg:antergos-iso-%s:version' % arch, version)
         build_iso()
         db.set('isoFlag', 'False')
+        db.delete('pkg:antergos-iso:last_commit')
+        return
 
     elif first:
         db.set('pkg_count', '0')
@@ -196,7 +208,7 @@ def handle_hook(first=False, last=False):
         for package in packages:
             # if 'numix-icon-theme' == package:
             # logger.info('cloning repo for %s' % package)
-            #     subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
+            # subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
             #                           cwd='/opt/antergos-packages/numix-icon-theme')
             #     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
             #                           cwd='/opt/antergos-packages/numix-icon-theme')
@@ -213,8 +225,9 @@ def handle_hook(first=False, last=False):
                                           cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
                 elif 'numix-frost-themes' == package:
                     logger.info('Copying numix-frost source file into build directory.')
-                    subprocess.check_call(['cp', '/opt/numix/numix-frost.zip', os.path.join(REPO_DIR, 'numix-frost-themes')],
-                                          cwd='/opt/numix')
+                    subprocess.check_call(
+                        ['cp', '/opt/numix/numix-frost.zip', os.path.join(REPO_DIR, 'numix-frost-themes')],
+                        cwd='/opt/numix')
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
@@ -235,44 +248,45 @@ def handle_hook(first=False, last=False):
                 db.lrem('queue', 0, c)
                 db.rpush('queue', c)
         logger.info('Check deps complete. Starting build_pkgs')
-
+    logger.info('[FIRST IS SET]: %s' % first)
+    logger.info('[LAST IS SET]: %s' % last)
     build_pkgs(last)
 
-def update_main_repo():
-    try:
-        container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh update_repo", name="update_repo",
-                                         volumes=['/makepkg', '/root/.gnupg', '/main'])
-    except Exception as err:
-        logger.error(err)
 
-    try:
-        doc.start(container, binds={
-            DOC_DIR:
-                {
-                    'bind': '/makepkg',
-                    'ro': True
-                },
-            '/srv/antergos.info/repo/antergos/':
-                {
-                    'bind': '/main',
-                    'ro': False
-                },
-            '/root/.gnupg':
-                {
-                    'bind': '/root/.gnupg',
-                    'ro': False
-                }
-        }, privileged=True)
-        doc.wait(container)
-    except Exception as err:
-        logger.error('Start container failed. Error Msg: %s' % err)
+def update_main_repo(pkg=None):
+    if pkg:
+        command = "/makepkg/build.sh update_repo %s" % pkg
+        pkgenv = "_PKGNAME=%s" % pkg
+        try:
+            container = doc.create_container("antergos/makepkg", command=command,
+                                             name="update_repo", environment=[pkgenv],
+                                             volumes=['/makepkg', '/root/.gnupg', '/main'])
+            doc.start(container, binds={
+                DOC_DIR:
+                    {
+                        'bind': '/makepkg',
+                        'ro': True
+                    },
+                '/srv/antergos.info/repo/antergos':
+                    {
+                        'bind': '/main',
+                        'ro': False
+                    },
+                '/root/.gnupg':
+                    {
+                        'bind': '/root/.gnupg',
+                        'ro': False
+                    }
+            }, privileged=True)
+            this_log = 'repo_update_log'
+            stream_process = Process(target=publish_build_ouput, args=(container, this_log))
+            stream_process.start()
+            doc.wait(container)
+        except Exception as err:
+            logger.error('Start container failed. Error Msg: %s' % err)
+            return
+            # doc.remove_container(container)
 
-    stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
-    log_stream = stream.split('\n')
-    dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-    for line in log_stream:
-        db.rpush('repo_log:%s' % dt, line)
-    #doc.remove_container(container)
 
 
 def db_filter_and_add(output=None, this_log=None):
@@ -303,11 +317,12 @@ def db_filter_and_add(output=None, this_log=None):
 
     filtered_string = '\n '.join(filtered)
     # db.rpush('%s:content' % this_log, line)
-    #filtered_string = filtered_string.decode('utf-8')
+    # filtered_string = filtered_string.decode('utf-8')
     pretty = highlight(filtered_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
                                                                    prestyles="background:#272822;color:#fff;",
                                                                    encoding='utf-8'))
     db.set('%s:content' % this_log, pretty.decode('utf-8'))
+
 
 def publish_build_ouput(container=None, this_log=None):
     if not container or not this_log:
@@ -319,39 +334,30 @@ def publish_build_ouput(container=None, this_log=None):
     content = []
     for line in output:
         time.sleep(.05)
-        if not line or line == '' or "Antergos Automated Build Server" in line or "--passphrase" in line:
+        if not line or line == '' or "Antergos Automated Build Server" in line or "--passphrase" in line \
+                or 'makepkg]# PS1="' in line:
             continue
         line = line.rstrip()
         end = line[20:]
         if end not in nodup:
             nodup.add(end)
-            #line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
-            #bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
+            line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
+            # bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
             #if bad_date:
             #    line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
-            if len(line) > 210:
-                part1 = line[:210]
-                part2 = line[211:]
-                content.append(part1)
-                db.publish('build-output', part1)
-                content.append('[' + datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p") + ']: ' + part2)
-                db.publish('build-output', '[' + datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p") + ']: ' + part2)
-                # db.rpush('%s:content' % this_log, part1)
-            else:
-                content.append(line)
-                db.publish('build-output', line)
+            content.append(line)
+            db.publish('build-output', line)
 
     db.publish('build-output', 'ENDOFLOG')
     content = '\n '.join(content)
     pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                   prestyles="background:#272822;color:#fff;",
-                                                                   encoding='utf-8'))
+                                                           prestyles="background:#272822;color:#fff;",
+                                                           encoding='utf-8'))
     db.set('%s:content' % this_log, pretty.decode('utf-8'))
 
 
 def build_pkgs(last=False):
-
     # Create our tmp directories
     repo = os.path.join("/tmp", "result")
     cache = os.path.join("/tmp", "pkg_cache")
@@ -391,7 +397,7 @@ def build_pkgs(last=False):
             container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
                                              name=pkg,
                                              volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg', '/root/.gnupg',
-                                                      '/staging', '/32bit', '/32build'])
+                                                      '/staging', '/32bit', '/32build', '/result'])
         except Exception as err:
             logger.error('Create container failed. Error Msg: %s' % err)
             failed = True
@@ -442,6 +448,11 @@ def build_pkgs(last=False):
                     {
                         'bind': '/32build',
                         'ro': False
+                    },
+                '/tmp/result':
+                    {
+                        'bind': '/result',
+                        'ro': False
                     }
             }, privileged=True)
             cont = db.get('container')
@@ -452,7 +463,7 @@ def build_pkgs(last=False):
             logger.error('Start container failed. Error Msg: %s' % err)
             failed = True
             continue
-        db.publish('build-ouput', 'ENDOFLOG')
+        #db.publish('build-ouput', 'ENDOFLOG')
         # stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
         # log_stream = stream.split('\n')
         # db_filter_and_add(log_stream, this_log)
@@ -471,23 +482,28 @@ def build_pkgs(last=False):
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        #doc.remove_container(container)
+        # doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
-        caches = db.scan_iter('*_cache*', 3)
-        for cache in caches:
-            logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % cache)
-            db.delete(cache)
+        try:
+            db_caches = db.scan_iter(match='*_cache*', count=3)
+            for db_cache in db_caches:
+                logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % db_cache)
+                db.delete(db_cache)
+        except Exception as err:
+            logger.error(err)
 
         if last:
             db.set('idle', "True")
             db.set('building', 'Idle')
-            # try:
-            # shutil.rmtree(repo)
-            #     shutil.rmtree(cache)
-            #     shutil.rmtree('/opt/antergos-packages')
-            # except Exception:
-            #     pass
+            try:
+                shutil.rmtree(repo)
+                shutil.rmtree(cache)
+                shutil.rmtree('/opt/antergos-packages')
+                shutil.rmtree('/tmp/32bit')
+                shutil.rmtree('/tmp/32build')
+            except Exception:
+                pass
         else:
             db.set('building', 'Starting next build in queue...')
 
@@ -497,7 +513,7 @@ def build_pkgs(last=False):
         db.delete('repo-count-staging')
         db.delete('repo-count-main')
 
-    #logger.info('Moving pkgs into repo and updating repo database')
+    # logger.info('Moving pkgs into repo and updating repo database')
     # try:
     #     repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
     #                                           volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
@@ -568,8 +584,8 @@ def build_iso():
                 os.remove(flag)
         # Initiate communication with docker daemon
         try:
-            doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
-            iso_container = doc.create_container("lots0logs/antergos-iso",
+            doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
+            iso_container = doc.create_container("antergos/mkarchiso",
                                                  volumes=['/var/cache/pacman', '/antergos-iso/configs/antergos/out',
                                                           '/var/run/dbus', '/start', '/sys/fs/cgroup'], tty=True,
                                                  name=['antergos-iso-%s' % arch], cpu_shares=512)
@@ -608,7 +624,7 @@ def build_iso():
             })
 
             cont = db.get('container')
-            stream_process = Process(target=publish_build_ouput, args=(cont,))
+            stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
             doc.wait(iso_container)
 
@@ -616,11 +632,7 @@ def build_iso():
             logger.error("Cant start container. Error msg: %s", err)
             break
 
-        db.publish('build-ouput', 'ENDOFLOG')
-
-        stream = doc.logs(iso_container, stdout=True, stderr=True, timestamps=True)
-        log_stream = stream.split('\n')
-        db_filter_and_add(log_stream, this_log)
+        db.publish('build-output', 'ENDOFLOG')
 
         pkg = 'antergos-iso-%s' % arch
         iso_dir = os.listdir('/srv/antergos.org/')
@@ -632,8 +644,6 @@ def build_iso():
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-
-
 
     try:
         shutil.rmtree('/opt/antergos-packages')

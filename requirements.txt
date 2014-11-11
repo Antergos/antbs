@@ -1,3 +1,5 @@
+gevent
+pygments
 ipaddress
 requests
 Flask>=0.10.1

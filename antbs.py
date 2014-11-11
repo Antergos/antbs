@@ -18,7 +18,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-#  MA 02110-1301, USA.
+# MA 02110-1301, USA.
 
 """Import the main class from the "Flask" library that we need to create our
 web application, as well as the `render_template` function for returning
@@ -29,27 +29,28 @@ stuff like that."""
 import ipaddress
 import json
 import subprocess
-import time
 import os
+import logging
+import logging.config
+import logging.handlers
+import glob
+import shutil
+from datetime import datetime, timedelta
+
 from rq import Queue, Connection, Worker
 from flask import Flask, request, Response, abort, render_template
 from werkzeug.contrib.fixers import ProxyFix
 import requests
 import docker
+from flask.ext.stormpath import StormpathManager, groups_required, user
+
 import src.build_pkg as builder
 from src.redis_connection import db
-import logging
-import logging.config
-import logging.handlers
 import src.logging_config as logconf
-import glob
-import re
-import shutil
-from flask.ext.stormpath import StormpathManager, groups_required, user
-from datetime import datetime, timedelta
 import newrelic
 import gevent
 import gevent.monkey
+
 
 gevent.monkey.patch_all()
 
@@ -93,15 +94,21 @@ logging.config.dictConfig(logconf.log_config)
 
 def handle_worker_exception(job, *exc_info):
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
+
     container = db.get('container')
-    doc.kill(container)
-    doc.remove_container(container)
+    queue = db.lrange('queue', 0, -1)
+    try:
+        doc.kill(container)
+        doc.remove_container(container)
+    except Exception:
+        logger.error('Unable to kill container')
     repo = os.path.join("/tmp", "staging")
     cache = os.path.join("/tmp", "pkg_cache")
     try:
         shutil.rmtree(repo)
         shutil.rmtree(cache)
         shutil.rmtree('/opt/antergos-packages')
+        subprocess.check_call(['/usr/bin/docker-clean.sh'])
     except Exception:
         pass
     db.set('idle', "True")
@@ -109,7 +116,23 @@ def handle_worker_exception(job, *exc_info):
     db.set('container', '')
     db.set('building_num', '')
     db.set('building_start', '')
-    db.ltrim('queue', 0, 0)
+    if queue:
+        first = True
+        last = False
+        last_pkg = queue[-1]
+        for p in queue:
+            if p == last_pkg:
+                last = True
+            queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
+            first = False
+        return False
+    else:
+        p = db.get('copying_to_main')
+        if p and p is not None:
+            queue.enqueue_call(builder.update_main_repo, args=(p,), timeout=9600)
+            return False
+
+        return True
 
 
 with Connection(db):
@@ -121,13 +144,13 @@ def stream_template(template_name, **context):
     app.update_template_context(context)
     t = app.jinja_env.get_template(template_name)
     rv = t.stream(context)
-    #rv.enable_buffering(5)
+    # rv.enable_buffering(5)
     rv.disable_buffering()
     return rv
 
 
 def get_log_stream(bnum=None):
-    #doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
+    # doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
     is_idle = db.get('idle')
     now_building = db.get('building')
     container = db.get('container')
@@ -216,7 +239,7 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
     pending_rev_cache = not db.exists('pending_rev_cache') and logged_in
     logger.info('[GET_BUILD_INFO] - CALLED')
     all_pages = 1
-    if any(not i for i in(pkg_info_cache, rev_info_cache, pending_rev_cache)):
+    if any(not i for i in (pkg_info_cache, rev_info_cache, pending_rev_cache)):
         logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION SATISFIED')
         try:
             all_builds = db.lrange(status, 0, -1)
@@ -227,7 +250,7 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
         rev_pending = []
 
         if all_builds is not None:
-            #builds, all_pages = get_paginated(all_builds, 10, page)
+            # builds, all_pages = get_paginated(all_builds, 10, page)
             for build in all_builds:
                 try:
                     pkg = db.get('build_log:%s:pkg' % build)
@@ -258,7 +281,7 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
             if review:
                 db.setex('rev_info_cache', 10800, pkg_list)
             else:
-                db.setex('pkg_info_cache:%s' % status,  10800, pkg_list)
+                db.setex('pkg_info_cache:%s' % status, 10800, pkg_list)
             db.setex('pending_rev_cache', 10800, rev_pending)
     else:
         logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION NOT SATISFIED')
@@ -278,8 +301,9 @@ def copy(src, dst):
     else:
         shutil.copy(src, dst)
 
+
 def set_pkg_review_result(bnum=None, dev=None, result=None):
-    if not all(i is not None for i in (bnum, dev, result)):
+    if any(i is None for i in (bnum, dev, result)):
         abort(500)
     errmsg = dict(error=False, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -288,16 +312,25 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
         pkg = db.get('build_log:%s:pkg' % bnum)
-        pkg_files = glob.glob('%s/*/%s*.*' % (STAGING_REPO, pkg))
+        logger.info('[UPDATE REPO]: pkg is %s' % pkg)
+        logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
+        pkg_files_64 = glob.glob('%s/%s***' % (STAGING_64, pkg))
+        pkg_files_32 = glob.glob('%s/%s***' % (STAGING_32, pkg))
+        pkg_files = pkg_files_64 + pkg_files_32
+        logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
         logger.info('[PKG_FILES]:')
         if pkg_files and pkg_files is not None:
             logger.info(pkg_files)
-            for file in pkg_files:
-                copy(file, MAIN_REPO)
+            for file in pkg_files_64:
+                copy(file, MAIN_64)
+                os.remove(file)
+            for file in pkg_files_32:
+                copy(file, MAIN_32)
+                os.remove(file)
+        db.set('copying_to_main', pkg)
+        queue.enqueue_call(builder.update_main_repo, args=(pkg,), timeout=9600)
     except Exception as err:
         errmsg = dict(error=True, msg=err)
-
-    queue.enqueue_call(builder.update_main_repo, timeout=9600)
 
     return errmsg
 
@@ -310,6 +343,7 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_error(e):
     return render_template('500.html'), 500
+
 
 @app.route("/")
 def homepage():
@@ -373,9 +407,11 @@ def build():
         container = None
     bnum = db.get('building_num')
     start = db.get('building_start')
+    ver = db.get('build_log:%s:version' % bnum)
 
-    return render_template("building.html", idle=is_idle, building=now_building, container=container, bnum=bnum, start=start)
-    #return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
+    return render_template("building.html", idle=is_idle, building=now_building, container=container, bnum=bnum,
+                           start=start, ver=ver)
+    # return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
     #                                container=container))
 
 
@@ -391,6 +427,7 @@ def get_log():
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
     is_phab = None
+    repo = None
     if request.method == 'GET':
         return ' Nothing to see here, move along ...'
 
@@ -414,7 +451,7 @@ def hooked():
             if request.headers.get('X-GitHub-Event') != "push":
                 return json.dumps({'msg': "wrong event type"})
     changes = []
-    if is_phab:
+    if is_phab and not request.args['repo'] == "CN":
         repo = 'antergos-packages'
         db.set('pullFrom', 'lots0logs')
         the_queue = list(db.lrange('queue', 0, -1))
@@ -436,10 +473,34 @@ def hooked():
                 changes.append(list(nx_pkg))
             else:
                 return json.dumps({'msg': 'OK!'})
+    elif is_phab and request.args['repo'] == "CN":
+        cnchi_git = '/var/repo/CN'
+        cnchi_clone = '/tmp/cnchi'
+        git = '/tmp/cnchi/.git'
+
+        try:
+            os.remove('/tmp/cnchi.tar')
+            os.remove('/srv/antergos.org/cnchi.tar')
+            shutil.rmtree(cnchi_clone)
+        except Exception as err:
+            logger.error(err)
+            pass
+
+        try:
+            subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
+
+            shutil.rmtree(git)
+
+            subprocess.check_call(['tar', '-cf', 'cnchi.tar', cnchi_clone],
+                                  cwd='/tmp')
+            shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
+            pass
     else:
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']
-        if 'lots0logs' in full_name:
+        if 'lots0logs' in full_name and 'antergos/' not in full_name:
             db.set('pullFrom', 'lots0logs')
         else:
             db.set('pullFrom', 'antergos')
@@ -481,12 +542,14 @@ def hooked():
 
     elif repo == "antergos-iso":
         last = db.get('pkg:antergos-iso:last_commit')
-        if (last and (datetime.now() - last) > timedelta(hours=1)) or (last and (last is None or last == '0')):
-            db.set('idle', 'False')
-            db.set('building', "Initializing...")
-            db.set('isoFlag', 'True')
-            db.set('pkg:antergos-iso:last_commit', datetime.now())
-            queue.enqueue_call(builder.handle_hook, timeout=10000)
+        #if not last or last is None or last == '0':
+        db.set('idle', 'False')
+        db.set('building', "Initializing...")
+        db.set('isoFlag', 'True')
+        #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
+        queue.enqueue_call(builder.handle_hook, timeout=10000)
+        #else:
+        #    logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
 
     return json.dumps({'msg': 'OK!'})
 
@@ -594,7 +657,7 @@ def dev_pkg_check():
     set_rev_error_msg = None
     review = True
     uname = user.username
-    #if page is None:
+    # if page is None:
     page = 1
     if request.method == 'POST':
         payload = json.loads(request.data)
@@ -617,7 +680,8 @@ def dev_pkg_check():
     completed, all_pages, rev_pending = get_build_info(page, status, True, True)
 
     return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages, page=page,
-                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, uname=uname, rev_pending=rev_pending, user=user)
+                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, uname=uname,
+                           rev_pending=rev_pending, user=user)
 
 
 # Some boilerplate code that just says "if you're running this from the command
