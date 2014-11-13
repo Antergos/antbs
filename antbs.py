@@ -93,6 +93,7 @@ logging.config.dictConfig(logconf.log_config)
 
 
 def handle_worker_exception(job, *exc_info):
+    #TODO: This needs a total rewrite
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
 
     container = db.get('container')
@@ -140,98 +141,40 @@ with Connection(db):
     w = Worker([queue], exc_handler=handle_worker_exception)
 
 
-def stream_template(template_name, **context):
-    app.update_template_context(context)
-    t = app.jinja_env.get_template(template_name)
-    rv = t.stream(context)
-    # rv.enable_buffering(5)
-    rv.disable_buffering()
-    return rv
-
-
-def get_log_stream(bnum=None):
-    # doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
-    is_idle = db.get('idle')
-    now_building = db.get('building')
-    container = db.get('container')
-    if bnum is not None:
-        log = db.lrange('build_log:%s:content' % bnum, 0, -1)
-        log_end = db.lrange('build_log:%s:content' % bnum, -1, -1)
-        nodata = ['data: Unable to retrieve build log.\n\n']
-        if not log:
-            for line in nodata:
-                yield line
-            yield 'data: ENDOFLOG\n\n'
-        else:
-            for line in log:
-                yield 'data: %s\n\n' % line
-            yield 'data: ENDOFLOG\n\n'
-    else:
-        nodata = ['data: There are no active builds.\n\n']
-        if is_idle == "True" or now_building == "Idle" or now_building == 'Initializing...':
-            app.logger.debug("No active container detected")
-            for line in nodata:
-                yield line
-            yield 'data: ENDOFLOG\n\n'
-        else:
-            #doclog = doc.logs(container, stdout=True, stderr=True, stream=True, timestamps=True)
-            proc = subprocess.Popen(['docker', 'logs', '--follow', '-t', container], stdout=subprocess.PIPE)
-            stream = iter(proc.stdout.readline, '')
-            nodup = set()
-            part2 = None
-            random = os.urandom(12)
-            db.set('stream:%s' % random, 'True')
-            db.expire('stream:%s' % random, 22)
-            session = db.exists('stream:%s' % random)
-            for line in stream:
-                if not session:
-                    yield 'data: PINGPING\n\n'
-                    db.set('stream:%s' % random, 'True')
-                    db.expire('stream:%s' % random, 22)
-                if not line or line == '':
-                    continue
-                line = line.rstrip()
-                end = line[20:]
-                if end not in nodup:
-                    gevent.sleep(.05)
-                    nodup.add(end)
-                    line = line.replace("can't", "can not")
-                    #if len(line) > 210:
-                    #    part1 = line[:210]
-                    #    part2 = line[211:]
-                    #    yield 'data: %s\n\n' % part1
-                    #   continue
-                    #elif part2:
-                    #   yield 'data: %s\n\n' % part2
-                    #   part2 = None
-                    #   continue
-                    #else:
-                    yield 'data: %s\n\n' % line
-            yield 'data: ENDOFLOG\n\n'
+# def stream_template(template_name, **context):
+#     app.update_template_context(context)
+#     t = app.jinja_env.get_template(template_name)
+#     rv = t.stream(context)
+#     # rv.enable_buffering(5)
+#     rv.disable_buffering()
+#     return rv
 
 
 def get_live_build_ouput():
-    pubsub = db.pubsub()
-    pubsub.subscribe('build-output')
-    for message in pubsub.listen():
+    psub = db.pubsub()
+    psub.subscribe('build-output')
+    while True:
+        message = psub.get_message()
+        if message:
+            if message['data'] == '1' or message['data'] == 1:
+                message['data'] = '...'
+            yield 'data: %s\n\n' % message['data']
         gevent.sleep(.05)
-        if message['data'] == '1' or message['data'] == 1:
-            message['data'] = '...'
-        yield 'data: %s\n\n' % message['data']
 
-
-def get_paginated(pkg_list, per_page, page):
-    pkg_list.reverse()
-    page -= 1
-    paginated = [pkg_list[i:i + per_page] for i in range(0, len(pkg_list), per_page)]
-    logger.info(paginated)
-    this_page = paginated[page]
-    all_pages = len(paginated)
-
-    return this_page, all_pages
+# Not using this yet.
+# def get_paginated(pkg_list, per_page, page):
+#     pkg_list.reverse()
+#     page -= 1
+#     paginated = [pkg_list[i:i + per_page] for i in range(0, len(pkg_list), per_page)]
+#     logger.info(paginated)
+#     this_page = paginated[page]
+#     all_pages = len(paginated)
+#
+#     return this_page, all_pages
 
 
 def get_build_info(page=None, status=None, logged_in=False, review=False):
+    # TODO: I don't like this. Need to come up with something better.
     if page is None or status is None:
         abort(500)
     pkg_info_cache = db.exists('pkg_info_cache:%s' % status)
@@ -299,10 +242,16 @@ def copy(src, dst):
         linkto = os.readlink(src)
         os.symlink(linkto, dst)
     else:
-        shutil.copy(src, dst)
+        try:
+            shutil.copy(src, dst)
+        except shutil.SameFileError:
+            pass
+        except shutil.Error:
+            pass
 
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
+    # TODO: This is garbage. Needs rewrite.
     if any(i is None for i in (bnum, dev, result)):
         abort(500)
     errmsg = dict(error=False, msg=None)
@@ -314,6 +263,9 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         pkg = db.get('build_log:%s:pkg' % bnum)
         logger.info('[UPDATE REPO]: pkg is %s' % pkg)
         logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
+        old_files_64 = glob.glob('%s/%s***' % (MAIN_64, pkg))
+        old_files_32 = glob.glob('%s/%s***' % (MAIN_32, pkg))
+        old_files = old_files_64 + old_files_32
         pkg_files_64 = glob.glob('%s/%s***' % (STAGING_64, pkg))
         pkg_files_32 = glob.glob('%s/%s***' % (STAGING_32, pkg))
         pkg_files = pkg_files_64 + pkg_files_32
@@ -323,13 +275,32 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             logger.info(pkg_files)
             for file in pkg_files_64:
                 copy(file, MAIN_64)
-                os.remove(file)
+                try:
+                    shutil.move(file, '/tmp')
+                except shutil.SameFileError:
+                    pass
+                except Exception:
+                    pass
             for file in pkg_files_32:
                 copy(file, MAIN_32)
-                os.remove(file)
+                try:
+                    shutil.move(file, '/tmp')
+                except shutil.SameFileError:
+                    pass
+                except Exception:
+                    pass
+            if old_files and old_files is not None:
+                logger.info(old_files)
+                for file in old_files_64:
+                    os.remove(file)
+                for file in old_files_32:
+                    os.remove(file)
         db.set('copying_to_main', pkg)
         queue.enqueue_call(builder.update_main_repo, args=(pkg,), timeout=9600)
+    except OSError as err:
+        pass
     except Exception as err:
+        err = str(err)
         errmsg = dict(error=True, msg=err)
 
     return errmsg
@@ -352,7 +323,6 @@ def homepage():
     stats = {}
     for stat in check_stats:
         res = db.llen(stat)
-        stats[stat] = res
         if stat is not "queue":
             builds = db.lrange(stat, 0, -1)
             within = []
@@ -361,7 +331,9 @@ def homepage():
                 end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
                 if (datetime.now() - end_fmt) < timedelta(hours=72):
                     within.append(build)
-                stats[stat] = len(within)
+            stats[stat] = len(within)
+        else:
+            stats[stat] = res
 
     repos = ['main', 'staging']
     x86_64 = None
@@ -668,7 +640,7 @@ def dev_pkg_check():
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')
-                message = dict(error=set_rev_error)
+                message = dict(error=set_review)
                 return json.dumps(message)
             else:
                 message = dict(msg='ok')

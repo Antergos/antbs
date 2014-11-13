@@ -255,12 +255,16 @@ def handle_hook(first=False, last=False):
 
 def update_main_repo(pkg=None):
     if pkg:
+        result = '/tmp/result'
+        if os.path.exists(result):
+            shutil.rmtree(result)
+        os.mkdir(result, 0o777)
         command = "/makepkg/build.sh update_repo %s" % pkg
         pkgenv = "_PKGNAME=%s" % pkg
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=[pkgenv],
-                                             volumes=['/makepkg', '/root/.gnupg', '/main'])
+                                             volumes=['/makepkg', '/root/.gnupg', '/main', '/result'])
             doc.start(container, binds={
                 DOC_DIR:
                     {
@@ -276,6 +280,11 @@ def update_main_repo(pkg=None):
                     {
                         'bind': '/root/.gnupg',
                         'ro': False
+                    },
+                '/tmp/result':
+                    {
+                        'bind': '/result',
+                        'ro': False
                     }
             }, privileged=True)
             this_log = 'repo_update_log'
@@ -286,6 +295,7 @@ def update_main_repo(pkg=None):
             logger.error('Start container failed. Error Msg: %s' % err)
             return
             # doc.remove_container(container)
+
 
 
 
@@ -559,7 +569,7 @@ def build_pkgs(last=False):
 
 def build_iso():
     iso_arch = ['x86_64', 'i686']
-
+    db.set('pkg_count_iso', '0')
     for arch in iso_arch:
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -616,6 +626,11 @@ def build_iso():
                         'bind': '/antergos-iso/configs/antergos/out',
                         'ro': False
                     },
+                '/srv/antergos.info/repo/antergos':
+                    {
+                        'bind': '/srv/antergos.info/repo/antergos',
+                        'ro': True
+                    },
                 '/sys/fs/cgroup':
                     {
                         'bind': '/sys/fs/cgroup',
@@ -633,12 +648,15 @@ def build_iso():
             break
 
         db.publish('build-output', 'ENDOFLOG')
+        db.set('%s:end' % this_log, datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
 
-        pkg = 'antergos-iso-%s' % arch
-        iso_dir = os.listdir('/srv/antergos.org/')
-        if pkg in iso_dir:
+        in_dir = len([name for name in os.listdir('/srv/antergos.org/')])
+        last_count = int(db.get('pkg_count_iso'))
+        if in_dir > last_count:
+            db.incr('pkg_count_iso', (in_dir - last_count))
             db.rpush('completed', build_id)
             db.set('%s:result' % this_log, 'completed')
+            #db.set('%s:review_stat' % this_log, '1')
         else:
             logger.error('antergos-iso-%s not found after container exit.' % arch)
             failed = True

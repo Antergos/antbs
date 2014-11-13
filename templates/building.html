@@ -97,6 +97,7 @@
                     sse.onmessage = function (message) {
 
                         if (message.data.indexOf('ENDOFLOG') >= 0) {
+                            console.log('ENDOFLOG');
                             sse.close();
                             jQuery('.fa-spin').removeClass('fa-spin');
                             jQuery('.header_dark h5').css('color', 'transparent');
@@ -106,6 +107,7 @@
                             editor.insert(message.data);
                             jQuery('.fa-spin').removeClass('fa-spin');
                             jQuery('.header_dark h5').css('color', 'transparent');
+                            console.log('NO ACTIVE BUILDS');
                             sse.close();
                             return;
                         }
