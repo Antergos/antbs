@@ -6,4 +6,3 @@ build.sh
 repo*.sh
 *pycache
 *expect*.conf
-src/repo-add_and_sign

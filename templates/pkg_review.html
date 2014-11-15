@@ -121,7 +121,7 @@
                             $('.clicked').parents('td').find(res).show();
                             $('.clicked').removeClass('clicked').parents('.btn-group').hide();
                         } else {
-                            alert('Unable to save result.')
+                            alert('Unable to save result. Server Error Msg:\n' + result['msg']);
                         }
                     }
 

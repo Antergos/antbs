@@ -141,11 +141,10 @@ def get_deps(package):
     with open(pbfile) as PKGBUILD:
         for line in PKGBUILD:
             if line.startswith("depends") or line.startswith("makedepends"):
-                dep_line = line.split('=')
+                dep_line = line.split('=', 1)
                 dep_str = dep_line[1].rstrip()
-                dep_str = dep_str.replace('(', '')
-                dep_str = dep_str.replace(')', '')
-                dep_str = dep_str.replace("'", '')
+                for c in ['(', ')', "'", '"']:
+                    dep_str = dep_str.replace(c, '')
                 deps = dep_str.split(' ')
                 for dep in deps:
                     depends.append(dep)
@@ -274,6 +273,11 @@ def update_main_repo(pkg=None):
                 '/srv/antergos.info/repo/antergos':
                     {
                         'bind': '/main',
+                        'ro': False
+                    },
+                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+                    {
+                        'bind': '/staging',
                         'ro': False
                     },
                 '/root/.gnupg':

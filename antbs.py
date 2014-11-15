@@ -277,16 +277,12 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 copy(file, MAIN_64)
                 try:
                     shutil.move(file, '/tmp')
-                except shutil.SameFileError:
-                    pass
                 except Exception:
                     pass
             for file in pkg_files_32:
                 copy(file, MAIN_32)
                 try:
                     shutil.move(file, '/tmp')
-                except shutil.SameFileError:
-                    pass
                 except Exception:
                     pass
             if old_files and old_files is not None:
@@ -361,11 +357,12 @@ def homepage():
                 new_fp = os.path.basename(fp)
                 new_fp = new_fp.split('.')
                 new_fp = new_fp[0]
-                filtered.append(new_fp)
+                if 'dummy-package' not in new_fp:
+                    filtered.append(new_fp)
             stats['repo_' + repo] = len(set(filtered))
             db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
 
-    return render_template("overview.html", idle=is_idle, stats=stats)
+    return render_template("overview.html", idle=is_idle, stats=stats, user=user)
 
 
 @app.route("/building")
@@ -597,7 +594,7 @@ def build_info(num):
         container = None
 
     return render_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
-                           bnum=bnum, container=container, log=log)
+                           bnum=bnum, container=container, log=log, user=user)
 
 
 @app.route('/browse/<goto>')
@@ -617,7 +614,8 @@ def repo_browser(goto=None):
         main = True
         template = "repo_browser_main.html"
 
-    return render_template(template, idle=is_idle, building=building, release=release, testing=testing, main=main)
+    return render_template(template, idle=is_idle, building=building, release=release, testing=testing,
+                           main=main, user=user)
 
 
 @app.route('/pkg_review', methods=['POST', 'GET'])
