@@ -118,6 +118,10 @@
                             padding: 22px;
                         }
 
+                        #build_now_form {
+                            display: inline-block;
+                        }
+
                     </style>
                 {%- endblock styles %}
             {%- endblock head %}
@@ -203,7 +207,12 @@
                         </div>
                     </div>
                     <div class="text-right collapse-button" style="padding:7px 9px;">
-                        <input type="text" class="form-control search" placeholder="Search..."/>
+                        {% if user.is_authenticated() %}
+                            <form action="/build_pkg_now" role="form" id="build_now_form" method="post">
+                                <input type="text" class="form-control search" name="pkgname" id="pkgname"
+                                       placeholder="Build Now..."/>
+                            </form>
+                        {% endif %}
                         <button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
                                                                                           class="fa fa-angle-left"></i>
                         </button>
@@ -231,9 +240,15 @@
                                     </li>
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
+                                        <li class="button" data-toggle="tooltip"
+                                            title="Status:
+                                                    {% if idle == False %}{{ building }}{% else %}Idle{% endif %}"
+                                            data-placement="bottom"><a href="#"><i
+                                                class="fa {% if idle == False %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a></li>
                                         <li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}"
                                             data-toggle="tooltip"
-                                            title="Packages Pending Review">
+                                            title="Pending Review"
+                                            data-placement="bottom">
                                             <a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle"
                                                data-toggle="dropdown"{% endif %}><i
                                                     class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
@@ -282,7 +297,11 @@
                                     </li>
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
-                                        <!-- Menu Notification Items -->
+                                        <li class="button" data-toggle="tooltip"
+                                                                                title="Status:
+                                                                                        {% if idle == False %}{{ building }}{% else %}Idle{% endif %}"
+                                                                                data-placement="bottom"><a href="#"><i
+                                                                                    class="fa {% if idle == False %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a></li>
                                     </ul>
                                 {% endif %}
 
@@ -358,6 +377,8 @@
                         jQuery('pre').addClass('pre-scrollable');
                     });
                     jQuery(window).load(function () {
+                        jQuery('[data-toggle="tooltip"]').tooltip();
+
                         jQuery('.loading').fadeIn();
                         if (jQuery('table').length && !jQuery('#noDt').length) {
 

@@ -589,7 +589,7 @@ def build_iso():
         db.set('%s:pkg' % this_log, 'antergos-iso-%s' % arch)
         db.rpush('pkg:antergos-iso-%s:build_logs' % arch, build_id)
 
-        flag = '/srv/antergos.org/ISO32'
+        flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
         if arch is 'i686':
             if not os.path.exists(flag):
                 open(flag, 'a').close()
@@ -625,7 +625,7 @@ def build_iso():
                         'bind': '/var/run/dbus',
                         'ro': False
                     },
-                '/srv/antergos.org':
+                '/srv/antergos.info/repo/iso/testing':
                     {
                         'bind': '/antergos-iso/configs/antergos/out',
                         'ro': False
@@ -654,7 +654,7 @@ def build_iso():
         db.publish('build-output', 'ENDOFLOG')
         db.set('%s:end' % this_log, datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
 
-        in_dir = len([name for name in os.listdir('/srv/antergos.org/')])
+        in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
         last_count = int(db.get('pkg_count_iso'))
         if in_dir > last_count:
             db.incr('pkg_count_iso', (in_dir - last_count))

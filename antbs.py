@@ -38,7 +38,7 @@ import shutil
 from datetime import datetime, timedelta
 
 from rq import Queue, Connection, Worker
-from flask import Flask, request, Response, abort, render_template
+from flask import Flask, request, Response, abort, render_template, url_for, redirect
 from werkzeug.contrib.fixers import ProxyFix
 import requests
 import docker
@@ -93,7 +93,7 @@ logging.config.dictConfig(logconf.log_config)
 
 
 def handle_worker_exception(job, *exc_info):
-    #TODO: This needs a total rewrite
+    # TODO: This needs a total rewrite
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
 
     container = db.get('container')
@@ -142,7 +142,7 @@ with Connection(db):
 
 
 # def stream_template(template_name, **context):
-#     app.update_template_context(context)
+# app.update_template_context(context)
 #     t = app.jinja_env.get_template(template_name)
 #     rv = t.stream(context)
 #     # rv.enable_buffering(5)
@@ -160,6 +160,7 @@ def get_live_build_ouput():
                 message['data'] = '...'
             yield 'data: %s\n\n' % message['data']
         gevent.sleep(.05)
+
 
 # Not using this yet.
 # def get_paginated(pkg_list, per_page, page):
@@ -248,6 +249,10 @@ def copy(src, dst):
             pass
         except shutil.Error:
             pass
+
+
+def redirect_url(default='homepage'):
+    return request.args.get('next') or request.referrer or url_for(default)
 
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
@@ -355,8 +360,6 @@ def homepage():
         if not cached or cached is None:
             for fp in all_p:
                 new_fp = os.path.basename(fp)
-                new_fp = new_fp.split('.')
-                new_fp = new_fp[0]
                 if 'dummy-package' not in new_fp:
                     filtered.append(new_fp)
             stats['repo_' + repo] = len(set(filtered))
@@ -652,6 +655,24 @@ def dev_pkg_check():
     return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages, page=page,
                            set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, uname=uname,
                            rev_pending=rev_pending, user=user)
+
+
+@app.route('/build_pkg_now', methods=['POST', 'GET'])
+@groups_required(['admin'])
+def build_pkg_now():
+    if request.method == 'POST':
+        pkgname = request.form['pkgname']
+        if not pkgname or pkgname is None:
+            abort(500)
+        db.rpush('queue', pkgname)
+        if 'antergos-iso' in pkgname:
+            db.set('isoFlag', 'True')
+        db.set('idle', 'False')
+        db.set('building', "Initializing...")
+
+        queue.enqueue_call(builder.handle_hook, args=(True, True), timeout=9600)
+
+    return redirect(redirect_url())
 
 
 # Some boilerplate code that just says "if you're running this from the command

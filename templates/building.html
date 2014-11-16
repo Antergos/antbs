@@ -93,26 +93,29 @@
                     editor.clearSelection();
                     var doc = editor.getSession().getDocument();
                     sse = new EventSource('/get_log');
-                    var noBuilds = false;
+                    var endOfLog = false;
                     sse.onmessage = function (message) {
+                        if (false === endOfLog) {
+                            if (message.data.indexOf('ENDOFLOG') >= 0) {
+                                console.log('ENDOFLOG');
+                                endOfLog = true;
+                                sse.close();
+                                jQuery('.fa-spin').removeClass('fa-spin');
+                                jQuery('.header_dark h5').css('color', 'transparent');
+                                return;
+                            }
+                            if (message.data.indexOf("There are no active builds") >= 0) {
+                                editor.insert(message.data);
+                                jQuery('.fa-spin').removeClass('fa-spin');
+                                jQuery('.header_dark h5').css('color', 'transparent');
+                                console.log('NO ACTIVE BUILDS');
 
-                        if (message.data.indexOf('ENDOFLOG') >= 0) {
-                            console.log('ENDOFLOG');
-                            sse.close();
-                            jQuery('.fa-spin').removeClass('fa-spin');
-                            jQuery('.header_dark h5').css('color', 'transparent');
-                            return;
+                                sse.close();
+                                return;
+                            }
+                            pos = doc.getLength();
+                            doc.insert({row: pos, column: -1}, '\n' + message.data);
                         }
-                        if (message.data.indexOf("There are no active builds") >= 0) {
-                            editor.insert(message.data);
-                            jQuery('.fa-spin').removeClass('fa-spin');
-                            jQuery('.header_dark h5').css('color', 'transparent');
-                            console.log('NO ACTIVE BUILDS');
-                            sse.close();
-                            return;
-                        }
-                        pos = doc.getLength();
-                        doc.insert({row: pos, column: -1}, '\n' + message.data);
                     }
                 });
     </script>

@@ -1283,6 +1283,7 @@ body.animated #cl-wrapper {
   position: relative;
   vertical-align: top;
   padding-bottom: 200px;
+  max-width: 280px;
 }
 #pcont {
   display: table-cell;
