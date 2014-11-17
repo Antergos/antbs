@@ -321,6 +321,7 @@ def internal_error(e):
 def homepage():
     is_idle = db.get('idle')
     check_stats = ['queue', 'completed', 'failed']
+    building = db.get('building')
     stats = {}
     for stat in check_stats:
         res = db.llen(stat)
@@ -365,7 +366,7 @@ def homepage():
             stats['repo_' + repo] = len(set(filtered))
             db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
 
-    return render_template("overview.html", idle=is_idle, stats=stats, user=user)
+    return render_template("overview.html", idle=is_idle, stats=stats, user=user, building=building)
 
 
 @app.route("/building")

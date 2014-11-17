@@ -254,6 +254,8 @@ def handle_hook(first=False, last=False):
 
 def update_main_repo(pkg=None):
     if pkg:
+        db.set('idle', 'False')
+        db.set('building', 'Updating Main Repo')
         result = '/tmp/result'
         if os.path.exists(result):
             shutil.rmtree(result)
@@ -297,8 +299,12 @@ def update_main_repo(pkg=None):
             doc.wait(container)
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
-            return
+            db.set('idle', 'True')
+            db.set('building', '')
+            return False
             # doc.remove_container(container)
+        db.set('idle', 'True')
+        db.set('building', '')
 
 
 
@@ -381,8 +387,9 @@ def build_pkgs(last=False):
     pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     for i in range(len(pkglist1)):
-        failed = False
         pkg = db.lpop('queue')
+        db.set('building', 'Building: %s' % pkg)
+        failed = False
         if pkg is None or pkg == '':
             continue
         logger.info('Building %s' % pkg)
@@ -397,7 +404,6 @@ def build_pkgs(last=False):
         db.set('%s:start' % this_log, dt)
         db.set('building_start', dt)
         db.set('%s:pkg' % this_log, pkg)
-        db.set('building', pkg)
         db.set('%s:version' % this_log, version)
         pkgdir = os.path.join(REPO_DIR, pkg)
         pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)

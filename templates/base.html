@@ -242,9 +242,10 @@
                                     <ul class="nav navbar-nav not-nav">
                                         <li class="button" data-toggle="tooltip"
                                             title="Status:
-                                                    {% if idle == False %}{{ building }}{% else %}Idle{% endif %}"
-                                            data-placement="bottom"><a href="#"><i
-                                                class="fa {% if idle == False %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a></li>
+                                                    {% if idle == 'False' %}{{ building }}{% else %}Idle{% endif %}"
+                                            data-placement="right"><a href="#"><i
+                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+                                        </li>
                                         <li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}"
                                             data-toggle="tooltip"
                                             title="Pending Review"
@@ -298,10 +299,12 @@
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
                                         <li class="button" data-toggle="tooltip"
-                                                                                title="Status:
-                                                                                        {% if idle == False %}{{ building }}{% else %}Idle{% endif %}"
-                                                                                data-placement="bottom"><a href="#"><i
-                                                                                    class="fa {% if idle == False %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a></li>
+                                            title="Status:
+
+                                                    {% if idle == 'False' %}{{ building }}{% else %}Idle{% endif %}"
+                                            data-placement="right"><a href="#"><i
+                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+                                        </li>
                                     </ul>
                                 {% endif %}
 
