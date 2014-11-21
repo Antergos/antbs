@@ -23,32 +23,35 @@
 """ Logging module """
 
 import logging
+import logging.config
+import src.redis_connection
 
 
-class RedisHandler(logging.Handler):
-    def __init__(self, channel, conn, *args, **kwargs):
-        logging.Handler.__init__(self, *args, **kwargs)
-        self._formatter = logging.Formatter()
-        self.channel = channel
-        self.redis_conn = conn
+# class RedisHandler(logging.Handler):
+#     def __init__(self, channel, conn, *args, **kwargs):
+#         logging.Handler.__init__(self, *args, **kwargs)
+#         self._formatter = logging.Formatter()
+#         self.channel = channel
+#         self.redis_conn = conn
+#
+#     def setFormatter(self, formatter):
+#         self._formatter = formatter
+#
+#     def emit(self, record):
+#         msg = self._formatter.format(record)
+#         try:
+#             self.redis_conn.pipeline() \
+#                 .publish(self.channel, msg) \
+#                 .rpush(self.channel, msg) \
+#                 .ltrim(self.channel, -1000, -1) \
+#                 .execute()
+#
+#         except Exception:
+#             pass
+#db = src.redis_connection.db
+logger = logging.getLogger()
 
-    def setFormatter(self, formatter):
-        self._formatter = formatter
-
-    def emit(self, record):
-        msg = self._formatter.format(record)
-        try:
-            self.redis_conn.pipeline() \
-                .publish(self.channel, msg) \
-                .rpush(self.channel, msg) \
-                .ltrim(self.channel, -1000, -1) \
-                .execute()
-
-        except Exception:
-            pass
-
-
-log_config = {
+logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,
 
@@ -70,15 +73,14 @@ log_config = {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
-            'maxBytes': 500000,
-            'backupCount': 5,
-            'formatter': 'file'
+            'maxBytes': 200000,
+            'backupCount': 5
         },
         'redis': {
             'level': 'INFO',
-            'class': 'src.logging_config.RedisHandler',
+            'class': 'rlog.RedisHandler',
             'channel': 'log_stream',
-            'conn': 'src.redis_connection.db()',
+            'redis_client': src.redis_connection.db,
             'formatter': 'file'
         },
         'email': {
@@ -99,7 +101,7 @@ log_config = {
             'propagate': True
         }
     }
-}
+})
 
 
 

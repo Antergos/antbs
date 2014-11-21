@@ -121,6 +121,19 @@
                         #build_now_form {
                             display: inline-block;
                         }
+                    #status_bar {
+                        display: none;
+                    }
+                    #status_bar span {
+                        float: left;
+                    }
+                    #status_bar_pre {
+                        margin-top: 6px;
+                        margin-bottom: 0px;
+                        float: left;
+                        padding-top: 4px;
+                        padding-bottom: 1px;
+                    }
 
                     </style>
                 {%- endblock styles %}
@@ -240,16 +253,10 @@
                                     </li>
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
-                                        <li class="button" data-toggle="tooltip"
-                                            title="Status:
-                                                    {% if idle == 'False' %}{{ building }}{% else %}Idle{% endif %}"
-                                            data-placement="right"><a href="#"><i
-                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-                                        </li>
                                         <li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}"
                                             data-toggle="tooltip"
                                             title="Pending Review"
-                                            data-placement="bottom">
+                                            data-placement="right">
                                             <a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle"
                                                data-toggle="dropdown"{% endif %}><i
                                                     class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
@@ -283,6 +290,13 @@
                                                 </ul>
                                             {% endif %}
                                         </li>
+                                        <li class="button" {% if idle == 'True' %}data-toggle="tooltip"
+                                            title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
+                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+                                        </li>
+                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% endif %}">
+                                            <pre id="status_bar_pre">Idle</pre>
+                                        </li>
                                     </ul>
 
 
@@ -298,12 +312,12 @@
                                     </li>
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
-                                        <li class="button" data-toggle="tooltip"
-                                            title="Status:
-
-                                                    {% if idle == 'False' %}{{ building }}{% else %}Idle{% endif %}"
-                                            data-placement="right"><a href="#"><i
+                                        <li class="button" {% if idle == 'True' %}data-toggle="tooltip"
+                                            title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
                                                 class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+                                        </li>
+                                        <li id="status_bar" class="button" {% if idle == 'False' %}not-idle"{% endif %}>
+                                            <pre id="status_bar_pre">Idle</pre>
                                         </li>
                                     </ul>
                                 {% endif %}
@@ -377,7 +391,29 @@
                 <script type="text/javascript">
                     //sets up numeric sorting of links
                     jQuery(document).ready(function () {
-                        jQuery('pre').addClass('pre-scrollable');
+                        jQuery('#main pre').addClass('pre-scrollable');
+                        jQuery('.not-idle').show();
+                        function getStatus() {
+                            $.getJSON('/get_status', function(data) {
+                                var current = jQuery('.not-idle').text();
+                                if (data['msg'] !== current) {
+                                    jQuery('.idle').hide();
+                                    jQuery('.not-idle').show();
+                                    jQuery('#status_bar_pre').text(data['msg']);
+                                }
+                                if (data['msg'] == 'Idle' || current == 'Idle') {
+                                    var idleIcon = '<li class="button idle" data-toggle="tooltip" ' +
+                                    'title="Status: Idle" data-placement="right"><a href="#">' +
+                                    '<iclass="fa-dot-circle-o"></i></a></li>';
+                                    jQuery(idleIcon).insertAfter(jQuery('.not-idle'));
+                                    jQuery('.not-idle').hide();
+
+                                }
+                            })
+
+                        }
+                        getStatus();
+                        setInterval( getStatus, 15000 );
                     });
                     jQuery(window).load(function () {
                         jQuery('[data-toggle="tooltip"]').tooltip();

@@ -88,8 +88,7 @@ settings.app_name = 'AntBS'
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
 # Setup logging
-logger = logging.getLogger('')
-logging.config.dictConfig(logconf.log_config)
+logger = logconf.logger
 
 
 def handle_worker_exception(job, *exc_info):
@@ -153,12 +152,20 @@ with Connection(db):
 def get_live_build_ouput():
     psub = db.pubsub()
     psub.subscribe('build-output')
+    last_msg = None
+    first_run = True
     while True:
         message = psub.get_message()
         if message:
             if message['data'] == '1' or message['data'] == 1:
+                if first_run and last_:
+                    message
                 message['data'] = '...'
+
             yield 'data: %s\n\n' % message['data']
+        elif last_msg is not None:
+            yield 'data: %s\n\n' % last_msg
+
         gevent.sleep(.05)
 
 
@@ -213,8 +220,8 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
                 review_date = db.get('build_log:%s:review_date' % bnum)
                 if logged_in and review and review_stat != "pending":
                     continue
-                all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end, review_stat=review_stat,
-                                review_dev=review_dev, review_date=review_date)
+                all_info = dict(bnum=bnum, name=name, version=version, start=start, end=end,
+                                review_stat=review_stat, review_dev=review_dev, review_date=review_date)
                 pkg_info = {bnum: all_info}
                 pkg_list.append(pkg_info)
                 if logged_in and review_stat == "pending" and len(rev_pending) < 5:
@@ -251,6 +258,23 @@ def copy(src, dst):
             pass
 
 
+def remove(src):
+    if os.path.isdir(src):
+        try:
+            shutil.rmtree(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    elif os.path.isfile(src):
+        try:
+            os.remove(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    else:
+        return True
+
+
 def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
 
@@ -265,12 +289,11 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('build_log:%s:review_stat' % bnum, result)
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
+        db.set('idle', 'False')
         pkg = db.get('build_log:%s:pkg' % bnum)
+        db.set('building', 'Updating pkg review status for %s.' % pkg)
         logger.info('[UPDATE REPO]: pkg is %s' % pkg)
         logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
-        old_files_64 = glob.glob('%s/%s***' % (MAIN_64, pkg))
-        old_files_32 = glob.glob('%s/%s***' % (MAIN_32, pkg))
-        old_files = old_files_64 + old_files_32
         pkg_files_64 = glob.glob('%s/%s***' % (STAGING_64, pkg))
         pkg_files_32 = glob.glob('%s/%s***' % (STAGING_32, pkg))
         pkg_files = pkg_files_64 + pkg_files_32
@@ -278,24 +301,15 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         logger.info('[PKG_FILES]:')
         if pkg_files and pkg_files is not None:
             logger.info(pkg_files)
+            db.set('building', 'Moving %s from staging to main repo.' % pkg)
+
             for file in pkg_files_64:
                 copy(file, MAIN_64)
-                try:
-                    shutil.move(file, '/tmp')
-                except Exception:
-                    pass
+                copy(file, '/tmp')
             for file in pkg_files_32:
                 copy(file, MAIN_32)
-                try:
-                    shutil.move(file, '/tmp')
-                except Exception:
-                    pass
-            if old_files and old_files is not None:
-                logger.info(old_files)
-                for file in old_files_64:
-                    os.remove(file)
-                for file in old_files_32:
-                    os.remove(file)
+                copy(file, '/tmp')
+
         db.set('copying_to_main', pkg)
         queue.enqueue_call(builder.update_main_repo, args=(pkg,), timeout=9600)
     except OSError as err:
@@ -339,23 +353,20 @@ def homepage():
 
     repos = ['main', 'staging']
     x86_64 = None
-    i686 = None
     cached = None
     for repo in repos:
         if repo == 'main':
-            x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.*.pkg.tar.xz')
-            i686 = glob.glob('/srv/antergos.info/repo/antergos/i686/*.*.pkg.tar.xz')
+            x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
             cached = db.exists('repo-count-main')
             if cached and cached is not None:
                 stats['repo_main'] = db.get('repo-count-main')
         elif repo == 'staging':
-            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.*.pkg.tar.xz')
-            i686 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/*.*.pkg.tar.xz')
+            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.pkg.tar.xz')
             cached = db.exists('repo-count-staging')
             if cached and cached is not None:
                 stats['repo_staging'] = db.get('repo-count-staging')
 
-        all_p = x86_64 + i686
+        all_p = x86_64
         filtered = []
 
         if not cached or cached is None:
@@ -399,7 +410,7 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
-    is_phab = None
+    is_phab = False
     repo = None
     if request.method == 'GET':
         return ' Nothing to see here, move along ...'
@@ -407,7 +418,6 @@ def hooked():
     elif request.method == 'POST':
         # Check if the POST request if from github.com
         phab = int(request.args.get('phab', '0'))
-        is_phab = False
         if phab and phab > 0:
             is_phab = True
         else:
@@ -424,10 +434,10 @@ def hooked():
             if request.headers.get('X-GitHub-Event') != "push":
                 return json.dumps({'msg': "wrong event type"})
     changes = []
+    the_queue = list(db.lrange('queue', 0, -1))
     if is_phab and not request.args['repo'] == "CN":
         repo = 'antergos-packages'
         db.set('pullFrom', 'lots0logs')
-        the_queue = list(db.lrange('queue', 0, -1))
         building = db.get('building')
         match = None
         nx_pkg = None
@@ -443,33 +453,39 @@ def hooked():
                 else:
                     continue
             if match is None:
-                changes.append(list(nx_pkg))
+                changes.append([nx_pkg])
             else:
                 return json.dumps({'msg': 'OK!'})
     elif is_phab and request.args['repo'] == "CN":
-        cnchi_git = '/var/repo/CN'
-        cnchi_clone = '/tmp/cnchi'
-        git = '/tmp/cnchi/.git'
+        repo = 'antergos-packages'
+        db.set('pullFrom', 'antergos')
+        cnchi = 'cnchi-dev'
+        changes.append([cnchi])
+        working = db.get('creating-cnchi-archive-from-dev')
+        if not working or working == 'False' and 'cnchi-dev' not in the_queue:
+            db.set('creating-cnchi-archive-from-dev', 'True')
+            cnchi_git = '/var/repo/CN'
+            cnchi_clone = '/tmp/cnchi'
+            git = '/tmp/cnchi/.git'
+            cnchi_tar_tmp = '/tmp/cnchi.tar'
+            cnchi_tar = '/srv/antergos.org/cnchi.tar'
 
-        try:
-            os.remove('/tmp/cnchi.tar')
-            os.remove('/srv/antergos.org/cnchi.tar')
-            shutil.rmtree(cnchi_clone)
-        except Exception as err:
-            logger.error(err)
-            pass
+            for f in [cnchi_clone, cnchi_tar, cnchi_tar_tmp]:
+                if os.path.exists(f):
+                    remove(f)
+            try:
+                subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
 
-        try:
-            subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
+                shutil.rmtree(git)
 
-            shutil.rmtree(git)
+                subprocess.check_call(['tar', '-cf', '/tmp/cnchi.tar', '-C', '/tmp', 'cnchi'])
+                shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
+            except subprocess.CalledProcessError as err:
+                logger.error(err.output)
+                db.set('creating-cnchi-archive-from-dev', 'False')
+                abort(500)
 
-            subprocess.check_call(['tar', '-cf', 'cnchi.tar', cnchi_clone],
-                                  cwd='/tmp')
-            shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
-        except subprocess.CalledProcessError as err:
-            logger.error(err.output)
-            pass
+            db.set('creating-cnchi-archive-from-dev', 'False')
     else:
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']
@@ -507,7 +523,8 @@ def hooked():
             last = False
             last_pkg = the_pkgs[-1]
             for p in the_pkgs:
-                db.rpush('queue', p)
+                if p not in the_queue:
+                    db.rpush('queue', p)
                 if p == last_pkg:
                     last = True
                 queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
@@ -516,13 +533,16 @@ def hooked():
     elif repo == "antergos-iso":
         last = db.get('pkg:antergos-iso:last_commit')
         #if not last or last is None or last == '0':
-        db.set('idle', 'False')
-        db.set('building', "Initializing...")
-        db.set('isoFlag', 'True')
-        #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
-        queue.enqueue_call(builder.handle_hook, timeout=10000)
-        #else:
-        #    logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
+        if db.get('idle') == 'True':
+            db.set('idle', 'False')
+            db.set('building', "Initializing...")
+
+        if db.get('isoBuilding') == 'False':
+            db.set('isoFlag', 'True')
+            #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
+            queue.enqueue_call(builder.handle_hook, timeout=10000)
+        else:
+            logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
 
     return json.dumps({'msg': 'OK!'})
 
@@ -674,6 +694,18 @@ def build_pkg_now():
         queue.enqueue_call(builder.handle_hook, args=(True, True), timeout=9600)
 
     return redirect(redirect_url())
+
+
+@app.route('/get_status', methods=['GET'])
+def get_status():
+    idle = db.get('idle')
+    building = db.get('building')
+    if idle == 'True':
+        message = dict(msg='Idle')
+    else:
+        message = dict(msg=building)
+
+    return json.dumps(message)
 
 
 # Some boilerplate code that just says "if you're running this from the command
