@@ -152,19 +152,17 @@ with Connection(db):
 def get_live_build_ouput():
     psub = db.pubsub()
     psub.subscribe('build-output')
-    last_msg = None
     first_run = True
     while True:
         message = psub.get_message()
         if message:
-            if message['data'] == '1' or message['data'] == 1:
-                if first_run and last_:
-                    message
+            if first_run and (message['data'] == '1' or message['data'] == 1):
+                message['data'] = db.get('build_log_last_line')
+                first_run = False
+            elif message['data'] == '1' or message['data'] == 1:
                 message['data'] = '...'
 
             yield 'data: %s\n\n' % message['data']
-        elif last_msg is not None:
-            yield 'data: %s\n\n' % last_msg
 
         gevent.sleep(.05)
 
@@ -290,6 +288,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
         db.set('idle', 'False')
+        result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
         db.set('building', 'Updating pkg review status for %s.' % pkg)
         logger.info('[UPDATE REPO]: pkg is %s' % pkg)
@@ -304,16 +303,29 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             db.set('building', 'Moving %s from staging to main repo.' % pkg)
 
             for file in pkg_files_64:
-                copy(file, MAIN_64)
-                copy(file, '/tmp')
+                if result is 2:
+                    copy(file, MAIN_64)
+                    copy(file, '/tmp')
+                elif result is 3:
+                    os.remove(file)
             for file in pkg_files_32:
-                copy(file, MAIN_32)
-                copy(file, '/tmp')
+                if result is 2:
+                    copy(file, MAIN_32)
+                    copy(file, '/tmp')
+                elif result is 3:
+                    os.remove(file)
 
-        db.set('copying_to_main', pkg)
-        queue.enqueue_call(builder.update_main_repo, args=(pkg,), timeout=9600)
+            queue.enqueue_call(builder.update_main_repo, args=(pkg, result), timeout=9600)
+
+        else:
+            logger.error('@@-antbs.py-@@ | While moving to main, no packages were found to move.')
+            err = 'While moving to main, no packages were found to move.'
+            errmsg = dict(error=True, msg=err)
+
     except OSError as err:
-        pass
+        logger.error('@@-antbs.py-@@ | Error while moving to main: ' + err)
+        err = str(err)
+        errmsg = dict(error=True, msg=err)
     except Exception as err:
         err = str(err)
         errmsg = dict(error=True, msg=err)
@@ -434,35 +446,40 @@ def hooked():
             if request.headers.get('X-GitHub-Event') != "push":
                 return json.dumps({'msg': "wrong event type"})
     changes = []
-    the_queue = list(db.lrange('queue', 0, -1))
+    the_queue = db.lrange('queue', 0, -1)
+    building = db.get('now_building')
     if is_phab and not request.args['repo'] == "CN":
         repo = 'antergos-packages'
         db.set('pullFrom', 'lots0logs')
-        building = db.get('building')
         match = None
         nx_pkg = None
         if request.args['repo'] == "NX":
-            nx_pkg = 'numix-icon-theme'
+            nx_pkg = ['numix-icon-theme']
         elif request.args['repo'] == "NXSQ":
-            nx_pkg = 'numix-icon-theme-square'
-        if the_queue and nx_pkg:
-            for p in the_queue:
-                if p == nx_pkg or p == building:
-                    match = True
-                    break
+            nx_pkg = ['numix-icon-theme-square']
+        if nx_pkg:
+            if not the_queue or (the_queue and nx_pkg[0] not in the_queue):
+                for p in the_queue:
+                    if p == nx_pkg[0] or p == building:
+                        match = True
+                        break
+                    else:
+                        continue
+                if match is None:
+                    changes.append(nx_pkg)
                 else:
-                    continue
-            if match is None:
-                changes.append([nx_pkg])
-            else:
-                return json.dumps({'msg': 'OK!'})
+                    logger.info('RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0])
+                    return json.dumps({'msg': 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]})
+        else:
+            logger.error('phab hook failed for numix')
+
     elif is_phab and request.args['repo'] == "CN":
         repo = 'antergos-packages'
         db.set('pullFrom', 'antergos')
-        cnchi = 'cnchi-dev'
-        changes.append([cnchi])
-        working = db.get('creating-cnchi-archive-from-dev')
-        if not working or working == 'False' and 'cnchi-dev' not in the_queue:
+        cnchi = ['cnchi-dev']
+        changes.append(cnchi)
+        working = db.exists('creating-cnchi-archive-from-dev')
+        if not working and 'cnchi-dev' not in the_queue and 'cnchi-dev' != building:
             db.set('creating-cnchi-archive-from-dev', 'True')
             cnchi_git = '/var/repo/CN'
             cnchi_clone = '/tmp/cnchi'
@@ -482,10 +499,9 @@ def hooked():
                 shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
-                db.set('creating-cnchi-archive-from-dev', 'False')
-                abort(500)
+                db.delete('creating-cnchi-archive-from-dev')
 
-            db.set('creating-cnchi-archive-from-dev', 'False')
+            db.delete('creating-cnchi-archive-from-dev')
     else:
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']
@@ -501,7 +517,7 @@ def hooked():
 
     if repo == "antergos-packages":
         db.set('idle', 'False')
-        db.set('building', "Initializing...")
+        db.set('building', "Build hook triggered. Updating build queue.")
         logger.info(changes)
         has_pkgs = False
         no_dups = []
@@ -512,7 +528,7 @@ def hooked():
                     pak = item
                 else:
                     pak = os.path.dirname(item)
-                if pak is not None and pak != '':
+                if pak is not None and pak != '' and pak != []:
                     logger.info('Adding %s to the build queue' % pak)
                     no_dups.append(pak)
                     has_pkgs = True
@@ -523,7 +539,7 @@ def hooked():
             last = False
             last_pkg = the_pkgs[-1]
             for p in the_pkgs:
-                if p not in the_queue:
+                if p not in the_queue and p is not None and p != '' and p != []:
                     db.rpush('queue', p)
                 if p == last_pkg:
                     last = True
@@ -533,11 +549,9 @@ def hooked():
     elif repo == "antergos-iso":
         last = db.get('pkg:antergos-iso:last_commit')
         #if not last or last is None or last == '0':
-        if db.get('idle') == 'True':
-            db.set('idle', 'False')
-            db.set('building', "Initializing...")
-
         if db.get('isoBuilding') == 'False':
+            db.set('idle', 'False')
+            db.set('building', "New commit detected. Adding package to queue...")
             db.set('isoFlag', 'True')
             #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
             queue.enqueue_call(builder.handle_hook, timeout=10000)
@@ -662,7 +676,7 @@ def dev_pkg_check():
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')
-                message = dict(error=set_review)
+                message = dict(error=set_rev_error)
                 return json.dumps(message)
             else:
                 message = dict(msg='ok')
@@ -683,15 +697,22 @@ def dev_pkg_check():
 def build_pkg_now():
     if request.method == 'POST':
         pkgname = request.form['pkgname']
-        if not pkgname or pkgname is None:
+        if not pkgname or pkgname is None or pkgname == '':
             abort(500)
         db.rpush('queue', pkgname)
+        args = (True, True)
         if 'antergos-iso' in pkgname:
-            db.set('isoFlag', 'True')
+            if db.get('isoBuilding') == 'False':
+                db.set('isoFlag', 'True')
+                args = None
+            else:
+                logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
+                return redirect(redirect_url())
+
         db.set('idle', 'False')
         db.set('building', "Initializing...")
 
-        queue.enqueue_call(builder.handle_hook, args=(True, True), timeout=9600)
+        queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
 
     return redirect(redirect_url())
 

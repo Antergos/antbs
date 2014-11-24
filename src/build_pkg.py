@@ -42,12 +42,14 @@ from pygments.formatters import HtmlFormatter
 import re
 import time
 from multiprocessing import Process
+import src.package as pkgclass
 
 logger = logging.getLogger(__name__)
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'docker_files')
 REPO_DIR = "/opt/antergos-packages"
+package = pkgclass.Package
 
 
 # Initiate communication with docker_files daemon
@@ -56,6 +58,7 @@ try:
     # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
 except Exception as err:
     logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+
 
 def remove(src):
     if os.path.isdir(src):
@@ -74,105 +77,116 @@ def remove(src):
         return True
 
 
-def get_pkgver(package):
-    pkg = package
-    pkgver = None
-    epoch_num = None
-    epoch_done = None
-    arch_done = None
-    pkgver_done = None
-    pkgrel_done = None
-    pkgrel_num = None
+def get_pkgver(pkg):
+    pkgobj = package(pkg)
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
-    pkgdir = os.path.join(REPO_DIR, pkg)
-    logger.info('pkgdir is %s' % pkgdir)
-    last_ver = db.get('pkg:%s:version' % pkg)
-    parse = open(pbfile).read()
-    if 'git+' in parse or 'numix-icon-theme-square' in pkg:
-        epoch = 'epoch=' in parse
-        logger.info('parse is %s' % parse)
-        giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-        if not giturl:
-            giturl = '/var/repo/NXSQ'
-        else:
-            giturl = giturl.group(0)
-        subprocess.check_call(['git', 'clone', giturl, pkg], cwd=pkgdir)
-        rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
-        short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
-        pkgver = '0.r%s.%s' % (rev, short)
-        if pkgver and pkgver != '0.r.':
-            if epoch:
-                epoch = re.search('(?<=epoch\\=)\d{1,2}', parse)
-                pkgver = epoch.group(0) + ':' + pkgver
-            logger.info('pkgver is %s' % pkgver)
-    elif 'cnchi-dev' == pkg:
-        if 'info' not in sys.modules:
-            if '/tmp/cnchi/src' not in sys.path:
-                sys.path.append('/tmp/cnchi/src')
-            import info
-        else:
-            reload('info')
-        pkgrel_num = last_ver[-1:]
-        pkgver = info.CNCHI_VERSION
-
-    else:
-
-        with open(pbfile) as PKGBUILD:
-            for line in PKGBUILD:
-                if line.startswith('arch='):
-                    if 'i686' in line:
-                        shutil.copyfile(pbfile, os.path.join(pkgdir, 'PKGBUILD32'))
-                    arch_done = True
-                    if epoch_done and pkgver_done:
-                        break
-                    else:
-                        continue
-                elif line.startswith('epoch='):
-                    epoch = line.split('=')
-                    epoch_num = epoch[1].strip('\n')
-                    epoch_done = True
-                    if arch_done and pkgver_done and pkgrel_done:
-                        break
-                    else:
-                        continue
-                elif line.startswith("pkgver") and not line.startswith("pkgver()"):
-                    l = line.split('=')
-                    logger.info('line is %s' % l)
-                    pkgver = l[1].strip('\n')
-                    pkgver_done = True
-                    if epoch_done and arch_done and pkgrel_done:
-                        break
-                    else:
-                        continue
-                elif line.startswith('pkgrel='):
-                    pkgrel = line.split('=')
-                    pkgrel_num = pkgrel[1].strip('\n')
-                    pkgrel_done = True
-                    if arch_done and pkgver_done and epoch_done:
-                        break
-                    else:
-                        continue
-
-    if epoch_num:
-        pkgver = epoch_num + ':' + pkgver
-    if pkgrel_num:
-        pkgver = pkgver + '-' + pkgrel_num
-        logger.info('[LAST_VER] %s' % last_ver)
-        if pkgver == last_ver:
-            last_rel = int(last_ver[-1:])
-            logger.info('[LAST_REL] %s' % str(last_rel))
-            new_rel = last_rel + 1
-            logger.info('[NEW_REL] %s' % str(new_rel))
-            pkgver = pkgver[:-1] + str(new_rel)
-            logger.info('[PKGVER] %s' % pkgver)
-    else:
-        pkgver += '-1'
-
+    pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
+    epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
+    pkgrel = pkgobj.get_from_pkgbuild('pkgrel', pbfile)
+    if epoch and epoch != '' and epoch is not None:
+        pkgver = epoch + ':' + pkgver
+    if pkgrel and pkgrel != '' and pkgrel is not None:
+        pbver = pkgver + '-' + pkgrel
+        if pbver == db.get('pkg:%s:version' % pkg):
+            pkgrel = int(pkgrel) + 1
+    pkgver = pkgver + '-' + str(pkgrel)
+    if pkgver and pkgver != '' and pkgver is not None:
+        logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
     return pkgver
+    # pkgver = None
+    # epoch_num = None
+    # epoch_done = None
+    # arch_done = None
+    # pkgver_done = None
+    # pkgrel_done = None
+    # pkgrel_num = None
+    # pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
+    # pkgdir = os.path.join(REPO_DIR, pkg)
+    # logger.info('pkgdir is %s' % pkgdir)
+    # last_ver = db.get('pkg:%s:version' % pkg)
+    # parse = open(pbfile).read()
+    # if 'git+' in parse or 'numix-icon-theme-square' in pkg:
+    # epoch = 'epoch=' in parse
+    # logger.info('parse is %s' % parse)
+    #     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+    #     if not giturl:
+    #         giturl = '/var/repo/NXSQ'
+    #     else:
+    #         giturl = giturl.group(0)
+    #     subprocess.check_call(['git', 'clone', giturl, pkg], cwd=pkgdir)
+    #     rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
+    #     short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
+    #     pkgver = '0.r%s.%s' % (rev, short)
+    #     if pkgver and pkgver != '0.r.':
+    #         if epoch:
+    #             epoch = re.search('(?<=epoch\\=)\d{1,2}', parse)
+    #             pkgver = epoch.group(0) + ':' + pkgver
+    #         logger.info('pkgver is %s' % pkgver)
+    # elif 'cnchi-dev' == pkg:
+    #     if 'info' not in sys.modules:
+    #         if '/tmp/cnchi/src' not in sys.path:
+    #             sys.path.append('/tmp/cnchi/src')
+    #         import info
+    #     else:
+    #         reload('info')
+    #     pkgrel_num = last_ver[-1:]
+    #     pkgver = info.CNCHI_VERSION
+    #
+    # else:
+    #
+    #     with open(pbfile) as PKGBUILD:
+    #         for line in PKGBUILD:
+    #             if line.startswith('arch='):
+    #                 if 'i686' in line:
+    #                     shutil.copyfile(pbfile, os.path.join(pkgdir, 'PKGBUILD32'))
+    #                 arch_done = True
+    #                 if epoch_done and pkgver_done:
+    #                     break
+    #                 else:
+    #                     continue
+    #             elif line.startswith('epoch='):
+    #                 epoch = line.split('=')
+    #                 epoch_num = epoch[1].strip('\n')
+    #                 epoch_done = True
+    #                 if arch_done and pkgver_done and pkgrel_done:
+    #                     break
+    #                 else:
+    #                     continue
+    #             elif line.startswith("pkgver") and not line.startswith("pkgver()"):
+    #                 l = line.split('=')
+    #                 logger.info('line is %s' % l)
+    #                 pkgver = l[1].strip('\n')
+    #                 pkgver_done = True
+    #                 if epoch_done and arch_done and pkgrel_done:
+    #                     break
+    #                 else:
+    #                     continue
+    #             elif line.startswith('pkgrel='):
+    #                 pkgrel = line.split('=')
+    #                 pkgrel_num = pkgrel[1].strip('\n')
+    #                 pkgrel_done = True
+    #                 if arch_done and pkgver_done and epoch_done:
+    #                     break
+    #                 else:
+    #                     continue
+    #
+    # if epoch_num:
+    #     pkgver = epoch_num + ':' + pkgver
+    # if pkgrel_num:
+    #     pkgver = pkgver + '-' + pkgrel_num
+    #     logger.info('[LAST_VER] %s' % last_ver)
+    #     if pkgver == last_ver:
+    #         last_rel = int(last_ver[-1:])
+    #         logger.info('[LAST_REL] %s' % str(last_rel))
+    #         new_rel = last_rel + 1
+    #         logger.info('[NEW_REL] %s' % str(new_rel))
+    #         pkgver = pkgver[:-1] + str(new_rel)
+    #         logger.info('[PKGVER] %s' % pkgver)
+    # else:
+    #     pkgver += '-1'
 
 
-def get_deps(package):
-    pkg = package
+def get_deps(pkg):
     depends = []
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     with open(pbfile) as PKGBUILD:
@@ -211,6 +225,7 @@ def handle_hook(first=False, last=False):
 
     if iso_flag == 'True':
         db.set('isoBuilding', 'True')
+        db.lrem('queue', 0, 'antergos-iso')
         archs = ['x86_64', 'i686']
         for arch in archs:
             db.rpush('queue', 'antergos-iso-%s' % arch)
@@ -225,7 +240,6 @@ def handle_hook(first=False, last=False):
         return True
 
     elif first:
-        db.set('pkg_count', '0')
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
         db.set('building', 'Pulling PKGBUILD changes from github.')
@@ -243,50 +257,50 @@ def handle_hook(first=False, last=False):
         nxsq = 'numix-icon-theme-square'
 
         subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
-        for package in packages:
+        for pack in packages:
             # if 'numix-icon-theme' == package:
             # logger.info('cloning repo for %s' % package)
             # subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
+            # cwd='/opt/antergos-packages/numix-icon-theme')
+            # subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
             #                           cwd='/opt/antergos-packages/numix-icon-theme')
-            #     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
-            #                           cwd='/opt/antergos-packages/numix-icon-theme')
-            version = get_pkgver(package)
-            depends = get_deps(package)
             try:
-                if 'numix-icon-theme-square' == package:
+                if 'numix-icon-theme-square' == pack:
                     subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq],
                                     cwd='/opt/antergos-packages/numix-icon-theme-square')
-                    logger.info('Creating tar archive for %s' % package)
+                    logger.info('Creating tar archive for %s' % pack)
                     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square')
-                elif 'numix-icon-theme-square-kde' == package:
+                elif 'numix-icon-theme-square-kde' == pack:
                     subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq],
                                     cwd='/opt/antergos-packages/numix-icon-theme-square')
-                    logger.info('Creating tar archive for %s' % package)
+                    logger.info('Creating tar archive for %s' % pack)
                     subprocess.check_call(['tar', '-cf', nxsq + '-kde.tar', nxsq + '-kde'],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
-                elif 'numix-frost-themes' == package:
+                elif 'numix-frost-themes' == pack:
                     logger.info('Copying numix-frost source file into build directory.')
                     subprocess.check_call(
                         ['cp', '/opt/numix/numix-frost.zip', os.path.join(REPO_DIR, 'numix-frost-themes')],
                         cwd='/opt/numix')
-                elif 'cnchi-dev' == package:
+                elif 'cnchi-dev' == pack:
                     logger.info('Copying cnchi-dev source file into build directory.')
-                    shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, package))
+                    shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pack))
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
-            if not db.exists('pkg:%s' % package):
-                logger.info('%s not found in database, adding entry..' % package)
-                db.set('building', '%s not found in database, adding entry..' % package)
-                db.set('pkg:%s' % package, True)
-                db.set('pkg:%s:name' % package, package)
-            db.delete('pkg:%s:deps' % package)
+            version = get_pkgver(pack)
+            depends = get_deps(pack)
+            # if not db.exists('pkg:%s' % package):
+            #     logger.info('%s not found in database, adding entry..' % package)
+            #     db.set('building', '%s not found in database, adding entry..' % package)
+            #     db.set('pkg:%s' % package, True)
+            #     db.set('pkg:%s:name' % package, package)
+            db.delete('pkg:%s:deps' % pack)
             for dep in depends:
-                db.rpush('pkg:%s:deps' % package, dep)
-            logger.info('Updating pkgver in databse for %s to %s' % (package, version))
-            db.set('building', 'Updating pkgver in databse for %s to %s' % (package, version))
-            db.set('pkg:%s:version' % package, version)
+                db.rpush('pkg:%s:deps' % pack, dep)
+            logger.info('Updating pkgver in databse for %s to %s' % (pack, version))
+            db.set('building', 'Updating pkgver in databse for %s to %s' % (pack, version))
+            db.set('pkg:%s:version' % pack, version)
         logger.info('All queued packages are in the database, checking deps to determine build order.')
         db.set('building', 'Determining build order based on pkg dependancies')
         check = check_deps(packages)
@@ -302,14 +316,18 @@ def handle_hook(first=False, last=False):
     build_pkgs(last)
 
 
-def update_main_repo(pkg=None):
-    if pkg:
+def update_main_repo(pkg=None, rev_result=None):
+    if pkg and rev_result:
+        if rev_result is 2:
+            rev_result = 'passed'
+        elif rev_result is 3:
+            rev_result = 'failed'
         db.set('idle', 'False')
         result = '/tmp/result'
         if os.path.exists(result):
             shutil.rmtree(result)
         os.mkdir(result, 0o777)
-        command = "/makepkg/build.sh update_repo %s" % pkg
+        command = "/makepkg/build.sh update_repo %s %s" % (pkg, rev_result)
         pkgenv = "_PKGNAME=%s" % pkg
         db.set('building', 'Updating repo database.')
         container = None
@@ -328,7 +346,7 @@ def update_main_repo(pkg=None):
                         'bind': '/main',
                         'ro': False
                     },
-                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
                     {
                         'bind': '/staging',
                         'ro': False
@@ -350,14 +368,12 @@ def update_main_repo(pkg=None):
             doc.wait(container)
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
-            db.set('idle', 'True')
-            db.set('building', 'Idle')
 
         doc.remove_container(container)
         db.set('idle', 'True')
         db.set('building', 'Idle')
-
-
+        db.delete('repo-count-staging')
+        db.delete('repo-count-main')
 
 
 def db_filter_and_add(output=None, this_log=None):
@@ -404,7 +420,7 @@ def publish_build_ouput(container=None, this_log=None):
     nodup = set()
     content = []
     for line in output:
-        time.sleep(.05)
+        time.sleep(.10)
         if not line or line == '' or "Antergos Automated Build Server" in line or "--passphrase" in line \
                 or 'makepkg]# PS1="' in line:
             continue
@@ -414,11 +430,12 @@ def publish_build_ouput(container=None, this_log=None):
             nodup.add(end)
             line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
             # bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
-            #if bad_date:
-            #    line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
+            # if bad_date:
+            # line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
             content.append(line)
             db.publish('build-output', line)
+            db.set('build_log_last_line', line)
 
     db.publish('build-output', 'ENDOFLOG')
     content = '\n '.join(content)
@@ -437,8 +454,11 @@ def build_pkgs(last=False):
             os.mkdir(d, 0o777)
     pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
+    in_dir_last = len([name for name in os.listdir(repo)])
+    db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
         pkg = db.lpop('queue')
+        db.set('now_building', pkg)
         db.set('building', 'Building %s with makepkg' % pkg)
         failed = False
         if pkg is None or pkg == '':
@@ -467,7 +487,7 @@ def build_pkgs(last=False):
         try:
             container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
                                              name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
-                                                                '/root/.gnupg','/staging', '/32bit', '/32build',
+                                                                '/root/.gnupg', '/staging', '/32bit', '/32build',
                                                                 '/result'])
         except Exception as err:
             logger.error('Create container failed. Error Msg: %s' % err)
@@ -534,7 +554,7 @@ def build_pkgs(last=False):
             logger.error('Start container failed. Error Msg: %s' % err)
             failed = True
             continue
-        #db.publish('build-ouput', 'ENDOFLOG')
+        # db.publish('build-ouput', 'ENDOFLOG')
         # stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
         # log_stream = stream.split('\n')
         # db_filter_and_add(log_stream, this_log)
@@ -585,8 +605,8 @@ def build_pkgs(last=False):
 
     # logger.info('Moving pkgs into repo and updating repo database')
     # try:
-    #     repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
-    #                                           volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
+    # repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
+    # volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
     #                                                    '/staging'])
     # except Exception as err:
     #     logger.error('Create container failed. Error Msg: %s' % err)
@@ -629,7 +649,8 @@ def build_pkgs(last=False):
 
 def build_iso():
     iso_arch = ['x86_64', 'i686']
-    db.set('pkg_count_iso', '0')
+    in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+    db.set('pkg_count_iso', in_dir_last)
     for arch in iso_arch:
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -656,8 +677,8 @@ def build_iso():
         try:
             doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
             iso_container = doc.create_container("antergos/mkarchiso",
-                                                 volumes=['/var/cache/pacman', '/antergos-iso/configs/antergos/out',
-                                                          '/var/run/dbus', '/start', '/sys/fs/cgroup'], tty=True,
+                                                 volumes=['/antergos-iso/configs/antergos/out', '/var/run/dbus',
+                                                          '/start', '/sys/fs/cgroup'], tty=True,
                                                  name=['antergos-iso-%s' % arch], cpu_shares=512)
             db.set('container', iso_container.get('Id'))
         except Exception as err:
@@ -666,11 +687,6 @@ def build_iso():
 
         try:
             doc.start(iso_container, privileged=True, binds={
-                '/var/cache/pacman':
-                    {
-                        'bind': '/var/cache/pacman',
-                        'ro': False
-                    },
                 '/opt/archlinux-mkarchiso':
                     {
                         'bind': '/start',
@@ -716,7 +732,7 @@ def build_iso():
             db.incr('pkg_count_iso', (in_dir - last_count))
             db.rpush('completed', build_id)
             db.set('%s:result' % this_log, 'completed')
-            #db.set('%s:review_stat' % this_log, '1')
+            # db.set('%s:review_stat' % this_log, '1')
         else:
             logger.error('antergos-iso-%s not found after container exit.' % arch)
             failed = True
