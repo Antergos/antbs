@@ -47,6 +47,17 @@ class Package(object):
     def delete(self):
         self.db.delete(self.key)
 
+    def get_from_db(self, attr):
+        if attr:
+            val = db.get('%s:%s' % (self.key, attr))
+            logger.info('@@-package.py-@@ | get_from_db val is %s' % val)
+            return val
+
+    def save_to_db(self, attr=None, value=None):
+        if attr and value:
+            db.set('%s:%s' % (self.key, attr), value)
+            return db.get('%s:%s' % (self.key, attr))
+
     def get_from_pkgbuild(self, var=None, path=None):
         if not var or not path:
             raise KeyError
@@ -58,18 +69,9 @@ class Package(object):
         out, err = proc.communicate()
         if len(out) > 0:
             out = out.strip()
+            out = self.save_to_db(var, out)
             logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
             logger.error('@@-package.py-@@ | proc.err is %s' % err)
 
         return out
-
-    def get_from_db(self, attr):
-        if attr:
-            val = db.get('%s:%s' % (self.key, attr))
-            logger.info('@@-package.py-@@ | get_from_db val is %s' % val)
-            return val
-
-    def save_to_db(self, attr=None, value=None):
-        if attr and value:
-            db.set('%s:%s' % (self.key, attr), value)

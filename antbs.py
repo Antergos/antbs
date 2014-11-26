@@ -293,8 +293,8 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('building', 'Updating pkg review status for %s.' % pkg)
         logger.info('[UPDATE REPO]: pkg is %s' % pkg)
         logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
-        pkg_files_64 = glob.glob('%s/%s***' % (STAGING_64, pkg))
-        pkg_files_32 = glob.glob('%s/%s***' % (STAGING_32, pkg))
+        pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg))
+        pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg))
         pkg_files = pkg_files_64 + pkg_files_32
         logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
         logger.info('[PKG_FILES]:')
@@ -303,19 +303,19 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             db.set('building', 'Moving %s from staging to main repo.' % pkg)
 
             for file in pkg_files_64:
-                if result is 2:
+                if result is 2 or result == '2':
                     copy(file, MAIN_64)
                     copy(file, '/tmp')
-                elif result is 3:
+                elif result is 3 or result == '3':
                     os.remove(file)
             for file in pkg_files_32:
-                if result is 2:
+                if result is 2 or result == '2':
                     copy(file, MAIN_32)
                     copy(file, '/tmp')
-                elif result is 3:
+                elif result is 3 or result == '3':
                     os.remove(file)
 
-            queue.enqueue_call(builder.update_main_repo, args=(pkg, result), timeout=9600)
+            queue.enqueue_call(builder.update_main_repo, args=(pkg, str(result)), timeout=9600)
 
         else:
             logger.error('@@-antbs.py-@@ | While moving to main, no packages were found to move.')
@@ -327,6 +327,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         err = str(err)
         errmsg = dict(error=True, msg=err)
     except Exception as err:
+        logger.error('@@-antbs.py-@@ | Error while moving to main: ' + err)
         err = str(err)
         errmsg = dict(error=True, msg=err)
 
@@ -701,16 +702,13 @@ def build_pkg_now():
             abort(500)
         db.rpush('queue', pkgname)
         args = (True, True)
-        if 'antergos-iso' in pkgname:
+        if 'antergos-iso' == pkgname:
             if db.get('isoBuilding') == 'False':
                 db.set('isoFlag', 'True')
-                args = None
+                args = (False, False)
             else:
                 logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                 return redirect(redirect_url())
-
-        db.set('idle', 'False')
-        db.set('building', "Initializing...")
 
         queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
 

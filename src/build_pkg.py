@@ -77,8 +77,8 @@ def remove(src):
         return True
 
 
-def get_pkgver(pkg):
-    pkgobj = package(pkg)
+def get_pkgver(pkgobj):
+    pkg = pkgobj.name
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
     epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
@@ -87,11 +87,13 @@ def get_pkgver(pkg):
         pkgver = epoch + ':' + pkgver
     if pkgrel and pkgrel != '' and pkgrel is not None:
         pbver = pkgver + '-' + pkgrel
-        if pbver == db.get('pkg:%s:version' % pkg):
+        if pbver == pkgobj.get_from_db('version'):
             pkgrel = int(pkgrel) + 1
     pkgver = pkgver + '-' + str(pkgrel)
     if pkgver and pkgver != '' and pkgver is not None:
         logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
+    else:
+        pkgver = pkgobj.get_from_db('version')
     return pkgver
     # pkgver = None
     # epoch_num = None
@@ -288,19 +290,21 @@ def handle_hook(first=False, last=False):
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
+            pack = package(pack, db)
             version = get_pkgver(pack)
-            depends = get_deps(pack)
+            depends = get_deps(pack.name)
             # if not db.exists('pkg:%s' % package):
             #     logger.info('%s not found in database, adding entry..' % package)
             #     db.set('building', '%s not found in database, adding entry..' % package)
             #     db.set('pkg:%s' % package, True)
             #     db.set('pkg:%s:name' % package, package)
-            db.delete('pkg:%s:deps' % pack)
+            db.delete('pkg:%s:deps' % pack.name)
             for dep in depends:
-                db.rpush('pkg:%s:deps' % pack, dep)
-            logger.info('Updating pkgver in databse for %s to %s' % (pack, version))
-            db.set('building', 'Updating pkgver in databse for %s to %s' % (pack, version))
-            db.set('pkg:%s:version' % pack, version)
+                db.rpush('pkg:%s:deps' % pack.name, dep)
+            logger.info('Updating pkgver in databse for %s to %s' % (pack.name, version))
+            db.set('building', 'Updating pkgver in databse for %s to %s' % (pack.name, version))
+            pack.save_to_db('version', version)
+
         logger.info('All queued packages are in the database, checking deps to determine build order.')
         db.set('building', 'Determining build order based on pkg dependancies')
         check = check_deps(packages)
@@ -328,13 +332,14 @@ def update_main_repo(pkg=None, rev_result=None):
             shutil.rmtree(result)
         os.mkdir(result, 0o777)
         command = "/makepkg/build.sh update_repo %s %s" % (pkg, rev_result)
-        pkgenv = "_PKGNAME=%s" % pkg
+        pkgenv = "_PKGNAME=%s,_RESULT=%s" % (pkg, rev_result)
         db.set('building', 'Updating repo database.')
         container = None
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=[pkgenv],
                                              volumes=['/makepkg', '/root/.gnupg', '/main', '/result'])
+            db.set('update_repo_container', container.get('Id'))
             doc.start(container, binds={
                 DOC_DIR:
                     {
@@ -363,7 +368,8 @@ def update_main_repo(pkg=None, rev_result=None):
                     }
             }, privileged=True)
             this_log = 'repo_update_log'
-            stream_process = Process(target=publish_build_ouput, args=(container, this_log))
+            cont = db.get('update_repo_container')
+            stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
             doc.wait(container)
         except Exception as err:
