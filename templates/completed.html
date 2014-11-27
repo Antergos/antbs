@@ -51,8 +51,12 @@
                                                             style="color:green;"></i>
                                                         Pass</a></li>
                                                     <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
-                                                            class="fa fa-exclamation-circle" style="color:red;"></i>
+                                                            class="fa fa-exclamation" style="color:red;"></i>
                                                         Fail</a>
+                                                    </li>
+                                                    <li style="font-style: italic;"><a href="#" id="4" bnum="{{ info['bnum'] }}"><i
+                                                            class="fa fa-eye-slash" style="color:#777777;"></i>
+                                                        Skip</a>
                                                     </li>
                                                 </ul>
                                             </div>
@@ -122,38 +126,38 @@
 
 {%- endblock bottomcontent %}
 {% if user.is_authenticated() %}
-{% block scripts %}
-    {{ super() }}
-    <script type="text/javascript">
-        jQuery(document).ready(function () {
-            jQuery('.set_result').on('click', 'a', function (e) {
-                e.preventDefault();
-                jQuery(this).addClass('clicked');
-                var data = {
-                    bnum: jQuery(this).attr('bnum'),
-                    result: jQuery(this).attr('id'),
-                    dev: '{{ user.username }}'
-                };
-                jQuery.ajax({
-                    type: 'POST',
-                    url: '/pkg_review',
-                    data: JSON.stringify(data, null, '\t'),
-                    contentType: 'application/json;charset=UTF-8',
-                    dataType: 'json',
-                    success: function(result) {
-                        console.log(result);
-                        var res = $('.clicked').attr('id') == '2' ? 'span.passed' : 'span.failed';
-                        if (result['msg'] == 'ok') {
-                            jQuery('.clicked').parents('td').find(res).show();
-                            jQuery('.clicked').removeClass('clicked').parents('.btn-group').hide();
-                        } else {
-                            alert('Unable to save result. Server Error Msg:\n' + result['msg']);
+    {% block scripts %}
+        {{ super() }}
+        <script type="text/javascript">
+            jQuery(document).ready(function () {
+                jQuery('.set_result').on('click', 'a', function (e) {
+                    e.preventDefault();
+                    jQuery(this).addClass('clicked');
+                    var data = {
+                        bnum: jQuery(this).attr('bnum'),
+                        result: jQuery(this).attr('id'),
+                        dev: '{{ user.username }}'
+                    };
+                    jQuery.ajax({
+                        type: 'POST',
+                        url: '/pkg_review',
+                        data: JSON.stringify(data, null, '\t'),
+                        contentType: 'application/json;charset=UTF-8',
+                        dataType: 'json',
+                        success: function (result) {
+                            console.log(result);
+                            var res = $('.clicked').attr('id') == '2' ? 'span.passed' : 'span.failed';
+                            if (result['msg'] == 'ok') {
+                                jQuery('.clicked').parents('td').find(res).show();
+                                jQuery('.clicked').removeClass('clicked').parents('.btn-group').hide();
+                            } else {
+                                alert('Unable to save result. Server Error Msg:\n' + result['msg']);
+                            }
                         }
-                    }
 
+                    });
                 });
             });
-        });
-    </script>
-{% endblock scripts %}
+        </script>
+    {% endblock scripts %}
 {% endif %}

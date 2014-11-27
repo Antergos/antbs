@@ -176,7 +176,7 @@
                                         <ul class="sub-menu">
                                             <li {% if request.path == "/scheduled" %}class="active"{% endif %}><a
                                                     href="/scheduled"><i
-                                                    class="fa  fa-clock-o"></i><span>Scheduled</span></a>
+                                                    class="fa  fa-clock-o"></i><span>Build Queue</span></a>
                                             </li>
                                             <li {% if request.path == "/completed" or res == "completed" %}class="active"{% endif %}>
                                                 <a
@@ -207,7 +207,7 @@
 
                                     </li>
                                     <li {% if request.path == "/browse/releases" %}class="active"{% endif %}><a
-                                            href="/browse/releases"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
+                                            href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
                                     </li>
                                     <li {% if request.path == "/browse/testing" %}class="active"{% endif %}><a
@@ -290,11 +290,11 @@
                                                 </ul>
                                             {% endif %}
                                         </li>
-                                        <li class="button" {% if idle == 'True' %}data-toggle="tooltip"
+                                        <li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
                                             title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
                                                 class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
                                         </li>
-                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% endif %}">
+                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
                                             <pre id="status_bar_pre">Idle</pre>
                                         </li>
                                     </ul>
@@ -312,11 +312,11 @@
                                     </li>
                                     </ul>
                                     <ul class="nav navbar-nav not-nav">
-                                        <li class="button" {% if idle == 'True' %}data-toggle="tooltip"
+                                        <li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
                                             title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
                                                 class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
                                         </li>
-                                        <li id="status_bar" class="button" {% if idle == 'False' %}not-idle"{% endif %}>
+                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
                                             <pre id="status_bar_pre">Idle</pre>
                                         </li>
                                     </ul>
@@ -402,11 +402,9 @@
                                     jQuery('#status_bar_pre').text(data['msg']);
                                 }
                                 if (data['msg'] == 'Idle' || current == 'Idle') {
-                                    var idleIcon = '<li class="button idle" data-toggle="tooltip" ' +
-                                    'title="Status: Idle" data-placement="right"><a href="#">' +
-                                    '<iclass="fa-dot-circle-o"></i></a></li>';
-                                    jQuery(idleIcon).insertAfter(jQuery('.not-idle'));
-                                    jQuery('.not-idle').hide();
+
+                                    jQuery('.status').children('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
+                                    jQuery('#status_bar').hide();
 
                                 }
                             })

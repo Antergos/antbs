@@ -285,6 +285,8 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
         db.set('build_log:%s:review_stat' % bnum, result)
+        if result == "4":
+            return errmsg
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
         db.set('idle', 'False')
@@ -355,11 +357,17 @@ def homepage():
         if stat is not "queue":
             builds = db.lrange(stat, 0, -1)
             within = []
+            nodup = []
             for build in builds:
                 end = db.get('build_log:%s:start' % build)
                 end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
-                if (datetime.now() - end_fmt) < timedelta(hours=72):
+                ver = db.get('build_log:%s:version' % build)
+                name = db.get('build_log:%s:pkg' % build)
+                ver = '%s:%s' % (name, ver)
+                if (datetime.now() - end_fmt) < timedelta(hours=48) and ver not in nodup:
                     within.append(build)
+                    nodup.append(ver)
+
             stats[stat] = len(within)
         else:
             stats[stat] = res
@@ -626,7 +634,10 @@ def build_info(num):
     bnum = num
     cont = db.get('container')
     log = db.get('build_log:%s:content' % bnum)
-    log = log.decode("utf8")
+    if log is not None:
+        log = log.decode("utf8")
+    else:
+        log = 'Unavailable'
     if cont:
         container = cont[:20]
     else:

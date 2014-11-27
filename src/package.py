@@ -13,7 +13,7 @@
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
+# GNU General Public License for more details.
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
@@ -26,6 +26,8 @@ import src.logging_config
 import src.redis_connection
 import subprocess
 import os
+import re
+import sys
 
 logger = src.logging_config.logger
 
@@ -49,24 +51,56 @@ class Package(object):
 
     def get_from_db(self, attr):
         if attr:
-            val = db.get('%s:%s' % (self.key, attr))
+            val = self.db.get('%s:%s' % (self.key, attr))
             logger.info('@@-package.py-@@ | get_from_db val is %s' % val)
             return val
 
     def save_to_db(self, attr=None, value=None):
         if attr and value:
-            db.set('%s:%s' % (self.key, attr), value)
-            return db.get('%s:%s' % (self.key, attr))
+            self.db.set('%s:%s' % (self.key, attr), value)
+            return self.db.get('%s:%s' % (self.key, attr))
 
     def get_from_pkgbuild(self, var=None, path=None):
         if not var or not path:
             raise KeyError
+        parse = open(path).read()
         dirpath = os.path.dirname(path)
-        cmd = 'source ' + path + '; echo $' + var
+        if var == "pkgver" and 'cnchi-dev' in parse:
+            if 'info' not in sys.modules:
+                if '/tmp/cnchi/src' not in sys.path:
+                    sys.path.append('/tmp/cnchi/src')
+                try:
+                    import info
+                except Exception as err:
+                    logger.error(err)
+            else:
+                reload('info')
 
-        proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            out = info.CNCHI_VERSION
+            err = []
+        #elif var == "pkgver" and 'cnchi-dev' not in parse and ('git+' in parse or 'numix-icon-theme-square' in parse):
+            # giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+            # if not giturl:
+            #     giturl = os.path.join(dirpath, 'numix-icon-theme-square')
+            # else:
+            #     giturl = giturl.group(0)
+            # gitcmd = 'git clone ' + giturl + ' pkgver'
+            # subprocess.check_output(gitcmd, cwd=dirpath, shell=True, executable='/bin/bash')
+            # rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(dirpath, 'pkgver'))
+            # short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(dirpath, 'pkgver'))
+            # out = '0.r%s.%s' % (rev.strip(), short.strip())
+            # err = []
+            # if not len(out) > 0:
+            #     err = 'Failed to determine pkgver from git revisions'
+        else:
+            cmd = 'source ' + path + '; echo $' + var
+            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
+                cmd = 'source ' + path + '; ' + var
 
-        out, err = proc.communicate()
+            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            out, err = proc.communicate()
+
         if len(out) > 0:
             out = out.strip()
             out = self.save_to_db(var, out)

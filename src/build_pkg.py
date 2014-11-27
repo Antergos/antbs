@@ -223,7 +223,8 @@ def check_deps(packages):
 def handle_hook(first=False, last=False):
     db.set('idle', 'False')
     iso_flag = db.get('isoFlag')
-    pull_from = db.get('pullFrom')
+    #pull_from = db.get('pullFrom')
+    pull_from = 'antergos'
 
     if iso_flag == 'True':
         db.set('isoBuilding', 'True')
@@ -251,6 +252,7 @@ def handle_hook(first=False, last=False):
             subprocess.check_call(['git', 'clone', gh_repo], cwd='/opt')
         except subprocess.CalledProcessError as err:
             logger.error(err.output)
+            return False
 
         # Check database to see if packages exist and add them if necessary.
         packages = db.lrange('queue', 0, -1)
@@ -268,14 +270,14 @@ def handle_hook(first=False, last=False):
             #                           cwd='/opt/antergos-packages/numix-icon-theme')
             try:
                 if 'numix-icon-theme-square' == pack:
-                    subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq],
+                    subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq],
                                     cwd='/opt/antergos-packages/numix-icon-theme-square')
                     logger.info('Creating tar archive for %s' % pack)
                     subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square')
                 elif 'numix-icon-theme-square-kde' == pack:
-                    subprocess.call(['tar', '-cf', nxsq + '.tar', nxsq],
-                                    cwd='/opt/antergos-packages/numix-icon-theme-square')
+                    subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq + '-kde'],
+                                    cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
                     logger.info('Creating tar archive for %s' % pack)
                     subprocess.check_call(['tar', '-cf', nxsq + '-kde.tar', nxsq + '-kde'],
                                           cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
@@ -322,22 +324,22 @@ def handle_hook(first=False, last=False):
 
 def update_main_repo(pkg=None, rev_result=None):
     if pkg and rev_result:
-        if rev_result is 2:
+        if rev_result == '2':
             rev_result = 'passed'
-        elif rev_result is 3:
+        elif rev_result == '3':
             rev_result = 'failed'
         db.set('idle', 'False')
         result = '/tmp/result'
         if os.path.exists(result):
             shutil.rmtree(result)
         os.mkdir(result, 0o777)
-        command = "/makepkg/build.sh update_repo %s %s" % (pkg, rev_result)
-        pkgenv = "_PKGNAME=%s,_RESULT=%s" % (pkg, rev_result)
+        command = "/makepkg/build.sh"
+        pkgenv = ["_PKGNAME=%s" % pkg, "_RESULT=%s" % rev_result, "_UPDREPO=True"]
         db.set('building', 'Updating repo database.')
         container = None
         try:
             container = doc.create_container("antergos/makepkg", command=command,
-                                             name="update_repo", environment=[pkgenv],
+                                             name="update_repo", environment=pkgenv,
                                              volumes=['/makepkg', '/root/.gnupg', '/main', '/result'])
             db.set('update_repo_container', container.get('Id'))
             doc.start(container, binds={
@@ -435,6 +437,9 @@ def publish_build_ouput(container=None, this_log=None):
         if end not in nodup:
             nodup.add(end)
             line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
+            if line[-1:] == "'" or line[-1:] == '"':
+                line = line[:-1]
+            line = re.sub('(?<=[\w\d])\' (?=[\w\d]+)', ' ', line)
             # bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
             # if bad_date:
             # line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
@@ -606,49 +611,6 @@ def build_pkgs(last=False):
 
         if not failed:
             return True
-
-
-
-    # logger.info('Moving pkgs into repo and updating repo database')
-    # try:
-    # repo_container = doc.create_container("antergos/makepkg", command="/makepkg/repo_expect.sh --repo",
-    # volumes=['/var/cache/pacman', '/makepkg', '/repo', '/root/.gnupg',
-    #                                                    '/staging'])
-    # except Exception as err:
-    #     logger.error('Create container failed. Error Msg: %s' % err)
-    #
-    # try:
-    #     doc.start(repo_container, binds={
-    #         cache:
-    #             {
-    #                 'bind': '/var/cache/pacman',
-    #                 'ro': False
-    #             },
-    #         DOC_DIR:
-    #             {
-    #                 'bind': '/makepkg',
-    #                 'ro': True
-    #             },
-    #         repo:
-    #             {
-    #                 'bind': '/staging',
-    #                 'ro': False
-    #             },
-    #         '/root/.gnupg':
-    #             {
-    #                 'bind': '/root/.gnupg',
-    #                 'ro': False
-    #             },
-    #         '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
-    #             {
-    #                 'bind': '/repo',
-    #                 'ro': False
-    #             }
-    #     })
-    #     doc.wait(repo_container)
-    # except Exception as err:
-    #     logger.error('Start container failed. Error Msg: %s' % err)
-    # # doc.remove_container(repo_container)
 
     logger.info('Build completed. Repo has been updated.')
 
