@@ -2,8 +2,8 @@
 
 {% block pagetitle -%} Antergos Build Server | Overview{%- endblock pagetitle %}
 {% block topcontent %}
-    <div class="col-md-1 col-sm-1"></div>
-    <div class="col-md-2 col-sm-2">
+    <div class="col-lg-1 col-md-0 col-sm-12"></div>
+    <div class="col-lg-2 col-md-4 col-sm-12">
         <div class="fd-tile detail clean tile-purple">
             <div class="content"><h1 class="text-left">{{ stats.queue }}</h1>
 
@@ -15,7 +15,7 @@
     </div>
 
 
-    <div class="col-md-2 col-sm-2">
+    <div class="col-lg-2 col-md-4 col-sm-12">
         <div class="fd-tile detail clean tile-lemon">
             <div class="content"><h1 class="text-left">{{ stats.completed }}</h1>
 
@@ -27,7 +27,7 @@
     </div>
 
 
-    <div class="col-md-2 col-sm-2">
+    <div class="col-lg-2 col-md-4 col-sm-12">
         <div class="fd-tile detail clean tile-red">
             <div class="content"><h1 class="text-left">{{ stats.failed }}</h1>
 
@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    <div class="col-md-2 col-sm-2">
+    <div class="col-lg-2 col-md-5 col-lg-offset-0 col-md-offset-1 col-sm-12">
         <div class="fd-tile detail clean tile-prusia">
             <div class="content"><h1 class="text-left">{{ stats.repo_staging }}</h1>
 
@@ -49,7 +49,7 @@
         </div>
     </div>
 
-    <div class="col-md-2 col-sm-2">
+    <div class="col-lg-2 col-md-5 col-sm-12">
             <div class="fd-tile detail clean tile-orange">
                 <div class="content"><h1 class="text-left">{{ stats.repo_main }}</h1>
 
@@ -60,5 +60,5 @@
             </div>
         </div>
 
-    <div class="col-md-1 col-sm-1"></div>
+    <div class="col-lg-1 col-md-3 col-sm-12"></div>
 {% endblock topcontent %}

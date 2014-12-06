@@ -40,6 +40,7 @@ class Package(object):
         self.key = 'pkg:%s' % self.name
         logger.info('@@-package.py-@@ | self.key is %s' % self.key)
         if not db.exists(self.key):
+            db.set(self.key, True)
             db.set('%s:%s' % (self.key, 'name'), self.name)
         self.version = db.get('%s:%s' % (self.key, 'version'))
         self.epoch = db.get('%s:%s' % (self.key, 'epoch'))
@@ -65,16 +66,13 @@ class Package(object):
             raise KeyError
         parse = open(path).read()
         dirpath = os.path.dirname(path)
-        if var == "pkgver" and 'cnchi-dev' in parse:
-            if 'info' not in sys.modules:
-                if '/tmp/cnchi/src' not in sys.path:
-                    sys.path.append('/tmp/cnchi/src')
-                try:
-                    import info
-                except Exception as err:
-                    logger.error(err)
+        if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
+            if not sys.modules.get('info'):
+                sys.path.append('/tmp/cnchi/src')
+                import info
             else:
-                reload('info')
+                import info
+                reload(info)
 
             out = info.CNCHI_VERSION
             err = []

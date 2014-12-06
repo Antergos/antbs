@@ -91,8 +91,38 @@ app.wsgi_app = ProxyFix(app.wsgi_app)
 logger = logconf.logger
 
 
+def copy(src, dst):
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst)
+    else:
+        try:
+            shutil.copy(src, dst)
+        except shutil.SameFileError:
+            pass
+        except shutil.Error:
+            pass
+
+
+def remove(src):
+    if os.path.isdir(src):
+        try:
+            shutil.rmtree(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    elif os.path.isfile(src):
+        try:
+            os.remove(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    else:
+        return True
+
+
 def handle_worker_exception(job, *exc_info):
-    # TODO: This needs a total rewrite
+    # TODO: This needs some thought on how to recover instead of bailing on entire build queue
     doc = docker.Client(base_url='unix://var/run/docker.sock', version='1.12', timeout=10)
 
     container = db.get('container')
@@ -104,35 +134,22 @@ def handle_worker_exception(job, *exc_info):
         logger.error('Unable to kill container')
     repo = os.path.join("/tmp", "staging")
     cache = os.path.join("/tmp", "pkg_cache")
-    try:
-        shutil.rmtree(repo)
-        shutil.rmtree(cache)
-        shutil.rmtree('/opt/antergos-packages')
-        subprocess.check_call(['/usr/bin/docker-clean.sh'])
-    except Exception:
-        pass
+
+    remove(repo)
+    remove(cache)
+    remove('/opt/antergos-packages')
+
     db.set('idle', "True")
     db.set('building', 'Idle')
+    db.set('now_building' '')
     db.set('container', '')
     db.set('building_num', '')
     db.set('building_start', '')
     if queue:
-        first = True
-        last = False
-        last_pkg = queue[-1]
         for p in queue:
-            if p == last_pkg:
-                last = True
-            queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
-            first = False
-        return False
-    else:
-        p = db.get('copying_to_main')
-        if p and p is not None:
-            queue.enqueue_call(builder.update_main_repo, args=(p,), timeout=9600)
-            return False
+            db.rpop('queue')
 
-        return True
+    return True
 
 
 with Connection(db):
@@ -243,35 +260,6 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
     return pkg_list, all_pages, rev_pending
 
 
-def copy(src, dst):
-    if os.path.islink(src):
-        linkto = os.readlink(src)
-        os.symlink(linkto, dst)
-    else:
-        try:
-            shutil.copy(src, dst)
-        except shutil.SameFileError:
-            pass
-        except shutil.Error:
-            pass
-
-
-def remove(src):
-    if os.path.isdir(src):
-        try:
-            shutil.rmtree(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    elif os.path.isfile(src):
-        try:
-            os.remove(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    else:
-        return True
-
 
 def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
@@ -292,7 +280,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('idle', 'False')
         result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
-        db.set('building', 'Updating pkg review status for %s.' % pkg)
+        logger.info('Updating pkg review status for %s.' % pkg)
         logger.info('[UPDATE REPO]: pkg is %s' % pkg)
         logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
         pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg))
@@ -302,7 +290,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         logger.info('[PKG_FILES]:')
         if pkg_files and pkg_files is not None:
             logger.info(pkg_files)
-            db.set('building', 'Moving %s from staging to main repo.' % pkg)
+            logger.info('Moving %s from staging to main repo.' % pkg)
 
             for file in pkg_files_64:
                 if result is 2 or result == '2':
@@ -316,19 +304,15 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                     copy(file, '/tmp')
                 elif result is 3 or result == '3':
                     os.remove(file)
-
-            queue.enqueue_call(builder.update_main_repo, args=(pkg, str(result)), timeout=9600)
+            if result and result is not 4 and result != '4':
+                queue.enqueue_call(builder.update_main_repo, args=(pkg, str(result)), timeout=9600)
 
         else:
             logger.error('@@-antbs.py-@@ | While moving to main, no packages were found to move.')
             err = 'While moving to main, no packages were found to move.'
             errmsg = dict(error=True, msg=err)
 
-    except OSError as err:
-        logger.error('@@-antbs.py-@@ | Error while moving to main: ' + err)
-        err = str(err)
-        errmsg = dict(error=True, msg=err)
-    except Exception as err:
+    except (OSError, Exception) as err:
         logger.error('@@-antbs.py-@@ | Error while moving to main: ' + err)
         err = str(err)
         errmsg = dict(error=True, msg=err)
@@ -344,6 +328,17 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_error(e):
     return render_template('500.html'), 500
+
+
+@app.errorhandler(400)
+def flask_error(e):
+    return render_template('500.html'), 400
+
+
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    return render_template('500.html'), 500
+
 
 
 @app.route("/")
@@ -404,7 +399,7 @@ def homepage():
 @app.route("/building")
 def build():
     is_idle = db.get('idle')
-    now_building = db.get('building')
+    now_building = db.get('now_building')
     cont = db.get('container')
     if cont:
         container = cont[:20]
@@ -526,7 +521,7 @@ def hooked():
 
     if repo == "antergos-packages":
         db.set('idle', 'False')
-        db.set('building', "Build hook triggered. Updating build queue.")
+        logger.info("Build hook triggered. Updating build queue.")
         logger.info(changes)
         has_pkgs = False
         no_dups = []
@@ -560,8 +555,9 @@ def hooked():
         #if not last or last is None or last == '0':
         if db.get('isoBuilding') == 'False':
             db.set('idle', 'False')
-            db.set('building', "New commit detected. Adding package to queue...")
+            logger.info("New commit detected. Adding package to queue...")
             db.set('isoFlag', 'True')
+            db.rpush('queue', 'antergos-iso')
             #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
             queue.enqueue_call(builder.handle_hook, timeout=10000)
         else:
@@ -711,16 +707,16 @@ def build_pkg_now():
         pkgname = request.form['pkgname']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        db.rpush('queue', pkgname)
         args = (True, True)
         if 'antergos-iso' == pkgname:
             if db.get('isoBuilding') == 'False':
                 db.set('isoFlag', 'True')
-                args = (False, False)
+                args = (True, True)
             else:
                 logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                 return redirect(redirect_url())
 
+        db.rpush('queue', pkgname)
         queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
 
     return redirect(redirect_url())
