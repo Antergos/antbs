@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # sign_pkgs.py
@@ -27,8 +27,8 @@
 import os
 import subprocess
 import sys
-import src.redis_connection as redconn
-import src.logging_config as logconf
+import redis_connection as redconn
+import logging_config as logconf
 
 logger = logconf.logger
 GPG_BIN = '/usr/bin/gpg'
@@ -36,7 +36,6 @@ SIG_EXT = '.sig'
 db = redconn.db
 password = db.get('ANTBS_GPG_PASS')
 gpg_key = db.get('ANTBS_GPG_KEY')
-
 
 
 def batch_sign(paths, uid=gpg_key, passphrase=password):
@@ -48,6 +47,8 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
     The passphrase is returned to avoid further prompts.
     """
     for path in paths:
+        db.publish('build-output', 'Creating detached signature for %s' % path)
+        logger.info('[SIGN PKG] Creating detached signature for %s' % path)
         # Verify existing signatures. This fails if the sig is invalid or
         # non-existent. Either way a new one will be needed.
         cmd = [GPG_BIN, '--verify', path + SIG_EXT]
@@ -60,19 +61,23 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
         sigpath = path + '.sig'
         try:
             os.remove(sigpath)
-        except FileNotFoundError:
+        except OSError:
             pass
 
-        print("signing", path)
+        db.publish('build-output', 'Signing %s' % path)
+        logger.info('[SIGN PKG] Signing %s' % path)
         if not passphrase:
             return False
             #passphrase = getpass.getpass("Enter passphrase for %s: " % uid).encode('utf-8')
-        cmd = [GPG_BIN, '-sbu', uid, '--batch', '--pinentry-mode', 'loopback', '--passphrase-fd', '0', path]
-        p = subprocess.Popen(cmd, stdin=subprocess.PIPE)
-        p.communicate(passphrase)
-        e = p.wait()
-        if e != 0:
-            sys.stderr.write('{} exited with non-zero status ({:d})'.format(GPG_BIN, e))
-            sys.exit(1)
+        cmd = [GPG_BIN, '-sbu', 'Antergos', '--batch', '--passphrase-fd', '0', path]
+        p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = p.communicate(passphrase)
+        if len(out) > 0:
+            db.publish('build-output', 'GPG OUTPUT is: %s' % out)
+            logger.info('GPG OUTPUT is: %s' % out)
+        if len(err) > 0:
+            db.publish('build-output', 'Signing FAILED for %s. Error output: %s' % (path, err))
+            logger.error('[SIGN PKG] Signing FAILED for %s. Error output: %s' % (path, err))
+            return False
 
     return True

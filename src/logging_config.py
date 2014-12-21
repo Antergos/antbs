@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # redis_connection.py
@@ -24,12 +24,13 @@
 
 import logging
 import logging.config
-import src.redis_connection
+import redis_connection
+import datetime
 
 
 # class RedisHandler(logging.Handler):
-#     def __init__(self, channel, conn, *args, **kwargs):
-#         logging.Handler.__init__(self, *args, **kwargs)
+# def __init__(self, channel, conn, *args, **kwargs):
+# logging.Handler.__init__(self, *args, **kwargs)
 #         self._formatter = logging.Formatter()
 #         self.channel = channel
 #         self.redis_conn = conn
@@ -48,7 +49,7 @@ import src.redis_connection
 #
 #         except Exception:
 #             pass
-#db = src.redis_connection.db
+db = redis_connection.db
 logger = logging.getLogger()
 
 logging.config.dictConfig({
@@ -57,30 +58,31 @@ logging.config.dictConfig({
 
     'formatters': {
         'file': {
-            'format': ' %(asctime)s [%(levelname)s]: %(message)s -[in %(pathname)s: %(lineno)d]'
+            'format': '%(asctime)s [%(levelname)s]: %(message)s -[in %(pathname)s: %(lineno)d]'
         },
         'email': {
-            'format': '%(levelname)s\n%(pathname)s: %(lineno)d\n%(module)s\n%(funcName)s\n%(asctime)s\nMsg: %(message)s'
+            'format': "'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\n" +
+                      "FUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'"
         }
     },
     'handlers': {
         'default': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'file'
         },
         'file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
             'maxBytes': 200000,
             'backupCount': 5
         },
         'redis': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'rlog.RedisHandler',
             'channel': 'log_stream',
-            'redis_client': src.redis_connection.db,
+            'redis_client': redis_connection.db,
             'formatter': 'file'
         },
         'email': {
@@ -97,11 +99,34 @@ logging.config.dictConfig({
     'loggers': {
         '': {
             'handlers': ['default', 'file', 'redis', 'email'],
-            'level': 'INFO',
+            'level': 'DEBUG',
             'propagate': True
         }
     }
 })
+
+
+def new_timeline_event(msg=None):
+    if msg is not None:
+        if not db.exists('next-timeline-id'):
+            db.set('next-timeline-id', '0')
+        event_id = db.incr('next-timeline-id')
+        dt_date = datetime.datetime.now().strftime("%b %d")
+        dt_time = datetime.datetime.now().strftime("%I:%M%p")
+        tl = 'timeline:%s' % event_id
+        success = False
+        try:
+            db.set(tl, 'True')
+            db.set('%s:date' % tl, dt_date)
+            db.set('%s:time' % tl, dt_time)
+            db.set('%s:msg' % tl, msg)
+            db.lpush('timeline:all', event_id)
+            success = True
+        except Exception as err:
+            logger.error('@@-logging_config.py-@@ | Unable to save timeline event, error msg: %s' % err)
+
+        return True
+
 
 
 

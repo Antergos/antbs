@@ -7,6 +7,7 @@
 
     <div class="col-md-12">
         <div id="bottom-wrap" class="block-flat">
+            <div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
             <div class="header">
                 <h3>Completed Builds</h3>
             </div>
@@ -54,7 +55,8 @@
                                                             class="fa fa-exclamation" style="color:red;"></i>
                                                         Fail</a>
                                                     </li>
-                                                    <li style="font-style: italic;"><a href="#" id="4" bnum="{{ info['bnum'] }}"><i
+                                                    <li style="font-style: italic;"><a href="#" id="4"
+                                                                                       bnum="{{ info['bnum'] }}"><i
                                                             class="fa fa-eye-slash" style="color:#777777;"></i>
                                                         Skip</a>
                                                     </li>
@@ -63,7 +65,7 @@
                                             <span class="passed" style="display: none"><i class="fa fa-check"
                                                                                           style="color:green;"></i> Passed</span>
                                             <span class="failed" style="display: none"><i
-                                                    class="fa fa-exclaimation-circle"
+                                                    class="fa fa-exclamation-circle"
                                                     style="color:red;"></i> Failed</span>
                                         {% elif info['review_stat'] == 'passed' %}
                                             <i class="fa fa-check" style="color:green;"></i>
@@ -104,24 +106,31 @@
                         </tbody>
                     </table>
                     {% if all_pages > 1 %}
-                        <div class="btn-group">
+                        <ul class="pagination">
                             {% if page >= 2 %}
-                                <a href="/completed/{{ page - 1 }}" class="btn btn-primary">&laquo;</a>
+                                <li><a href="/completed/{{ page - 1 }}">&laquo;</a></li>
                             {% else %}
-                                <a href="#" class="btn btn-primary">&laquo;</a>
+                                <li><a href="#" class="disabled">&laquo;</a></li>
                             {% endif %}
                             {% for i in range(0, all_pages) %}
-                                <a href="/completed/{{ loop.index0 + 1 }}"
-                                   class="btn btn-primary">{{ loop.index0 + 1 }}</a>
+                                {% if loop.index0 <= 6 %}
+                                    {% if loop.index0 == page %}
+                                        <li><a href="#" class="active">{{ page }}</a></li>
+                                    {% else %}
+                                        <li><a href="/completed/{{ loop.index0 + 1 }}">{{ loop.index0 + 1 }}</a></li>
+                                    {% endif %}
+                                {% elif loop.index0 == 7 %}
+                                    <li><a href="/completed/{{ loop.index0 + 1 }}">...</a></li>
+                                {% endif %}
                             {% endfor %}
 
-                            <a href="/completed/{{ page + 1 }}" class="btn btn-primary">&raquo;</a>
+                            <li><a href="/completed/{{ page + 1 }}">&raquo;</a></li>
                         </div>
                     {% endif %}
                 {% endif %}
-            </div>
-            <div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
         </div>
+
+    </div>
     </div>
 
 {%- endblock bottomcontent %}

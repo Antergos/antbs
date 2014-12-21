@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # package.py
@@ -28,12 +28,15 @@ import subprocess
 import os
 import re
 import sys
+from github3 import login
 
 logger = src.logging_config.logger
 
 
 class Package(object):
+
     db = src.redis_connection.db
+    gh_user = db.get('ANTBS_GITHUB_TOKEN')
 
     def __init__(self, name, db=db):
         self.name = name
@@ -42,10 +45,12 @@ class Package(object):
         if not db.exists(self.key):
             db.set(self.key, True)
             db.set('%s:%s' % (self.key, 'name'), self.name)
+            db.set('%s:%s' % (self.key, 'push_version'), "False")
         self.version = db.get('%s:%s' % (self.key, 'version'))
         self.epoch = db.get('%s:%s' % (self.key, 'epoch'))
         self.depends = db.lrange('%s:%s' % (self.key, 'depends'), 0, -1)
         self.builds = db.lrange('%s:%s' % (self.key, 'builds'), 0, -1)
+        self.push_version = db.get('%s:%s' % (self.key, 'push_version'))
 
     def delete(self):
         self.db.delete(self.key)
@@ -58,6 +63,11 @@ class Package(object):
 
     def save_to_db(self, attr=None, value=None):
         if attr and value:
+            if self.push_version and self.push_version == "True" and attr == "pkgver":
+                old = self.get_from_db(attr)
+                if old != value:
+                    self.update_and_push_github(attr, old, value)
+
             self.db.set('%s:%s' % (self.key, attr), value)
             return self.db.get('%s:%s' % (self.key, attr))
 
@@ -93,6 +103,12 @@ class Package(object):
         else:
             cmd = 'source ' + path + '; echo $' + var
             if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
+                if 'numix-icon-theme' not in parse:
+                    giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+                    giturl = giturl.group(0)
+                    pkgdir, pkgbuild = os.path.split(path)
+                    subprocess.check_call(['git', 'clone', giturl, self.name], cwd=pkgdir)
+
                 cmd = 'source ' + path + '; ' + var
 
             proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
@@ -101,9 +117,25 @@ class Package(object):
 
         if len(out) > 0:
             out = out.strip()
-            out = self.save_to_db(var, out)
             logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
             logger.error('@@-package.py-@@ | proc.err is %s' % err)
 
         return out
+
+    def update_and_push_github(self, var=None, old_val=None, new_val=None):
+
+        gh = login(token=self.gh_user)
+        repo = gh.repository('antergos', 'antergos-packages')
+        tf = repo.file_contents(self.name + '/PKGBUILD')
+        content = tf.decoded
+        search_str = '%s=%s' % (var, old_val)
+        replace_str = '%s=%s' % (var, new_val)
+        content = content.replace(search_str, replace_str)
+        commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
+        if commit and commit['commit'] is not None:
+            logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
+            return True
+        else:
+            logger.error('@@-package.py-@@ | commit failed')
+            return False

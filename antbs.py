@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # build_pkg.py
@@ -184,29 +184,28 @@ def get_live_build_ouput():
         gevent.sleep(.05)
 
 
-# Not using this yet.
-# def get_paginated(pkg_list, per_page, page):
-#     pkg_list.reverse()
-#     page -= 1
-#     paginated = [pkg_list[i:i + per_page] for i in range(0, len(pkg_list), per_page)]
-#     logger.info(paginated)
-#     this_page = paginated[page]
-#     all_pages = len(paginated)
-#
-#     return this_page, all_pages
+
+def get_paginated(item_list, per_page, page, timeline):
+    page -= 1
+    if not timeline:
+        item_list.reverse()
+    paginated = [item_list[i:i + per_page] for i in range(0, len(item_list), per_page)]
+    this_page = paginated[page]
+    all_pages = len(paginated)
+
+    return this_page, all_pages
 
 
 def get_build_info(page=None, status=None, logged_in=False, review=False):
     # TODO: I don't like this. Need to come up with something better.
     if page is None or status is None:
         abort(500)
-    pkg_info_cache = db.exists('pkg_info_cache:%s' % status)
-    rev_info_cache = not db.exists('rev_info_cache') and review and logged_in
-    pending_rev_cache = not db.exists('pending_rev_cache') and logged_in
+    pkg_info_cache = not db.exists('pkg_info_cache:%s:%s' % (status, page))
+    rev_info_cache = not db.exists('rev_info_cache:%s' % page) and review and logged_in
+    pending_rev_cache = not db.exists('pending_rev_cache:%s' % page) and review and logged_in
     logger.info('[GET_BUILD_INFO] - CALLED')
-    all_pages = 1
-    if any(not i for i in (pkg_info_cache, rev_info_cache, pending_rev_cache)):
-        logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION SATISFIED')
+    if any(i for i in (pkg_info_cache, rev_info_cache, pending_rev_cache)):
+        logger.info('[GET_BUILD_INFO] - "ANY" CONDITION SATISFIED, NOT USING CACHED VALUE')
         try:
             all_builds = db.lrange(status, 0, -1)
         except Exception:
@@ -216,8 +215,8 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
         rev_pending = []
 
         if all_builds is not None:
-            # builds, all_pages = get_paginated(all_builds, 10, page)
-            for build in all_builds:
+            builds, all_pages = get_paginated(all_builds, 10, page, False)
+            for build in builds:
                 try:
                     pkg = db.get('build_log:%s:pkg' % build)
                 except Exception:
@@ -239,23 +238,29 @@ def get_build_info(page=None, status=None, logged_in=False, review=False):
                                 review_stat=review_stat, review_dev=review_dev, review_date=review_date)
                 pkg_info = {bnum: all_info}
                 pkg_list.append(pkg_info)
-                if logged_in and review_stat == "pending" and len(rev_pending) < 5:
+                db.hset('pkg_info_cache:%s:%s:hash' % (status, page), bnum, all_info)
+                #db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
+                if logged_in and review and review_stat == "pending":
                     rev_pending.append(pkg_info)
+                    db.hset('pending_rev_cache:%s:hash' % page, bnum, all_info)
+                    #db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
                 else:
                     continue
 
             if review:
-                db.setex('rev_info_cache', 10800, pkg_list)
-            else:
-                db.setex('pkg_info_cache:%s' % status, 10800, pkg_list)
-            db.setex('pending_rev_cache', 10800, rev_pending)
+                db.setex('pending_rev_cache:%s' % page, 10800, "True")
+
+            db.setex('rev_info_cache:%s' % page, 10800, "True")
+            db.setex('pkg_info_cache:%s:%s' % (status, page), 10800, "True")
+            db.setex('all_pages_cache', 10800, all_pages)
     else:
-        logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION NOT SATISFIED')
+        logger.info('[GET_BUILD_INFO] - "NOT ANY" CONDITION NOT SATISFIED - WE ARE USING CACHED VALUES')
         if review:
-            pkg_list = list(db.get('rev_info_cache'))
+            pkg_list = db.hgetall('pending_rev_cache:%s:hash' % page)
         else:
-            pkg_list = list(db.get('pkg_info_cache:%s' % status))
-        rev_pending = list(db.get('pending_rev_cache'))
+            pkg_list = db.hgetall('pkg_info_cache:%s:%s:hash' % (status, page))
+        rev_pending = db.hgetall('pending_rev_cache:%s:hash' % page)
+        all_pages = db.get('all_pages_cache')
 
     return pkg_list, all_pages, rev_pending
 
@@ -320,6 +325,21 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     return errmsg
 
 
+def get_timeline(tlpage=None):
+    event_ids = db.lrange('timeline:all', 0, -1)
+    timeline = []
+    for event_id in event_ids:
+        date = db.get('timeline:%s:date' % event_id)
+        time = db.get('timeline:%s:time' % event_id)
+        msg = db.get('timeline:%s:msg' % event_id)
+        allinfo = dict(event_id=event_id, date=date, msg=msg, time=time)
+        event = {event_id: allinfo}
+        timeline.append(event)
+    this_page, all_pages = get_paginated(timeline, 6, tlpage, True)
+
+    return this_page, all_pages
+
+
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('404.html'), 404
@@ -327,25 +347,31 @@ def page_not_found(e):
 
 @app.errorhandler(500)
 def internal_error(e):
+    logger.error(e)
     return render_template('500.html'), 500
 
 
 @app.errorhandler(400)
 def flask_error(e):
+    logger.error(e)
     return render_template('500.html'), 400
 
 
 @app.errorhandler(Exception)
 def unhandled_exception(e):
+    logger.error(e)
     return render_template('500.html'), 500
 
-
-
+@app.route("/timeline/<int:tlpage>")
 @app.route("/")
-def homepage():
+def homepage(tlpage=None):
+    if tlpage is None:
+        tlpage = 1
     is_idle = db.get('idle')
     check_stats = ['queue', 'completed', 'failed']
     building = db.get('building')
+    this_page, all_pages = get_timeline(tlpage)
+    #logger.info('@@-antbs.py-@@ | this_page is %s' % this_page)
     stats = {}
     for stat in check_stats:
         res = db.llen(stat)
@@ -393,7 +419,8 @@ def homepage():
             stats['repo_' + repo] = len(set(filtered))
             db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
 
-    return render_template("overview.html", idle=is_idle, stats=stats, user=user, building=building)
+    return render_template("overview.html", idle=is_idle, stats=stats, user=user, building=building,
+                           this_page=this_page, all_pages=all_pages, page=tlpage)
 
 
 @app.route("/building")
@@ -427,6 +454,7 @@ def get_log():
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
     is_phab = False
+    db.set('isPhab', "False")
     repo = None
     if request.method == 'GET':
         return ' Nothing to see here, move along ...'
@@ -436,6 +464,7 @@ def hooked():
         phab = int(request.args.get('phab', '0'))
         if phab and phab > 0:
             is_phab = True
+            logconf.new_timeline_event('Webhook triggered by <strong>Phabricator.</strong>')
         else:
             # Store the IP address blocks that github uses for hook requests.
             hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
@@ -478,6 +507,7 @@ def hooked():
             logger.error('phab hook failed for numix')
 
     elif is_phab and request.args['repo'] == "CN":
+        db.set('isPhab', "True")
         repo = 'antergos-packages'
         db.set('pullFrom', 'antergos')
         cnchi = ['cnchi-dev']
@@ -507,6 +537,7 @@ def hooked():
 
             db.delete('creating-cnchi-archive-from-dev')
     else:
+        logconf.new_timeline_event('Webhook triggered by <strong>Github.</strong>')
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']
         if 'lots0logs' in full_name and 'antergos/' not in full_name:
@@ -514,10 +545,12 @@ def hooked():
         else:
             db.set('pullFrom', 'antergos')
         repo = payload['repository']['name']
+        pusher = payload['pusher']['name']
         commits = payload['commits']
-        for commit in commits:
-            changes.append(commit['modified'])
-            changes.append(commit['added'])
+        if pusher != "antbs":
+            for commit in commits:
+                changes.append(commit['modified'])
+                changes.append(commit['added'])
 
     if repo == "antergos-packages":
         db.set('idle', 'False')
@@ -547,6 +580,7 @@ def hooked():
                     db.rpush('queue', p)
                 if p == last_pkg:
                     last = True
+                logconf.new_timeline_event('<strong>%s</strong> was added to the <strong>build queue.</strong>' % p)
                 queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
                 first = False
 
@@ -560,6 +594,7 @@ def hooked():
             db.rpush('queue', 'antergos-iso')
             #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
             queue.enqueue_call(builder.handle_hook, timeout=10000)
+            logconf.new_timeline_event('<strong>antergos-iso</strong> was added to the <strong>build queue.</strong>')
         else:
             logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
 
@@ -705,6 +740,7 @@ def dev_pkg_check():
 def build_pkg_now():
     if request.method == 'POST':
         pkgname = request.form['pkgname']
+        dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
         args = (True, True)
@@ -718,6 +754,7 @@ def build_pkg_now():
 
         db.rpush('queue', pkgname)
         queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
+        logconf.new_timeline_event('<strong>%s</strong> added %s to the <strong>build queue.</strong>' % (dev, pkgname ))
 
     return redirect(redirect_url())
 

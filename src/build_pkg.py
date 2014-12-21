@@ -31,8 +31,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 from src.redis_connection import db
 import docker
 import subprocess
-import logging
-import logging.config
 import src.logging_config as logconf
 import datetime
 import shutil
@@ -92,112 +90,26 @@ def get_pkgver(pkgobj):
     pkg = pkgobj.name
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
+    pkgobj.save_to_db('pkgver', pkgver)
     epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
     pkgrel = pkgobj.get_from_pkgbuild('pkgrel', pbfile)
     if epoch and epoch != '' and epoch is not None:
         pkgver = epoch + ':' + pkgver
     if pkgrel and pkgrel != '' and pkgrel is not None:
         pbver = pkgver + '-' + pkgrel
+        old_pkgrel = pkgrel
         if pbver == pkgobj.get_from_db('version'):
-            pkgrel = int(pkgrel) + 1
+            pkgrel = str(int(pkgrel) + 1)
+            pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
+        pkgobj.save_to_db('pkgrel', pkgrel)
+
     pkgver = pkgver + '-' + str(pkgrel)
     if pkgver and pkgver != '' and pkgver is not None:
+        pkgobj.save_to_db('version', pkgver)
         logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
     else:
         pkgver = pkgobj.get_from_db('version')
     return pkgver
-    # pkgver = None
-    # epoch_num = None
-    # epoch_done = None
-    # arch_done = None
-    # pkgver_done = None
-    # pkgrel_done = None
-    # pkgrel_num = None
-    # pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
-    # pkgdir = os.path.join(REPO_DIR, pkg)
-    # logger.info('pkgdir is %s' % pkgdir)
-    # last_ver = db.get('pkg:%s:version' % pkg)
-    # parse = open(pbfile).read()
-    # if 'git+' in parse or 'numix-icon-theme-square' in pkg:
-    # epoch = 'epoch=' in parse
-    # logger.info('parse is %s' % parse)
-    #     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-    #     if not giturl:
-    #         giturl = '/var/repo/NXSQ'
-    #     else:
-    #         giturl = giturl.group(0)
-    #     subprocess.check_call(['git', 'clone', giturl, pkg], cwd=pkgdir)
-    #     rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
-    #     short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(pkgdir, pkg))
-    #     pkgver = '0.r%s.%s' % (rev, short)
-    #     if pkgver and pkgver != '0.r.':
-    #         if epoch:
-    #             epoch = re.search('(?<=epoch\\=)\d{1,2}', parse)
-    #             pkgver = epoch.group(0) + ':' + pkgver
-    #         logger.info('pkgver is %s' % pkgver)
-    # elif 'cnchi-dev' == pkg:
-    #     if 'info' not in sys.modules:
-    #         if '/tmp/cnchi/src' not in sys.path:
-    #             sys.path.append('/tmp/cnchi/src')
-    #         import info
-    #     else:
-    #         reload('info')
-    #     pkgrel_num = last_ver[-1:]
-    #     pkgver = info.CNCHI_VERSION
-    #
-    # else:
-    #
-    #     with open(pbfile) as PKGBUILD:
-    #         for line in PKGBUILD:
-    #             if line.startswith('arch='):
-    #                 if 'i686' in line:
-    #                     shutil.copyfile(pbfile, os.path.join(pkgdir, 'PKGBUILD32'))
-    #                 arch_done = True
-    #                 if epoch_done and pkgver_done:
-    #                     break
-    #                 else:
-    #                     continue
-    #             elif line.startswith('epoch='):
-    #                 epoch = line.split('=')
-    #                 epoch_num = epoch[1].strip('\n')
-    #                 epoch_done = True
-    #                 if arch_done and pkgver_done and pkgrel_done:
-    #                     break
-    #                 else:
-    #                     continue
-    #             elif line.startswith("pkgver") and not line.startswith("pkgver()"):
-    #                 l = line.split('=')
-    #                 logger.info('line is %s' % l)
-    #                 pkgver = l[1].strip('\n')
-    #                 pkgver_done = True
-    #                 if epoch_done and arch_done and pkgrel_done:
-    #                     break
-    #                 else:
-    #                     continue
-    #             elif line.startswith('pkgrel='):
-    #                 pkgrel = line.split('=')
-    #                 pkgrel_num = pkgrel[1].strip('\n')
-    #                 pkgrel_done = True
-    #                 if arch_done and pkgver_done and epoch_done:
-    #                     break
-    #                 else:
-    #                     continue
-    #
-    # if epoch_num:
-    #     pkgver = epoch_num + ':' + pkgver
-    # if pkgrel_num:
-    #     pkgver = pkgver + '-' + pkgrel_num
-    #     logger.info('[LAST_VER] %s' % last_ver)
-    #     if pkgver == last_ver:
-    #         last_rel = int(last_ver[-1:])
-    #         logger.info('[LAST_REL] %s' % str(last_rel))
-    #         new_rel = last_rel + 1
-    #         logger.info('[NEW_REL] %s' % str(new_rel))
-    #         pkgver = pkgver[:-1] + str(new_rel)
-    #         logger.info('[PKGVER] %s' % pkgver)
-    # else:
-    #     pkgver += '-1'
-
 
 def get_deps(pkg):
     depends = []
@@ -486,13 +398,16 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
     if upd_repo:
         db.publish('build-output', 'ENDOFLOG')
     content = '\n '.join(content)
-    pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                           prestyles="background:#272822;color:#fff;",
-                                                           encoding='utf-8'))
+
     log_exists = db.get('%s:content' % this_log)
     if log_exists and log_exists != '':
-        pretty = log_exists + pretty
-    db.set('%s:content' % this_log, pretty.decode('utf-8'))
+        content = content + log_exists
+        pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                               prestyles="background:#272822;color:#fff;",
+                                                               encoding='utf-8'))
+        db.set('%s:content' % this_log, pretty.decode('utf-8'))
+    else:
+        db.set('%s:content' % this_log, content)
 
 
 def build_pkgs(last=False):
@@ -616,15 +531,30 @@ def build_pkgs(last=False):
         #last_count = int(db.get('pkg_count'))
         #logger.info('last count is %s %s' % (last_count, type(last_count)))
         #logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
+        pkgs2sign = None
         if not failed:
             db.publish('build-output', 'Signing package..')
-            pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/%s-**.xz' % pkg)
-            try_sign = sign_pkgs.batch_sign(pkgs2sign)
+            pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-**.xz' % pkg)
+            pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-**.xz' % pkg)
+            pkgs2sign = pkgs2sign + pkgs2sign32
+            logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
+            if pkgs2sign is not None:
+                try_sign = sign_pkgs.batch_sign(pkgs2sign)
+            else:
+                try_sign = False
             if try_sign:
+                db.publish('build-output', 'Signature created successfully for %s' % pkg)
+                logger.info('[SIGN PKG] Signature created successfully for %s' % pkg)
                 db.publish('build-output', 'Updating staging repo database..')
                 update_main_repo(pkg, 'staging', this_log)
             else:
                 failed = True
+                log_string = db.get('%s:content' % this_log)
+                if log_string and log_string != '':
+                    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                                           prestyles="background:#272822;color:#fff;",
+                                                                           encoding='utf-8'))
+                    db.set('%s:content' % this_log, pretty.decode('utf-8'))
 
         if not failed:
             db.publish('build-output', 'Build completed successfully!')
@@ -634,10 +564,12 @@ def build_pkgs(last=False):
             db.set('%s:review_stat' % this_log, '1')
         else:
             logger.error('No package found after container exit.')
-            failed = True
+            if pkgs2sign is not None:
+                for p in pkgs2sign:
+                    remove(p)
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        # doc.remove_container(container)
+        doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
         try:

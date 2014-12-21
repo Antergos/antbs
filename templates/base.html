@@ -146,6 +146,24 @@
                             max-width: 100%;
                         }
                     }
+                        ul.timeline li > .date {
+                            width: 47px;
+                        }
+                    ul.timeline {
+                        margin-bottom: 0px;
+                    }
+                    ul.pagination {
+                        margin: 0 auto;
+                    }
+                    .timeline {
+                        text-align: left;
+                    }
+                    .tlwrap {
+                        text-align: center;
+                    }
+                    .tlwrap h4 {
+                        text-align: left;
+                    }
 
                     </style>
                 {%- endblock styles %}
@@ -236,6 +254,7 @@
                             <form action="/build_pkg_now" role="form" id="build_now_form" method="post">
                                 <input type="text" class="form-control search" name="pkgname" id="pkgname"
                                        placeholder="Build Now..."/>
+                                <input type="hidden" name="dev" id="dev" value="{{ user.username }}" />
                             </form>
                         {% endif %}
                         <button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
