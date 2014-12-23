@@ -46,18 +46,24 @@ class Package(object):
             db.set(self.key, True)
             db.set('%s:%s' % (self.key, 'name'), self.name)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
-        self.version = db.get('%s:%s' % (self.key, 'version'))
-        self.epoch = db.get('%s:%s' % (self.key, 'epoch'))
-        self.depends = db.lrange('%s:%s' % (self.key, 'depends'), 0, -1)
-        self.builds = db.lrange('%s:%s' % (self.key, 'builds'), 0, -1)
-        self.push_version = db.get('%s:%s' % (self.key, 'push_version'))
+        self.version = self.get_from_db('version')
+        self.epoch = self.get_from_db('epoch')
+        self.depends = self.get_from_db('depends')
+        self.builds = self.get_from_db('builds')
+        self.push_version = self.get_from_db('push_version')
+        self.pkgrel = self.get_from_db('pkgrel')
 
     def delete(self):
         self.db.delete(self.key)
 
     def get_from_db(self, attr):
         if attr:
-            val = self.db.get('%s:%s' % (self.key, attr))
+            if self.db.type('string'):
+                val = self.db.get('%s:%s' % (self.key, attr))
+            elif self.db.type('list'):
+                val = self.db.lrange('%s:%s' % (self.key, attr), 0, -1)
+            else:
+                val = ''
             logger.info('@@-package.py-@@ | get_from_db val is %s' % val)
             return val
 
@@ -85,6 +91,7 @@ class Package(object):
                 reload(info)
 
             out = info.CNCHI_VERSION
+            del info.CNCHI_VERSION
             err = []
         #elif var == "pkgver" and 'cnchi-dev' not in parse and ('git+' in parse or 'numix-icon-theme-square' in parse):
             # giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -124,7 +131,8 @@ class Package(object):
         return out
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
-
+        if self.push_version != "True":
+            return
         gh = login(token=self.gh_user)
         repo = gh.repository('antergos', 'antergos-packages')
         tf = repo.file_contents(self.name + '/PKGBUILD')

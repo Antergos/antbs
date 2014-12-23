@@ -98,7 +98,7 @@ def get_pkgver(pkgobj):
     if pkgrel and pkgrel != '' and pkgrel is not None:
         pbver = pkgver + '-' + pkgrel
         old_pkgrel = pkgrel
-        if pbver == pkgobj.get_from_db('version'):
+        if pbver == pkgobj.version:
             pkgrel = str(int(pkgrel) + 1)
             pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
         pkgobj.save_to_db('pkgrel', pkgrel)
@@ -109,6 +109,7 @@ def get_pkgver(pkgobj):
         logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
     else:
         pkgver = pkgobj.get_from_db('version')
+    del pkgobj
     return pkgver
 
 def get_deps(pkg):
@@ -247,6 +248,7 @@ def handle_hook(first=False, last=False):
                     db.rpush('queue', c)
             logger.info('Check deps complete. Starting build_pkgs')
             db.set('building', 'Check deps complete. Starting build container.')
+            del pack
 
     logger.info('[FIRST IS SET]: %s' % first)
     logger.info('[LAST IS SET]: %s' % last)

@@ -105,32 +105,33 @@
 
                         </tbody>
                     </table>
-                    {% if all_pages > 1 %}
-                        <ul class="pagination">
-                            {% if page >= 2 %}
-                                <li><a href="/completed/{{ page - 1 }}">&laquo;</a></li>
-                            {% else %}
-                                <li><a href="#" class="disabled">&laquo;</a></li>
+                    {% macro render_pagination(pagination) %}
+                        <ul class="pagination custom">
+                            {% if pagination.has_prev %}
+                                <li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
                             {% endif %}
-                            {% for i in range(0, all_pages) %}
-                                {% if loop.index0 <= 6 %}
-                                    {% if loop.index0 == page %}
-                                        <li><a href="#" class="active">{{ page }}</a></li>
+                            {%- for page in pagination.iter_pages() %}
+                                {% if page %}
+
+                                    {% if page != pagination.page %}
+                                        <li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
                                     {% else %}
-                                        <li><a href="/completed/{{ loop.index0 + 1 }}">{{ loop.index0 + 1 }}</a></li>
+                                        <li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
                                     {% endif %}
-                                {% elif loop.index0 == 7 %}
-                                    <li><a href="/completed/{{ loop.index0 + 1 }}">...</a></li>
+                                {% else %}
+                                    <li><span class=ellipsis>…</span></li>
                                 {% endif %}
-                            {% endfor %}
-
-                            <li><a href="/completed/{{ page + 1 }}">&raquo;</a></li>
-                        </div>
-                    {% endif %}
+                            {%- endfor %}
+                            {% if pagination.has_next %}
+                                <li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
+                            {% endif %}
+                        </ul>
+                    {% endmacro %}
+                    {{ render_pagination(pagination) }}
                 {% endif %}
-        </div>
+            </div>
 
-    </div>
+        </div>
     </div>
 
 {%- endblock bottomcontent %}

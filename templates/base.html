@@ -164,6 +164,9 @@
                     .tlwrap h4 {
                         text-align: left;
                     }
+                    ul.custom{
+                        float: right !important;
+                    }
 
                     </style>
                 {%- endblock styles %}
@@ -418,7 +421,7 @@
                 <script type="text/javascript"
                         src="/static/js/jquery.datatables/bootstrap-adapter/js/dataTables.bootstrap.js"></script>
                 <script type="text/javascript"
-                        src="//cdn.datatables.net/plug-ins/725b2a2115b/type-detection/num-html.js"></script>
+                        src="/static/js/jquery.datatables/media/js/num-html.js"></script>
                 <script type="text/javascript">
                     //sets up numeric sorting of links
                     jQuery(document).ready(function () {
@@ -477,7 +480,7 @@
                                             null,
                                             null,
                                             null,
-                                            null{% if request.path == '/completed' or request.path == '/pkg_review' %},
+                                            null{% if '/completed' in request.path or '/pkg_review' in request.path %},
                                                 null,
                                                 null,
                                                 null{% endif %}
@@ -489,7 +492,7 @@
                                     })
 
                         }
-
+                        jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
                     });
 
 
