@@ -52,6 +52,8 @@ class Package(object):
         self.builds = self.get_from_db('builds')
         self.push_version = self.get_from_db('push_version')
         self.pkgrel = self.get_from_db('pkgrel')
+        self.pkgver = self.get_from_db('pkgver')
+        self.saved_commit = None
 
     def delete(self):
         self.db.delete(self.key)
@@ -83,15 +85,15 @@ class Package(object):
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
-            if not sys.modules.get('info'):
+            if "info" in sys.modules:
+                del(sys.modules["info"])
+            if "/tmp/cnchi/src" not in sys.path:
                 sys.path.append('/tmp/cnchi/src')
-                import info
-            else:
-                import info
-                reload(info)
+            import info
 
             out = info.CNCHI_VERSION
-            del info.CNCHI_VERSION
+            del(info.CNCHI_VERSION)
+            del(sys.modules["info"])
             err = []
         #elif var == "pkgver" and 'cnchi-dev' not in parse and ('git+' in parse or 'numix-icon-theme-square' in parse):
             # giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -136,11 +138,23 @@ class Package(object):
         gh = login(token=self.gh_user)
         repo = gh.repository('antergos', 'antergos-packages')
         tf = repo.file_contents(self.name + '/PKGBUILD')
-        content = tf.decoded
+        if self.saved_commit is not None:
+            content = self.saved_commit
+        else:
+            content = tf.decoded
         search_str = '%s=%s' % (var, old_val)
         replace_str = '%s=%s' % (var, new_val)
         content = content.replace(search_str, replace_str)
-        commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
+        ppath = os.path.join('/opt/antergos-packages/', self.name, '/PKGBUILD')
+        with open(ppath, 'w') as pbuild:
+            pbuild.write(content)
+        pbuild.close()
+        if self.saved_commit is None:
+            self.saved_commit = content
+            commit = {'commit': True}
+        else:
+            self.saved_commit = None
+            commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
         if commit and commit['commit'] is not None:
             logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
             return True

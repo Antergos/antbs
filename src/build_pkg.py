@@ -90,6 +90,7 @@ def get_pkgver(pkgobj):
     pkg = pkgobj.name
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
+    old_pkgver = pkgobj.pkgver
     pkgobj.save_to_db('pkgver', pkgver)
     epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
     pkgrel = pkgobj.get_from_pkgbuild('pkgrel', pbfile)
@@ -98,9 +99,14 @@ def get_pkgver(pkgobj):
     if pkgrel and pkgrel != '' and pkgrel is not None:
         pbver = pkgver + '-' + pkgrel
         old_pkgrel = pkgrel
-        if pbver == pkgobj.version:
+        if pkgver == old_pkgver:
             pkgrel = str(int(pkgrel) + 1)
-            pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
+        elif pkgver != pkgobj.pkgver and pkgobj.push_version == "True":
+            pkgrel = 1
+        else:
+            pass
+
+        pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
         pkgobj.save_to_db('pkgrel', pkgrel)
 
     pkgver = pkgver + '-' + str(pkgrel)
@@ -236,7 +242,7 @@ def handle_hook(first=False, last=False):
                     db.rpush('pkg:%s:deps' % pack.name, dep)
             logger.info('Updating pkgver in databse for %s to %s' % (pack.name, version))
             db.set('building', 'Updating pkgver in databse for %s to %s' % (pack.name, version))
-            pack.save_to_db('version', version)
+            #pack.save_to_db('version', version)
 
             logger.info('All queued packages are in the database, checking deps to determine build order.')
             db.set('building', 'Determining build order based on pkg dependancies')
@@ -249,6 +255,10 @@ def handle_hook(first=False, last=False):
             logger.info('Check deps complete. Starting build_pkgs')
             db.set('building', 'Check deps complete. Starting build container.')
             del pack
+    try:
+        subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
+    except subprocess.CalledProcessError as err:
+        logger.error(err.output)
 
     logger.info('[FIRST IS SET]: %s' % first)
     logger.info('[LAST IS SET]: %s' % last)
@@ -370,7 +380,7 @@ def db_filter_and_add(output=None, this_log=None):
 
 def publish_build_ouput(container=None, this_log=None, upd_repo=False):
     if not container or not this_log:
-        logging.error('Unable to publish build output. (Container is None)')
+        logger.error('Unable to publish build output. (Container is None)')
         return
     proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
     output = iter(proc.stdout.readline, '')
