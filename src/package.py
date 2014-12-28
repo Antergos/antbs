@@ -153,10 +153,13 @@ class Package(object):
             self.saved_commit = content
             commit = {'commit': True}
         else:
-            self.saved_commit = None
             commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
+            self.saved_commit = None
         if commit and commit['commit'] is not None:
-            logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
+            try:
+                logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
+            except AttributeError:
+                pass
             return True
         else:
             logger.error('@@-package.py-@@ | commit failed')

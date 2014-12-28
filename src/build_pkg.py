@@ -90,6 +90,8 @@ def get_pkgver(pkgobj):
     pkg = pkgobj.name
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
+    if pkg == "cnchi-dev" and pkgver[-1] != "0":
+        return False
     old_pkgver = pkgobj.pkgver
     pkgobj.save_to_db('pkgver', pkgver)
     epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
@@ -230,6 +232,8 @@ def handle_hook(first=False, last=False):
 
             pack = package(pack, db)
             version = get_pkgver(pack)
+            if not version:
+                return False
             depends = get_deps(pack.name)
             # if not db.exists('pkg:%s' % package):
             #     logger.info('%s not found in database, adding entry..' % package)
