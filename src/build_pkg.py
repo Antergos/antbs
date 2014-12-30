@@ -101,7 +101,7 @@ def get_pkgver(pkgobj):
     if pkgrel and pkgrel != '' and pkgrel is not None:
         pbver = pkgver + '-' + pkgrel
         old_pkgrel = pkgrel
-        if pkgver == old_pkgver:
+        if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel and pkgobj.push_version == "True":
             pkgrel = str(int(pkgrel) + 1)
         elif pkgver != pkgobj.pkgver and pkgobj.push_version == "True":
             pkgrel = 1
@@ -117,7 +117,7 @@ def get_pkgver(pkgobj):
         logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
     else:
         pkgver = pkgobj.get_from_db('version')
-    del pkgobj
+    #del pkgobj
     return pkgver
 
 def get_deps(pkg):
@@ -258,7 +258,7 @@ def handle_hook(first=False, last=False):
                     db.rpush('queue', c)
             logger.info('Check deps complete. Starting build_pkgs')
             db.set('building', 'Check deps complete. Starting build container.')
-            del pack
+
     try:
         subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
     except subprocess.CalledProcessError as err:
@@ -268,6 +268,7 @@ def handle_hook(first=False, last=False):
     logger.info('[LAST IS SET]: %s' % last)
     if iso_flag == 'False':
         build_pkgs(last)
+        del pack
 
 
 def update_main_repo(pkg=None, rev_result=None, this_log=None):
@@ -299,7 +300,7 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=pkgenv,
-                                             volumes=['/makepkg', '/root/.gnupg', '/main', '/result'])
+                                             volumes=['/makepkg', '/root/.gnupg', '/main', '/result', '/staging'])
             db.set('update_repo_container', container.get('Id'))
             doc.start(container, binds={
                 DOC_DIR:
@@ -340,46 +341,11 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
 
-        doc.remove_container(container)
+        #doc.remove_container(container)
         db.set('idle', 'True')
         db.set('building', 'Idle')
         db.delete('repo-count-staging')
         db.delete('repo-count-main')
-
-
-def db_filter_and_add(output=None, this_log=None):
-    if output is None or this_log is None:
-        return
-    nodup = set()
-    part2 = None
-    filtered = []
-    for line in output:
-        if not line or line == '' or "Antergos Automated Build Server" in line or "--passphrase" in line:
-            continue
-        line = line.rstrip()
-        end = line[20:]
-        if end not in nodup:
-            nodup.add(end)
-            line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
-            bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
-            if bad_date:
-                line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
-            if len(line) > 210:
-                part1 = line[:210]
-                part2 = line[211:]
-                filtered.append(part1)
-                filtered.append(datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p") + ' ' + part2)
-                # db.rpush('%s:content' % this_log, part1)
-            else:
-                filtered.append(line)
-
-    filtered_string = '\n '.join(filtered)
-    # db.rpush('%s:content' % this_log, line)
-    # filtered_string = filtered_string.decode('utf-8')
-    pretty = highlight(filtered_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                   prestyles="background:#272822;color:#fff;",
-                                                                   encoding='utf-8'))
-    db.set('%s:content' % this_log, pretty.decode('utf-8'))
 
 
 def publish_build_ouput(container=None, this_log=None, upd_repo=False):
@@ -421,9 +387,15 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
         pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
                                                                prestyles="background:#272822;color:#fff;",
                                                                encoding='utf-8'))
-        db.set('%s:content' % this_log, pretty.decode('utf-8'))
+        db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+    elif (db.get('build_faled') and db.get('build_falied') == "True") or "TRY BUILD FAILED" in content:
+        pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                               prestyles="background:#272822;color:#fff;",
+                                                               encoding='utf-8'))
+        db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+        db.set('build_faled', "False")
     else:
-        db.set('%s:content' % this_log, content)
+        db.setex('%s:content' % this_log, 1800, content)
 
 
 def build_pkgs(last=False):
@@ -529,8 +501,11 @@ def build_pkgs(last=False):
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
             result = doc.wait(container)
+            while result not in [0, 1]:
+                time.sleep(1)
             if result is not 0:
                 failed = True
+                db.set('build_failed', "True")
                 logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
             else:
                 logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
@@ -550,11 +525,11 @@ def build_pkgs(last=False):
         pkgs2sign = None
         if not failed:
             db.publish('build-output', 'Signing package..')
-            pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-**.xz' % pkg)
-            pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-**.xz' % pkg)
+            pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
+            pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkg)
             pkgs2sign = pkgs2sign + pkgs2sign32
             logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
-            if pkgs2sign is not None:
+            if pkgs2sign is not None and pkgs2sign != []:
                 try_sign = sign_pkgs.batch_sign(pkgs2sign)
             else:
                 try_sign = False
@@ -585,7 +560,7 @@ def build_pkgs(last=False):
                     remove(p)
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        doc.remove_container(container)
+        #doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
         try:
