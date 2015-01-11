@@ -20,7 +20,7 @@
                                         <li class="file-li">
                                             <a id="i686" href="#" onclick="//goToi686()"><i class="fa fa-folder-o"></i> i686</a>
                                         </li>
-                                        <li class="file-li"><a id="x86_64" href="#" onclick="//goTox86_64()"><i class="fa fa-folder-o"></i> x86_64
+                                        <li class="file-li"><a id="x86_64" href="#" onclick="//goTox86_64()"><i class="fa fa-folder-open-o"></i> x86_64
                                         </a></li>
                                     </ul>
                                 </li>
@@ -33,7 +33,7 @@
         </div>
 
         <div class="content">
-            <iframe id="filesFrame" style="border:none; background: #F0F0F0;" src="{%  if release %}//repo.antergos.info/iso/release{% elif testing %}//repo.antergos.info/iso/testing{% else %}//repo.antergos.info/iso/testing/uefi/antergos-staging/{% endif %}" width="100%" height="100%"
+            <iframe id="filesFrame" style="border:none; background: #F0F0F0;" src="{%  if release %}//repo.antergos.info/iso/release{% elif testing %}//repo.antergos.info/iso/testing{% else %}//repo.antergos.info/iso/testing/uefi/antergos-staging/x86_64{% endif %}" width="100%" height="100%"
                     seamless="seamless" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
         </div>
     </div>

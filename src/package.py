@@ -92,6 +92,7 @@ class Package(object):
             import info
 
             out = info.CNCHI_VERSION
+            out = out.replace('"', '')
             del(info.CNCHI_VERSION)
             del(sys.modules["info"])
             err = []

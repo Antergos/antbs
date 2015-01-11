@@ -46,7 +46,7 @@ import src.pagination
 import src.build_pkg as builder
 from src.redis_connection import db
 import src.logging_config as logconf
-import newrelic
+#import newrelic
 
 gevent.monkey.patch_all()
 
@@ -77,8 +77,8 @@ app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
 
-settings = newrelic.agent.global_settings()
-settings.app_name = 'AntBS'
+#settings = newrelic.agent.global_settings()
+#settings.app_name = 'AntBS'
 
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -372,8 +372,7 @@ def flask_error(e):
 
 @app.errorhandler(Exception)
 def unhandled_exception(e):
-    logger.error(e.message)
-    logger.error(e.args)
+    logger.info(e.message)
     return render_template('500.html'), 500
 
 
@@ -479,7 +478,6 @@ def hooked():
         phab = int(request.args.get('phab', '0'))
         if phab and phab > 0:
             is_phab = True
-            logconf.new_timeline_event('Webhook triggered by <strong>Phabricator.</strong>')
         else:
             # Store the IP address blocks that github uses for hook requests.
             hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
@@ -498,7 +496,7 @@ def hooked():
     building = db.get('now_building')
     if is_phab and request.args['repo'] != "CN":
         repo = 'antergos-packages'
-        db.set('pullFrom', 'lots0logs')
+        db.set('pullFrom', 'antergos')
         match = None
         nx_pkg = None
         if request.args['repo'] == "NX":
@@ -549,7 +547,6 @@ def hooked():
                 shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
-                db.delete('creating-cnchi-archive-from-dev')
 
             db.delete('creating-cnchi-archive-from-dev')
     else:
@@ -596,8 +593,14 @@ def hooked():
                     db.rpush('queue', p)
                 if p == last_pkg:
                     last = True
-                logconf.new_timeline_event('<strong>%s</strong> was added to the <strong>build queue.</strong>' % p)
                 queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
+                if last:
+                    if is_phab:
+                        source = 'Phabricator'
+                    else:
+                        source = 'Github'
+                    logconf.new_timeline_event('Webhook triggered by <strong>%s.</strong> Packages added to the build'
+                                               ' queue: <strong>[%s]</strong>' % (source, the_pkgs))
                 first = False
 
     elif repo == "antergos-iso":
@@ -684,11 +687,14 @@ def build_info(num):
     end = db.get('build_log:%s:end' % num)
     bnum = num
     cont = db.get('container')
-    log = db.get('build_log:%s:content' % bnum)
-    if log is not None:
-        log = log.decode("utf8")
+    check_log = db.hexists('build_log:%s:content' % bnum, 'content')
+    if not check_log:
+        log = db.get('build_log:%s:content' % bnum)
     else:
+        log = db.hget('build_log:%s:content' % bnum, 'content')
+    if log is None or log == '':
         log = 'Unavailable'
+    log = log.decode("utf8")
     if cont:
         container = cont[:20]
     else:

@@ -30,6 +30,7 @@ import __builtin__
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from src.redis_connection import db
 import docker
+from docker.utils import create_host_config
 import subprocess
 import src.logging_config as logconf
 import datetime
@@ -86,11 +87,13 @@ def run_docker_clean(pkg=None):
         pass
     return True
 
+
 def get_pkgver(pkgobj):
     pkg = pkgobj.name
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
     if pkg == "cnchi-dev" and pkgver[-1] != "0":
+        pkgobj.save_to_db('pkgver', pkgver)
         return False
     old_pkgver = pkgobj.pkgver
     pkgobj.save_to_db('pkgver', pkgver)
@@ -117,8 +120,9 @@ def get_pkgver(pkgobj):
         logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
     else:
         pkgver = pkgobj.get_from_db('version')
-    #del pkgobj
+    # del pkgobj
     return pkgver
+
 
 def get_deps(pkg):
     depends = []
@@ -155,7 +159,7 @@ def check_deps(packages):
 def handle_hook(first=False, last=False):
     db.set('idle', 'False')
     iso_flag = db.get('isoFlag')
-    #pull_from = db.get('pullFrom')
+    # pull_from = db.get('pullFrom')
     pull_from = 'antergos'
 
     if iso_flag == 'True':
@@ -199,7 +203,7 @@ def handle_hook(first=False, last=False):
             # subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
             # cwd='/opt/antergos-packages/numix-icon-theme')
             # subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
-            #                           cwd='/opt/antergos-packages/numix-icon-theme')
+            # cwd='/opt/antergos-packages/numix-icon-theme')
             try:
                 if 'numix-icon-theme' == pack:
                     subprocess.call(['git', 'clone', '/var/repo/NX', 'numix-icon-theme'],
@@ -233,7 +237,8 @@ def handle_hook(first=False, last=False):
             pack = package(pack, db)
             version = get_pkgver(pack)
             if not version:
-                return False
+                db.lrem('queue', 0, 'cnchi-dev')
+                continue
             depends = get_deps(pack.name)
             # if not db.exists('pkg:%s' % package):
             #     logger.info('%s not found in database, adding entry..' % package)
@@ -258,17 +263,30 @@ def handle_hook(first=False, last=False):
                     db.rpush('queue', c)
             logger.info('Check deps complete. Starting build_pkgs')
             db.set('building', 'Check deps complete. Starting build container.')
+            del pack
 
     try:
         subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
     except subprocess.CalledProcessError as err:
         logger.error(err.output)
+    except Exception as err:
+        logger.error(err)
 
     logger.info('[FIRST IS SET]: %s' % first)
     logger.info('[LAST IS SET]: %s' % last)
     if iso_flag == 'False':
         build_pkgs(last)
-        del pack
+
+    try:
+        shutil.rmtree('/opt/antergos-packages')
+    except Exception:
+        pass
+    db.set('idle', "True")
+    db.set('building', 'Idle')
+    db.set('container', '')
+    db.set('building_num', '')
+    db.set('building_start', '')
+    logger.info('All iso builds completed.')
 
 
 def update_main_repo(pkg=None, rev_result=None, this_log=None):
@@ -293,7 +311,8 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
             shutil.rmtree(result)
         os.mkdir(result, 0o777)
         command = "/makepkg/build.sh"
-        pkgenv = ["_PKGNAME=%s" % pkg, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo, "_REPO_DIR=%s" % repodir]
+        pkgenv = ["_PKGNAME=%s" % pkg, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo,
+                  "_REPO_DIR=%s" % repodir]
         db.set('building', 'Updating repo database.')
         container = None
         run_docker_clean("update_repo")
@@ -341,7 +360,7 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
 
-        #doc.remove_container(container)
+        doc.remove_container(container)
         db.set('idle', 'True')
         db.set('building', 'Idle')
         db.delete('repo-count-staging')
@@ -381,21 +400,14 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
         db.publish('build-output', 'ENDOFLOG')
     content = '\n '.join(content)
 
-    log_exists = db.get('%s:content' % this_log)
+    log_exists = db.hget('%s:content' % this_log, 'content')
+
+    pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                           prestyles="background:#272822;color:#fff;",
+                                                           encoding='utf-8'))
     if log_exists and log_exists != '':
-        content = content + log_exists
-        pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                               prestyles="background:#272822;color:#fff;",
-                                                               encoding='utf-8'))
-        db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-    elif (db.get('build_faled') and db.get('build_falied') == "True") or "TRY BUILD FAILED" in content:
-        pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                               prestyles="background:#272822;color:#fff;",
-                                                               encoding='utf-8'))
-        db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-        db.set('build_faled', "False")
-    else:
-        db.setex('%s:content' % this_log, 1800, content)
+        pretty = log_exists + pretty
+    db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
 
 
 def build_pkgs(last=False):
@@ -501,14 +513,13 @@ def build_pkgs(last=False):
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
             result = doc.wait(container)
-            while result not in [0, 1]:
-                time.sleep(1)
             if result is not 0:
                 failed = True
                 db.set('build_failed', "True")
                 logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
             else:
                 logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
+                db.set('build_failed', "False")
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
             failed = True
@@ -518,8 +529,8 @@ def build_pkgs(last=False):
         # log_stream = stream.split('\n')
         # db_filter_and_add(log_stream, this_log)
 
-        #in_dir = len([name for name in os.listdir(result)])
-        #last_count = int(db.get('pkg_count'))
+        # in_dir = len([name for name in os.listdir(result)])
+        # last_count = int(db.get('pkg_count'))
         #logger.info('last count is %s %s' % (last_count, type(last_count)))
         #logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
         pkgs2sign = None
@@ -540,12 +551,6 @@ def build_pkgs(last=False):
                 update_main_repo(pkg, 'staging', this_log)
             else:
                 failed = True
-                log_string = db.get('%s:content' % this_log)
-                if log_string and log_string != '':
-                    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                           prestyles="background:#272822;color:#fff;",
-                                                                           encoding='utf-8'))
-                    db.set('%s:content' % this_log, pretty.decode('utf-8'))
 
         if not failed:
             db.publish('build-output', 'Build completed successfully!')
@@ -560,7 +565,13 @@ def build_pkgs(last=False):
                     remove(p)
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        #doc.remove_container(container)
+            log_string = db.get('%s:content' % this_log)
+            if log_string and log_string != '':
+                pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                                          prestyles="background:#272822;color:#fff;",
+                                                                          encoding='utf-8'))
+                db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+        doc.remove_container(container)
         end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.set('%s:end' % this_log, end)
         try:
@@ -596,6 +607,7 @@ def build_iso():
     in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
     db.set('pkg_count_iso', in_dir_last)
     for arch in iso_arch:
+        failed = False
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
@@ -617,22 +629,64 @@ def build_iso():
         else:
             if os.path.exists(flag):
                 os.remove(flag)
+        # Get and compile translations for updater script
+        trans_dir = "/opt/antergos-iso-translations/"
+        trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
+        dest_dir = '/srv/antergos.info/repo/iso/testing/trans'
+        if not os.path.exists(dest_dir):
+            os.mkdir(dest_dir)
+        try:
+            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi_updaterpot', '--minimum-perc=50'],
+                                  cwd=trans_dir)
+            for r, d, f in os.walk(trans_files_dir):
+                for tfile in f:
+                    logger.info('tfile is %s' % tfile)
+                    logger.info('tfile cut is %s' % tfile[:-2])
+                    mofile = tfile[:-2] + 'mo'
+                    logger.info('mofile is %s' % mofile)
+                    subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans_files_dir)
+                    os.rename(os.path.join(trans_files_dir, mofile), os.path.join(dest_dir, mofile))
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
+        except Exception as err:
+            logger.error(err)
+
         nm = 'antergos-iso-%s' % arch
         # Initiate communication with docker daemon
         run_docker_clean(nm)
+        hconfig = create_host_config(privileged=True, cap_add=['ALL'],
+                                     binds={
+                                         '/opt/archlinux-mkarchiso':
+                                             {
+                                                 'bind': '/start',
+                                                 'ro': False
+                                             },
+                                         '/run/dbus':
+                                             {
+                                                 'bind': '/var/run/dbus',
+                                                 'ro': False
+                                             },
+                                         '/srv/antergos.info/repo/iso/testing':
+                                             {
+                                                 'bind': '/antergos-iso/configs/antergos/out',
+                                                 'ro': False
+                                             },
+                                         '/sys/fs/cgroup':
+                                             {
+                                                 'bind': '/sys/fs/cgroup',
+                                                 'ro': True
+                                             }})
         try:
             doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
-            iso_container = doc.create_container("antergos/mkarchiso",
-                                                 volumes=['/antergos-iso/configs/antergos/out', '/var/run/dbus',
-                                                          '/start', '/sys/fs/cgroup'], tty=True,
-                                                 name=nm, cpu_shares=512)
+            iso_container = doc.create_container("antergos/mkarchiso", tty=True, name=nm, host_config=hconfig)
             db.set('container', iso_container.get('Id'))
         except Exception as err:
             logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+            failed = True
             break
 
         try:
-            doc.start(iso_container, privileged=True, binds={
+            doc.start(iso_container, privileged=True, cap_add=['ALL'], binds={
                 '/opt/archlinux-mkarchiso':
                     {
                         'bind': '/start',
@@ -648,22 +702,28 @@ def build_iso():
                         'bind': '/antergos-iso/configs/antergos/out',
                         'ro': False
                     },
-                '/srv/antergos.info/repo/antergos':
-                    {
-                        'bind': '/srv/antergos.info/repo/antergos',
-                        'ro': True
-                    },
                 '/sys/fs/cgroup':
                     {
                         'bind': '/sys/fs/cgroup',
                         'ro': True
-                    }
-            })
+                    }}
+            )
 
             cont = db.get('container')
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
-            doc.wait(iso_container)
+            result = doc.wait(iso_container)
+            result2 = None
+            if result is not 0:
+                retry = doc.restart(cont)
+                result2 = doc.wait(retry)
+                if result2 is not 0:
+                    failed = True
+                    db.set('build_failed', "True")
+                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+            if result is 0 or (result2 and result2 is 0):
+                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+                db.set('build_failed', "False")
 
         except Exception as err:
             logger.error("Cant start container. Error msg: %s", err)
@@ -684,20 +744,18 @@ def build_iso():
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        db.set('idle', 'True')
-        db.set('isoFlag', 'False')
-        db.set('isoBuilding', 'False')
+        if not failed:
+            doc.remove_container(cont)
+            # log_string = db.hget('%s:content' % this_log, 'content')
+            # if log_string and log_string != '':
+            #    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+            #                                                              prestyles="background:#272822;color:#fff;",
+            #                                                             encoding='utf-8'))
+            # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+    db.set('idle', 'True')
+    db.set('isoFlag', 'False')
+    db.set('isoBuilding', 'False')
 
-    try:
-        shutil.rmtree('/opt/antergos-packages')
-    except Exception:
-        pass
-    db.set('idle', "True")
-    db.set('building', 'Idle')
-    db.set('container', '')
-    db.set('building_num', '')
-    db.set('building_start', '')
-    logger.info('All iso builds completed.')
 
 
 
