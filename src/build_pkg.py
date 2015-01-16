@@ -93,7 +93,11 @@ def get_pkgver(pkgobj):
     pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
     if pkg == "cnchi-dev" and pkgver[-1] != "0":
-        pkgobj.save_to_db('pkgver', pkgver)
+        event = pkgobj.tl_event
+        results = db.scan_iter('timeline:%s:*' % event, 5)
+        for k in results:
+            db.delete(k)
+        db.lrem('timeline:all', 0, event)
         return False
     old_pkgver = pkgobj.pkgver
     pkgobj.save_to_db('pkgver', pkgver)
@@ -102,16 +106,11 @@ def get_pkgver(pkgobj):
     if epoch and epoch != '' and epoch is not None:
         pkgver = epoch + ':' + pkgver
     if pkgrel and pkgrel != '' and pkgrel is not None:
-        pbver = pkgver + '-' + pkgrel
         old_pkgrel = pkgrel
-        if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel and pkgobj.push_version == "True":
+        if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
             pkgrel = str(int(pkgrel) + 1)
-        elif pkgver != pkgobj.pkgver and pkgobj.push_version == "True":
-            pkgrel = 1
-        else:
-            pass
+            pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
 
-        pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
         pkgobj.save_to_db('pkgrel', pkgrel)
 
     pkgver = pkgver + '-' + str(pkgrel)
@@ -286,7 +285,7 @@ def handle_hook(first=False, last=False):
     db.set('container', '')
     db.set('building_num', '')
     db.set('building_start', '')
-    logger.info('All iso builds completed.')
+    logger.info('All builds completed.')
 
 
 def update_main_repo(pkg=None, rev_result=None, this_log=None):
@@ -424,180 +423,181 @@ def build_pkgs(last=False):
     db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
         pkg = db.lpop('queue')
-        db.set('now_building', pkg)
-        db.set('building', 'Building %s with makepkg' % pkg)
-        failed = False
-        if pkg is None or pkg == '':
-            continue
-        logger.info('Building %s' % pkg)
-        version = db.get('pkg:%s:version' % pkg)
-        db.incr('build_number')
-        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        build_id = db.get('build_number')
-        db.set('building_num', build_id)
-        this_log = 'build_log:%s' % build_id
-        db.set(this_log, True)
-        db.rpush('pkg:%s:build_logs' % pkg, build_id)
-        db.set('%s:start' % this_log, dt)
-        db.set('building_start', dt)
-        db.set('%s:pkg' % this_log, pkg)
-        db.set('%s:version' % this_log, version)
-        pkgdir = os.path.join(REPO_DIR, pkg)
-        pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
-        pkg_deps_str = ' '.join(pkg_deps)
-        logger.info('pkg_deps_str is %s' % pkg_deps_str)
-        run_docker_clean(pkg)
-        try:
-            container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
-                                             name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
-                                                                '/root/.gnupg', '/staging', '/32bit', '/32build',
-                                                                '/result'])
-        except Exception as err:
-            logger.error('Create container failed. Error Msg: %s' % err)
-            failed = True
-            continue
-        db.set('container', container.get('Id'))
-        dirs = ['/tmp/32build', '/tmp/32bit']
-        for d in dirs:
-            if not os.path.exists(d):
-                os.mkdir(d)
-        try:
-            doc.start(container, binds={
-                cache:
-                    {
-                        'bind': '/var/cache/pacman',
-                        'ro': False
-                    },
-                DOC_DIR:
-                    {
-                        'bind': '/makepkg',
-                        'ro': False
-                    },
-                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
-                    {
-                        'bind': '/staging',
-                        'ro': False
-                    },
-                '/srv/antergos.info/repo/antergos/':
-                    {
-                        'bind': '/main',
-                        'ro': False
-                    },
-                pkgdir:
-                    {
-                        'bind': '/pkg',
-                        'ro': False
-                    },
-                '/root/.gnupg':
-                    {
-                        'bind': '/root/.gnupg',
-                        'ro': False
-                    },
-                '/tmp/32bit':
-                    {
-                        'bind': '/32bit',
-                        'ro': False
-                    },
-                '/tmp/32build':
-                    {
-                        'bind': '/32build',
-                        'ro': False
-                    },
-                result:
-                    {
-                        'bind': '/result',
-                        'ro': False
-                    }
-            }, privileged=True)
-            cont = db.get('container')
-            stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
-            stream_process.start()
-            result = doc.wait(container)
-            if result is not 0:
+        if pkg and pkg is not None and pkg != '':
+            db.set('now_building', pkg)
+            db.set('building', 'Building %s with makepkg' % pkg)
+            failed = False
+            if pkg is None or pkg == '':
+                continue
+            logger.info('Building %s' % pkg)
+            version = db.get('pkg:%s:version' % pkg)
+            db.incr('build_number')
+            dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+            build_id = db.get('build_number')
+            db.set('building_num', build_id)
+            this_log = 'build_log:%s' % build_id
+            db.set(this_log, True)
+            db.rpush('pkg:%s:build_logs' % pkg, build_id)
+            db.set('%s:start' % this_log, dt)
+            db.set('building_start', dt)
+            db.set('%s:pkg' % this_log, pkg)
+            db.set('%s:version' % this_log, version)
+            pkgdir = os.path.join(REPO_DIR, pkg)
+            pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
+            pkg_deps_str = ' '.join(pkg_deps)
+            logger.info('pkg_deps_str is %s' % pkg_deps_str)
+            run_docker_clean(pkg)
+            try:
+                container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
+                                                 name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
+                                                                    '/root/.gnupg', '/staging', '/32bit', '/32build',
+                                                                    '/result'])
+            except Exception as err:
+                logger.error('Create container failed. Error Msg: %s' % err)
                 failed = True
-                db.set('build_failed', "True")
-                logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
-            else:
-                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
-                db.set('build_failed', "False")
-        except Exception as err:
-            logger.error('Start container failed. Error Msg: %s' % err)
-            failed = True
-            continue
-        # db.publish('build-ouput', 'ENDOFLOG')
-        # stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
-        # log_stream = stream.split('\n')
-        # db_filter_and_add(log_stream, this_log)
-
-        # in_dir = len([name for name in os.listdir(result)])
-        # last_count = int(db.get('pkg_count'))
-        #logger.info('last count is %s %s' % (last_count, type(last_count)))
-        #logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
-        pkgs2sign = None
-        if not failed:
-            db.publish('build-output', 'Signing package..')
-            pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
-            pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkg)
-            pkgs2sign = pkgs2sign + pkgs2sign32
-            logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
-            if pkgs2sign is not None and pkgs2sign != []:
-                try_sign = sign_pkgs.batch_sign(pkgs2sign)
-            else:
-                try_sign = False
-            if try_sign:
-                db.publish('build-output', 'Signature created successfully for %s' % pkg)
-                logger.info('[SIGN PKG] Signature created successfully for %s' % pkg)
-                db.publish('build-output', 'Updating staging repo database..')
-                update_main_repo(pkg, 'staging', this_log)
-            else:
+                continue
+            db.set('container', container.get('Id'))
+            dirs = ['/tmp/32build', '/tmp/32bit']
+            for d in dirs:
+                if not os.path.exists(d):
+                    os.mkdir(d)
+            try:
+                doc.start(container, binds={
+                    cache:
+                        {
+                            'bind': '/var/cache/pacman',
+                            'ro': False
+                        },
+                    DOC_DIR:
+                        {
+                            'bind': '/makepkg',
+                            'ro': False
+                        },
+                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+                        {
+                            'bind': '/staging',
+                            'ro': False
+                        },
+                    '/srv/antergos.info/repo/antergos/':
+                        {
+                            'bind': '/main',
+                            'ro': False
+                        },
+                    pkgdir:
+                        {
+                            'bind': '/pkg',
+                            'ro': False
+                        },
+                    '/root/.gnupg':
+                        {
+                            'bind': '/root/.gnupg',
+                            'ro': False
+                        },
+                    '/tmp/32bit':
+                        {
+                            'bind': '/32bit',
+                            'ro': False
+                        },
+                    '/tmp/32build':
+                        {
+                            'bind': '/32build',
+                            'ro': False
+                        },
+                    result:
+                        {
+                            'bind': '/result',
+                            'ro': False
+                        }
+                }, privileged=True)
+                cont = db.get('container')
+                stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
+                stream_process.start()
+                result = doc.wait(container)
+                if result is not 0:
+                    failed = True
+                    db.set('build_failed', "True")
+                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
+                else:
+                    logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
+                    db.set('build_failed', "False")
+            except Exception as err:
+                logger.error('Start container failed. Error Msg: %s' % err)
                 failed = True
+                continue
+            # db.publish('build-ouput', 'ENDOFLOG')
+            # stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
+            # log_stream = stream.split('\n')
+            # db_filter_and_add(log_stream, this_log)
 
-        if not failed:
-            db.publish('build-output', 'Build completed successfully!')
-            #db.incr('pkg_count', (in_dir - last_count))
-            db.rpush('completed', build_id)
-            db.set('%s:result' % this_log, 'completed')
-            db.set('%s:review_stat' % this_log, '1')
-        else:
-            logger.error('No package found after container exit.')
-            if pkgs2sign is not None:
-                for p in pkgs2sign:
-                    remove(p)
-            db.set('%s:result' % this_log, 'failed')
-            db.rpush('failed', build_id)
-            log_string = db.get('%s:content' % this_log)
-            if log_string and log_string != '':
-                pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                          prestyles="background:#272822;color:#fff;",
-                                                                          encoding='utf-8'))
-                db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-        doc.remove_container(container)
-        end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        db.set('%s:end' % this_log, end)
-        try:
-            db_caches = db.scan_iter(match='*_cache*', count=3)
-            for db_cache in db_caches:
-                logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % db_cache)
-                db.delete(db_cache)
-        except Exception as err:
-            logger.error(err)
+            # in_dir = len([name for name in os.listdir(result)])
+            # last_count = int(db.get('pkg_count'))
+            #logger.info('last count is %s %s' % (last_count, type(last_count)))
+            #logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
+            pkgs2sign = None
+            if not failed:
+                db.publish('build-output', 'Signing package..')
+                pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
+                pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkg)
+                pkgs2sign = pkgs2sign + pkgs2sign32
+                logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
+                if pkgs2sign is not None and pkgs2sign != []:
+                    try_sign = sign_pkgs.batch_sign(pkgs2sign)
+                else:
+                    try_sign = False
+                if try_sign:
+                    db.publish('build-output', 'Signature created successfully for %s' % pkg)
+                    logger.info('[SIGN PKG] Signature created successfully for %s' % pkg)
+                    db.publish('build-output', 'Updating staging repo database..')
+                    update_main_repo(pkg, 'staging', this_log)
+                else:
+                    failed = True
 
-        db.set('container', '')
-        db.set('building_num', '')
-        db.set('building_start', '')
-        db.delete('repo-count-staging')
-        db.delete('repo-count-main')
+            if not failed:
+                db.publish('build-output', 'Build completed successfully!')
+                #db.incr('pkg_count', (in_dir - last_count))
+                db.rpush('completed', build_id)
+                db.set('%s:result' % this_log, 'completed')
+                db.set('%s:review_stat' % this_log, '1')
+            else:
+                logger.error('No package found after container exit.')
+                if pkgs2sign is not None:
+                    for p in pkgs2sign:
+                        remove(p)
+                db.set('%s:result' % this_log, 'failed')
+                db.rpush('failed', build_id)
+                log_string = db.get('%s:content' % this_log)
+                if log_string and log_string != '':
+                    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                                              prestyles="background:#272822;color:#fff;",
+                                                                              encoding='utf-8'))
+                    db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+            doc.remove_container(container)
+            end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+            db.set('%s:end' % this_log, end)
+            try:
+                db_caches = db.scan_iter(match='*_cache*', count=3)
+                for db_cache in db_caches:
+                    logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % db_cache)
+                    db.delete(db_cache)
+            except Exception as err:
+                logger.error(err)
 
-        if last:
-            db.set('idle', "True")
-            db.set('building', 'Idle')
-            for f in [result, cache, '/opt/antergos-packages', '/tmp/32bit', '/tmp/32build']:
-                remove(f)
-        else:
-            db.set('building', 'Starting next build in queue...')
+            db.set('container', '')
+            db.set('building_num', '')
+            db.set('building_start', '')
+            db.delete('repo-count-staging')
+            db.delete('repo-count-main')
 
-        if not failed:
-            return True
+            if last:
+                db.set('idle', "True")
+                db.set('building', 'Idle')
+                for f in [result, cache, '/opt/antergos-packages', '/tmp/32bit', '/tmp/32build']:
+                    remove(f)
+            else:
+                db.set('building', 'Starting next build in queue...')
+
+            if not failed:
+                return True
 
     logger.info('Build completed. Repo has been updated.')
 

@@ -46,6 +46,7 @@ import src.pagination
 import src.build_pkg as builder
 from src.redis_connection import db
 import src.logging_config as logconf
+import src.package as package
 #import newrelic
 
 gevent.monkey.patch_all()
@@ -345,7 +346,8 @@ def get_timeline(tlpage=None):
         date = db.get('timeline:%s:date' % event_id)
         time = db.get('timeline:%s:time' % event_id)
         msg = db.get('timeline:%s:msg' % event_id)
-        allinfo = dict(event_id=event_id, date=date, msg=msg, time=time)
+        tltype = db.get('timeline:%s:type' % event_id)
+        allinfo = dict(event_id=event_id, date=date, msg=msg, time=time, tltype=tltype)
         event = {event_id: allinfo}
         timeline.append(event)
     this_page, all_pages = get_paginated(timeline, 6, tlpage, True)
@@ -550,7 +552,6 @@ def hooked():
 
             db.delete('creating-cnchi-archive-from-dev')
     else:
-        logconf.new_timeline_event('Webhook triggered by <strong>Github.</strong>')
         payload = json.loads(request.data)
         full_name = payload['repository']['full_name']
         if 'lots0logs' in full_name and 'antergos/' not in full_name:
@@ -588,19 +589,34 @@ def hooked():
             first = True
             last = False
             last_pkg = the_pkgs[-1]
+            p_ul = []
+            if len(the_pkgs) > 1:
+                p_ul.append('<ul>')
             for p in the_pkgs:
                 if p not in the_queue and p is not None and p != '' and p != []:
                     db.rpush('queue', p)
+                    if len(the_pkgs) > 1:
+                        p_li = '<li>%s</li>' % p
+                    else:
+                        p_li = '<strong>%s</strong>' % p
+                    p_ul.append(p_li)
                 if p == last_pkg:
                     last = True
                 queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
                 if last:
                     if is_phab:
                         source = 'Phabricator'
+                        tltype = 2
                     else:
                         source = 'Github'
-                    logconf.new_timeline_event('Webhook triggered by <strong>%s.</strong> Packages added to the build'
-                                               ' queue: <strong>[%s]</strong>' % (source, the_pkgs))
+                        tltype = 1
+                    if len(the_pkgs) > 1:
+                        p_ul.append('</ul>')
+                    the_pkgs_str = ''.join(p_ul)
+                    tl_event = logconf.new_timeline_event('Webhook triggered by <strong>%s.</strong> Packages added to'
+                                                          ' the build queue: %s' % (source, the_pkgs_str), tltype)
+                    p_obj = package.Package(p, db)
+                    p_obj.save_to_db('tl_event', tl_event)
                 first = False
 
     elif repo == "antergos-iso":

@@ -36,6 +36,9 @@
                     <link href="/static/css/monokai.css" rel="stylesheet">
                     <link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
                     <style type="text/css">
+                    body, .cl-mcont {
+                        background-color: #e0e0e0;
+                    }
                         .sidebar-logo {
                             background: #4aa3df;
                         }
@@ -167,6 +170,28 @@
                     ul.custom{
                         float: right !important;
                     }
+
+                        .phab {
+                        position: absolute;
+                        width: 40px;
+                        height: 40px;
+                            background-image: url('/static/img/phab.png') !important;
+                            background-repeat: no-repeat !important;
+                            background-size: 22px 14px !important;
+                            background-position: center center !important;
+                            background-color: #21415B !important;
+                        top: 2px;
+                        }
+                    .fa-github {
+                        background-color: #1f1f1f !important;
+                        font-size: 19px !important;
+                    }
+                        .fa-github:before {
+                            content: "\f09b";
+                            position: relative;
+                            bottom: 2px;
+                            right: 1px;
+                        }
 
                     </style>
                 {%- endblock styles %}

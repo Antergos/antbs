@@ -72,8 +72,8 @@
                 <ul class="timeline">
                     {% for item in this_page %}
                         {% for event, info in item.items() %}
-                            <li>
-                                <i class="fa fa-comment"></i>
+                            <li id="{{ info['event_id'] }}">
+                                <i class="{% if info['tltype'] == '1' %}fa fa-github{% elif info['tltype'] == '2' %}fa phab{% else %}fa fa-comment{% endif %}"></i>
                                 <span class="date">{{ info['date'] }}</span>
 
                                 <div class="content">

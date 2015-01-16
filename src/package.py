@@ -53,7 +53,8 @@ class Package(object):
         self.push_version = self.get_from_db('push_version')
         self.pkgrel = self.get_from_db('pkgrel')
         self.pkgver = self.get_from_db('pkgver')
-        self.saved_commit = None
+        self.saved_commit = self.get_from_db('saved_commit')
+        self.tl_event = self.get_from_db('tl_event')
 
     def delete(self):
         self.db.delete(self.key)
@@ -66,7 +67,7 @@ class Package(object):
                 val = self.db.lrange('%s:%s' % (self.key, attr), 0, -1)
             else:
                 val = ''
-            logger.info('@@-package.py-@@ | get_from_db val is %s' % val)
+            logger.info('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
             return val
 
     def save_to_db(self, attr=None, value=None):
@@ -139,10 +140,7 @@ class Package(object):
         gh = login(token=self.gh_user)
         repo = gh.repository('antergos', 'antergos-packages')
         tf = repo.file_contents(self.name + '/PKGBUILD')
-        if self.saved_commit is not None:
-            content = self.saved_commit
-        else:
-            content = tf.decoded
+        content = tf.decoded
         search_str = '%s=%s' % (var, old_val)
         replace_str = '%s=%s' % (var, new_val)
         content = content.replace(search_str, replace_str)
@@ -150,12 +148,7 @@ class Package(object):
         with open(ppath, 'w') as pbuild:
             pbuild.write(content)
         pbuild.close()
-        if self.saved_commit is None:
-            self.saved_commit = content
-            commit = {'commit': True}
-        else:
-            commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
-            self.saved_commit = None
+        commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
         if commit and commit['commit'] is not None:
             try:
                 logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
