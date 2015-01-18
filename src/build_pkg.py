@@ -94,7 +94,7 @@ def get_pkgver(pkgobj):
     pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
     if pkg == "cnchi-dev" and pkgver[-1] != "0":
         event = pkgobj.tl_event
-        results = db.scan_iter('timeline:%s:*' % event, 5)
+        results = db.scan_iter('timeline:%s:*' % event, 100)
         for k in results:
             db.delete(k)
         db.lrem('timeline:all', 0, event)
@@ -103,15 +103,23 @@ def get_pkgver(pkgobj):
     pkgobj.save_to_db('pkgver', pkgver)
     epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
     pkgrel = pkgobj.get_from_pkgbuild('pkgrel', pbfile)
-    if epoch and epoch != '' and epoch is not None:
-        pkgver = epoch + ':' + pkgver
     if pkgrel and pkgrel != '' and pkgrel is not None:
+        pkgrel_upd = False
         old_pkgrel = pkgrel
         if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
             pkgrel = str(int(pkgrel) + 1)
+            pkgrel_upd = True
+        elif pkgver != old_pkgver and pkgrel != "1":
+            pkgrel = "1"
+            pkgrel_upd = True
+
+        if pkgrel_upd:
             pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
 
         pkgobj.save_to_db('pkgrel', pkgrel)
+
+    if epoch and epoch != '' and epoch is not None:
+        pkgver = epoch + ':' + pkgver
 
     pkgver = pkgver + '-' + str(pkgrel)
     if pkgver and pkgver != '' and pkgver is not None:

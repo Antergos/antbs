@@ -135,7 +135,7 @@ class Package(object):
         return out
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
-        if self.push_version != "True":
+        if self.push_version != "True" or old_val == new_val:
             return
         gh = login(token=self.gh_user)
         repo = gh.repository('antergos', 'antergos-packages')
