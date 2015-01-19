@@ -720,11 +720,13 @@ def build_iso():
             cont = db.get('container')
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
             stream_process.start()
-            result = doc.wait(iso_container)
+            result = doc.wait(cont)
             result2 = None
             if result is not 0:
-                retry = doc.restart(cont)
-                result2 = doc.wait(retry)
+                doc.restart(cont)
+                stream_process2 = Process(target=publish_build_ouput, args=(cont, this_log))
+                stream_process2.start()
+                result2 = doc.wait(cont)
                 if result2 is not 0:
                     failed = True
                     db.set('build_failed', "True")
