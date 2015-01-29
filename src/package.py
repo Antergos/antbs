@@ -118,7 +118,11 @@ class Package(object):
                     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
                     giturl = giturl.group(0)
                     pkgdir, pkgbuild = os.path.split(path)
-                    subprocess.check_call(['git', 'clone', giturl, self.name], cwd=pkgdir)
+                    if self.name == 'pamac-dev':
+                        gitnm = 'pamac'
+                    else:
+                        gitnm = self.name
+                    subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
 
                 cmd = 'source ' + path + '; ' + var
 

@@ -37,15 +37,28 @@
                     <link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
                     <style type="text/css">
                     body, .cl-mcont {
-                        background-color: #e0e0e0;
+                        background-color: #EFEFEF;
                     }
-                        .sidebar-logo {
-                            background: #4aa3df;
+                    .cl-sidebar, .cl-sidebar .collapse-button {
+                        width: 225px;
+                        max-width: 225px;
                         }
+                        .cl-mcont {
+                        margin-left: 50px;
+margin-right: 50px;
+padding-top: 40px;
+}
+.sidebar-logo {
+background: #272930;
+}
+                        .cl-sidebar .collapse-button .search {
+                        width: 163px;
+                        }
+                     
 
                         .sb-collapsed .sidebar-logo {
 
-                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #4aa3df;
+                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930;
                         }
 
                         .pre-scrollable {
@@ -88,17 +101,18 @@
                         }
 
                         .sb-collapsed .sidebar-logo {
-                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 12px 5px #4aa3df;
+                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 12px 5px #272930;
                             background-size: 300%;
                         }
 
                         .sidebar-logo .logo a img {
-                            max-width: 65%;
+                            max-width: 79%;
                             height: auto;
                             display: block;
                             margin: 0 auto;
                             position: relative;
                             right: 8px;
+                            top: 17px;
                         }
 
                         .sb-collapsed .sidebar-logo .logo a img {
@@ -112,7 +126,7 @@
                             right: 0;
                             height: 35px;
                             width: 10px;
-                            background: #4aa3df;
+                            background: #272930;
                             z-index: 99999;
                             top: 8px;
                         }
@@ -130,6 +144,12 @@
                     #status_bar span {
                         float: left;
                     }
+                    #cl-wrapper .cl-sidebar .side-user {
+                    font-size: 13px;
+                    }
+                    .fd-tile .content h1 {
+font-size: 45px;
+}
                     #status_bar_pre {
                         margin-top: 6px;
                         margin-bottom: 0px;

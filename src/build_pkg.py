@@ -238,6 +238,9 @@ def handle_hook(first=False, last=False):
                 elif 'cnchi-dev' == pack:
                     logger.info('Copying cnchi-dev source file into build directory.')
                     shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pack))
+                elif 'cnchi' == pack:
+                    get_latest_translations()
+                    
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
@@ -283,17 +286,17 @@ def handle_hook(first=False, last=False):
     logger.info('[LAST IS SET]: %s' % last)
     if iso_flag == 'False':
         build_pkgs(last)
-
-    try:
-        shutil.rmtree('/opt/antergos-packages')
-    except Exception:
-        pass
-    db.set('idle', "True")
-    db.set('building', 'Idle')
-    db.set('container', '')
-    db.set('building_num', '')
-    db.set('building_start', '')
-    logger.info('All builds completed.')
+    if last:
+        try:
+            shutil.rmtree('/opt/antergos-packages')
+        except Exception:
+            pass
+        db.set('idle', "True")
+        db.set('building', 'Idle')
+        db.set('container', '')
+        db.set('building_num', '')
+        db.set('building_start', '')
+        logger.info('All builds completed.')
 
 
 def update_main_repo(pkg=None, rev_result=None, this_log=None):
@@ -415,6 +418,21 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
     if log_exists and log_exists != '':
         pretty = log_exists + pretty
     db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+
+def get_latest_translations():
+    # Get translations for Cnchi
+        trans_dir = "/opt/cnchi-translations/"
+        trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi")
+        dest_dir = '/opt/antergos-packages/cnchi/po'
+        if not os.path.exists(dest_dir):
+            return
+        try:
+            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
+                                  cwd=trans_dir)
+            for f in os.listdir(trans_files_dir):
+                shutil.copy(f, dest_dir)
+        except Exception as err:
+            logger.error(err)
 
 
 def build_pkgs(last=False):
