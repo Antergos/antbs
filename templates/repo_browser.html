@@ -2,6 +2,14 @@
 {% block pagetitle %}Repository Browser{% endblock pagetitle %}
 {% block body_attribs %} class="animated"{% endblock body_attribs %}
 {% block stats %}{% endblock stats %}
+{% block styles %}
+{{ super() }}
+<style type="text/css">
+    .cl-mcont {
+        margin-left: 0px;
+    }
+</style>
+{% endblock styles %}
 {% block maincontainer %}
     <div class="cl-mcont aside">
         <div class="page-aside tree">

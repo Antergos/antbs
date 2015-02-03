@@ -815,6 +815,11 @@ def get_status():
     return json.dumps(message)
 
 
+@app.route('/issues', methods=['GET'])
+def show_issues():
+    return render_template('issues.html')
+
+
 # Some boilerplate code that just says "if you're running this from the command
 # line, start here." It's not critical to know what this means yet.
 if __name__ == "__main__":

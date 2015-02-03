@@ -485,8 +485,9 @@ def build_pkgs(last=False):
             db.set('container', container.get('Id'))
             dirs = ['/tmp/32build', '/tmp/32bit']
             for d in dirs:
-                if not os.path.exists(d):
-                    os.mkdir(d)
+                if os.path.exists(d):
+                    shutil.rmtree(d)
+                os.mkdir(d, 0o777)
             try:
                 doc.start(container, binds={
                     cache:
