@@ -8,9 +8,7 @@ function handleResponse(response) {
 
         var row = document.createElement('tr');
         var issueId = document.createElement('td');
-        issueId.innerHTML = '<a href=' + items[i].html_url + '\'>' + items[i].id + '</a>';
-        var issueProject = document.createElement('td');
-        issueProject.innerHTML = items[i].milestone;
+        issueId.innerHTML = '<a href=' + items[i].html_url + '\' target="_blanK">' + items[i].id + '</a>';
         var issueTitle = document.createElement('td');
         issueTitle.innerHTML = items[i].title;
         var issueState = document.createElement('td');
@@ -18,6 +16,8 @@ function handleResponse(response) {
         var issueAssignee = document.createElement('td');
         var issueAssigneeUrl = items[i].assignee != null ? '<a href="' + items[i].assignee.html_url + '">' : '';
         issueAssignee.innerHTML = items[i].assignee != null ? issueAssigneeUrl + items[i].assignee.login + '</a>' : '';
+        var issueMilestone = document.createElement('td');
+        issueMilestone.innerHTML = items[i].milestone != null ? items[i].milestone.title : '';
         var issueUpdate = document.createElement('td');
         issueUpdate.innerHTML = items[i].updated_at;
         row.appendChild(issueId);
@@ -34,20 +34,20 @@ function handleResponse(response) {
 function progressListener() {
     if (this.readyState == 4 && this.status == 200) {
         handleResponse(this.responseText);
-        var wmssg = document.getElementById('show_MSG');
+        var wmssg = document.getElementById('issuetable');
         if (l > 0) {
-            wmssg.id = 'hide_MSG';
+            jQuery('#issuetable').trigger('issuesReady');
         }
         else {
-            wmssg.innerHTML = 'No Issues Found !';
+           // wmssg.innerHTML = 'No Issues Found !';
         }
     }
 }
 function showIssues() {
-    var wmssg = document.createElement('h1');
-    wmssg.innerHTML = "Fetching Github Issues ...";
-    wmssg.id = 'show_MSG';
-    document.getElementsByTagName('body')[0].appendChild(wmssg);
+    //var wmssg = document.createElement('h1');
+    //wmssg.innerHTML = "Fetching Github Issues ...";
+    //wmssg.id = 'show_MSG';
+    //document.getElementsByTagName('body')[0].appendChild(wmssg);
     //var projects = ["Addon-Tests", "Affiliates-Tests", "bouncer-tests", "marketplace-tests", "mcom-tests",
     //                "mdn-tests", "mozillians-tests", "moztrap-tests", "qmo-tests", "remo-tests", "snippets-tests",
     //                "Socorro-Tests", "sumo-tests", "wiki-tests"

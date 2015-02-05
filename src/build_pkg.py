@@ -173,16 +173,21 @@ def handle_hook(first=False, last=False):
         db.set('isoBuilding', 'True')
         db.lrem('queue', 0, 'antergos-iso')
         archs = ['x86_64', 'i686']
+        if db.get('isoMinimal') == 'True':
+            iso_name = 'antergos-iso-minimal-'
+        else:
+            iso_name = 'antergos-iso-'
         for arch in archs:
-            db.rpush('queue', 'antergos-iso-%s' % arch)
+            db.rpush('queue', iso_name + arch)
             version = datetime.datetime.now().strftime('%Y.%m.%d')
-            if not db.exists('pkg:antergos-iso-%s' % arch):
-                db.set('pkg:antergos-iso-%s' % arch, True)
-                db.set('pkg:antergos-iso-%s:name' % arch, 'antergos-iso-%s' % arch)
-            db.set('pkg:antergos-iso-%s:version' % arch, version)
+            db.set('pkg:%s' % iso_name + arch, True)
+            db.set('pkg:%s:name' % iso_name + arch, iso_name + arch)
+            db.set('pkg:%s:version' % iso_name + arch, version)
         build_iso()
         db.set('isoFlag', 'False')
         db.set('isoBuilding', 'False')
+        db.set('isoMinimal', 'False')
+        db.set('idle', "True")
         return True
 
     elif first:
@@ -633,7 +638,13 @@ def build_iso():
     iso_arch = ['x86_64', 'i686']
     in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
     db.set('pkg_count_iso', in_dir_last)
+    is_minimal = db.get('isoMinimal')
+    if is_minimal == 'True':
+        iso_name = 'antergos-iso-minimal-'
+    else:
+        iso_name = 'antergos-iso-'
     for arch in iso_arch:
+        version = db.get('pkg:%s:version' % iso_name + arch)
         failed = False
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -643,19 +654,27 @@ def build_iso():
         db.set('building_num', build_id)
         db.set(this_log, True)
         db.set('building_start', dt)
-        logger.info('Building antergos-iso-%s' % arch)
-        db.set('building', 'Building: antergos-iso-%s' % arch)
-        db.lrem('queue', 0, 'antergos-iso-%s' % arch)
-        db.set('%s:pkg' % this_log, 'antergos-iso-%s' % arch)
-        db.rpush('pkg:antergos-iso-%s:build_logs' % arch, build_id)
+        logger.info('Building %s' % iso_name + arch)
+        db.set('building', 'Building: %s' % iso_name + arch)
+        db.lrem('queue', 0, iso_name + arch)
+        db.set('%s:pkg' % this_log, iso_name + arch)
+        db.set('%s:version' % this_log, version)
+        db.rpush('pkg:%s:build_logs' % iso_name + arch, build_id)
 
         flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
+        minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
         if arch is 'i686':
             if not os.path.exists(flag):
                 open(flag, 'a').close()
         else:
             if os.path.exists(flag):
                 os.remove(flag)
+        if is_minimal == "True":
+            if not os.path.exists(minimal):
+                open(minimal, 'a').close()
+        else:
+            if os.path.exists(minimal):
+                os.remove(minimal)
         # Get and compile translations for updater script
         trans_dir = "/opt/antergos-iso-translations/"
         trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
@@ -678,7 +697,7 @@ def build_iso():
         except Exception as err:
             logger.error(err)
 
-        nm = 'antergos-iso-%s' % arch
+        nm = iso_name + arch
         # Initiate communication with docker daemon
         run_docker_clean(nm)
         hconfig = create_host_config(privileged=True, cap_add=['ALL'],
@@ -769,7 +788,7 @@ def build_iso():
             db.set('%s:result' % this_log, 'completed')
             # db.set('%s:review_stat' % this_log, '1')
         else:
-            logger.error('antergos-iso-%s not found after container exit.' % arch)
+            logger.error('%s not found after container exit.' % iso_name + arch)
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
@@ -781,9 +800,6 @@ def build_iso():
             #                                                              prestyles="background:#272822;color:#fff;",
             #                                                             encoding='utf-8'))
             # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-    db.set('idle', 'True')
-    db.set('isoFlag', 'False')
-    db.set('isoBuilding', 'False')
 
 
 

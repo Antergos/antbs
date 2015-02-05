@@ -579,7 +579,7 @@ def hooked():
                     pak = item
                 else:
                     pak = os.path.dirname(item)
-                if pak is not None and pak != '' and pak != []:
+                if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
                     logger.info('Adding %s to the build queue' % pak)
                     no_dups.append(pak)
                     has_pkgs = True
@@ -787,10 +787,12 @@ def build_pkg_now():
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
         args = (True, True)
-        if 'antergos-iso' == pkgname:
+        if 'antergos-iso' in pkgname:
             if db.get('isoBuilding') == 'False':
                 db.set('isoFlag', 'True')
                 args = (True, True)
+                if 'openbox' in pkgname:
+                    db.set('isoMinimal', 'True')
             else:
                 logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                 return redirect(redirect_url())

@@ -36,25 +36,28 @@
                     <link href="/static/css/monokai.css" rel="stylesheet">
                     <link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
                     <style type="text/css">
-                    body, .cl-mcont {
-                        background-color: #EFEFEF;
-                    }
-                    .cl-sidebar, .cl-sidebar .collapse-button {
-                        width: 225px;
-                        max-width: 225px;
+                        body, .cl-mcont {
+                            background-color: #EFEFEF;
                         }
+
+                        .cl-sidebar, .cl-sidebar .collapse-button {
+                            width: 225px;
+                            max-width: 225px;
+                        }
+
                         .cl-mcont {
-                        margin-left: 50px;
-margin-right: 50px;
-padding-top: 40px;
-}
-.sidebar-logo {
-background: #272930;
-}
-                        .cl-sidebar .collapse-button .search {
-                        width: 163px;
+                            margin-left: 50px;
+                            margin-right: 50px;
+                            padding-top: 40px;
                         }
-                     
+
+                        .sidebar-logo {
+                            background: #272930;
+                        }
+
+                        .cl-sidebar .collapse-button .search {
+                            width: 163px;
+                        }
 
                         .sb-collapsed .sidebar-logo {
 
@@ -138,74 +141,89 @@ background: #272930;
                         #build_now_form {
                             display: inline-block;
                         }
-                    #status_bar {
-                        display: none;
-                    }
-                    #status_bar span {
-                        float: left;
-                    }
-                    #cl-wrapper .cl-sidebar .side-user {
-                    font-size: 13px;
-                    }
-                    .fd-tile .content h1 {
-font-size: 45px;
-}
-                    #status_bar_pre {
-                        margin-top: 6px;
-                        margin-bottom: 0px;
-                        float: left;
-                        padding-top: 4px;
-                        padding-bottom: 1px;
-                    }
-                    @media only screen and (min-width: 1200px) and (max-width: 1366px) {
-                        .fd-tile .content p {
-                        font-weight: 600;
-                        font-size: 9px;
-                        }
-                    }
 
-                    @media only screen and (max-width: 568px) {
-                        .cl-sidebar {
-                            max-width: 100%;
+                        #status_bar {
+                            display: none;
                         }
-                    }
+
+                        #status_bar span {
+                            float: left;
+                        }
+
+                        #cl-wrapper .cl-sidebar .side-user {
+                            font-size: 13px;
+                        }
+
+                        .fd-tile .content h1 {
+                            font-size: 45px;
+                        }
+
+                        #status_bar_pre {
+                            margin-top: 6px;
+                            margin-bottom: 0px;
+                            float: left;
+                            padding-top: 4px;
+                            padding-bottom: 1px;
+                        }
+
+                        @media only screen and (min-width: 1200px) and (max-width: 1366px) {
+                            .fd-tile .content p {
+                                font-weight: 600;
+                                font-size: 9px;
+                            }
+                        }
+
+                        @media only screen and (max-width: 568px) {
+                            .cl-sidebar {
+                                max-width: 100%;
+                            }
+                        }
+
                         ul.timeline li > .date {
                             width: 47px;
                         }
-                    ul.timeline {
-                        margin-bottom: 0px;
-                    }
-                    ul.pagination {
-                        margin: 0 auto;
-                    }
-                    .timeline {
-                        text-align: left;
-                    }
-                    .tlwrap {
-                        text-align: center;
-                    }
-                    .tlwrap h4 {
-                        text-align: left;
-                    }
-                    ul.custom{
-                        float: right !important;
-                    }
+
+                        ul.timeline {
+                            margin-bottom: 0px;
+                        }
+
+                        ul.pagination {
+                            margin: 0 auto;
+                        }
+
+                        .timeline {
+                            text-align: left;
+                        }
+
+                        .tlwrap {
+                            text-align: center;
+                        }
+
+                        .tlwrap h4 {
+                            text-align: left;
+                        }
+
+                        ul.custom {
+                            float: right !important;
+                        }
 
                         .phab {
-                        position: absolute;
-                        width: 40px;
-                        height: 40px;
+                            position: absolute;
+                            width: 40px;
+                            height: 40px;
                             background-image: url('/static/img/phab.png') !important;
                             background-repeat: no-repeat !important;
                             background-size: 22px 14px !important;
                             background-position: center center !important;
                             background-color: #21415B !important;
-                        top: 2px;
+                            top: 2px;
                         }
-                    .fa-github {
-                        background-color: #1f1f1f !important;
-                        font-size: 19px !important;
-                    }
+
+                        .fa-github {
+                            background-color: #1f1f1f !important;
+                            font-size: 19px !important;
+                        }
+
                         .fa-github:before {
                             content: "\f09b";
                             position: relative;
@@ -291,6 +309,11 @@ font-size: 45px;
                                     <li {% if request.path == "/browse/testing" %}class="active"{% endif %}><a
                                             href="/browse/testing"><i
                                             class="fa fa-wrench"></i><span>Testing</span></a></li>
+                                    {% if user.is_authenticated() %}
+                                        <li {% if request.path == "/issues" %}class="active"{% endif %}><a
+                                                href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
+
+                                        </li>{% endif %}
 
 
                                 </ul>
@@ -302,7 +325,7 @@ font-size: 45px;
                             <form action="/build_pkg_now" role="form" id="build_now_form" method="post">
                                 <input type="text" class="form-control search" name="pkgname" id="pkgname"
                                        placeholder="Build Now..."/>
-                                <input type="hidden" name="dev" id="dev" value="{{ user.username }}" />
+                                <input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
                             </form>
                         {% endif %}
                         <button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
@@ -373,7 +396,8 @@ font-size: 45px;
                                             title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
                                                 class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
                                         </li>
-                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+                                        <li id="status_bar"
+                                            class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
                                             <pre id="status_bar_pre">Idle</pre>
                                         </li>
                                     </ul>
@@ -395,7 +419,8 @@ font-size: 45px;
                                             title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
                                                 class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
                                         </li>
-                                        <li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+                                        <li id="status_bar"
+                                            class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
                                             <pre id="status_bar_pre">Idle</pre>
                                         </li>
                                     </ul>
@@ -473,7 +498,7 @@ font-size: 45px;
                         jQuery('#main pre').addClass('pre-scrollable');
                         jQuery('.not-idle').show();
                         function getStatus() {
-                            $.getJSON('/get_status', function(data) {
+                            $.getJSON('/get_status', function (data) {
                                 var current = jQuery('.not-idle').text();
                                 if (data['msg'] !== current) {
                                     jQuery('.idle').hide();
@@ -489,56 +514,86 @@ font-size: 45px;
                             })
 
                         }
+
                         getStatus();
-                        setInterval( getStatus, 15000 );
+                        setInterval(getStatus, 15000);
                     });
                     jQuery(window).load(function () {
-                        jQuery('[data-toggle="tooltip"]').tooltip();
+                                jQuery('[data-toggle="tooltip"]').tooltip();
 
-                        jQuery('.loading').fadeIn();
-                        if (jQuery('table').length && !jQuery('#noDt').length) {
+                                jQuery('.loading').fadeIn();
+                                if (jQuery('table').length && !jQuery('#noDt').length) {
 
-                            jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
-                                var x = a.replace(/<.*?>/g, "");
-                                var y = b.replace(/<.*?>/g, "");
-                                x = parseFloat(x);
-                                y = parseFloat(y);
-                                return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
-                            };
+                                    jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
+                                        var x = a.replace(/<.*?>/g, "");
+                                        var y = b.replace(/<.*?>/g, "");
+                                        x = parseFloat(x);
+                                        y = parseFloat(y);
+                                        return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
+                                    };
 
-                            jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
-                                var x = a.replace(/<.*?>/g, "");
-                                var y = b.replace(/<.*?>/g, "");
-                                x = parseFloat(x);
-                                y = parseFloat(y);
-                                return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
-                            };
-                            jQuery('table')
-                                    .on('init.dt', function (e, settings, data) {
-                                        setTimeout(function () {
-                                            jQuery('.loading').fadeOut();
-                                        }, 750)
-                                    })
-                                    .dataTable({
-                                        "aoColumns": [
-                                            {"sType": "num-html"},
-                                            null,
-                                            null,
-                                            null,
-                                            null{% if '/completed' in request.path or '/pkg_review' in request.path %},
-                                                null,
-                                                null,
-                                                null{% endif %}
-                                        ],
-                                        "aaSorting": [
-                                            [0, "desc"]
-                                        ]
+                                    jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
+                                        var x = a.replace(/<.*?>/g, "");
+                                        var y = b.replace(/<.*?>/g, "");
+                                        x = parseFloat(x);
+                                        y = parseFloat(y);
+                                        return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
+                                    };
+                                    jQuery('table').not('#issuetable')
+                                            .on('init.dt', function (e, settings, data) {
+                                                setTimeout(function () {
+                                                    jQuery('.loading').fadeOut();
+                                                }, 750)
+                                            })
+                                            .dataTable({
+                                                "aoColumns": [
+                                                    {"sType": "num-html"},
+                                                    null,
+                                                    null,
+                                                    null,
+                                                    null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+                                                    null,
+                                                    null,
+                                                    null{% endif %}{% if '/issues' in request.path %},
+                                                    null{% endif %}
+                                                ],
+                                                "aaSorting": [
+                                                    [0, "desc"]
+                                                ]
 
-                                    })
+                                            });
+                                    jQuery('#issuetable').bind('issuesReady', function () {
+                                        jQuery('#issuetable')
+                                                .on('init.dt', function (e, settings, data) {
+                                                    setTimeout(function () {
+                                                        jQuery('.loading').fadeOut();
+                                                    }, 750)
+                                                })
+                                                .dataTable({
+                                                    "aoColumns": [
+                                                        {"sType": "num-html"},
+                                                        null,
+                                                        null,
+                                                        null,
+                                                        null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+                                                        null,
+                                                        null,
+                                                        null{% endif %}{% if '/issues' in request.path %},
+                                                        null{% endif %}
+                                                    ],
+                                                    "aaSorting": [
+                                                        [0, "desc"]
+                                                    ]
 
-                        }
-                        jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
-                    });
+                                                });
+
+                                    });
+                                    if (!jQuery('#issuetable').length) {
+                                        jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
+                                    }
+                                }
+                            }
+                    )
 
 
                 </script>
