@@ -6,3 +6,4 @@ build.sh
 repo*.sh
 *pycache
 *expect*.conf
+antbs.log

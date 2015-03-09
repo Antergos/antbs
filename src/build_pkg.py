@@ -48,12 +48,12 @@ import glob
 logger = logconf.logger
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
-DOC_DIR = os.path.join(BASE_DIR, 'docker_files')
+DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
 
 
-# Initiate communication with docker_files daemon
+# Initiate communication with build daemon
 try:
     doc = docker.Client(base_url='unix://var/run/docker.sock')
     # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
@@ -170,6 +170,7 @@ def handle_hook(first=False, last=False):
     pull_from = 'antergos'
 
     if iso_flag == 'True':
+        db.set('isoFlag', 'False')
         db.set('isoBuilding', 'True')
         db.lrem('queue', 0, 'antergos-iso')
         archs = ['x86_64', 'i686']
@@ -184,13 +185,12 @@ def handle_hook(first=False, last=False):
             db.set('pkg:%s:name' % iso_name + arch, iso_name + arch)
             db.set('pkg:%s:version' % iso_name + arch, version)
         build_iso()
-        db.set('isoFlag', 'False')
         db.set('isoBuilding', 'False')
         db.set('isoMinimal', 'False')
         db.set('idle', "True")
         return True
 
-    elif first:
+    elif first and iso_flag == 'False':
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
         db.set('building', 'Pulling PKGBUILD changes from github.')
@@ -280,16 +280,16 @@ def handle_hook(first=False, last=False):
             db.set('building', 'Check deps complete. Starting build container.')
             del pack
 
-    try:
-        subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
-    except subprocess.CalledProcessError as err:
-        logger.error(err.output)
-    except Exception as err:
-        logger.error(err)
-
-    logger.info('[FIRST IS SET]: %s' % first)
-    logger.info('[LAST IS SET]: %s' % last)
     if iso_flag == 'False':
+        try:
+            subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
+        except Exception as err:
+            logger.error(err)
+
+        logger.info('[FIRST IS SET]: %s' % first)
+        logger.info('[LAST IS SET]: %s' % last)
         build_pkgs(last)
     if last:
         try:

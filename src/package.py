@@ -88,8 +88,8 @@ class Package(object):
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
             if "info" in sys.modules:
                 del(sys.modules["info"])
-            if "/tmp/cnchi/src" not in sys.path:
-                sys.path.append('/tmp/cnchi/src')
+            if "/tmp/cnchi/cnchi" not in sys.path:
+                sys.path.append('/tmp/cnchi/cnchi')
             import info
 
             out = info.CNCHI_VERSION
@@ -97,20 +97,6 @@ class Package(object):
             del(info.CNCHI_VERSION)
             del(sys.modules["info"])
             err = []
-        #elif var == "pkgver" and 'cnchi-dev' not in parse and ('git+' in parse or 'numix-icon-theme-square' in parse):
-            # giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-            # if not giturl:
-            #     giturl = os.path.join(dirpath, 'numix-icon-theme-square')
-            # else:
-            #     giturl = giturl.group(0)
-            # gitcmd = 'git clone ' + giturl + ' pkgver'
-            # subprocess.check_output(gitcmd, cwd=dirpath, shell=True, executable='/bin/bash')
-            # rev = subprocess.check_output(['git', 'rev-list', '--count', 'HEAD'], cwd=os.path.join(dirpath, 'pkgver'))
-            # short = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD'], cwd=os.path.join(dirpath, 'pkgver'))
-            # out = '0.r%s.%s' % (rev.strip(), short.strip())
-            # err = []
-            # if not len(out) > 0:
-            #     err = 'Failed to determine pkgver from git revisions'
         else:
             cmd = 'source ' + path + '; echo $' + var
             if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):

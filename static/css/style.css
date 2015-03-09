@@ -6494,12 +6494,12 @@ ul.timeline:after {
   left: 17px;
   content: "";
 }
-ul.timeline li {
+ul.timeline > li {
   position: relative;
   list-style: none;
   margin-bottom: 25px;
 }
-ul.timeline li > .fa {
+ul.timeline > li > .fa {
   left: 2px;
   text-shadow: 0 1px 0 rgba(0, 0, 0, 0.1);
   font-size: 14px;
@@ -6517,16 +6517,16 @@ ul.timeline li > .fa {
   z-index: 2;
   top: 0;
 }
-ul.timeline li .fa.red {
+ul.timeline > li .fa.red {
   background: #ea6153;
 }
-ul.timeline li .fa.green {
+ul.timeline > li .fa.green {
   background: #19b698;
 }
-ul.timeline li .fa.purple {
+ul.timeline > li .fa.purple {
   background: #7761a7;
 }
-ul.timeline li .content {
+ul.timeline > li .content {
   position: relative;
   border-radius: 3px;
   background: #FFF;
@@ -6535,22 +6535,22 @@ ul.timeline li .content {
   border: 1px solid #E8E8E6;
   line-height: 15px;
 }
-ul.timeline li .content p {
+ul.timeline > li .content p {
   margin: 0;
 }
-ul.timeline li .content .img-thumbnail {
+ul.timeline > li .content .img-thumbnail {
   border-radius: 0;
   margin: 10px 5px 0 0;
   cursor: pointer;
 }
-ul.timeline li .content blockquote {
+ul.timeline > li .content blockquote {
   margin: 10px 0 0 0;
 }
-ul.timeline li .content blockquote p {
+ul.timeline > li .content blockquote p {
   margin: 0 0 5px 0 !important;
   font-size: 14px;
 }
-ul.timeline li .content:before {
+ul.timeline > li .content:before {
   background: #FFF;
   position: absolute;
   top: 14px;
@@ -6566,7 +6566,7 @@ ul.timeline li .content:before {
   -webkit-transform: rotate(45deg);
   /* Safari and Chrome */
 }
-ul.timeline li > .date {
+ul.timeline > li > .date {
   background: #E8E8E8;
   position: absolute;
   top: 49px;

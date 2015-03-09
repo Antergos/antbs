@@ -501,6 +501,7 @@ def hooked():
         db.set('pullFrom', 'antergos')
         match = None
         nx_pkg = None
+        logger.debug('Request Arg Repo is %s' % request.args)
         if request.args['repo'] == "NX":
             nx_pkg = ['numix-icon-theme']
         elif request.args['repo'] == "NXSQ":
@@ -591,7 +592,7 @@ def hooked():
             last_pkg = the_pkgs[-1]
             p_ul = []
             if len(the_pkgs) > 1:
-                p_ul.append('<ul>')
+                p_ul.append('<ul class="hook-pkg-list">')
             for p in the_pkgs:
                 if p not in the_queue and p is not None and p != '' and p != []:
                     db.rpush('queue', p)

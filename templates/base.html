@@ -179,16 +179,58 @@
                             }
                         }
 
-                        ul.timeline li > .date {
-                            width: 47px;
+                        ul.timeline > li > .date {
+                            width: 48px;
                         }
 
                         ul.timeline {
                             margin-bottom: 0px;
+                            font-size: 14px;
                         }
 
                         ul.pagination {
                             margin: 0 auto;
+                        }
+                        ul.timeline > li > .date {
+                        background: #D0D0D0;
+                        position: absolute;
+                        top: 49px;
+                        display: block;
+                        padding: 0 5px;
+                        text-align: center;
+                        border: 1px solid #D0D0D0;
+                        font-size: 11px;
+                        border-radius: 1px;
+                        text-shadow: 0 1px 0 #fafafa;
+                        color: #000;
+                        line-height: 19px;
+                        }
+                        ul.timeline > li .content {
+                        position: relative;
+                        border-radius: 3px;
+                        background: #FFF;
+                        margin-left: 75px;
+                        padding: 12px 10px;
+                        border: 1px solid #D0D0D0;
+                        line-height: 15px;
+                        }
+                        ul.timeline:before {
+                            background-color: #D0D0D0;
+                        }
+                        ul.timeline > li .content p {
+                        margin: 0;
+                        padding-bottom: 5px;
+                        }
+                        ul.timeline > li .content:before {
+                            background: #FFF;
+                            position: absolute;
+                            top: 14px;
+                            content: "";
+                            width: 10px;
+                            height: 10px;
+                            left: -6px;
+                            border-left: 1px solid #D0D0D0;
+                            border-bottom: 1px solid #D0D0D0;
                         }
 
                         .timeline {
@@ -206,6 +248,15 @@
                         ul.custom {
                             float: right !important;
                         }
+                        ul.hook-pkg-list {
+                            margin-top: 20px;
+                            margin-bottom: 20px;
+                        }
+                        ul.hook-pkg-list li {
+                            list-style-type: none;
+                            font-size: 14px;
+                        }
+
 
                         .phab {
                             position: absolute;
@@ -229,6 +280,19 @@
                             position: relative;
                             bottom: 2px;
                             right: 1px;
+                        }
+
+                        ul.hook-pkg-list li:before {
+                            display: inline-block;
+                              font-family: FontAwesome;
+                              font-style: normal;
+                              font-weight: normal;
+                              line-height: 1;
+                              -webkit-font-smoothing: antialiased;
+                              -moz-osx-font-smoothing: grayscale;
+                            content: "\f187";
+                            margin-right: 8px;
+                            font-size: 10px;
                         }
 
                     </style>
