@@ -29,8 +29,7 @@ import __builtin__
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from src.redis_connection import db
-import docker
-from docker.utils import create_host_config
+import src.docker_util as docker_utils
 import subprocess
 import src.logging_config as logconf
 import datetime
@@ -51,14 +50,8 @@ BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
-
-
-# Initiate communication with build daemon
-try:
-    doc = docker.Client(base_url='unix://var/run/docker.sock')
-    # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
-except Exception as err:
-    logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+doc = docker_utils.doc
+create_host_config = docker_utils.create_host_config
 
 
 def remove(src):
@@ -191,6 +184,7 @@ def handle_hook(first=False, last=False):
         return True
 
     elif first and iso_flag == 'False':
+        docker_utils.maybe_build_base_devel()
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
         db.set('building', 'Pulling PKGBUILD changes from github.')
@@ -723,7 +717,6 @@ def build_iso():
                                                  'ro': True
                                              }})
         try:
-            doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
             iso_container = doc.create_container("antergos/mkarchiso", tty=True, name=nm, host_config=hconfig)
             db.set('container', iso_container.get('Id'))
         except Exception as err:

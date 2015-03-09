@@ -3,7 +3,7 @@
 #
 # redis_connection.py
 #
-# Copyright 2013 Antergos
+# Copyright 2013-2015 Antergos
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,27 +28,6 @@ import redis_connection
 import datetime
 
 
-# class RedisHandler(logging.Handler):
-# def __init__(self, channel, conn, *args, **kwargs):
-# logging.Handler.__init__(self, *args, **kwargs)
-#         self._formatter = logging.Formatter()
-#         self.channel = channel
-#         self.redis_conn = conn
-#
-#     def setFormatter(self, formatter):
-#         self._formatter = formatter
-#
-#     def emit(self, record):
-#         msg = self._formatter.format(record)
-#         try:
-#             self.redis_conn.pipeline() \
-#                 .publish(self.channel, msg) \
-#                 .rpush(self.channel, msg) \
-#                 .ltrim(self.channel, -1000, -1) \
-#                 .execute()
-#
-#         except Exception:
-#             pass
 db = redis_connection.db
 logger = logging.getLogger()
 
