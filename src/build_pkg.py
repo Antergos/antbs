@@ -161,6 +161,7 @@ def handle_hook(first=False, last=False):
     iso_flag = db.get('isoFlag')
     # pull_from = db.get('pullFrom')
     pull_from = 'antergos'
+    packages = db.lrange('queue', 0, -1)
 
     if iso_flag == 'True':
         db.set('isoFlag', 'False')
@@ -184,7 +185,10 @@ def handle_hook(first=False, last=False):
         return True
 
     elif first and iso_flag == 'False':
-        docker_utils.maybe_build_base_devel()
+        db.set('building', 'Building docker image.')
+        image = docker_utils.maybe_build_base_devel()
+        if not image:
+            return False
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
         db.set('building', 'Pulling PKGBUILD changes from github.')
@@ -197,7 +201,6 @@ def handle_hook(first=False, last=False):
             return False
 
         # Check database to see if packages exist and add them if necessary.
-        packages = db.lrange('queue', 0, -1)
         logger.info('Checking database for packages.')
         db.set('building', 'Checking database for queued packages')
         nxsq = 'numix-icon-theme-square'
@@ -272,9 +275,9 @@ def handle_hook(first=False, last=False):
                     db.rpush('queue', c)
             logger.info('Check deps complete. Starting build_pkgs')
             db.set('building', 'Check deps complete. Starting build container.')
-            del pack
 
-    if iso_flag == 'False':
+    if iso_flag == 'False' and len(packages) > 0:
+        pack = package(db.lpop('queue'), db)
         try:
             subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
         except subprocess.CalledProcessError as err:
@@ -284,7 +287,7 @@ def handle_hook(first=False, last=False):
 
         logger.info('[FIRST IS SET]: %s' % first)
         logger.info('[LAST IS SET]: %s' % last)
-        build_pkgs(last)
+        build_pkgs(last, pack)
     if last:
         try:
             shutil.rmtree('/opt/antergos-packages')
@@ -434,7 +437,7 @@ def get_latest_translations():
             logger.error(err)
 
 
-def build_pkgs(last=False):
+def build_pkgs(last=False, pkg_info=None):
     # Create our tmp directories
     result = os.path.join("/tmp", "result")
     cache = os.path.join("/tmp", "pkg_cache")
@@ -442,20 +445,18 @@ def build_pkgs(last=False):
         if os.path.exists(d):
             shutil.rmtree(d)
         os.mkdir(d, 0o777)
-    pkglist = db.lrange('queue', 0, -1)
+    #pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
-        pkg = db.lpop('queue')
+        pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
             db.set('now_building', pkg)
             db.set('building', 'Building %s with makepkg' % pkg)
             failed = False
-            if pkg is None or pkg == '':
-                continue
             logger.info('Building %s' % pkg)
-            version = db.get('pkg:%s:version' % pkg)
+            version = pkg_info.version
             db.incr('build_number')
             dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             build_id = db.get('build_number')
@@ -468,15 +469,21 @@ def build_pkgs(last=False):
             db.set('%s:pkg' % this_log, pkg)
             db.set('%s:version' % this_log, version)
             pkgdir = os.path.join(REPO_DIR, pkg)
-            pkg_deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
+            pkg_deps = pkg_info.depends or []
             pkg_deps_str = ' '.join(pkg_deps)
             logger.info('pkg_deps_str is %s' % pkg_deps_str)
             run_docker_clean(pkg)
+            logger.info('@@-build_pkg.py-@@ | AUTOSUMS is %s' % pkg_info.autosum)
+            if pkg_info is not None and pkg_info.autosum == "True":
+                build_env = ['_AUTOSUMS=True']
+            else:
+                build_env = ['_AUTOSUMS=False']
+            logger.info('@@-build_pkg.py-@@ | build_env is %s' % build_env)
             try:
                 container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
                                                  name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
                                                                     '/root/.gnupg', '/staging', '/32bit', '/32build',
-                                                                    '/result'])
+                                                                    '/result'], environment=build_env)
             except Exception as err:
                 logger.error('Create container failed. Error Msg: %s' % err)
                 failed = True

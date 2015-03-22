@@ -46,6 +46,11 @@ class Package(object):
             db.set(self.key, True)
             db.set('%s:%s' % (self.key, 'name'), self.name)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
+            db.set('%s:%s' % (self.key, 'autosum'), "False")
+        if self.name in ['pycharm-pro-eap', 'pycharm-com-eap']:
+            db.set('%s:%s' % (self.key, 'autosum'), "True")
+        else:
+            db.set('%s:%s' % (self.key, 'autosum'), "False")
         self.version = self.get_from_db('version')
         self.epoch = self.get_from_db('epoch')
         self.depends = self.get_from_db('depends')
@@ -55,6 +60,7 @@ class Package(object):
         self.pkgver = self.get_from_db('pkgver')
         self.saved_commit = self.get_from_db('saved_commit')
         self.tl_event = self.get_from_db('tl_event')
+        self.autosum = self.get_from_db('autosum')
 
     def delete(self):
         self.db.delete(self.key)
@@ -64,7 +70,7 @@ class Package(object):
             if self.db.type('string'):
                 val = self.db.get('%s:%s' % (self.key, attr))
             elif self.db.type('list'):
-                val = self.db.lrange('%s:%s' % (self.key, attr), 0, -1)
+                val = list(self.db.lrange('%s:%s' % (self.key, attr), 0, -1))
             else:
                 val = ''
             logger.info('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))

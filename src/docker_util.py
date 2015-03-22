@@ -37,7 +37,7 @@ doc_pass = db.get('docker-images:password')
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
-DOC_DIR = os.path.join(BASE_DIR, 'build')
+DOC_DIR = os.path.join(BASE_DIR, 'build/docker')
 
 # Initiate communication with build daemon
 try:
@@ -66,16 +66,17 @@ def maybe_build_base_devel():
         mpkg = build_makepkg()
         if not mpkg:
             return False
-        db.psetex('docker-images:base-devel:built-today', 86400000, 'True')
+        db.psetex('docker-images:base-devel:built-today', 604800000, 'True')
         return True
     else:
         return False
 
 def build_makepkg():
-    dockerfile = os.path.join(DOC_DIR, 'build/makepkg')
+    dockerfile = os.path.join(DOC_DIR, 'makepkg')
     try:
         build_it = [line for line in doc.build(dockerfile, 'antergos/makepkg', False, None, True, False, True)]
-        push_to_hub('antergos/makepkg')
+        if build_it:
+            push_to_hub('antergos/makepkg')
     except Exception as err:
         logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
         return False
@@ -87,9 +88,10 @@ def push_to_hub(repo=None):
     if repo is None:
         return
     try:
-        doc.login(doc_user, doc_pass)
+        doc.login(username=doc_user, password=doc_pass, email='dustin@falgout.us')
         response = [line for line in doc.push(repo, stream=True)]
-        logger.info('@@-docker_util.py-@@ | Push to hub output: %s' % response)
+        if not response:
+            return False
     except Exception as err:
         logger.error('@@-docker_util.py-@@ | Pushing to docker hub failed with error: %s', err)
 
