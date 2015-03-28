@@ -92,35 +92,36 @@ class Package(object):
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
-            if "info" in sys.modules:
-                del(sys.modules["info"])
-            if "/tmp/cnchi/cnchi" not in sys.path:
-                sys.path.append('/tmp/cnchi/cnchi')
-            import info
+            pass
+            # if "info" in sys.modules:
+            #     del(sys.modules["info"])
+            # if "/tmp/cnchi/cnchi" not in sys.path:
+            #     sys.path.append('/tmp/cnchi/cnchi')
+            # import info
+            #
+            # out = info.CNCHI_VERSION
+            # out = out.replace('"', '')
+            # del(info.CNCHI_VERSION)
+            # del(sys.modules["info"])
+            # err = []
+        #else:
+        cmd = 'source ' + path + '; echo $' + var
+        if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
+            if 'numix-icon-theme' not in parse:
+                giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+                giturl = giturl.group(0)
+                pkgdir, pkgbuild = os.path.split(path)
+                if self.name == 'pamac-dev':
+                    gitnm = 'pamac'
+                else:
+                    gitnm = self.name
+                subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
 
-            out = info.CNCHI_VERSION
-            out = out.replace('"', '')
-            del(info.CNCHI_VERSION)
-            del(sys.modules["info"])
-            err = []
-        else:
-            cmd = 'source ' + path + '; echo $' + var
-            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
-                if 'numix-icon-theme' not in parse:
-                    giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-                    giturl = giturl.group(0)
-                    pkgdir, pkgbuild = os.path.split(path)
-                    if self.name == 'pamac-dev':
-                        gitnm = 'pamac'
-                    else:
-                        gitnm = self.name
-                    subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
+            cmd = 'source ' + path + '; ' + var
 
-                cmd = 'source ' + path + '; ' + var
-
-            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-            out, err = proc.communicate()
+        proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        out, err = proc.communicate()
 
         if len(out) > 0:
             out = out.strip()

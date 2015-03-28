@@ -507,18 +507,18 @@ def hooked():
         elif request.args['repo'] == "NXSQ":
             nx_pkg = ['numix-icon-theme-square']
         if nx_pkg:
-            if not the_queue or (the_queue and nx_pkg[0] not in the_queue):
+            if the_queue and nx_pkg[0] in the_queue:
                 for p in the_queue:
                     if p == nx_pkg[0] or p == building:
                         match = True
                         break
                     else:
                         continue
-                if match is None:
-                    changes.append(nx_pkg)
-                else:
-                    logger.info('RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0])
-                    return json.dumps({'msg': 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]})
+            if match is None:
+                changes.append(nx_pkg)
+            else:
+                logger.info('RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0])
+                return json.dumps({'msg': 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]})
         else:
             logger.error('phab hook failed for numix')
 
