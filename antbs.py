@@ -575,15 +575,22 @@ def hooked():
         no_dups = []
 
         for changed in changes:
-            for item in changed:
-                if is_phab:
-                    pak = item
-                else:
-                    pak = os.path.dirname(item)
-                if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
-                    logger.info('Adding %s to the build queue' % pak)
-                    no_dups.append(pak)
-                    has_pkgs = True
+            if changed:
+                for item in changed:
+                    if is_phab:
+                        pak = item
+                    else:
+                        if "PKGBUILD" in item or ".antbs" in item:
+                            pak, pkb = item.rsplit('/', 1)
+                            pak = pak.rsplit('/', 1)[-1]
+                        else:
+                            pak = None
+
+                    if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
+                        logger.info('Adding %s to the build queue' % pak)
+                        no_dups.append(pak)
+                        db.sadd('pkgs:all', pak)
+                        has_pkgs = True
 
         if has_pkgs:
             the_pkgs = list(set(no_dups))

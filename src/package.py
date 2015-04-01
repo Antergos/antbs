@@ -22,31 +22,37 @@
 
 """ Package Class """
 
-import src.logging_config
+import src.logging_config as logconf
 import src.redis_connection
 import subprocess
 import os
 import re
 import sys
 from github3 import login
+from src.redis_connection import db
 
-logger = src.logging_config.logger
+logger = logconf.logger
 
 
 class Package(object):
 
     db = src.redis_connection.db
     gh_user = db.get('ANTBS_GITHUB_TOKEN')
+    db.setnx('pkg:id:next', 0)
 
     def __init__(self, name, db=db):
+        db.incr('pkg:id:next')
+        self.next_id = db.get('pkg:id:next')
         self.name = name
         self.key = 'pkg:%s' % self.name
-        logger.info('@@-package.py-@@ | self.key is %s' % self.key)
-        if not db.exists(self.key):
+        logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
+        if not db.exists(self.key) or True:
             db.set(self.key, True)
             db.set('%s:%s' % (self.key, 'name'), self.name)
+            db.set('%s:%s' % (self.key, 'id'), self.next_id)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
             db.set('%s:%s' % (self.key, 'autosum'), "False")
+            db.sadd('%s:%s' % (self.key, 'depends'), '')
         if self.name in ['pycharm-pro-eap', 'pycharm-com-eap']:
             db.set('%s:%s' % (self.key, 'autosum'), "True")
         else:
@@ -54,6 +60,7 @@ class Package(object):
         self.version = self.get_from_db('version')
         self.epoch = self.get_from_db('epoch')
         self.depends = self.get_from_db('depends')
+        self.groups = self.get_from_db('groups')
         self.builds = self.get_from_db('builds')
         self.push_version = self.get_from_db('push_version')
         self.pkgrel = self.get_from_db('pkgrel')
@@ -61,33 +68,47 @@ class Package(object):
         self.saved_commit = self.get_from_db('saved_commit')
         self.tl_event = self.get_from_db('tl_event')
         self.autosum = self.get_from_db('autosum')
+        self.depends = self.get_from_db('depends')
 
     def delete(self):
         self.db.delete(self.key)
 
-    def get_from_db(self, attr):
-        if attr:
-            if self.db.type('string'):
-                val = self.db.get('%s:%s' % (self.key, attr))
-            elif self.db.type('list'):
-                val = list(self.db.lrange('%s:%s' % (self.key, attr), 0, -1))
-            else:
-                val = ''
-            logger.info('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
-            return val
+    def get_from_db(self, attr=None):
+        val = ''
+        if attr is not None:
+            key = '%s:%s' % (self.key, attr)
+            if self.db.type(key) == 'string':
+                val = self.db.get(key)
+            elif self.db.type(key) == 'list':
+                val = list(self.db.lrange(key, 0, -1))
+            elif self.db.type(key) == 'set':
+                val = self.db.smembers(key)
+            logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
+
+        return val
 
     def save_to_db(self, attr=None, value=None):
-        if attr and value:
+        if attr is not None and value is not None:
+            # TODO: This needs to be moved into its own method.
             if self.push_version and self.push_version == "True" and attr == "pkgver":
-                old = self.get_from_db(attr)
-                if old != value:
-                    self.update_and_push_github(attr, old, value)
+                if self.pkgver != value:
+                    self.update_and_push_github(attr, self.pkgver, value)
 
-            self.db.set('%s:%s' % (self.key, attr), value)
-            return self.db.get('%s:%s' % (self.key, attr))
+            key = '%s:%s' % (self.key, attr)
+
+            if self.db.type(key) == 'string':
+                self.db.set(key, value)
+
+            elif self.db.type(key) == 'list':
+                self.db.rpush(key, value)
+
+            elif self.db.type(key) == 'set':
+                self.db.sadd(key, value)
+
+            return value
 
     def get_from_pkgbuild(self, var=None, path=None):
-        if not var or not path:
+        if var is None or path is None:
             raise KeyError
         parse = open(path).read()
         dirpath = os.path.dirname(path)
@@ -125,7 +146,7 @@ class Package(object):
 
         if len(out) > 0:
             out = out.strip()
-            logger.info('@@-package.py-@@ | proc.out is %s' % out)
+            #logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
             logger.error('@@-package.py-@@ | proc.err is %s' % err)
 
@@ -155,3 +176,62 @@ class Package(object):
         else:
             logger.error('@@-package.py-@@ | commit failed')
             return False
+
+    def get_version(self):
+        pbfile = self.get_from_db('pbpath')
+        pkgver = self.get_from_pkgbuild('pkgver', pbfile)
+        if self.name == "cnchi-dev" and pkgver[-1] != "0":
+            event = self.tl_event
+            results = db.scan_iter('timeline:%s:*' % event, 100)
+            for k in results:
+                db.delete(k)
+            db.lrem('timeline:all', 0, event)
+            return False
+        old_pkgver = self.pkgver
+        self.save_to_db('pkgver', pkgver)
+        epoch = self.get_from_pkgbuild('epoch', pbfile)
+        pkgrel = self.get_from_pkgbuild('pkgrel', pbfile)
+        if pkgrel and pkgrel != '' and pkgrel is not None:
+            pkgrel_upd = False
+            old_pkgrel = pkgrel
+            # if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
+            #     pkgrel = str(int(pkgrel) + 1)
+            #     pkgrel_upd = True
+            if pkgver != old_pkgver and pkgrel != "1":
+                pkgrel = "1"
+                pkgrel_upd = True
+
+            if pkgrel_upd:
+                self.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
+
+            self.save_to_db('pkgrel', pkgrel)
+
+        if epoch and epoch != '' and epoch is not None:
+            pkgver = epoch + ':' + pkgver
+
+        version = pkgver + '-' + str(pkgrel)
+        if version and version != '' and version is not None:
+            self.save_to_db('version', version)
+            logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
+        else:
+            version = self.version
+
+        return version
+
+    def get_deps(self):
+        depends = []
+        pbfile = self.get_from_db('pbpath')
+        deps = self.get_from_pkgbuild('depends', pbfile).split()
+
+        for dep in deps:
+            has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
+            if has_ver is not None:
+                dep = has_ver.group(0)
+            if db.sismember('pkgs:all', dep):
+                depends.append(dep)
+
+            self.save_to_db('depends', dep)
+
+        res = (self.name, depends)
+        return res
+

@@ -24,8 +24,6 @@
 
 import os
 import sys
-import importlib
-import __builtin__
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from src.redis_connection import db
@@ -81,79 +79,103 @@ def run_docker_clean(pkg=None):
     return True
 
 
-def get_pkgver(pkgobj):
-    pkg = pkgobj.name
-    pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
-    pkgver = pkgobj.get_from_pkgbuild('pkgver', pbfile)
-    if pkg == "cnchi-dev" and pkgver[-1] != "0":
-        event = pkgobj.tl_event
-        results = db.scan_iter('timeline:%s:*' % event, 100)
-        for k in results:
-            db.delete(k)
-        db.lrem('timeline:all', 0, event)
-        return False
-    old_pkgver = pkgobj.pkgver
-    pkgobj.save_to_db('pkgver', pkgver)
-    epoch = pkgobj.get_from_pkgbuild('epoch', pbfile)
-    pkgrel = pkgobj.get_from_pkgbuild('pkgrel', pbfile)
-    if pkgrel and pkgrel != '' and pkgrel is not None:
-        pkgrel_upd = False
-        old_pkgrel = pkgrel
-        if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
-            pkgrel = str(int(pkgrel) + 1)
-            pkgrel_upd = True
-        elif pkgver != old_pkgver and pkgrel != "1":
-            pkgrel = "1"
-            pkgrel_upd = True
+def check_deps(source):
+    # # TODO: This still needs to be improved.
+    """perform topo sort on elements.
 
-        if pkgrel_upd:
-            pkgobj.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
-
-        pkgobj.save_to_db('pkgrel', pkgrel)
-
-    if epoch and epoch != '' and epoch is not None:
-        pkgver = epoch + ':' + pkgver
-
-    pkgver = pkgver + '-' + str(pkgrel)
-    if pkgver and pkgver != '' and pkgver is not None:
-        pkgobj.save_to_db('version', pkgver)
-        logger.info('@@-build_pkg.py-@@ | pkgver is %s' % pkgver)
-    else:
-        pkgver = pkgobj.get_from_db('version')
-    # del pkgobj
-    return pkgver
+    :arg source: list of ``(name, [list of dependancies])`` pairs
+    :returns: list of names, with dependancies listed first
+    """
+    pending = [(name, set(deps)) for name, deps in source]  # copy deps so we can modify set in-place
+    emitted = []
+    while pending:
+        next_pending = []
+        next_emitted = []
+        for entry in pending:
+            name, deps = entry
+            deps.difference_update(emitted)  # remove deps we emitted last pass
+            if deps:  # still has deps? recheck during next pass
+                next_pending.append(entry)
+            else:  # no more deps? time to emit
+                yield name
+                emitted.append(name)  # <-- not required, but helps preserve original ordering
+                next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
+        if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
+            #raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
+            pass
+        pending = next_pending
+        emitted = next_emitted
 
 
-def get_deps(pkg):
-    depends = []
-    pbfile = os.path.join(REPO_DIR, pkg, 'PKGBUILD')
-    with open(pbfile) as PKGBUILD:
-        for line in PKGBUILD:
-            if line.startswith("depends") or line.startswith("makedepends"):
-                dep_line = line.split('=', 1)
-                dep_str = dep_line[1].rstrip()
-                for c in ['(', ')', "'", '"']:
-                    dep_str = dep_str.replace(c, '')
-                deps = dep_str.split(' ')
-                for dep in deps:
-                    depends.append(dep)
+def process_package_queue(the_queue=None):
+    if the_queue is not None:
+        special_cases = [
+            {'numix-icon-theme': {
+                'callsign': 'NX'}
+             },
+            {'numix-icon-theme-square': {
+                'callsign': 'NXSQ'}
+             },
+            {'numix-icon-theme-square-kde': {
+                'callsign': 'NXSQ'}
+             },
+            {'numix-frost-themes': {
+                'dest': '/opt/numix',
+                'source': '/opt/numix/numix-frost.zip'}
+             },
+            {'cnchi-dev': {
+                'cwd': '/srv/antergos.org/cnchi.tar'}
+             },
+            {'cnchi': {
+                'cwd': ''}
+             }]
+        all_deps = []
+        for pkg in the_queue:
+            special = [x for x in special_cases if pkg in x.items()]
+            if special and len(special) > 0:
+                try:
+                    callsign = special[pkg]['callsign'] or ''
+                    source = special[pkg]['source'] or ''
+                    if callsign and callsign != '':
+                        subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
+                                        cwd='/opt/antergos-pkgages/' + pkg)
+                        logger.info('Creating tar archive for %s' % pkg)
+                        subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-pkgages/' + pkg)
+                    elif source and source != '':
+                        logger.info('Copying numix-frost source file into build directory.')
+                        subprocess.check_call(['cp', '/opt/numix/' + pkg + '.zip', os.path.join(REPO_DIR, pkg)],
+                                              cwd='/opt/numix')
+                    elif 'cnchi-dev' == pkg:
+                        logger.info('Copying cnchi-dev source file into build directory.')
+                        shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pkg))
+                    elif 'cnchi' == pkg:
+                        get_latest_translations()
+
+                except Exception as err:
+                    logger.error(err)
+
+            pkgobj = package(pkg, db)
+            if not os.path.exists(os.path.join(REPO_DIR, pkgobj.name)):
+                pkgobj.save_to_db('deepin', 'True')
+                pbfile = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name, 'PKGBUILD')
+                path = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name)
             else:
+                pbfile = os.path.join(REPO_DIR, pkgobj.name, 'PKGBUILD')
+                path = os.path.join(REPO_DIR, pkgobj.name)
+            pkgobj.save_to_db('pbpath', pbfile)
+            pkgobj.save_to_db('path', path)
+            version = pkgobj.get_version()
+            if not version:
+                db.lrem('queue', 0, 'cnchi-dev')
                 continue
-    return depends
+            logger.info('Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
+            db.set('building', 'Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
+            depends = pkgobj.get_deps()
+            p, d = depends
+            if len(d) > 0:
+                all_deps.append(depends)
 
-
-def check_deps(packages):
-    # TODO: Come up with more versitile solution. This will only help in the most basic situations.
-    pkgs = packages
-    queued = db.lrange('queue', 0, -1)
-    matches = []
-    for pkg in pkgs:
-        deps = db.lrange('pkg:%s:deps' % pkg, 0, -1)
-        if set(deps).intersection(set(queued)):
-            logger.info('CHECK DEPS: %s added to matches.' % pkg)
-            matches.append(pkg)
-            continue
-    return set(matches)
+        return all_deps
 
 
 def handle_hook(first=False, last=False):
@@ -200,81 +222,25 @@ def handle_hook(first=False, last=False):
             logger.error(err.output)
             return False
 
-        # Check database to see if packages exist and add them if necessary.
         logger.info('Checking database for packages.')
         db.set('building', 'Checking database for queued packages')
-        nxsq = 'numix-icon-theme-square'
-
         subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
-        for pack in packages:
-            # if 'numix-icon-theme' == package:
-            # logger.info('cloning repo for %s' % package)
-            # subprocess.check_call(['git', 'clone', '/var/repo/NX', nxsq],
-            # cwd='/opt/antergos-packages/numix-icon-theme')
-            # subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
-            # cwd='/opt/antergos-packages/numix-icon-theme')
-            try:
-                if 'numix-icon-theme' == pack:
-                    subprocess.call(['git', 'clone', '/var/repo/NX', 'numix-icon-theme'],
-                                    cwd='/opt/antergos-packages/numix-icon-theme')
-                    logger.info('Creating tar archive for %s' % pack)
-                    subprocess.check_call(['tar', '-cf', 'numix-icon-theme.tar', 'numix-icon-theme'],
-                                          cwd='/opt/antergos-packages/numix-icon-theme')
-                elif 'numix-icon-theme-square' == pack:
-                    subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq],
-                                    cwd='/opt/antergos-packages/numix-icon-theme-square')
-                    logger.info('Creating tar archive for %s' % pack)
-                    subprocess.check_call(['tar', '-cf', nxsq + '.tar', nxsq],
-                                          cwd='/opt/antergos-packages/numix-icon-theme-square')
-                elif 'numix-icon-theme-square-kde' == pack:
-                    subprocess.call(['git', 'clone', '/var/repo/NXSQ', nxsq + '-kde'],
-                                    cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
-                    logger.info('Creating tar archive for %s' % pack)
-                    subprocess.check_call(['tar', '-cf', nxsq + '-kde.tar', nxsq + '-kde'],
-                                          cwd='/opt/antergos-packages/numix-icon-theme-square-kde')
-                elif 'numix-frost-themes' == pack:
-                    logger.info('Copying numix-frost source file into build directory.')
-                    subprocess.check_call(
-                        ['cp', '/opt/numix/numix-frost.zip', os.path.join(REPO_DIR, 'numix-frost-themes')],
-                        cwd='/opt/numix')
-                elif 'cnchi-dev' == pack:
-                    logger.info('Copying cnchi-dev source file into build directory.')
-                    shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pack))
-                elif 'cnchi' == pack:
-                    get_latest_translations()
-                    
-            except subprocess.CalledProcessError as err:
-                logger.error(err.output)
 
-            pack = package(pack, db)
-            version = get_pkgver(pack)
-            if not version:
-                db.lrem('queue', 0, 'cnchi-dev')
-                continue
-            depends = get_deps(pack.name)
-            # if not db.exists('pkg:%s' % package):
-            #     logger.info('%s not found in database, adding entry..' % package)
-            #     db.set('building', '%s not found in database, adding entry..' % package)
-            #     db.set('pkg:%s' % package, True)
-            #     db.set('pkg:%s:name' % package, package)
-            if depends is not None:
-                db.delete('pkg:%s:deps' % pack.name)
-                for dep in depends:
-                    db.rpush('pkg:%s:deps' % pack.name, dep)
-            logger.info('Updating pkgver in databse for %s to %s' % (pack.name, version))
-            db.set('building', 'Updating pkgver in databse for %s to %s' % (pack.name, version))
-            #pack.save_to_db('version', version)
+        all_deps = process_package_queue(packages)
 
-            logger.info('All queued packages are in the database, checking deps to determine build order.')
-            db.set('building', 'Determining build order based on pkg dependancies')
-            check = check_deps(packages)
-            if len(check) > 0:
-                for c in check:
-                    logger.info('%s depends on a pkg in this build. Moving it to the end of the queue.' % c)
-                    db.lrem('queue', 0, c)
-                    db.rpush('queue', c)
-            logger.info('Check deps complete. Starting build_pkgs')
-            db.set('building', 'Check deps complete. Starting build container.')
+        logger.info('All queued packages are in the database, checking deps to determine build order.')
+        db.set('building', 'Determining build order by sorting package depends')
+        if len(all_deps) > 1:
+            topsort = check_deps(all_deps)
+            check = []
+            db.delete('queue')
+            for p in topsort:
+                db.rpush('queue', p)
+                check.append(p)
+            logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
+
+        logger.info('Check deps complete. Starting build_pkgs')
+        db.set('building', 'Check deps complete. Starting build container.')
 
     if iso_flag == 'False' and len(packages) > 0:
         pack = package(db.lpop('queue'), db)
@@ -421,20 +387,21 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
         pretty = log_exists + pretty
     db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
 
+
 def get_latest_translations():
     # Get translations for Cnchi
-        trans_dir = "/opt/cnchi-translations/"
-        trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi")
-        dest_dir = '/opt/antergos-packages/cnchi/po'
-        if not os.path.exists(dest_dir):
-            return
-        try:
-            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
-                                  cwd=trans_dir)
-            for f in os.listdir(trans_files_dir):
-                shutil.copy(f, dest_dir)
-        except Exception as err:
-            logger.error(err)
+    trans_dir = "/opt/cnchi-translations/"
+    trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi")
+    dest_dir = '/opt/antergos-packages/cnchi/po'
+    if not os.path.exists(dest_dir):
+        return
+    try:
+        subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
+                              cwd=trans_dir)
+        for f in os.listdir(trans_files_dir):
+            shutil.copy(f, dest_dir)
+    except Exception as err:
+        logger.error(err)
 
 
 def build_pkgs(last=False, pkg_info=None):
@@ -445,7 +412,7 @@ def build_pkgs(last=False, pkg_info=None):
         if os.path.exists(d):
             shutil.rmtree(d)
         os.mkdir(d, 0o777)
-    #pkglist = db.lrange('queue', 0, -1)
+    # pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)
@@ -468,7 +435,7 @@ def build_pkgs(last=False, pkg_info=None):
             db.set('building_start', dt)
             db.set('%s:pkg' % this_log, pkg)
             db.set('%s:version' % this_log, version)
-            pkgdir = os.path.join(REPO_DIR, pkg)
+            pkgdir = pkg_info.get_from_db('path')
             pkg_deps = pkg_info.depends or []
             pkg_deps_str = ' '.join(pkg_deps)
             logger.info('pkg_deps_str is %s' % pkg_deps_str)
@@ -564,13 +531,15 @@ def build_pkgs(last=False, pkg_info=None):
 
             # in_dir = len([name for name in os.listdir(result)])
             # last_count = int(db.get('pkg_count'))
-            #logger.info('last count is %s %s' % (last_count, type(last_count)))
-            #logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
+            # logger.info('last count is %s %s' % (last_count, type(last_count)))
+            # logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
             pkgs2sign = None
             if not failed:
                 db.publish('build-output', 'Signing package..')
-                pkgs2sign = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
-                pkgs2sign32 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkg)
+                pkgs2sign = glob.glob(
+                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
+                pkgs2sign32 = glob.glob(
+                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkg)
                 pkgs2sign = pkgs2sign + pkgs2sign32
                 logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
                 if pkgs2sign is not None and pkgs2sign != []:
@@ -587,7 +556,7 @@ def build_pkgs(last=False, pkg_info=None):
 
             if not failed:
                 db.publish('build-output', 'Build completed successfully!')
-                #db.incr('pkg_count', (in_dir - last_count))
+                # db.incr('pkg_count', (in_dir - last_count))
                 db.rpush('completed', build_id)
                 db.set('%s:result' % this_log, 'completed')
                 db.set('%s:review_stat' % this_log, '1')
@@ -753,7 +722,7 @@ def build_iso():
                         'bind': '/sys/fs/cgroup',
                         'ro': True
                     }}
-            )
+                      )
 
             cont = db.get('container')
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
@@ -796,9 +765,9 @@ def build_iso():
             doc.remove_container(cont)
             # log_string = db.hget('%s:content' % this_log, 'content')
             # if log_string and log_string != '':
-            #    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-            #                                                              prestyles="background:#272822;color:#fff;",
-            #                                                             encoding='utf-8'))
+            # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+            # prestyles="background:#272822;color:#fff;",
+            # encoding='utf-8'))
             # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
 
 
