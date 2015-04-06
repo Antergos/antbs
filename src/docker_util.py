@@ -71,6 +71,21 @@ def maybe_build_base_devel():
     else:
         return False
 
+
+def maybe_build_mkarchiso():
+    if db.exists('docker-images:mkarchiso:built-today'):
+        return True
+
+    archiso = build_mkarchiso()
+
+    if not archiso or archiso is None:
+        return False
+
+    db.psetex('docker-images:mkarchiso:built-today', 604800000, 'True')
+
+    return True
+
+
 def build_makepkg():
     dockerfile = os.path.join(DOC_DIR, 'makepkg')
     try:
@@ -82,6 +97,20 @@ def build_makepkg():
         return False
 
     return True
+
+
+def build_mkarchiso():
+    dockerfile = '/opt/archlinux-mkarchiso'
+    try:
+        build_it = [line for line in doc.build(dockerfile, 'antergos/mkarchiso', False, None, True, False, True)]
+        if build_it:
+            push_to_hub('antergos/mkarchiso')
+    except Exception as err:
+        logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
+        return False
+
+    return True
+
 
 def push_to_hub(repo=None):
 

@@ -362,19 +362,22 @@ def page_not_found(e):
 
 @app.errorhandler(500)
 def internal_error(e):
-    logger.error(e)
+    if e is not None:
+        logger.error(e)
     return render_template('500.html'), 500
 
 
 @app.errorhandler(400)
 def flask_error(e):
-    logger.error(e)
+    if e is not None:
+        logger.error(e)
     return render_template('500.html'), 400
 
 
 @app.errorhandler(Exception)
 def unhandled_exception(e):
-    logger.info(e.message)
+    if e is not None:
+        logger.debug(e.message)
     return render_template('500.html'), 500
 
 
@@ -387,21 +390,22 @@ def homepage(tlpage=None):
     check_stats = ['queue', 'completed', 'failed']
     building = db.get('building')
     this_page, all_pages = get_timeline(tlpage)
-    #logger.info('@@-antbs.py-@@ | this_page is %s' % this_page)
+    #logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
     stats = {}
     for stat in check_stats:
         res = db.llen(stat)
         if stat is not "queue":
             builds = db.lrange(stat, 0, -1)
+            builds = [x for x in builds if x is not None]
             within = []
             nodup = []
             for build in builds:
-                end = db.get('build_log:%s:start' % build)
+                end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
                 end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
-                ver = db.get('build_log:%s:version' % build)
-                name = db.get('build_log:%s:pkg' % build)
+                ver = db.get('build_log:%s:version' % build) or '0.00'
+                name = db.get('build_log:%s:pkg' % build) or 'None'
                 ver = '%s:%s' % (name, ver)
-                if (datetime.now() - end_fmt) < timedelta(hours=48) and ver not in nodup:
+                if (datetime.now() - end_fmt) < timedelta(hours=48) and ver not in nodup and name != 'None':
                     within.append(build)
                     nodup.append(ver)
 
@@ -410,9 +414,9 @@ def homepage(tlpage=None):
             stats[stat] = res
 
     repos = ['main', 'staging']
-    x86_64 = None
-    cached = None
     for repo in repos:
+        x86_64 = None
+        cached = None
         if repo == 'main':
             x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
             cached = db.exists('repo-count-main')
@@ -673,10 +677,10 @@ def completed(page=None):
         page = 1
     building = db.get('building')
     completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
-    logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
+    #logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
     pagination = src.pagination.Pagination(page, 10, all_pages)
-    logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
-        pagination.page, pagination.per_page, pagination.total_count))
+    #logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
+    #    pagination.page, pagination.per_page, pagination.total_count))
 
     return render_template("completed.html", idle=is_idle, building=building, completed=completed, all_pages=all_pages,
                            rev_pending=rev_pending, user=user, pagination=pagination)
@@ -693,9 +697,9 @@ def failed(page=None):
     is_logged_in = user.is_authenticated()
 
     failed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
-
+    pagination = src.pagination.Pagination(page, 10, all_pages)
     return render_template("failed.html", idle=is_idle, building=building, failed=failed, all_pages=all_pages,
-                           page=page, rev_pending=rev_pending, user=user)
+                           page=page, rev_pending=rev_pending, user=user, pagination=pagination)
 
 
 @app.route('/build/<int:num>')

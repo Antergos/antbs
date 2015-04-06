@@ -111,48 +111,59 @@ def process_package_queue(the_queue=None):
     if the_queue is not None:
         special_cases = [
             {'numix-icon-theme': {
-                'callsign': 'NX'}
+                'callsign': 'NX',
+                'source': ''}
              },
             {'numix-icon-theme-square': {
-                'callsign': 'NXSQ'}
+                'callsign': 'NXSQ',
+                'source': ''}
              },
             {'numix-icon-theme-square-kde': {
-                'callsign': 'NXSQ'}
+                'callsign': 'NXSQ',
+                'source': ''}
              },
             {'numix-frost-themes': {
                 'dest': '/opt/numix',
+                'callsign': '',
                 'source': '/opt/numix/numix-frost.zip'}
              },
             {'cnchi-dev': {
-                'cwd': '/srv/antergos.org/cnchi.tar'}
+                'cwd': '/srv/antergos.org/cnchi.tar',
+                'callsign': '',
+                'source': ''}
              },
             {'cnchi': {
-                'cwd': ''}
+                'cwd': '',
+                'callsign': '',
+                'source': ''}
              }]
         all_deps = []
         for pkg in the_queue:
-            special = [x for x in special_cases if pkg in x.items()]
+            special = [x for x in special_cases if pkg in x.keys()]
+            logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
             if special and len(special) > 0:
-                try:
-                    callsign = special[pkg]['callsign'] or ''
-                    source = special[pkg]['source'] or ''
-                    if callsign and callsign != '':
-                        subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
-                                        cwd='/opt/antergos-pkgages/' + pkg)
-                        logger.info('Creating tar archive for %s' % pkg)
-                        subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-pkgages/' + pkg)
-                    elif source and source != '':
-                        logger.info('Copying numix-frost source file into build directory.')
-                        subprocess.check_call(['cp', '/opt/numix/' + pkg + '.zip', os.path.join(REPO_DIR, pkg)],
-                                              cwd='/opt/numix')
-                    elif 'cnchi-dev' == pkg:
-                        logger.info('Copying cnchi-dev source file into build directory.')
-                        shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pkg))
-                    elif 'cnchi' == pkg:
-                        get_latest_translations()
+                for case in special:
+                    callsign = case[pkg]['callsign']
+                    source = case[pkg]['source']
+                    logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
+                    try:
+                        if callsign and callsign != '':
+                            subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
+                                            cwd='/opt/antergos-packages/' + pkg)
+                            logger.info('Creating tar archive for %s' % pkg)
+                            subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/' + pkg)
+                        elif source and source != '':
+                            logger.info('Copying numix-frost source file into build directory.')
+                            subprocess.check_call(['cp', '/opt/numix/' + pkg + '.zip', os.path.join(REPO_DIR, pkg)],
+                                                  cwd='/opt/numix')
+                        elif 'cnchi-dev' == pkg:
+                            logger.info('Copying cnchi-dev source file into build directory.')
+                            shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pkg))
+                        elif 'cnchi' == pkg:
+                            get_latest_translations()
 
-                except Exception as err:
-                    logger.error(err)
+                    except Exception as err:
+                        logger.error(err)
 
             pkgobj = package(pkg, db)
             if not os.path.exists(os.path.join(REPO_DIR, pkgobj.name)):
@@ -186,9 +197,13 @@ def handle_hook(first=False, last=False):
     packages = db.lrange('queue', 0, -1)
 
     if iso_flag == 'True':
+        db.set('building', 'Building docker image.')
+        image = docker_utils.maybe_build_mkarchiso()
         db.set('isoFlag', 'False')
-        db.set('isoBuilding', 'True')
         db.lrem('queue', 0, 'antergos-iso')
+        if not image:
+            return False
+        db.set('isoBuilding', 'True')
         archs = ['x86_64', 'i686']
         if db.get('isoMinimal') == 'True':
             iso_name = 'antergos-iso-minimal-'
@@ -607,6 +622,8 @@ def build_pkgs(last=False, pkg_info=None):
 def build_iso():
     iso_arch = ['x86_64', 'i686']
     in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+    if in_dir_last is None:
+        in_dir_last = "0"
     db.set('pkg_count_iso', in_dir_last)
     is_minimal = db.get('isoMinimal')
     if is_minimal == 'True':
@@ -642,9 +659,11 @@ def build_iso():
         if is_minimal == "True":
             if not os.path.exists(minimal):
                 open(minimal, 'a').close()
+            pkg_cache = ['KEEP_PACMAN_PACKAGES=n']
         else:
             if os.path.exists(minimal):
                 os.remove(minimal)
+            pkg_cache = ['KEEP_PACMAN_PACKAGES=y']
         # Get and compile translations for updater script
         trans_dir = "/opt/antergos-iso-translations/"
         trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
@@ -693,7 +712,8 @@ def build_iso():
                                                  'ro': True
                                              }})
         try:
-            iso_container = doc.create_container("antergos/mkarchiso", tty=True, name=nm, host_config=hconfig)
+            iso_container = doc.create_container("antergos/mkarchiso", tty=True, name=nm, host_config=hconfig,
+                                                 environment=pkg_cache)
             db.set('container', iso_container.get('Id'))
         except Exception as err:
             logger.error("Cant connect to Docker daemon. Error msg: %s", err)

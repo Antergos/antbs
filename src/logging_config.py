@@ -40,8 +40,12 @@ logging.config.dictConfig({
             'format': '%(asctime)s [%(levelname)s]: %(message)s -[in %(pathname)s: %(lineno)d]'
         },
         'email': {
-            'format': "'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\n" +
-                      "FUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'"
+            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\nFUNCTION: '
+                      '%(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
+        },
+        'redis': {
+            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\nFUNCTION: '
+                      '%(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
         }
     },
     'handlers': {
@@ -62,7 +66,7 @@ logging.config.dictConfig({
             'class': 'rlog.RedisHandler',
             'channel': 'log_stream',
             'redis_client': redis_connection.db,
-            'formatter': 'file'
+            'formatter': 'redis'
         },
         'email': {
             'level': 'ERROR',

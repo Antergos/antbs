@@ -2,15 +2,6 @@
 
 {% block pagetitle -%}Scheduled{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
-{% block subheader %}
-    <div class="page-head"><h2>{{ self.pagetitle() }}</h2>
-        <ol class="breadcrumb">
-            <li><a href="/">Home</a></li>
-            <li><a href="#">Build Reports</a></li>
-            <li class="active">{{ self.pagetitle() }}</li>
-        </ol>
-    </div>
-{% endblock subheader %}
 {% block bottomcontent -%}
     <div class="row">
         <div class="col-md-10">
@@ -33,7 +24,7 @@
                     </tr>
                     </thead>
                     <tbody class="no-border-y">
-                        {% for pkg, info in queue.items() %}
+                        {% for pkg, info in queue.items()|reverse() %}
                             <tr>
                                 <td>{{ loop.index }}</td>
                                 <td>{{ info['name'] }}</td>

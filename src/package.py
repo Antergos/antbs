@@ -96,7 +96,7 @@ class Package(object):
 
             key = '%s:%s' % (self.key, attr)
 
-            if self.db.type(key) == 'string':
+            if self.db.type(key) == 'string' or self.db.type(key) == 'none':
                 self.db.set(key, value)
 
             elif self.db.type(key) == 'list':
@@ -109,7 +109,7 @@ class Package(object):
 
     def get_from_pkgbuild(self, var=None, path=None):
         if var is None or path is None:
-            raise KeyError
+            return ''
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
@@ -127,7 +127,7 @@ class Package(object):
             # err = []
         #else:
         cmd = 'source ' + path + '; echo $' + var
-        if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
+        if var == "pkgver" and ('git+' in parse or 'numix-icon-theme-no' in parse):
             if 'numix-icon-theme' not in parse:
                 giturl = re.search('(?<=git\\+).+(?="|\')', parse)
                 giturl = giturl.group(0)
@@ -180,13 +180,13 @@ class Package(object):
     def get_version(self):
         pbfile = self.get_from_db('pbpath')
         pkgver = self.get_from_pkgbuild('pkgver', pbfile)
-        if self.name == "cnchi-dev" and pkgver[-1] != "0":
-            event = self.tl_event
-            results = db.scan_iter('timeline:%s:*' % event, 100)
-            for k in results:
-                db.delete(k)
-            db.lrem('timeline:all', 0, event)
-            return False
+        #if self.name == "cnchi-dev" and pkgver[-1] != "0":
+        #    event = self.tl_event
+        #    results = db.scan_iter('timeline:%s:*' % event, 100)
+        #    for k in results:
+        #        db.delete(k)
+        #    db.lrem('timeline:all', 0, event)
+        #    return False
         old_pkgver = self.pkgver
         self.save_to_db('pkgver', pkgver)
         epoch = self.get_from_pkgbuild('epoch', pbfile)
@@ -197,9 +197,9 @@ class Package(object):
             # if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
             #     pkgrel = str(int(pkgrel) + 1)
             #     pkgrel_upd = True
-            if pkgver != old_pkgver and pkgrel != "1":
-                pkgrel = "1"
-                pkgrel_upd = True
+            # if pkgver != old_pkgver and pkgrel != "1":
+            #     pkgrel = "1"
+            #     pkgrel_upd = True
 
             if pkgrel_upd:
                 self.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
