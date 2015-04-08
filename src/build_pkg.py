@@ -198,24 +198,23 @@ def handle_hook(first=False, last=False):
 
     if iso_flag == 'True':
         db.set('building', 'Building docker image.')
+        db.set('isoBuilding', 'True')
         image = docker_utils.maybe_build_mkarchiso()
         db.set('isoFlag', 'False')
-        db.lrem('queue', 0, 'antergos-iso')
-        if not image:
-            return False
-        db.set('isoBuilding', 'True')
-        archs = ['x86_64', 'i686']
-        if db.get('isoMinimal') == 'True':
-            iso_name = 'antergos-iso-minimal-'
-        else:
-            iso_name = 'antergos-iso-'
-        for arch in archs:
-            db.rpush('queue', iso_name + arch)
-            version = datetime.datetime.now().strftime('%Y.%m.%d')
-            db.set('pkg:%s' % iso_name + arch, True)
-            db.set('pkg:%s:name' % iso_name + arch, iso_name + arch)
-            db.set('pkg:%s:version' % iso_name + arch, version)
-        build_iso()
+        db.lrem('queue', 0, 'antergos-iso') and db.lrem('queue', 0, 'antergos-iso.openbox')
+        if image:
+            archs = ['x86_64', 'i686']
+            if db.get('isoMinimal') == 'True':
+                iso_name = 'antergos-iso-minimal-'
+            else:
+                iso_name = 'antergos-iso-'
+            for arch in archs:
+                db.rpush('queue', iso_name + arch)
+                version = datetime.datetime.now().strftime('%Y.%m.%d')
+                db.set('pkg:%s' % iso_name + arch, True)
+                db.set('pkg:%s:name' % iso_name + arch, iso_name + arch)
+                db.set('pkg:%s:version' % iso_name + arch, version)
+            build_iso()
         db.set('isoBuilding', 'False')
         db.set('isoMinimal', 'False')
         db.set('idle', "True")
@@ -268,7 +267,25 @@ def handle_hook(first=False, last=False):
 
         logger.info('[FIRST IS SET]: %s' % first)
         logger.info('[LAST IS SET]: %s' % last)
-        build_pkgs(last, pack)
+        built = build_pkgs(last, pack)
+        # TODO: Move this into its own method
+        if built:
+            completed = db.lrange('completed', 0, -1)
+            failed = db.lrange('failed', 0, -1)
+            success = len([x for x in pack.builds if x in completed])
+            failure = len([x for x in pack.builds if x in failed])
+            total = len(pack.builds)
+            if total > 0:
+                if success > 0:
+                    success = 100 * success/total
+                else:
+                    success = 0
+                if failure > 0:
+                    failure = 100 * failure/total
+                else:
+                    failure = 0
+                pack.save_to_db('success_rate', success)
+                pack.save_to_db('failure_rate', failure)
     if last:
         try:
             shutil.rmtree('/opt/antergos-packages')
@@ -374,12 +391,14 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
                 or 'makepkg]# PS1="' in line:
             continue
         line = line.rstrip()
-        end = line[20:]
+        if db.get('isoBuilding') == "True":
+            line = line[15:]
+        end = line[25:]
         if end not in nodup:
             nodup.add(end)
             line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
-            if line[-1:] == "'" or line[-1:] == '"':
-                line = line[:-1]
+            # if line[-1:] == "'" or line[-1:] == '"':
+            #     line = line[:-1]
             line = re.sub('(?<=[\w\d])\' (?=[\w\d]+)', ' ', line)
             # bad_date = re.search(r"\d{4}-\d{2}-[\d\w:\.]+Z{1}", line)
             # if bad_date:
@@ -420,6 +439,8 @@ def get_latest_translations():
 
 
 def build_pkgs(last=False, pkg_info=None):
+    if pkg_info is None:
+        return False
     # Create our tmp directories
     result = os.path.join("/tmp", "result")
     cache = os.path.join("/tmp", "pkg_cache")
@@ -443,6 +464,8 @@ def build_pkgs(last=False, pkg_info=None):
             dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             build_id = db.get('build_number')
             db.set('building_num', build_id)
+            tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg)
+            logconf.new_timeline_event(tlmsg, '3')
             this_log = 'build_log:%s' % build_id
             db.set(this_log, True)
             db.rpush('pkg:%s:build_logs' % pkg, build_id)
@@ -571,12 +594,16 @@ def build_pkgs(last=False, pkg_info=None):
 
             if not failed:
                 db.publish('build-output', 'Build completed successfully!')
+                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> completed.' % (build_id, build_id, pkg)
+                logconf.new_timeline_event(tlmsg, '4')
                 # db.incr('pkg_count', (in_dir - last_count))
                 db.rpush('completed', build_id)
                 db.set('%s:result' % this_log, 'completed')
                 db.set('%s:review_stat' % this_log, '1')
             else:
                 logger.error('No package found after container exit.')
+                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
+                logconf.new_timeline_event(tlmsg, '5')
                 if pkgs2sign is not None:
                     for p in pkgs2sign:
                         remove(p)
@@ -633,6 +660,7 @@ def build_iso():
     for arch in iso_arch:
         version = db.get('pkg:%s:version' % iso_name + arch)
         failed = False
+        db.set('now_building', iso_name + arch)
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
@@ -754,13 +782,13 @@ def build_iso():
                 stream_process2 = Process(target=publish_build_ouput, args=(cont, this_log))
                 stream_process2.start()
                 result2 = doc.wait(cont)
-                if result2 is not 0:
-                    failed = True
-                    db.set('build_failed', "True")
-                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-            if result is 0 or (result2 and result2 is 0):
-                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-                db.set('build_failed', "False")
+                # if result2 is not 0:
+                #     failed = True
+                #     db.set('build_failed', "True")
+                #     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+            # if result is 0 or (result2 and result2 is 0):
+            #     logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+            #     db.set('build_failed', "False")
 
         except Exception as err:
             logger.error("Cant start container. Error msg: %s", err)

@@ -73,7 +73,7 @@
                     {% for item in this_page %}
                         {% for event, info in item.items() %}
                             <li id="{{ info['event_id'] }}">
-                                <i class="{% if info['tltype'] == '1' %}fa fa-github{% elif info['tltype'] == '2' %}fa phab{% else %}fa fa-comment{% endif %}"></i>
+                                <i class="{% if info['tltype'] == '1' %}fa fa-github{% elif info['tltype'] == '2' %}fa phab{% elif info['tltype'] == '3' %}fa fa-start{% elif info['tltype'] == '4' %}fa fa-success{% elif info['tltype'] == '5' %}fa fa-fail{% else %}fa fa-comment{% endif %}"></i>
                                 <span class="date">{{ info['date'] }}</span>
 
                                 <div class="content">

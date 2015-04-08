@@ -93,7 +93,8 @@
                     editor.clearSelection();
                     var doc = editor.getSession().getDocument();
                     sse = new EventSource('/get_log');
-                    var endOfLog = false;
+                    var endOfLog = false,
+                            lastMsg = '';
                     sse.onmessage = function (message) {
                         if (false === endOfLog) {
                             if (message.data.indexOf('ENDOFLOG') >= 0) {
@@ -113,6 +114,8 @@
                                 sse.close();
                                 return;
                             }
+                            if (message.data === lastMsg) return;
+                            lastMsg = message.data;
                             pos = doc.getLength();
                             doc.insert({row: pos, column: -1}, '\n' + message.data);
                         }

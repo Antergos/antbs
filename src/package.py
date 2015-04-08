@@ -61,7 +61,7 @@ class Package(object):
         self.epoch = self.get_from_db('epoch')
         self.depends = self.get_from_db('depends')
         self.groups = self.get_from_db('groups')
-        self.builds = self.get_from_db('builds')
+        self.builds = self.get_from_db('build_logs')
         self.push_version = self.get_from_db('push_version')
         self.pkgrel = self.get_from_db('pkgrel')
         self.pkgver = self.get_from_db('pkgver')
@@ -69,6 +69,8 @@ class Package(object):
         self.tl_event = self.get_from_db('tl_event')
         self.autosum = self.get_from_db('autosum')
         self.depends = self.get_from_db('depends')
+        self.success_rate = self.get_from_db('success_rate')
+        self.failure_rate = self.get_from_db('failure_rate')
 
     def delete(self):
         self.db.delete(self.key)

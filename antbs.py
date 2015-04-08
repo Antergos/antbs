@@ -812,7 +812,7 @@ def build_pkg_now():
         db.rpush('queue', pkgname)
         queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
         logconf.new_timeline_event(
-            '<strong>%s</strong> added %s to the <strong>build queue.</strong>' % (dev, pkgname ))
+            '<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname ))
 
     return redirect(redirect_url())
 
@@ -832,6 +832,46 @@ def get_status():
 @app.route('/issues', methods=['GET'])
 def show_issues():
     return render_template('issues.html')
+
+
+@app.route('/pkg/<pkgname>', methods=['GET'])
+def get_and_show_pkg_profile(pkgname=None):
+    if pkgname is None:
+        abort(404)
+    check = db.exists('pkg:%s' % pkgname)
+    if not check:
+        abort(404)
+
+    # all_pkgs = db.scan_iter('pkg:*:name', 100)
+    #
+    # for pkg in all_pkgs:
+    #     try:
+    #         pkgobj = package.Package(db.get(pkg))
+    #         #key = 'pkg:' + db.get(pkg) + ':'
+    #         completed = db.lrange('completed', 0, -1)
+    #         failed = db.lrange('failed', 0, -1)
+    #         success = len([x for x in pkgobj.builds if x in completed])
+    #         failure = len([x for x in pkgobj.builds if x in failed])
+    #         total = len(pkgobj.builds)
+    #         success = 100 * success/total
+    #         failure = 100 * failure/total
+    #         pkgobj.save_to_db('success_rate', success)
+    #         pkgobj.save_to_db('failure_rate', failure)
+    #     except Exception as err:
+    #         logger.error(err)
+    pkgobj = package.Package(pkgname)
+
+    return render_template('package.html', pkg=pkgobj)
+
+
+
+
+
+
+
+
+
+    
 
 
 # Some boilerplate code that just says "if you're running this from the command
