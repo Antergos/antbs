@@ -201,7 +201,8 @@ def handle_hook(first=False, last=False):
         db.set('isoBuilding', 'True')
         image = docker_utils.maybe_build_mkarchiso()
         db.set('isoFlag', 'False')
-        db.lrem('queue', 0, 'antergos-iso') and db.lrem('queue', 0, 'antergos-iso.openbox')
+        db.lrem('queue', 0, 'antergos-iso')
+        db.lrem('queue', 0, 'antergos-iso.openbox')
         if image:
             archs = ['x86_64', 'i686']
             if db.get('isoMinimal') == 'True':

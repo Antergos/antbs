@@ -41,7 +41,7 @@ DOC_DIR = os.path.join(BASE_DIR, 'build/docker')
 
 # Initiate communication with build daemon
 try:
-    doc = docker.Client(base_url='unix://var/run/docker.sock')
+    doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
     # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
 except Exception as err:
     logger.error("Cant connect to Docker daemon. Error msg: %s", err)
