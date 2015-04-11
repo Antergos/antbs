@@ -101,7 +101,7 @@ def check_deps(source):
                 emitted.append(name)  # <-- not required, but helps preserve original ordering
                 next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
         if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
-            #raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
+            # raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
             pass
         pending = next_pending
         emitted = next_emitted
@@ -151,7 +151,8 @@ def process_package_queue(the_queue=None):
                             subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
                                             cwd='/opt/antergos-packages/' + pkg)
                             logger.info('Creating tar archive for %s' % pkg)
-                            subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/' + pkg)
+                            subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg],
+                                                  cwd='/opt/antergos-packages/' + pkg)
                         elif source and source != '':
                             logger.info('Copying numix-frost source file into build directory.')
                             subprocess.check_call(['cp', '/opt/numix/' + pkg + '.zip', os.path.join(REPO_DIR, pkg)],
@@ -166,7 +167,7 @@ def process_package_queue(the_queue=None):
                         logger.error(err)
 
             pkgobj = package(pkg, db)
-            if not os.path.exists(os.path.join(REPO_DIR, pkgobj.name)):
+            if not (os.path.exists(os.path.join(REPO_DIR, pkgobj.name)) and 'antergos-iso' in pkgobj.name):
                 pkgobj.save_to_db('deepin', 'True')
                 pbfile = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name, 'PKGBUILD')
                 path = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name)
@@ -212,9 +213,8 @@ def handle_hook(first=False, last=False):
             for arch in archs:
                 db.rpush('queue', iso_name + arch)
                 version = datetime.datetime.now().strftime('%Y.%m.%d')
-                db.set('pkg:%s' % iso_name + arch, True)
-                db.set('pkg:%s:name' % iso_name + arch, iso_name + arch)
-                db.set('pkg:%s:version' % iso_name + arch, version)
+                pkgobj = package(iso_name + arch, db)
+                pkgobj.save_to_db('version', version)
             build_iso()
         db.set('isoBuilding', 'False')
         db.set('isoMinimal', 'False')
@@ -278,11 +278,11 @@ def handle_hook(first=False, last=False):
             total = len(pack.builds)
             if total > 0:
                 if success > 0:
-                    success = 100 * success/total
+                    success = 100 * success / total
                 else:
                     success = 0
                 if failure > 0:
-                    failure = 100 * failure/total
+                    failure = 100 * failure / total
                 else:
                     failure = 0
                 pack.save_to_db('success_rate', success)
@@ -392,8 +392,8 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
                 or 'makepkg]# PS1="' in line:
             continue
         line = line.rstrip()
-        if db.get('isoBuilding') == "True":
-            line = line[15:]
+        #if db.get('isoBuilding') == "True":
+        #line = line[15:]
         end = line[25:]
         if end not in nodup:
             nodup.add(end)
@@ -595,7 +595,8 @@ def build_pkgs(last=False, pkg_info=None):
 
             if not failed:
                 db.publish('build-output', 'Build completed successfully!')
-                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> completed.' % (build_id, build_id, pkg)
+                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> completed.' % (
+                    build_id, build_id, pkg)
                 logconf.new_timeline_event(tlmsg, '4')
                 # db.incr('pkg_count', (in_dir - last_count))
                 db.rpush('completed', build_id)
@@ -659,23 +660,25 @@ def build_iso():
     else:
         iso_name = 'antergos-iso-'
     for arch in iso_arch:
-        version = db.get('pkg:%s:version' % iso_name + arch)
+        if db.exists('iso:one:arch') and arch == 'x86_64':
+            continue
+        pkgobj = package(iso_name + arch, db)
         failed = False
-        db.set('now_building', iso_name + arch)
+        db.set('now_building', pkgobj.name)
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
+        pkgobj.save_to_db('builds', build_id, 'list')
         this_log = 'build_log:%s' % build_id
         db.set('%s:start' % this_log, dt)
         db.set('building_num', build_id)
         db.set(this_log, True)
         db.set('building_start', dt)
-        logger.info('Building %s' % iso_name + arch)
-        db.set('building', 'Building: %s' % iso_name + arch)
-        db.lrem('queue', 0, iso_name + arch)
-        db.set('%s:pkg' % this_log, iso_name + arch)
-        db.set('%s:version' % this_log, version)
-        db.rpush('pkg:%s:build_logs' % iso_name + arch, build_id)
+        logger.info('Building %s' % pkgobj.name)
+        db.set('building', 'Building: %s' % pkgobj.name)
+        db.lrem('queue', 0, pkgobj.name)
+        db.set('%s:pkg' % this_log, pkgobj.name)
+        db.set('%s:version' % this_log, pkgobj.version)
 
         flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
         minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
@@ -686,14 +689,15 @@ def build_iso():
             if os.path.exists(flag):
                 os.remove(flag)
         if is_minimal == "True":
+            out_dir = '/out'
             if not os.path.exists(minimal):
                 open(minimal, 'a').close()
-            pkg_cache = ['KEEP_PACMAN_PACKAGES=n']
         else:
+            out_dir = '/out'
             if os.path.exists(minimal):
                 os.remove(minimal)
-            pkg_cache = ['KEEP_PACMAN_PACKAGES=y']
         # Get and compile translations for updater script
+        # TODO: Move this into its own method.
         trans_dir = "/opt/antergos-iso-translations/"
         trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
         dest_dir = '/srv/antergos.info/repo/iso/testing/trans'
@@ -732,17 +736,22 @@ def build_iso():
                                              },
                                          '/srv/antergos.info/repo/iso/testing':
                                              {
-                                                 'bind': '/antergos-iso/configs/antergos/out',
+                                                 'bind': out_dir,
                                                  'ro': False
                                              },
                                          '/sys/fs/cgroup':
                                              {
                                                  'bind': '/sys/fs/cgroup',
                                                  'ro': True
-                                             }})
+                                             }},
+                                     restart_policy={
+                                         "MaximumRetryCount": 2,
+                                         "Name": "on-failure"
+                                     }
+                                     )
         try:
-            iso_container = doc.create_container("antergos/mkarchiso", tty=True, name=nm, host_config=hconfig,
-                                                 environment=pkg_cache)
+            iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh', tty=True,
+                                                 name=nm, host_config=hconfig)
             db.set('container', iso_container.get('Id'))
         except Exception as err:
             logger.error("Cant connect to Docker daemon. Error msg: %s", err)
@@ -763,7 +772,7 @@ def build_iso():
                     },
                 '/srv/antergos.info/repo/iso/testing':
                     {
-                        'bind': '/antergos-iso/configs/antergos/out',
+                        'bind': out_dir,
                         'ro': False
                     },
                 '/sys/fs/cgroup':
@@ -783,13 +792,13 @@ def build_iso():
                 stream_process2 = Process(target=publish_build_ouput, args=(cont, this_log))
                 stream_process2.start()
                 result2 = doc.wait(cont)
-                # if result2 is not 0:
-                #     failed = True
-                #     db.set('build_failed', "True")
-                #     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-            # if result is 0 or (result2 and result2 is 0):
-            #     logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-            #     db.set('build_failed', "False")
+                if result2 is not 0:
+                    #failed = True
+                    #db.set('build_failed', "True")
+                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+            if result is 0 or (result2 and result2 is 0):
+                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
+                db.set('build_failed', "False")
 
         except Exception as err:
             logger.error("Cant start container. Error msg: %s", err)
@@ -810,8 +819,8 @@ def build_iso():
             failed = True
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
-        if not failed:
-            doc.remove_container(cont)
+        remove('/opt/archlinux-mkarchiso/antergos-iso')
+        doc.remove_container(cont)
             # log_string = db.hget('%s:content' % this_log, 'content')
             # if log_string and log_string != '':
             # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',

@@ -89,7 +89,7 @@ class Package(object):
 
         return val
 
-    def save_to_db(self, attr=None, value=None):
+    def save_to_db(self, attr=None, value=None, type=None):
         if attr is not None and value is not None:
             # TODO: This needs to be moved into its own method.
             if self.push_version and self.push_version == "True" and attr == "pkgver":
@@ -98,13 +98,13 @@ class Package(object):
 
             key = '%s:%s' % (self.key, attr)
 
-            if self.db.type(key) == 'string' or self.db.type(key) == 'none':
+            if (self.db.type(key) == 'string' or self.db.type(key) == 'none') and type is None:
                 self.db.set(key, value)
 
             elif self.db.type(key) == 'list':
                 self.db.rpush(key, value)
 
-            elif self.db.type(key) == 'set':
+            elif self.db.type(key) == 'set' or type == 'set':
                 self.db.sadd(key, value)
 
             return value
@@ -115,36 +115,34 @@ class Package(object):
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
-            pass
-            # if "info" in sys.modules:
-            #     del(sys.modules["info"])
-            # if "/tmp/cnchi/cnchi" not in sys.path:
-            #     sys.path.append('/tmp/cnchi/cnchi')
-            # import info
-            #
-            # out = info.CNCHI_VERSION
-            # out = out.replace('"', '')
-            # del(info.CNCHI_VERSION)
-            # del(sys.modules["info"])
-            # err = []
-        #else:
-        cmd = 'source ' + path + '; echo $' + var
-        if var == "pkgver" and ('git+' in parse or 'numix-icon-theme-no' in parse):
-            if 'numix-icon-theme' not in parse:
-                giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-                giturl = giturl.group(0)
-                pkgdir, pkgbuild = os.path.split(path)
-                if self.name == 'pamac-dev':
-                    gitnm = 'pamac'
-                else:
-                    gitnm = self.name
-                subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
+            if "info" in sys.modules:
+                del(sys.modules["info"])
+            if "/tmp/cnchi/cnchi" not in sys.path:
+                sys.path.append('/tmp/cnchi/cnchi')
+            import info
+            out = info.CNCHI_VERSION
+            out = out.replace('"', '')
+            del(info.CNCHI_VERSION)
+            del(sys.modules["info"])
+            err = []
+        else:
+            cmd = 'source ' + path + '; echo $' + var
+            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme-no' in parse):
+                if 'numix-icon-theme' not in parse:
+                    giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+                    giturl = giturl.group(0)
+                    pkgdir, pkgbuild = os.path.split(path)
+                    if self.name == 'pamac-dev':
+                        gitnm = 'pamac'
+                    else:
+                        gitnm = self.name
+                    subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
 
-            cmd = 'source ' + path + '; ' + var
+                cmd = 'source ' + path + '; ' + var
 
-        proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE)
-        out, err = proc.communicate()
+            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            out, err = proc.communicate()
 
         if len(out) > 0:
             out = out.strip()
@@ -182,13 +180,13 @@ class Package(object):
     def get_version(self):
         pbfile = self.get_from_db('pbpath')
         pkgver = self.get_from_pkgbuild('pkgver', pbfile)
-        #if self.name == "cnchi-dev" and pkgver[-1] != "0":
-        #    event = self.tl_event
-        #    results = db.scan_iter('timeline:%s:*' % event, 100)
-        #    for k in results:
-        #        db.delete(k)
-        #    db.lrem('timeline:all', 0, event)
-        #    return False
+        if self.name == "cnchi-dev" and pkgver[-1] != "0":
+            event = self.tl_event
+            results = db.scan_iter('timeline:%s:*' % event, 100)
+            for k in results:
+                db.delete(k)
+            db.lrem('timeline:all', 0, event)
+            return False
         old_pkgver = self.pkgver
         self.save_to_db('pkgver', pkgver)
         epoch = self.get_from_pkgbuild('epoch', pbfile)
@@ -196,12 +194,13 @@ class Package(object):
         if pkgrel and pkgrel != '' and pkgrel is not None:
             pkgrel_upd = False
             old_pkgrel = pkgrel
-            # if pkgver == old_pkgver and pkgrel == pkgobj.pkgrel:
-            #     pkgrel = str(int(pkgrel) + 1)
-            #     pkgrel_upd = True
-            # if pkgver != old_pkgver and pkgrel != "1":
-            #     pkgrel = "1"
-            #     pkgrel_upd = True
+            if db.exists('build:pkg:now') and db.get('build:pkg:now') == "True":
+                if pkgver == old_pkgver and pkgrel == self.pkgrel:
+                    pkgrel = str(int(pkgrel) + 1)
+                    pkgrel_upd = True
+                elif pkgver != old_pkgver and pkgrel != "1":
+                    pkgrel = "1"
+                    pkgrel_upd = True
 
             if pkgrel_upd:
                 self.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
@@ -214,7 +213,7 @@ class Package(object):
         version = pkgver + '-' + str(pkgrel)
         if version and version != '' and version is not None:
             self.save_to_db('version', version)
-            logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
+            #logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version
 
@@ -224,6 +223,7 @@ class Package(object):
         depends = []
         pbfile = self.get_from_db('pbpath')
         deps = self.get_from_pkgbuild('depends', pbfile).split()
+        mkdeps = self.get_from_pkgbuild('makedepends', pbfile).split()
 
         for dep in deps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
@@ -232,7 +232,15 @@ class Package(object):
             if db.sismember('pkgs:all', dep):
                 depends.append(dep)
 
-            self.save_to_db('depends', dep)
+            self.save_to_db('depends', dep, type='set')
+        for mkdep in mkdeps:
+            has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
+            if has_ver is not None:
+                mkdep = has_ver.group(0)
+            if db.sismember('pkgs:all', mkdep):
+                depends.append(mkdep)
+
+            self.save_to_db('depends', mkdep, type='set')
 
         res = (self.name, depends)
         return res
