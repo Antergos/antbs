@@ -35,7 +35,7 @@
                                 {% if user.is_authenticated() %}
                                     <tr>
                                         <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                                        <td>{{ info['name'] }}</td>
+                                        <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
                                         <td>{{ info['version'] }}</td>
                                         <td>{{ info['start'] }}</td>
                                         <td>{{ info['end'] }}</td>

@@ -32,7 +32,8 @@
                     {% for pkg, info in item.items() %}
                         <tr>
                             <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                            <td>{{ info['name'] }}</td>
+                            {% if user.is_authenticated() %}<td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>{% else %}
+                            <td>{{ info['name'] }}</td>{% endif %}
                             <td>{{ info['version'] }}</td>
                             <td>{{ info['start'] }}</td>
                             <td>{{ info['end'] }}</td>
