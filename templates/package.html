@@ -1,21 +1,16 @@
 {% extends "base.html" %}
 
 {% block pagetitle -%}Package Profile{%- endblock pagetitle %}
-{% block styles %}
-<link rel="stylesheet" type="text/css" href="/static/js/jquery.easypiechart/jquery.easy-pie-chart.css" />
-{{ super() }}
-{% endblock styles %}
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
 
-
 <div class="col-sm-12">
     <div class="block-flat profile-info">
         <div class="row">
-            <div class="col-sm-2">
+            <div class="col-sm-1">
                 <div class="avatar">
-                    <img src="/static/img/pkg-default.png" class="profile-avatar"/>
+                    <img src="http://antergos.info/apps/{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
                 </div>
             </div>
             <div class="col-sm-4">
@@ -29,7 +24,7 @@
                 <h3 style="margin-bottom: 20px;">Total Builds</h3>
                 {{ pkg.builds|length() }}
             </div>
-            <div class="col-sm-4">
+            <div class="col-sm-5">
                 <h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
                               <div class="progress">
                                 <div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate }}% Completed</div>

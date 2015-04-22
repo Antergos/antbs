@@ -605,6 +605,8 @@ def hooked():
             if len(the_pkgs) > 1:
                 p_ul.append('<ul class="hook-pkg-list">')
             for p in the_pkgs:
+                if p in the_queue:
+                    continue
                 if p not in the_queue and p is not None and p != '' and p != []:
                     db.rpush('queue', p)
                     if len(the_pkgs) > 1:
@@ -839,9 +841,10 @@ def show_issues():
 def get_and_show_pkg_profile(pkgname=None):
     if pkgname is None:
         abort(404)
-    check = db.exists('pkg:%s' % pkgname)
+    check = db.exists('pkg:%s:name' % pkgname)
     if not check:
         abort(404)
+
 
     # all_pkgs = db.scan_iter('pkg:*:name', 100)
     #

@@ -66,7 +66,7 @@ def maybe_build_base_devel():
         mpkg = build_makepkg()
         if not mpkg:
             return False
-        db.psetex('docker-images:base-devel:built-today', 604800000, 'True')
+        db.psetex('docker-images:base-devel:built-today', 304800000, 'True')
         return True
     else:
         return False
@@ -81,7 +81,7 @@ def maybe_build_mkarchiso():
     if not archiso or archiso is None:
         return False
 
-    db.psetex('docker-images:mkarchiso:built-today', 604800000, 'True')
+    db.psetex('docker-images:mkarchiso:built-today', 304800000, 'True')
 
     return True
 

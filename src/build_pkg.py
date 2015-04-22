@@ -122,11 +122,6 @@ def process_package_queue(the_queue=None):
                 'callsign': 'NXSQ',
                 'source': ''}
              },
-            {'numix-frost-themes': {
-                'dest': '/opt/numix',
-                'callsign': '',
-                'source': '/opt/numix/numix-frost.zip'}
-             },
             {'cnchi-dev': {
                 'cwd': '/srv/antergos.org/cnchi.tar',
                 'callsign': '',
@@ -161,13 +156,15 @@ def process_package_queue(the_queue=None):
                             logger.info('Copying cnchi-dev source file into build directory.')
                             shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pkg))
                         elif 'cnchi' == pkg:
+                            subprocess.check_call(['git', 'clone', 'http://github.com/antergos/cnchi.git', pkg],
+                                                  cwd='/opt/antergos-packages/cnchi')
                             get_latest_translations()
 
                     except Exception as err:
                         logger.error(err)
 
             pkgobj = package(pkg, db)
-            if not (os.path.exists(os.path.join(REPO_DIR, pkgobj.name)) and 'antergos-iso' in pkgobj.name):
+            if not os.path.exists(os.path.join(REPO_DIR, pkgobj.name)) and 'antergos-iso' not in pkgobj.name:
                 pkgobj.save_to_db('deepin', 'True')
                 pbfile = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name, 'PKGBUILD')
                 path = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name)
@@ -427,16 +424,20 @@ def get_latest_translations():
     # Get translations for Cnchi
     trans_dir = "/opt/cnchi-translations/"
     trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi")
-    dest_dir = '/opt/antergos-packages/cnchi/po'
+    dest_dir = '/opt/antergos-packages/cnchi/cnchi/po'
     if not os.path.exists(dest_dir):
-        return
-    try:
-        subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
-                              cwd=trans_dir)
-        for f in os.listdir(trans_files_dir):
-            shutil.copy(f, dest_dir)
-    except Exception as err:
-        logger.error(err)
+        logger.error('cnchi po directory not found.')
+    else:
+        try:
+            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
+                                  cwd=trans_dir)
+            for f in os.listdir(trans_files_dir):
+                shutil.copy(f, dest_dir)
+        except Exception as err:
+            logger.error(err)
+
+    subprocess.check_call(['tar', '-cf', '/tmp/Cnchi-master.tar', '-C', '/opt/antergos-packages/cnchi', 'cnchi'])
+    shutil.copy('/tmp/Cnchi-master.tar', '/opt/antergos-packages/cnchi')
 
 
 def build_pkgs(last=False, pkg_info=None):

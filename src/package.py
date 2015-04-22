@@ -71,6 +71,7 @@ class Package(object):
         self.depends = self.get_from_db('depends')
         self.success_rate = self.get_from_db('success_rate')
         self.failure_rate = self.get_from_db('failure_rate')
+        self.short_name = self.get_from_db('short_name')
 
     def delete(self):
         self.db.delete(self.key)
@@ -79,13 +80,16 @@ class Package(object):
         val = ''
         if attr is not None:
             key = '%s:%s' % (self.key, attr)
-            if self.db.type(key) == 'string':
-                val = self.db.get(key)
-            elif self.db.type(key) == 'list':
-                val = list(self.db.lrange(key, 0, -1))
-            elif self.db.type(key) == 'set':
-                val = self.db.smembers(key)
-            logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
+            if db.exists(key):
+                if self.db.type(key) == 'string':
+                    val = self.db.get(key)
+                elif self.db.type(key) == 'list':
+                    val = list(self.db.lrange(key, 0, -1))
+                elif self.db.type(key) == 'set':
+                    val = self.db.smembers(key)
+                logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
+            else:
+                val = ''
 
         return val
 
@@ -127,7 +131,7 @@ class Package(object):
             err = []
         else:
             cmd = 'source ' + path + '; echo $' + var
-            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme-no' in parse):
+            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
                 if 'numix-icon-theme' not in parse:
                     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
                     giturl = giturl.group(0)
@@ -201,6 +205,7 @@ class Package(object):
                 elif pkgver != old_pkgver and pkgrel != "1":
                     pkgrel = "1"
                     pkgrel_upd = True
+                db.set('build:pkg:now', "False")
 
             if pkgrel_upd:
                 self.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
