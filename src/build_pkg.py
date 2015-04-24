@@ -457,7 +457,6 @@ def build_pkgs(last=False, pkg_info=None):
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
-            db.set('now_building', pkg)
             db.set('building', 'Building %s with makepkg' % pkg)
             failed = False
             logger.info('Building %s' % pkg)
@@ -469,6 +468,9 @@ def build_pkgs(last=False, pkg_info=None):
             tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg)
             logconf.new_timeline_event(tlmsg, '3')
             this_log = 'build_log:%s' % build_id
+            db.hset('now_building', 'build_id', build_id)
+            db.hset('now_building', 'key', this_log)
+            db.hset('now_building', 'pkg', pkg)
             db.set(this_log, True)
             db.rpush('pkg:%s:build_logs' % pkg, build_id)
             db.set('%s:start' % this_log, dt)

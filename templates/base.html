@@ -191,36 +191,41 @@
                         ul.pagination {
                             margin: 0 auto;
                         }
+
                         ul.timeline > li > .date {
-                        background: #D0D0D0;
-                        position: absolute;
-                        top: 49px;
-                        display: block;
-                        padding: 0 5px;
-                        text-align: center;
-                        border: 1px solid #D0D0D0;
-                        font-size: 11px;
-                        border-radius: 1px;
-                        text-shadow: 0 1px 0 #fafafa;
-                        color: #000;
-                        line-height: 19px;
+                            background: #D0D0D0;
+                            position: absolute;
+                            top: 49px;
+                            display: block;
+                            padding: 0 5px;
+                            text-align: center;
+                            border: 1px solid #D0D0D0;
+                            font-size: 11px;
+                            border-radius: 1px;
+                            text-shadow: 0 1px 0 #fafafa;
+                            color: #000;
+                            line-height: 19px;
                         }
+
                         ul.timeline > li .content {
-                        position: relative;
-                        border-radius: 3px;
-                        background: #FFF;
-                        margin-left: 75px;
-                        padding: 12px 10px;
-                        border: 1px solid #D0D0D0;
-                        line-height: 15px;
+                            position: relative;
+                            border-radius: 3px;
+                            background: #FFF;
+                            margin-left: 75px;
+                            padding: 12px 10px;
+                            border: 1px solid #D0D0D0;
+                            line-height: 15px;
                         }
+
                         ul.timeline:before {
                             background-color: #D0D0D0;
                         }
+
                         ul.timeline > li .content p {
-                        margin: 0;
-                        padding-bottom: 5px;
+                            margin: 0;
+                            padding-bottom: 5px;
                         }
+
                         ul.timeline > li .content:before {
                             background: #FFF;
                             position: absolute;
@@ -248,15 +253,16 @@
                         ul.custom {
                             float: right !important;
                         }
+
                         ul.hook-pkg-list {
                             margin-top: 20px;
                             margin-bottom: 20px;
                         }
+
                         ul.hook-pkg-list li {
                             list-style-type: none;
                             font-size: 14px;
                         }
-
 
                         .phab {
                             position: absolute;
@@ -281,36 +287,41 @@
                             bottom: 2px;
                             right: 1px;
                         }
+
                         ul.timeline > li > .fa-times {
                             background: #EA6153;
                         }
+
                         ul.timeline > li > .fa-check {
-                                                    background: #2CC36B;
-                                                }
+                            background: #2CC36B;
+                        }
+
                         ul.timeline > li > .fa-rocket {
-                                                                            background: #7761A7;
-                                                                        }
+                            background: #7761A7;
+                        }
 
                         ul.hook-pkg-list li:before {
                             display: inline-block;
-                              font-family: FontAwesome;
-                              font-style: normal;
-                              font-weight: normal;
-                              line-height: 1;
-                              -webkit-font-smoothing: antialiased;
-                              -moz-osx-font-smoothing: grayscale;
+                            font-family: FontAwesome;
+                            font-style: normal;
+                            font-weight: normal;
+                            line-height: 1;
+                            -webkit-font-smoothing: antialiased;
+                            -moz-osx-font-smoothing: grayscale;
                             content: "\f187";
                             margin-right: 8px;
                             font-size: 10px;
                         }
+
                         .profile-info .avatar {
-                          padding-top: 10px;
-                          text-align: right;
+                            padding-top: 10px;
+                            text-align: right;
                         }
-                    .profile-info .avatar img {
-                        max-width: 64px;
-                        max-height: 64px;
-                    }
+
+                        .profile-info .avatar img {
+                            max-width: 64px;
+                            max-height: 64px;
+                        }
 
                     </style>
                 {%- endblock styles %}
@@ -379,6 +390,18 @@
                                                     href="/browse"><i
                                                     class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
                                             </li>
+                                            {% if user.is_authenticated() %}
+                                                <li {% if 'repo_pkgs' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
+                                                    <a
+                                                            href="/repo_packages/antergos"><i
+                                                            class="fa   fa-list"></i><span>Repo Pkgs (Main)</span></a>
+                                                </li>
+                                                <li {% if 'repo_pkgs' in request.path and 'staging' in request.path %}class="active"{% endif %}>
+                                                    <a
+                                                            href="/repo_packages/antergos-staging"><i
+                                                            class="fa   fa-list"></i><span>Repo Pkgs (Staging)</span></a>
+                                                </li>
+                                            {% endif %}
                                         </ul>
                                         <!--<li><a href="#" class="md-trigger" data-modal="md-3dSign"><i class="fa  fa-archive"></i><span>Packages</span></a>-->
 
@@ -451,17 +474,16 @@
                                                         <div class="nano nscroller has-scrollbar">
                                                             <div class="content" tabindex="0" style="right: -15px;">
                                                                 <ul>
-                                                                    {% for item in completed %}
-                                                                        {% for pkg, info in item.items() %}
-                                                                            {% if info['review_stat'] == "pending" %}
-                                                                                <li><a href="/pkg_review"><i
-                                                                                        class="fa fa-archive"></i><b>{{ info['name'] }}</b>
-                                                                                    {{ info['version'] }} <span
-                                                                                            class="date">{{ info['end'] }}</span></a>
-                                                                                </li>
-                                                                            {% endif %}
-                                                                        {% endfor %}
+                                                                    {#                                                                    {% for item in rev_pending %}#}
+                                                                    {% for pkg, info in rev_pending.items() %}
+                                                                        <li><a href="/pkg_review"><i
+                                                                                class="fa fa-archive"></i><b>{{ info['name'] }}</b>
+                                                                            {{ info['version'] }} <span
+                                                                                    class="date">{{ info['end'] }}</span></a>
+                                                                        </li>
+
                                                                     {% endfor %}
+                                                                    {#                                                                    {% endfor %}#}
 
                                                                 </ul>
                                                             </div>
@@ -580,15 +602,16 @@
                         jQuery('.not-idle').show();
                         function getStatus() {
                             $.getJSON('/get_status', function (data) {
-                                var current = jQuery('.not-idle').text();
+                                var current = jQuery('#status_bar_pre').text();
                                 if (data['msg'] !== current) {
-                                    jQuery('.idle').hide();
-                                    jQuery('.not-idle').show();
+                                    jQuery('.idle').addClass('not-idle').removeClass('idle');
+                                    jQuery('fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
+                                    jQuery('#status_bar').show();
                                     jQuery('#status_bar_pre').text(data['msg']);
                                 }
                                 if (data['msg'] == 'Idle' || current == 'Idle') {
 
-                                    jQuery('.status').children('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
+                                    jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
                                     jQuery('#status_bar').hide();
 
                                 }
@@ -597,7 +620,7 @@
                         }
 
                         getStatus();
-                        setInterval(getStatus, 15000);
+                        setInterval(getStatus, 10000);
                     });
                     jQuery(window).load(function () {
                                 jQuery('[data-toggle="tooltip"]').tooltip();
@@ -631,7 +654,10 @@
                                                     {"sType": "num-html"},
                                                     null,
                                                     null,
-                                                    null,
+                                                    null,{% if 'repo_packages' in request.path %}
+                                                        null,
+                                                        null,
+                                                    {% endif %}
                                                     null{% if '/completed' in request.path or '/pkg_review' in request.path %},
                                                     null,
                                                     null,
@@ -639,7 +665,7 @@
                                                     null{% endif %}
                                                 ],
                                                 "aaSorting": [
-                                                    [0, "desc"]
+                                                        [{% if 'repo_packages' in request.path %}1, "asc"{% else %}0, "desc"{% endif %}]
                                                 ]
 
                                             });
@@ -669,9 +695,9 @@
                                                 });
 
                                     });
-                                    if (!jQuery('#issuetable').length) {
+                                    {% if 'repo_packages' not in request.path %}if (!jQuery('#issuetable').length) {
                                         jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
-                                    }
+                                    }{% endif %}
                                 }
                             }
                     )

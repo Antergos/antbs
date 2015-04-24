@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block pagetitle -%}Repo Package List{%- endblock pagetitle %}
+{% block stats %}{% endblock stats %}
+
+{% block bottomcontent -%}
+
+    <div class="col-md-12">
+        <div id="bottom-wrap" class="block-flat">
+            <div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
+            <div class="header">
+                <h3>{{ name }}</h3>
+            </div>
+            <div class="content">
+                {% if not repo_packages %}
+                    No packages found.
+                {% else %}
+                    <table class="table no-border hover">
+                        <thead class="no-border">
+                        <tr>
+                            <th>ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+                            <th>Name</th>
+                            <th>Version</th>
+                            <th>Last Build Result</th>
+                            <th>Last Build Reviewed By</th>
+                            <th>Last Build Review Date</th>
+                            {% if user.is_authenticated() %}
+                                <th>Manage</th>{% endif %}
+                        </tr>
+                        </thead>
+                        <tbody class="no-border-y">
+
+                        {% for i in pkg_index %}
+                        {% for info in repo_packages[i]|dictsort() %}
+
+                            {% if user.is_authenticated() %}
+                                <tr>
+                                    <td>{{ info['pkgid'] }}</td>
+                                    <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
+                                    <td>{{ info['version'] }}</td>
+                                    <td>{% if info['review_stat'] == 'pending' %}
+                                        <i class="fafa-clock-o" style="color:yellow;"></i>
+                                        {{ info['review_stat'] }}
+                                    {% elif info['review_stat'] == 'passed' %}
+                                        <i class="fa fa-check" style="color:green;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                        {{ info['review_stat'] }}
+                                    {% endif %}</td>
+                                    <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                <td></td>
+                                </tr>
+
+                            {% else %}
+                                <tr>
+                                    <td>{{ info['pkgid'] }}</td>
+                                    <td>{{ info['name'] }}</td>
+                                    <td>{{ info['version'] }}</td>
+                                    <td>{% if info['review_stat'] == 'pending' %}
+                                        <i class="fafa-clock-o" style="color:yellow;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
+                                        <i class="fa fa-check" style="color:green;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                        {{ info['review_stat'] }}{% endif %}</td>
+                                    <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                <td></td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                        {% endfor %}
+
+
+
+                        </tbody>
+                    </table>
+                    {% macro render_pagination(pagination) %}
+                        <ul class="pagination custom">
+                            {% if pagination.has_prev %}
+                                <li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
+                            {% endif %}
+                            {%- for page in pagination.iter_pages() %}
+                                {% if page %}
+
+                                    {% if page != pagination.page %}
+                                        <li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
+                                    {% else %}
+                                        <li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
+                                    {% endif %}
+                                {% else %}
+                                    <li><span class=ellipsis>…</span></li>
+                                {% endif %}
+                            {%- endfor %}
+                            {% if pagination.has_next %}
+                                <li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
+                            {% endif %}
+                        </ul>
+                    {% endmacro %}
+                    {#                    {{ render_pagination(pagination) }}#}
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+
+{%- endblock bottomcontent %}
+{% if user.is_authenticated() %}
+    {% block scripts %}
+        {{ super() }}
+        <script type="text/javascript">
+            jQuery(document).ready(function () {
+                jQuery('.set_result').on('click', 'a', function (e) {
+                    e.preventDefault();
+                    jQuery(this).addClass('clicked');
+                    var data = {
+                        bnum: jQuery(this).attr('bnum'),
+                        result: jQuery(this).attr('id'),
+                        dev: '{{ user.username }}'
+                    };
+                    jQuery.ajax({
+                        type: 'POST',
+                        url: '/pkg_review',
+                        data: JSON.stringify(data, null, '\t'),
+                        contentType: 'application/json;charset=UTF-8',
+                        dataType: 'json',
+                        success: function (result) {
+                            console.log(result);
+                            var res = $('.clicked').attr('id') == '2' ? 'span.passed' : 'span.failed';
+                            if (result['msg'] == 'ok') {
+                                jQuery('.clicked').parents('td').find(res).show();
+                                jQuery('.clicked').removeClass('clicked').parents('.btn-group').hide();
+                            } else {
+                                alert('Unable to save result. Server Error Msg:\n' + result['msg']);
+                            }
+                        }
+
+                    });
+                });
+            });
+        </script>
+    {% endblock scripts %}
+{% endif %}

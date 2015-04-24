@@ -23,10 +23,11 @@
 """ Database module """
 import redis
 import logging
+from walrus import *
 
 logger = logging.getLogger(__name__)
 
-db = redis.StrictRedis(unix_socket_path='/var/run/redis.sock')
+db = Database(unix_socket_path='/var/run/redis.sock')
 
 
 def init_db():

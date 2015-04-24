@@ -41,22 +41,25 @@ class Package(object):
     db.setnx('pkg:id:next', 0)
 
     def __init__(self, name, db=db):
-        db.incr('pkg:id:next')
-        self.next_id = db.get('pkg:id:next')
         self.name = name
         self.key = 'pkg:%s' % self.name
         logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
-        if not db.exists(self.key) or True:
+        if not db.exists(self.key):
             db.set(self.key, True)
+            db.incr('pkg:id:next')
+            pkgid = db.get('pkg:id:next')
+            db.set('%s:%s' % (self.key, 'pkgid'), pkgid)
+
             db.set('%s:%s' % (self.key, 'name'), self.name)
-            db.set('%s:%s' % (self.key, 'id'), self.next_id)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
             db.set('%s:%s' % (self.key, 'autosum'), "False")
+            db.delete('%s:%s' % (self.key, 'depends'))
             db.sadd('%s:%s' % (self.key, 'depends'), '')
         if self.name in ['pycharm-pro-eap', 'pycharm-com-eap']:
             db.set('%s:%s' % (self.key, 'autosum'), "True")
         else:
             db.set('%s:%s' % (self.key, 'autosum'), "False")
+        self.pkgid = self.get_from_db('pkgid')
         self.version = self.get_from_db('version')
         self.epoch = self.get_from_db('epoch')
         self.depends = self.get_from_db('depends')
@@ -83,9 +86,9 @@ class Package(object):
             if db.exists(key):
                 if self.db.type(key) == 'string':
                     val = self.db.get(key)
-                elif self.db.type(key) == 'list':
+                elif self.db.type(key) == 'list' and self.db.llen(key) > 0:
                     val = list(self.db.lrange(key, 0, -1))
-                elif self.db.type(key) == 'set':
+                elif self.db.type(key) == 'set' and self.db.scard(key) > 0:
                     val = self.db.smembers(key)
                 logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
             else:
