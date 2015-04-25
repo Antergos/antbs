@@ -21,61 +21,84 @@
                             <th>ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
                             <th>Name</th>
                             <th>Version</th>
-                            <th>Last Build Result</th>
-                            <th>Last Build Reviewed By</th>
-                            <th>Last Build Review Date</th>
+                            <th>Last Result</th>
+                            <th>Last Reviewed By</th>
+                            <th>Last Review Date</th>
                             {% if user.is_authenticated() %}
                                 <th>Manage</th>{% endif %}
                         </tr>
                         </thead>
                         <tbody class="no-border-y">
 
-                        {% for i in pkg_index %}
-                        {% for info in repo_packages[i]|dictsort() %}
+
+                        {% for item, info in repo_packages|dictsort() %}
+
 
                             {% if user.is_authenticated() %}
-                                <tr>
-                                    <td>{{ info['pkgid'] }}</td>
-                                    <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
-                                    <td>{{ info['version'] }}</td>
-                                    <td>{% if info['review_stat'] == 'pending' %}
-                                        <i class="fafa-clock-o" style="color:yellow;"></i>
-                                        {{ info['review_stat'] }}
-                                    {% elif info['review_stat'] == 'passed' %}
-                                        <i class="fa fa-check" style="color:green;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
-                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                        {{ info['review_stat'] }}
-                                    {% endif %}</td>
-                                    <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                    <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
-                                <td></td>
-                                </tr>
+                            <tr>
+                                <td>{{ info['pkgid'] }}</td>
+                                <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
+                                <td>{{ info['version'] }}</td>
+                                <td>{% if info['review_stat'] == 'pending' %}
+                                    <i class="fafa-clock-o" style="color:yellow;"></i>
+                                    {{ info['review_stat'] }}
+                                {% elif info['review_stat'] == 'passed' %}
+                                    <i class="fa fa-check" style="color:green;"></i>
+                                    {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                    <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                    {{ info['review_stat'] }}
+                                {% endif %}</td>
+                                <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                    {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                    {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
 
-                            {% else %}
-                                <tr>
-                                    <td>{{ info['pkgid'] }}</td>
-                                    <td>{{ info['name'] }}</td>
-                                    <td>{{ info['version'] }}</td>
-                                    <td>{% if info['review_stat'] == 'pending' %}
-                                        <i class="fafa-clock-o" style="color:yellow;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
-                                        <i class="fa fa-check" style="color:green;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
-                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                        {{ info['review_stat'] }}{% endif %}</td>
-                                    <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                    <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
-                                <td></td>
-                                </tr>
-                            {% endif %}
-                        {% endfor %}
-                        {% endfor %}
+                                <td>
+                                    <div class="btn-group">
+                                        <button class="btn btn-default btn-xs" type="button">Action</button>
+                                        <button data-toggle="dropdown"
+                                                class="btn btn-xs btn-primary dropdown-toggle" type="button">
+                                            <span class="caret"></span>
+                                            <span class="sr-only">Toggle Dropdown</span></button>
+                                        <ul role="menu" class="dropdown-menu actions">
+                                            <li><a href="#" id="2" bnum="{{ info['bnum'] }}"><i
+                                                    class="fa fa-refresh"
+                                                    style="color:green;"></i>
+                                                Rebuild</a></li>
+                                            <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
+                                                    class="fa fa-trash" style="color:red;"></i>
+                                                Remove</a>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                    <span class="passed" style="display: none"><i class="fa fa-check"
+                                                                                  style="color:green;"></i> Passed</span>
+                                    <span class="failed" style="display: none"><i
+                                            class="fa fa-exclamation-circle"
+                                            style="color:red;"></i> Failed</span>
+                                    </td>
+                                    </tr>
 
+                                {% else %}
+                                    <tr>
+                                        <td>{{ info['pkgid'] }}</td>
+                                        <td>{{ info['name'] }}</td>
+                                        <td>{{ info['version'] }}</td>
+                                        <td>{% if info['review_stat'] == 'pending' %}
+                                            <i class="fafa-clock-o" style="color:yellow;"></i>
+                                            {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
+                                            <i class="fa fa-check" style="color:green;"></i>
+                                            {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                            <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                            {{ info['review_stat'] }}{% endif %}</td>
+                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                        <td></td>
+                                    </tr>
+                                {% endif %}
+                        {% endfor %}
 
 
                         </tbody>
@@ -114,7 +137,7 @@
     {% block scripts %}
         {{ super() }}
         <script type="text/javascript">
-            jQuery(document).ready(function () {
+            /*jQuery(document).ready(function () {
                 jQuery('.set_result').on('click', 'a', function (e) {
                     e.preventDefault();
                     jQuery(this).addClass('clicked');
@@ -142,7 +165,7 @@
 
                     });
                 });
-            });
+            });*/
         </script>
     {% endblock scripts %}
 {% endif %}

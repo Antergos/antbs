@@ -1,4 +1,3 @@
-walrus
 gevent
 pygments
 ipaddress

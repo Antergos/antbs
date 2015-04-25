@@ -28,8 +28,8 @@
                 <tbody class="no-border-y">
 
 
-                    {% for item in failed %}
-                    {% for pkg, info in item.items() %}
+
+                    {% for pkg, info in failed|dictsort() %}
                         <tr>
                             <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
                             {% if user.is_authenticated() %}<td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>{% else %}
@@ -40,7 +40,7 @@
                         </tr>
 
                     {% endfor %}
-                    {% endfor %}
+
 
 
                         </tbody>
