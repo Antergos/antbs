@@ -447,6 +447,8 @@ def homepage(tlpage=None):
     check_stats = ['queue', 'completed', 'failed']
     building = db.get('building')
     this_page, all_pages = get_timeline(tlpage)
+    is_logged_in = user.is_authenticated()
+    c, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
     #logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
     stats = {}
     for stat in check_stats:
@@ -497,7 +499,7 @@ def homepage(tlpage=None):
             db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
 
     return render_template("overview.html", idle=is_idle, stats=stats, user=user, building=building,
-                           this_page=this_page, all_pages=all_pages, page=tlpage)
+                           this_page=this_page, all_pages=all_pages, page=tlpage, rev_pending=rev_pending)
 
 
 @app.route("/building")

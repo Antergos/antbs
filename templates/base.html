@@ -328,6 +328,20 @@
                         .block-flat .actions a:hover {
                             color: #fff;
                         }
+                        b {
+                          font-weight: 600;
+                        }
+                        .navbar-nav > li.button:first-child .dropdown-menu {
+                          padding: 0;
+                          min-width: 280px;
+                          max-width: 300px;
+                        }
+                        .navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
+                        text-overflow: ellipsis;
+                          white-space: nowrap;
+                          overflow: hidden;
+                          max-width: 280px;
+                        }
 
                     </style>
                 {%- endblock styles %}
@@ -614,6 +628,7 @@
                                     jQuery('fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
                                     jQuery('#status_bar').show();
                                     jQuery('#status_bar_pre').text(data['msg']);
+                                    current = jQuery('#status_bar_pre').text();
                                 }
                                 if (data['msg'] == 'Idle' || current == 'Idle') {
 

@@ -365,6 +365,13 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log, upd_repo))
             stream_process.start()
             doc.wait(container)
+            try:
+                cache_keys = db.scan_iter(match='cache:*', count=100)
+                for key in cache_keys:
+                    logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % key)
+                    db.delete(key)
+            except Exception as err:
+                logger.error(err)
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
 
@@ -623,14 +630,6 @@ def build_pkgs(last=False, pkg_info=None):
             doc.remove_container(container)
             end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             db.set('%s:end' % this_log, end)
-            try:
-                db_caches = db.scan_iter(match='*_cache*', count=3)
-                for db_cache in db_caches:
-                    logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % db_cache)
-                    db.delete(db_cache)
-            except Exception as err:
-                logger.error(err)
-
             db.set('container', '')
             db.set('building_num', '')
             db.set('building_start', '')
@@ -646,6 +645,13 @@ def build_pkgs(last=False, pkg_info=None):
                 db.set('building', 'Starting next build in queue...')
 
             if not failed:
+                try:
+                    cache_keys = db.scan_iter(match='cache:*', count=100)
+                    for key in cache_keys:
+                        logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % key)
+                        db.delete(key)
+                except Exception as err:
+                    logger.error(err)
                 return True
 
     logger.info('Build completed. Repo has been updated.')
