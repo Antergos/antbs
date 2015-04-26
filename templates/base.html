@@ -21,6 +21,7 @@
                           type='text/css'>
                     <!-- Bootstrap core CSS -->
                     <link href="/static/js/bootstrap/dist/css/bootstrap.css" rel="stylesheet">
+                    <link rel="stylesheet" type="text/css" href="/static/js/jquery.gritter/css/jquery.gritter.css" />
                     <link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
                     <link rel="stylesheet" type="text/css"
                           href="/static/js/jquery.datatables/bootstrap-adapter/css/datatables.css"/>
@@ -342,6 +343,24 @@
                           overflow: hidden;
                           max-width: 280px;
                         }
+                        .gritter-item-wrapper.clean.error .gritter-close {
+                            background: #ea6153;
+                        }
+                        #gritter-notice-wrapper {
+                            width: 460px;
+                            max-width: 100%;
+                        }
+                        .gritter-without-image, .gritter-with-image {
+                            padding-left: 7px;
+                            width: 450px;
+                            max-width: 100%;
+                        }
+                        .nano > .nano-pane {
+                          width: 7px;
+                          border-radius: 0px;
+                        }
+
+
 
                     </style>
                 {%- endblock styles %}
@@ -491,8 +510,8 @@
                                             {% if rev_pending|count() > 0 %}
                                                 <ul class="dropdown-menu">
                                                     <li>
-                                                        <div class="nano nscroller has-scrollbar">
-                                                            <div class="content" tabindex="0" style="right: -15px;">
+                                                        <div class="nano" style="width:280px;">
+                                                                         <div class="nano-content content">
                                                                 <ul>
                                                                     {#                                                                    {% for item in rev_pending %}#}
                                                                     {% for pkg, info in rev_pending.items() %}
@@ -607,6 +626,7 @@
                 ================================================== -->
                 <!-- Placed at the end of the document so the pages load faster -->
                 <script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
+                <script type="text/javascript" src="/static/js/jquery.gritter/js/jquery.gritter.js"></script>
                 <script type="text/javascript" src="/static/js/behaviour/core.js"></script>
                 <script type="text/javascript" src="/static/js/jquery.datatables/jquery.datatables.min.js"></script>
                 <script type="text/javascript"
@@ -618,6 +638,23 @@
                 <script type="text/javascript">
                     //sets up numeric sorting of links
                     jQuery(document).ready(function () {
+
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                        {% for category, message in messages %}
+                            setTimeout(function() {
+                                $.gritter.add({
+                                    title: '{{ category|upper() }}',
+                                    text: '{{ message }}',
+                                    class_name: 'clean {% if category == "error" %}error{% else %}info{% endif %} {{ category }}',
+                                    sticky: '{% if category == "error" %}true{% else %}false{% endif %}'
+                                });
+                            }, {{ loop.index * 500 }} );
+                        {% endfor %}
+                        {% endif %}
+                        {% endwith %}
+
+
                         jQuery('#main pre').addClass('pre-scrollable');
                         jQuery('.not-idle').show();
                         function getStatus() {
@@ -625,7 +662,7 @@
                                 var current = jQuery('#status_bar_pre').text();
                                 if (data['msg'] !== current) {
                                     jQuery('.idle').addClass('not-idle').removeClass('idle');
-                                    jQuery('fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
+                                    jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
                                     jQuery('#status_bar').show();
                                     jQuery('#status_bar_pre').text(data['msg']);
                                     current = jQuery('#status_bar_pre').text();

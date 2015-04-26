@@ -48,10 +48,10 @@
                                     <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                     {{ info['review_stat'] }}
                                 {% endif %}</td>
-                                <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                    {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                    {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
+                                                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                                                        <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
+                                                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
 
                                 <td>
                                     <div class="btn-group">
@@ -91,10 +91,10 @@
                                             {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
                                             <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                             {{ info['review_stat'] }}{% endif %}</td>
-                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                        <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
+                                                                                    {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                                                                <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
+                                                                                    {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
                                         <td></td>
                                     </tr>
                                 {% endif %}

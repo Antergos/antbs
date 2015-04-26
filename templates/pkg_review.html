@@ -50,9 +50,10 @@
                         </thead>
                         <tbody class="no-border-y">
 
-                        {% for item in completed %}
-                            {% for pkg, info in item.items() %}
+
+                            {% for pkg, info in completed|dictsort() %}
                                 {% if user.is_authenticated() %}
+                                    {% if info['review_stat'] == "pending" %}
                                     <tr>
                                         <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
                                         <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
@@ -93,11 +94,12 @@
                                             <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                             {{ info['review_stat'] }}
                                         {% endif %}</td>
-                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                        <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
                                             {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                        <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
                                             {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
                                     </tr>
+                                        {% endif %}
 
                                 {% else %}
                                     <tr>
@@ -113,14 +115,14 @@
                                             {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
                                             <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                             {{ info['review_stat'] }}{% endif %}</td>
-                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
+                                        <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
                                             {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
+                                        <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
                                             {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
                                     </tr>
                                 {% endif %}
                             {% endfor %}
-                        {% endfor %}
+
 
 
                         </tbody>

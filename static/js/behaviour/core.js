@@ -245,7 +245,7 @@ $(function(){
   /*Bind plugins on hidden elements*/
   /*Dropdown shown event*/
   $('.dropdown').on('shown.bs.dropdown', function () {
-    $(".nscroller").nanoScroller();
+    $(".dropdown .nano").nanoScroller();
   });
     
   /*Tabs refresh hidden elements*/

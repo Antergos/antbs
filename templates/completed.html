@@ -31,76 +31,75 @@
                         <tbody class="no-border-y">
 
 
-                            {% for pkg, info in completed|dictsort() %}
-                                {% if user.is_authenticated() %}
-                                    <tr>
-                                        <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                                        <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
-                                        <td>{{ info['version'] }}</td>
-                                        <td>{{ info['start'] }}</td>
-                                        <td>{{ info['end'] }}</td>
-                                        <td>{% if info['review_stat'] == 'pending' %}
-                                            <div class="btn-group">
-                                                <button class="btn btn-default btn-xs" type="button">Set Result</button>
-                                                <button data-toggle="dropdown"
-                                                        class="btn btn-xs btn-primary dropdown-toggle" type="button">
-                                                    <span class="caret"></span>
-                                                    <span class="sr-only">Toggle Dropdown</span></button>
-                                                <ul role="menu" class="dropdown-menu set_result">
-                                                    <li><a href="#" id="2" bnum="{{ info['bnum'] }}"><i
-                                                            class="fa fa-check"
-                                                            style="color:green;"></i>
-                                                        Pass</a></li>
-                                                    <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
-                                                            class="fa fa-exclamation" style="color:red;"></i>
-                                                        Fail</a>
-                                                    </li>
-                                                    <li style="font-style: italic;"><a href="#" id="4"
-                                                                                       bnum="{{ info['bnum'] }}"><i
-                                                            class="fa fa-eye-slash" style="color:#777777;"></i>
-                                                        Skip</a>
-                                                    </li>
-                                                </ul>
-                                            </div>
-                                            <span class="passed" style="display: none"><i class="fa fa-check"
-                                                                                          style="color:green;"></i> Passed</span>
-                                            <span class="failed" style="display: none"><i
-                                                    class="fa fa-exclamation-circle"
-                                                    style="color:red;"></i> Failed</span>
-                                        {% elif info['review_stat'] == 'passed' %}
-                                            <i class="fa fa-check" style="color:green;"></i>
-                                            {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
-                                            <i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                            {{ info['review_stat'] }}
-                                        {% endif %}</td>
-                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
-                                    </tr>
+                        {% for pkg, info in completed|dictsort() %}
+                            {% if user.is_authenticated() %}
+                                <tr>
+                                    <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
+                                    <td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
+                                    <td>{{ info['version'] }}</td>
+                                    <td>{{ info['start'] }}</td>
+                                    <td>{{ info['end'] }}</td>
+                                    <td>{% if info['review_stat'] == 'pending' %}
+                                        <div class="btn-group">
+                                            <button class="btn btn-default btn-xs" type="button">Set Result</button>
+                                            <button data-toggle="dropdown"
+                                                    class="btn btn-xs btn-primary dropdown-toggle" type="button">
+                                                <span class="caret"></span>
+                                                <span class="sr-only">Toggle Dropdown</span></button>
+                                            <ul role="menu" class="dropdown-menu set_result">
+                                                <li><a href="#" id="2" bnum="{{ info['bnum'] }}"><i
+                                                        class="fa fa-check"
+                                                        style="color:green;"></i>
+                                                    Pass</a></li>
+                                                <li><a href="#" id="3" bnum="{{ info['bnum'] }}"><i
+                                                        class="fa fa-exclamation" style="color:red;"></i>
+                                                    Fail</a>
+                                                </li>
+                                                <li style="font-style: italic;"><a href="#" id="4"
+                                                                                   bnum="{{ info['bnum'] }}"><i
+                                                        class="fa fa-eye-slash" style="color:#777777;"></i>
+                                                    Skip</a>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <span class="passed" style="display: none"><i class="fa fa-check"
+                                                                                      style="color:green;"></i> Passed</span>
+                                        <span class="failed" style="display: none"><i
+                                                class="fa fa-exclamation-circle"
+                                                style="color:red;"></i> Failed</span>
+                                    {% elif info['review_stat'] == 'passed' %}
+                                        <i class="fa fa-check" style="color:green;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                        {{ info['review_stat'] }}
+                                    {% endif %}</td>
+                                    <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
+                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
+                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                </tr>
 
-                                {% else %}
-                                    <tr>
-                                        <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                                        <td>{{ info['name'] }}</td>
-                                        <td>{{ info['version'] }}</td>
-                                        <td>{{ info['start'] }}</td>
-                                        <td>{{ info['end'] }}</td>
-                                        <td>{% if info['review_stat'] == 'pending' %}
-                                            <i class="fafa-clock-o" style="color:yellow;"></i>
-                                            {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
-                                            <i class="fa fa-check" style="color:green;"></i>
-                                            {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
-                                            <i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                            {{ info['review_stat'] }}{% endif %}</td>
-                                        <td>{% if info['review_dev'] %}<i class="fa fa-user"></i>
-                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                        <td>{% if info['review_date'] %}<i class="fa fa-calendar"></i>
-                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
-                                    </tr>
-                                {% endif %}
-                            {% endfor %}
-
+                            {% else %}
+                                <tr>
+                                    <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
+                                    <td>{{ info['name'] }}</td>
+                                    <td>{{ info['version'] }}</td>
+                                    <td>{{ info['start'] }}</td>
+                                    <td>{{ info['end'] }}</td>
+                                    <td>{% if info['review_stat'] == 'pending' %}
+                                        <i class="fafa-clock-o" style="color:yellow;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
+                                        <i class="fa fa-check" style="color:green;"></i>
+                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+                                        <i class="fa fa-exclamation-circle" style="color:red;"></i>
+                                        {{ info['review_stat'] }}{% endif %}</td>
+                                    <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
+                                                                                {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                                                            <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
+                                                                                {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
 
 
                         </tbody>

@@ -35,7 +35,7 @@ import shutil
 from datetime import datetime, timedelta
 import ipaddress
 from rq import Queue, Connection, Worker
-from flask import Flask, request, Response, abort, render_template, url_for, redirect
+from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
 import requests
 import docker
@@ -277,8 +277,8 @@ def get_build_info(page=None, status=None, logged_in=False):
             h = db.hgetall('%s:%s' % (pinfo_key, p))
             pkg_list[p] = h
         for rev in revindex:
-            h = db.hgetall('%s:%s' % (pinfo_key, rev))
-            pkg_list[rev] = h
+            h = db.hgetall('%s:%s' % (revinfo_key, rev))
+            rev_pending[rev] = h
         logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
         all_pages = db.get('%s:all_pages' % pinfo_key)
 
@@ -844,7 +844,7 @@ def dev_pkg_check(page=None):
                 db.delete('pending_rev_cache')
                 return json.dumps(message)
 
-    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in, True)
+    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
     pagination = src.pagination.Pagination(page, 10, len(rev_pending))
     return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages,
                            set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, user=user,
@@ -859,22 +859,37 @@ def build_pkg_now():
         dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        args = (True, True)
-        if 'antergos-iso' in pkgname:
-            if db.get('isoBuilding') == 'False':
-                db.set('isoFlag', 'True')
-                args = (True, True)
-                if 'openbox' in pkgname:
-                    db.set('isoMinimal', 'True')
-            else:
-                logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
-                return redirect(redirect_url())
+        pexists = db.exists('pkg:%s' % pkgname)
+        is_logged_in = user.is_authenticated()
+        p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
+        logger.info(rev_pending)
+        pending = False
+        for bnum in rev_pending.keys():
+            logger.info(bnum)
+            if pkgname == rev_pending[bnum]['name']:
+                pending = True
+                break
+        if not pexists:
+            flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
+        elif pending:
+            flash('Unable to build %s because it is in "pending review" status.' % pkgname, category='error')
+        else:
+            args = (True, True)
+            if 'antergos-iso' in pkgname:
+                if db.get('isoBuilding') == 'False':
+                    db.set('isoFlag', 'True')
+                    args = (True, True)
+                    if 'openbox' in pkgname:
+                        db.set('isoMinimal', 'True')
+                else:
+                    logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
+                    return redirect(redirect_url())
 
-        db.rpush('queue', pkgname)
-        db.set('build:pkg:now', "True")
-        queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
-        logconf.new_timeline_event(
-            '<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname ))
+            db.rpush('queue', pkgname)
+            db.set('build:pkg:now', "True")
+            queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
+            logconf.new_timeline_event(
+                '<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname))
 
     return redirect(redirect_url())
 
