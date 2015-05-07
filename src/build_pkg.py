@@ -376,6 +376,7 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
             logger.error('Start container failed. Error Msg: %s' % err)
 
         doc.remove_container(container)
+        os.chown('/srv/antergos.info/repo/')
         db.set('idle', 'True')
         db.set('building', 'Idle')
         db.delete('repo-count-staging')
@@ -673,7 +674,6 @@ def build_iso():
             continue
         pkgobj = package(iso_name + arch, db)
         failed = False
-        db.set('now_building', pkgobj.name)
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         build_id = db.get('build_number')
@@ -681,6 +681,9 @@ def build_iso():
         this_log = 'build_log:%s' % build_id
         db.set('%s:start' % this_log, dt)
         db.set('building_num', build_id)
+        db.hset('now_building', 'build_id', build_id)
+        db.hset('now_building', 'key', this_log)
+        db.hset('now_building', 'pkg', pkgobj.name)
         db.set(this_log, True)
         db.set('building_start', dt)
         logger.info('Building %s' % pkgobj.name)

@@ -74,6 +74,7 @@ app.config['STORMPATH_ENABLE_REGISTRATION'] = False
 app.config['STORMPATH_REDIRECT_URL'] = '/pkg_review'
 app.config['STORMPATH_LOGIN_TEMPLATE'] = 'login.html'
 app.config['STORMPATH_COOKIE_DURATION'] = timedelta(days=14)
+app.config['STORMPATH_ENABLE_FORGOT_PASSWORD'] = True
 stormpath_manager = StormpathManager(app)
 app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
@@ -149,7 +150,7 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
 
             db.set('idle', "True")
             db.set('building', 'Idle')
-            db.set('now_building' '')
+            db.set('now_building', 'pkg', '')
             db.set('container', '')
             db.set('building_num', '')
             db.set('building_start', '')
@@ -558,7 +559,12 @@ def hooked():
                 return json.dumps({'msg': "wrong event type"})
     changes = []
     the_queue = db.lrange('queue', 0, -1)
-    building = db.hget('now_building', 'pkg')
+    try:
+        building = db.hget('now_building', 'pkg')
+    except Exception as err:
+        logger.error(err)
+        db.delete('now_building')
+        building = None
     if is_phab and request.args['repo'] != "CN":
         repo = 'antergos-packages'
         db.set('pullFrom', 'antergos')
