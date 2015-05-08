@@ -137,7 +137,7 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
     except Exception:
         logger.error('Unable to kill container')
     if job['origin'] == 'build_queue':
-        db.set('%s:result' % now_building['key'], 'failed')
+        db.hset('%s:result' % now_building['key'], 'failed')
         db.rpush('failed', now_building['build_id'])
 
         if not queue or len(queue) == 0 or queue == []:

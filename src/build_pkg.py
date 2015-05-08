@@ -376,7 +376,6 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
             logger.error('Start container failed. Error Msg: %s' % err)
 
         doc.remove_container(container)
-        os.chown('/srv/antergos.info/repo/')
         db.set('idle', 'True')
         db.set('building', 'Idle')
         db.delete('repo-count-staging')
