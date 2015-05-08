@@ -623,6 +623,19 @@ def hooked():
             db.delete('creating-cnchi-archive-from-dev')
     else:
         payload = json.loads(request.data)
+
+        # Save payload in the database temporarily in case we need it.
+        dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
+        key = 'payloads:%s' % dt
+        if db.exists(key):
+            for i in range(1, 5):
+                tmp = '%s:%s' % (key, i)
+                if not db.exists(tmp):
+                    key = tmp
+                    break
+        db.hmset(key, payload)
+        db.expire(key, 172800)
+
         full_name = payload['repository']['full_name']
         if 'lots0logs' in full_name and 'antergos/' not in full_name:
             db.set('pullFrom', 'lots0logs')
