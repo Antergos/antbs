@@ -112,7 +112,7 @@ def new_timeline_event(msg=None, type=None):
 
         if success:
             try:
-                pop_event = db.scan_iter('timeline:%s:**' % popid, 4)
+                pop_event = db.scan_iter('timeline:%s:**' % popid, 20)
                 for pev in pop_event:
                     db.delete(pev)
             except Exception as err:

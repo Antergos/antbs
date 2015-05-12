@@ -88,23 +88,26 @@ def check_deps(source):
     """
     pending = [(name, set(deps)) for name, deps in source]  # copy deps so we can modify set in-place
     emitted = []
-    while pending:
-        next_pending = []
-        next_emitted = []
-        for entry in pending:
-            name, deps = entry
-            deps.difference_update(emitted)  # remove deps we emitted last pass
-            if deps:  # still has deps? recheck during next pass
-                next_pending.append(entry)
-            else:  # no more deps? time to emit
-                yield name
-                emitted.append(name)  # <-- not required, but helps preserve original ordering
-                next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
-        if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
-            # raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
-            pass
-        pending = next_pending
-        emitted = next_emitted
+    try:
+        while pending:
+            next_pending = []
+            next_emitted = []
+            for entry in pending:
+                name, deps = entry
+                deps.difference_update(emitted)  # remove deps we emitted last pass
+                if deps:  # still has deps? recheck during next pass
+                    next_pending.append(entry)
+                else:  # no more deps? time to emit
+                    yield name
+                    emitted.append(name)  # <-- not required, but helps preserve original ordering
+                    next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
+            if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
+                raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
+                pass
+            pending = next_pending
+            emitted = next_emitted
+    except ValueError as err:
+        logger.error(err)
 
 
 def process_package_queue(the_queue=None):
@@ -113,25 +116,25 @@ def process_package_queue(the_queue=None):
             {'numix-icon-theme': {
                 'callsign': 'NX',
                 'source': ''}
-             },
+            },
             {'numix-icon-theme-square': {
                 'callsign': 'NXSQ',
                 'source': ''}
-             },
+            },
             {'numix-icon-theme-square-kde': {
                 'callsign': 'NXSQ',
                 'source': ''}
-             },
+            },
             {'cnchi-dev': {
                 'cwd': '/srv/antergos.org/cnchi.tar',
                 'callsign': '',
                 'source': ''}
-             },
+            },
             {'cnchi': {
                 'cwd': '',
                 'callsign': '',
                 'source': ''}
-             }]
+            }]
         all_deps = []
         for pkg in the_queue:
             special = [x for x in special_cases if pkg in x.keys()]
@@ -396,8 +399,8 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
                 or 'makepkg]# PS1="' in line:
             continue
         line = line.rstrip()
-        #if db.get('isoBuilding') == "True":
-        #line = line[15:]
+        # if db.get('isoBuilding') == "True":
+        # line = line[15:]
         end = line[25:]
         if end not in nodup:
             nodup.add(end)
@@ -749,17 +752,10 @@ def build_iso():
                                              {
                                                  'bind': out_dir,
                                                  'ro': False
-                                             },
-                                         '/sys/fs/cgroup':
-                                             {
-                                                 'bind': '/sys/fs/cgroup',
-                                                 'ro': True
                                              }},
                                      restart_policy={
                                          "MaximumRetryCount": 2,
-                                         "Name": "on-failure"
-                                     }
-                                     )
+                                         "Name": "on-failure"})
         try:
             iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh', tty=True,
                                                  name=nm, host_config=hconfig)
@@ -786,12 +782,7 @@ def build_iso():
                         'bind': out_dir,
                         'ro': False
                     },
-                '/sys/fs/cgroup':
-                    {
-                        'bind': '/sys/fs/cgroup',
-                        'ro': True
-                    }}
-                      )
+            })
 
             cont = db.get('container')
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
@@ -804,8 +795,8 @@ def build_iso():
                 stream_process2.start()
                 result2 = doc.wait(cont)
                 if result2 is not 0:
-                    #failed = True
-                    #db.set('build_failed', "True")
+                    # failed = True
+                    # db.set('build_failed', "True")
                     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
             if result is 0 or (result2 and result2 is 0):
                 logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
@@ -832,17 +823,9 @@ def build_iso():
             db.rpush('failed', build_id)
         remove('/opt/archlinux-mkarchiso/antergos-iso')
         doc.remove_container(cont)
-            # log_string = db.hget('%s:content' % this_log, 'content')
-            # if log_string and log_string != '':
-            # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-            # prestyles="background:#272822;color:#fff;",
-            # encoding='utf-8'))
-            # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-
-
-
-
-
-
-
-
+        # log_string = db.hget('%s:content' % this_log, 'content')
+        # if log_string and log_string != '':
+        # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+        # prestyles="background:#272822;color:#fff;",
+        # encoding='utf-8'))
+        # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))

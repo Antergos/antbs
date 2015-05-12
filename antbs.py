@@ -3,7 +3,7 @@
 #
 # build_pkg.py
 #
-# Copyright 2013 Antergos
+# Copyright © 2013-2015 Antergos
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,11 +20,9 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-"""Import the main class from the "Flask" library that we need to create our
-web application, as well as the `render_template` function for returning
-HTML files as responses and getting `request` objects that contain
-information about requests that we receive, like the URL and cookies and
-stuff like that."""
+"""Main AntBS (Antergos Build Server) Module"""
+
+import ast
 
 import json
 import re
@@ -48,6 +46,7 @@ import src.build_pkg as builder
 from src.redis_connection import db
 import src.logging_config as logconf
 import src.package as package
+import src.webhook as webhook
 #import newrelic
 
 gevent.monkey.patch_all()
@@ -297,7 +296,7 @@ def get_repo_info(repo=None, logged_in=False):
     logger.info('@@-antbs.py-@@ 293 | GET_REPO_INFO - FIRED')
     if not repo_info_cache:
         logger.info('@@-antbs.py-@@ 295 | GET_REPO_INFO - CACHE CHECK FAILED. WE ARE NOT USING CACHED INFO')
-        all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/**.pkg.tar.xz' % repo)
+        all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
 
         if all_packages is not None:
             for item in all_packages:
@@ -533,199 +532,7 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
-    is_phab = False
-    db.set('isPhab', "False")
-    repo = None
-    if request.method == 'GET':
-        return ' Nothing to see here, move along ...'
-
-    elif request.method == 'POST':
-        # Check if the POST request if from github.com
-        phab = int(request.args.get('phab', '0'))
-        if phab and phab > 0:
-            is_phab = True
-        else:
-            # Store the IP address blocks that github uses for hook requests.
-            hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
-            for block in hook_blocks:
-                ip = ipaddress.ip_address(u'%s' % request.remote_addr)
-                if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
-                    break  # the remote_addr is within the network range of github
-            else:
-                abort(403)
-            if request.headers.get('X-GitHub-Event') == "ping":
-                return json.dumps({'msg': 'Hi!'})
-            if request.headers.get('X-GitHub-Event') != "push":
-                return json.dumps({'msg': "wrong event type"})
-    changes = []
-    the_queue = db.lrange('queue', 0, -1)
-    try:
-        building = db.hget('now_building', 'pkg')
-    except Exception as err:
-        logger.error(err)
-        db.delete('now_building')
-        building = None
-    if is_phab and request.args['repo'] != "CN":
-        repo = 'antergos-packages'
-        db.set('pullFrom', 'antergos')
-        match = None
-        nx_pkg = None
-        logger.debug('Request Arg Repo is %s' % request.args)
-        if request.args['repo'] == "NX":
-            nx_pkg = ['numix-icon-theme']
-        elif request.args['repo'] == "NXSQ":
-            nx_pkg = ['numix-icon-theme-square']
-        if nx_pkg:
-            if the_queue and nx_pkg[0] in the_queue:
-                for p in the_queue:
-                    if p == nx_pkg[0] or p == building:
-                        match = True
-                        break
-                    else:
-                        continue
-            if match is None:
-                changes.append(nx_pkg)
-            else:
-                logger.info('RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0])
-                return json.dumps({'msg': 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]})
-        else:
-            logger.error('phab hook failed for numix')
-
-    elif is_phab and request.args['repo'] == "CN":
-        db.set('isPhab', "True")
-        idle = db.get('idle')
-        repo = 'antergos-packages'
-        db.set('pullFrom', 'antergos')
-        cnchi = ['cnchi-dev']
-        changes.append(cnchi)
-        working = db.exists('creating-cnchi-archive-from-dev')
-        if not working and 'cnchi-dev' not in the_queue and ('cnchi-dev' != building or idle == "True"):
-            db.set('creating-cnchi-archive-from-dev', 'True')
-            cnchi_git = '/var/repo/CN'
-            cnchi_clone = '/tmp/cnchi'
-            git = '/tmp/cnchi/.git'
-            cnchi_tar_tmp = '/tmp/cnchi.tar'
-            cnchi_tar = '/srv/antergos.org/cnchi.tar'
-
-            for f in [cnchi_clone, cnchi_tar, cnchi_tar_tmp]:
-                if os.path.exists(f):
-                    remove(f)
-            try:
-                subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
-
-                shutil.rmtree(git)
-
-                subprocess.check_call(['tar', '-cf', '/tmp/cnchi.tar', '-C', '/tmp', 'cnchi'])
-                shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
-            except subprocess.CalledProcessError as err:
-                logger.error(err.output)
-
-            db.delete('creating-cnchi-archive-from-dev')
-    else:
-        payload = json.loads(request.data)
-
-        # Save payload in the database temporarily in case we need it.
-        dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
-        key = 'payloads:%s' % dt
-        if db.exists(key):
-            for i in range(1, 5):
-                tmp = '%s:%s' % (key, i)
-                if not db.exists(tmp):
-                    key = tmp
-                    break
-        db.hmset(key, payload)
-        db.expire(key, 172800)
-
-        full_name = payload['repository']['full_name']
-        if 'lots0logs' in full_name and 'antergos/' not in full_name:
-            db.set('pullFrom', 'lots0logs')
-        else:
-            db.set('pullFrom', 'antergos')
-        repo = payload['repository']['name']
-        pusher = payload['pusher']['name']
-        commits = payload['commits']
-        if pusher != "antbs":
-            for commit in commits:
-                changes.append(commit['modified'])
-                changes.append(commit['added'])
-
-    if repo == "antergos-packages":
-        db.set('idle', 'False')
-        logger.info("Build hook triggered. Updating build queue.")
-        logger.info(changes)
-        has_pkgs = False
-        no_dups = []
-
-        for changed in changes:
-            if changed:
-                for item in changed:
-                    if is_phab:
-                        pak = item
-                    else:
-                        if "PKGBUILD" in item or ".antbs" in item:
-                            pak, pkb = item.rsplit('/', 1)
-                            pak = pak.rsplit('/', 1)[-1]
-                        else:
-                            pak = None
-
-                    if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
-                        logger.info('Adding %s to the build queue' % pak)
-                        no_dups.append(pak)
-                        db.sadd('pkgs:all', pak)
-                        has_pkgs = True
-
-        if has_pkgs:
-            the_pkgs = list(set(no_dups))
-            first = True
-            last = False
-            last_pkg = the_pkgs[-1]
-            p_ul = []
-            if len(the_pkgs) > 1:
-                p_ul.append('<ul class="hook-pkg-list">')
-            for p in the_pkgs:
-                if p in the_queue:
-                    continue
-                if p not in the_queue and p is not None and p != '' and p != []:
-                    db.rpush('queue', p)
-                    if len(the_pkgs) > 1:
-                        p_li = '<li>%s</li>' % p
-                    else:
-                        p_li = '<strong>%s</strong>' % p
-                    p_ul.append(p_li)
-                if p == last_pkg:
-                    last = True
-                queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
-                if last:
-                    if is_phab:
-                        source = 'Phabricator'
-                        tltype = 2
-                    else:
-                        source = 'Github'
-                        tltype = 1
-                    if len(the_pkgs) > 1:
-                        p_ul.append('</ul>')
-                    the_pkgs_str = ''.join(p_ul)
-                    tl_event = logconf.new_timeline_event('Webhook triggered by <strong>%s.</strong> Packages added to'
-                                                          ' the build queue: %s' % (source, the_pkgs_str), tltype)
-                    p_obj = package.Package(p, db)
-                    p_obj.save_to_db('tl_event', tl_event)
-                first = False
-
-    elif repo == "antergos-iso":
-        last = db.get('pkg:antergos-iso:last_commit')
-        #if not last or last is None or last == '0':
-        if db.get('isoBuilding') == 'False':
-            db.set('idle', 'False')
-            logger.info("New commit detected. Adding package to queue...")
-            db.set('isoFlag', 'True')
-            db.rpush('queue', 'antergos-iso')
-            #db.setex('pkg:antergos-iso:last_commit', 3600, 'True')
-            queue.enqueue_call(builder.handle_hook, timeout=10000)
-            logconf.new_timeline_event('<strong>antergos-iso</strong> was added to the <strong>build queue.</strong>')
-        else:
-            logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
-
-    return json.dumps({'msg': 'OK!'})
+    return webhook.Webhook(request, db, queue)
 
 
 @app.route('/scheduled')
