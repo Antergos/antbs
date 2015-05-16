@@ -47,7 +47,7 @@ from src.redis_connection import db
 import src.logging_config as logconf
 import src.package as package
 import src.webhook as webhook
-#import newrelic
+# import newrelic
 
 gevent.monkey.patch_all()
 
@@ -79,8 +79,8 @@ app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
 
-#settings = newrelic.agent.global_settings()
-#settings.app_name = 'AntBS'
+# settings = newrelic.agent.global_settings()
+# settings.app_name = 'AntBS'
 
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -200,6 +200,8 @@ def get_live_build_ouput():
 
         gevent.sleep(.05)
 
+    psub.close()
+
 
 def get_paginated(item_list, per_page, page, timeline):
     page -= 1
@@ -222,7 +224,7 @@ def get_build_info(page=None, status=None, logged_in=False):
     pkg_list = {}
     rev_pending = {}
 
-    logger.info('@@-antbs.py-@@ 221 | GET_BUILD_INFO - FIRED')
+    # logger.info('@@-antbs.py-@@ 221 | GET_BUILD_INFO - FIRED')
     if not all(i for i in (pkg_info_cache, rev_info_cache)):
         logger.info('@@-antbs.py-@@ 223 | GET_BUILD_INFO - "ALL" CONDITION FAILED. WE ARE NOT USING CACHED INFO')
         try:
@@ -234,14 +236,14 @@ def get_build_info(page=None, status=None, logged_in=False):
         if all_builds is not None:
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             db.set('%s:all_pages' % pinfo_key, all_pages)
-            logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s' % all_pages)
+            # logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s' % all_pages)
             for build in builds:
-                logger.info(build)
+                # logger.info(build)
                 try:
                     pkg = db.get('build_log:%s:pkg' % build)
-                    logger.info(pkg)
+                    # logger.info(pkg)
                 except Exception:
-                    logger.info('exception')
+                    logger.error('exception')
                     continue
                 bnum = build
                 version = db.get('build_log:%s:version' % bnum)
@@ -260,14 +262,14 @@ def get_build_info(page=None, status=None, logged_in=False):
                 db.expire('%s:%s' % (pinfo_key, bnum), 902)
                 db.rpush(pinfo_key, bnum)
                 db.expire(pinfo_key, 901)
-                #db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
+                # db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
                 if logged_in and review_stat == "pending":
                     rev_pending[bnum] = all_info
                     db.hmset('%s:%s' % (revinfo_key, bnum), all_info)
                     db.expire('%s:%s' % (revinfo_key, bnum), 901)
                     db.rpush(revinfo_key, bnum)
                     db.expire(revinfo_key, 900)
-                    #db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
+                    # db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
 
     else:
         logger.info('@@-antbs.py-@@ 276 | GET_BUILD_INFO - "ALL" CONDITION MET. WE ARE USING CACHED INFO')
@@ -279,7 +281,7 @@ def get_build_info(page=None, status=None, logged_in=False):
         for rev in revindex:
             h = db.hgetall('%s:%s' % (revinfo_key, rev))
             rev_pending[rev] = h
-        logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
+        # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
         all_pages = db.get('%s:all_pages' % pinfo_key)
 
     return pkg_list, int(all_pages), rev_pending
@@ -293,14 +295,14 @@ def get_repo_info(repo=None, logged_in=False):
     pkg_list = {}
     p, a, rev_pending = get_build_info(1, 'completed', logged_in)
 
-    logger.info('@@-antbs.py-@@ 293 | GET_REPO_INFO - FIRED')
+    # logger.info('@@-antbs.py-@@ 293 | GET_REPO_INFO - FIRED')
     if not repo_info_cache:
         logger.info('@@-antbs.py-@@ 295 | GET_REPO_INFO - CACHE CHECK FAILED. WE ARE NOT USING CACHED INFO')
         all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
 
         if all_packages is not None:
             for item in all_packages:
-                logger.info(item)
+                # logger.info(item)
                 item = item.split('/')[-1]
                 item = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', item)
                 if not item or item == '':
@@ -332,7 +334,7 @@ def get_repo_info(repo=None, logged_in=False):
         for i in rindex:
             h = db.hgetall('%s:%s' % (rinfo_key, i))
             pkg_list[i] = h
-        logger.info('@@-antbs.py-@@ 320 | GET_REPO_INFO - pkg_list hash is %s' % str(pkg_list))
+            # logger.info('@@-antbs.py-@@ 320 | GET_REPO_INFO - pkg_list hash is %s' % str(pkg_list))
 
     return pkg_list, rev_pending
 
@@ -356,16 +358,16 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('idle', 'False')
         result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
-        logger.info('Updating pkg review status for %s.' % pkg)
-        logger.info('[UPDATE REPO]: pkg is %s' % pkg)
-        logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
+        # logger.info('Updating pkg review status for %s.' % pkg)
+        # logger.info('[UPDATE REPO]: pkg is %s' % pkg)
+        # logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
         pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg))
         pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg))
         pkg_files = pkg_files_64 + pkg_files_32
-        logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
-        logger.info('[PKG_FILES]:')
+        # logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
+        # logger.info('[PKG_FILES]:')
         if pkg_files and pkg_files is not None:
-            logger.info(pkg_files)
+            # logger.info(pkg_files)
             logger.info('Moving %s from staging to main repo.' % pkg)
 
             for f in pkg_files_64:
@@ -449,7 +451,7 @@ def homepage(tlpage=None):
     this_page, all_pages = get_timeline(tlpage)
     is_logged_in = user.is_authenticated()
     c, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
-    #logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
+    # logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
     stats = {}
     for stat in check_stats:
         res = db.llen(stat)
@@ -532,7 +534,11 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
-    return webhook.Webhook(request, db, queue)
+    hook = webhook.Webhook(request, db, queue)
+    if hook.result is int:
+        abort(hook.result)
+    else:
+        return hook.result
 
 
 @app.route('/scheduled')
@@ -564,9 +570,9 @@ def completed(page=None):
         page = 1
     building = db.get('building')
     completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
-    #logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
+    # logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
     pagination = src.pagination.Pagination(page, 10, all_pages)
-    #logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
+    # logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
     #    pagination.page, pagination.per_page, pagination.total_count))
 
     return render_template("completed.html", idle=is_idle, building=building, completed=completed, all_pages=all_pages,
@@ -688,10 +694,10 @@ def build_pkg_now():
         pexists = db.exists('pkg:%s' % pkgname)
         is_logged_in = user.is_authenticated()
         p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
-        logger.info(rev_pending)
+        #logger.info(rev_pending)
         pending = False
         for bnum in rev_pending.keys():
-            logger.info(bnum)
+            #logger.info(bnum)
             if pkgname == rev_pending[bnum]['name']:
                 pending = True
                 break
@@ -713,7 +719,7 @@ def build_pkg_now():
 
             db.rpush('queue', pkgname)
             db.set('build:pkg:now', "True")
-            queue.enqueue_call(builder.handle_hook, args=args, timeout=9600)
+            queue.enqueue_call(builder.handle_hook, args=args, timeout=0)
             logconf.new_timeline_event(
                 '<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname))
 
@@ -778,16 +784,6 @@ def repo_packages(repo=None):
     packages, rev_pending = get_repo_info(repo, is_logged_in)
     return render_template("repo_pkgs.html", idle=is_idle, building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)
-
-
-
-
-
-
-
-
-    
-
 
 # Some boilerplate code that just says "if you're running this from the command
 # line, start here." It's not critical to know what this means yet.

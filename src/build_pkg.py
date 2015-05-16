@@ -78,6 +78,16 @@ def run_docker_clean(pkg=None):
         pass
     return True
 
+def truncate_middle(s, n):
+    if len(s) <= n:
+        # string is already short-enough
+        return s
+    # half of the size, minus the 3 .'s
+    n_2 = int(n) / 2 - 3
+    # whatever's left
+    n_1 = n - n_2 - 3
+    return '{0}...{1}'.format(s[:n_1], s[-n_2:])
+
 
 def check_deps(source):
     # # TODO: This still needs to be improved.
@@ -102,7 +112,7 @@ def check_deps(source):
                     emitted.append(name)  # <-- not required, but helps preserve original ordering
                     next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
             if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
-                raise ValueError("cyclic or missing dependancy detected: %r" % (next_pending,))
+                logger.error("cyclic or missing dependancy detected: %r" % (next_pending,))
                 pass
             pending = next_pending
             emitted = next_emitted
@@ -138,12 +148,12 @@ def process_package_queue(the_queue=None):
         all_deps = []
         for pkg in the_queue:
             special = [x for x in special_cases if pkg in x.keys()]
-            logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
+            #logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
             if special and len(special) > 0:
                 for case in special:
                     callsign = case[pkg]['callsign']
                     source = case[pkg]['source']
-                    logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
+                    #logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
                     try:
                         if callsign and callsign != '':
                             subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
@@ -412,6 +422,8 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
             # if bad_date:
             # line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
+            if len(line) > 120:
+                line = truncate_middle(line, 120)
             content.append(line)
             db.publish('build-output', line)
             db.set('build_log_last_line', line)
@@ -455,11 +467,25 @@ def build_pkgs(last=False, pkg_info=None):
         return False
     # Create our tmp directories
     result = os.path.join("/tmp", "result")
-    cache = os.path.join("/tmp", "pkg_cache")
+    cache = os.path.join("/var/tmp", "pkg_cache")
     for d in [result, cache]:
-        if os.path.exists(d):
+        if os.path.exists(d) and 'result' in d:
             shutil.rmtree(d)
-        os.mkdir(d, 0o777)
+            os.mkdir(d, 0o777)
+        elif os.path.exists(d) and 'pkg_cache' in d:
+            logger.info('@@-build_pkg.py-@@ 476 | Cleaning package cache....')
+            db.set('building', 'Cleaning package cache.')
+            for pcache in os.listdir(d):
+                pcache = os.path.join(d, pcache)
+                if not os.path.isdir(pcache):
+                    logger.error('@@-build_pkg.py-@@ 479 | pcache is not a directory')
+                    continue
+                for pfile in os.listdir(pcache):
+                    pfile = os.path.join(pcache, pfile)
+                    if os.stat(pfile).st_mtime < datetime.time() - 7 * 86400:
+                        remove(pfile)
+        else:
+            os.mkdir(d, 0o777)
     # pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])
@@ -508,7 +534,7 @@ def build_pkgs(last=False, pkg_info=None):
                 failed = True
                 continue
             db.set('container', container.get('Id'))
-            dirs = ['/tmp/32build', '/tmp/32bit']
+            dirs = ['/var/tmp/32build', '/var/tmp/32bit']
             for d in dirs:
                 if os.path.exists(d):
                     shutil.rmtree(d)
@@ -545,12 +571,12 @@ def build_pkgs(last=False, pkg_info=None):
                             'bind': '/root/.gnupg',
                             'ro': False
                         },
-                    '/tmp/32bit':
+                    '/var/tmp/32bit':
                         {
                             'bind': '/32bit',
                             'ro': False
                         },
-                    '/tmp/32build':
+                    '/var/tmp/32build':
                         {
                             'bind': '/32build',
                             'ro': False
@@ -622,9 +648,10 @@ def build_pkgs(last=False, pkg_info=None):
                 if pkgs2sign is not None:
                     for p in pkgs2sign:
                         remove(p)
+                        remove(p + '.sig')
                 db.set('%s:result' % this_log, 'failed')
                 db.rpush('failed', build_id)
-                log_string = db.get('%s:content' % this_log)
+                log_string = db.hget('%s:content' % this_log, 'content')
                 if log_string and log_string != '':
                     pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
                                                                               prestyles="background:#272822;color:#fff;",
@@ -642,7 +669,7 @@ def build_pkgs(last=False, pkg_info=None):
             if last:
                 db.set('idle', "True")
                 db.set('building', 'Idle')
-                for f in [result, cache, '/opt/antergos-packages', '/tmp/32bit', '/tmp/32build']:
+                for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
                     remove(f)
             else:
                 db.set('building', 'Starting next build in queue...')

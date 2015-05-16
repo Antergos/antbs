@@ -43,7 +43,7 @@ class Package(object):
     def __init__(self, name, db=db):
         self.name = name
         self.key = 'pkg:%s' % self.name
-        logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
+        #logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
         if not db.exists(self.key):
             db.set(self.key, True)
             db.incr('pkg:id:next')
@@ -90,7 +90,7 @@ class Package(object):
                     val = list(self.db.lrange(key, 0, -1))
                 elif self.db.type(key) == 'set' and self.db.scard(key) > 0:
                     val = self.db.smembers(key)
-                logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
+                #logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
             else:
                 val = ''
 
@@ -232,24 +232,27 @@ class Package(object):
         pbfile = self.get_from_db('pbpath')
         deps = self.get_from_pkgbuild('depends', pbfile).split()
         mkdeps = self.get_from_pkgbuild('makedepends', pbfile).split()
+        q = db.lrange('queue', 0, -1)
 
         for dep in deps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver is not None:
                 dep = has_ver.group(0)
-            if db.sismember('pkgs:all', dep):
+            if db.sismember('pkgs:all', dep) and dep in q:
                 depends.append(dep)
 
             self.save_to_db('depends', dep, type='set')
+
         for mkdep in mkdeps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
             if has_ver is not None:
                 mkdep = has_ver.group(0)
-            if db.sismember('pkgs:all', mkdep):
+            if db.sismember('pkgs:all', mkdep) and mkdep in q:
                 depends.append(mkdep)
 
             self.save_to_db('depends', mkdep, type='set')
 
         res = (self.name, depends)
+
         return res
 

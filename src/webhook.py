@@ -70,7 +70,7 @@ class Webhook(object):
             self.db = db
             self.request = request
             self.is_phab = False
-            self.is_github = True
+            self.is_github = False
             self.changes = []
             self.phab_payload = False
             self.the_queue = db.lrange('queue', 0, -1)
@@ -93,7 +93,7 @@ class Webhook(object):
                 # Process Webhook
                 if self.is_phab:
                     self.process_phab()
-                elif self.is_github:
+                if self.is_github:
                     self.process_github()
                 if len(self.changes) > 0:
                     self.process_changes()
@@ -117,10 +117,10 @@ class Webhook(object):
             else:
                 return False
 
-        if self.request.headers.get('X-GitHub-Event') == "ping":
-            self.result = json.dumps({'msg': 'Hi!'})
-        if self.request.headers.get('X-GitHub-Event') != "push":
-            self.result = json.dumps({'msg': "wrong event type"})
+            if self.request.headers.get('X-GitHub-Event') == "ping":
+                self.result = json.dumps({'msg': 'Hi!'})
+            if self.request.headers.get('X-GitHub-Event') != "push":
+                self.result = json.dumps({'msg': "wrong event type"})
 
         return True
 
@@ -133,7 +133,7 @@ class Webhook(object):
         if phab_repo == "NX":
             nx_pkg = ['numix-icon-theme']
         elif phab_repo == "NXSQ":
-            nx_pkg = ['numix-icon-theme-square']
+            nx_pkg = ['numix-icon-theme-square', 'numix-icon-theme-square-kde']
         elif phab_repo == "CN":
             nx_pkg = ['cnchi-dev']
         elif phab_repo == "payload":
@@ -145,10 +145,11 @@ class Webhook(object):
                 logger.error(err)
                 self.result = 500
                 return
-
-            self.full_name = 'Antergos/antergos-packages'
-            self.repo = 'antergos-packages'
             self.commits = ast.literal_eval(self.payload['commits'])
+            self.is_github = True
+
+        self.full_name = 'Antergos/antergos-packages'
+        self.repo = 'antergos-packages'
 
         # We enforce a rate limit to so we don't build the package more than once in 15 minutes.
         if nx_pkg:
@@ -163,8 +164,9 @@ class Webhook(object):
                 self.changes.append(nx_pkg)
                 self.db.setex('phab-commit-flag', 900, 'True')
             else:
-                logger.info('RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0])
-                self.result = json.dumps({'msg': 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]})
+                msg = 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]
+                logger.info(msg)
+                self.result = json.dumps({'msg': msg})
 
         if phab_repo == "CN":
             db.set('isPhab', "True")
@@ -193,24 +195,25 @@ class Webhook(object):
                 db.delete('creating-cnchi-archive-from-dev')
 
     def process_github(self):
-        payload = json.loads(self.request.data)
-        # Save payload in the database temporarily in case we need it later.
-        dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
-        key = 'payloads:%s' % dt
-        if db.exists(key):
-            for i in range(1, 5):
-                tmp = '%s:%s' % (key, i)
-                if not db.exists(tmp):
-                    key = tmp
-                    break
-        db.hmset(key, payload)
-        db.rpush('payloads:index', key)
-        db.expire(key, 172800)
+        if not self.phab_payload:
+            self.payload = json.loads(self.request.data)
+            # Save payload in the database temporarily in case we need it later.
+            dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
+            key = 'payloads:%s' % dt
+            if db.exists(key):
+                for i in range(1, 5):
+                    tmp = '%s:%s' % (key, i)
+                    if not db.exists(tmp):
+                        key = tmp
+                        break
+            db.hmset(key, self.payload)
+            db.rpush('payloads:index', key)
+            db.expire(key, 172800)
 
-        self.full_name = payload['repository']['full_name']
-        self.repo = payload['repository']['name']
-        self.pusher = payload['pusher']['name']
-        self.commits = payload['commits']
+            self.full_name = self.payload['repository']['full_name']
+            self.repo = self.payload['repository']['name']
+            self.pusher = self.payload['pusher']['name']
+            self.commits = self.payload['commits']
 
         if self.pusher != "antbs":
             for commit in self.commits:
@@ -223,10 +226,13 @@ class Webhook(object):
             logger.info("Build hook triggered. Updating build queue.")
             has_pkgs = False
             no_dups = []
+            logger.info(self.changes)
 
             for changed in self.changes:
+                logger.info(changed)
                 if changed is not None and changed != [] and changed != '':
                     for item in changed:
+                        logger.info(item)
                         if self.is_phab and not self.phab_payload:
                             pak = item
                         else:
@@ -236,6 +242,7 @@ class Webhook(object):
                             else:
                                 pak = None
 
+                        logger.info(pak)
                         if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
                             logger.info('Adding %s to the build queue' % pak)
                             no_dups.append(pak)
@@ -262,7 +269,7 @@ class Webhook(object):
                         p_ul.append(p_li)
                     if p == last_pkg:
                         last = True
-                    self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=9600)
+                    self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=0)
                     if last:
                         if self.is_phab:
                             source = 'Phabricator'
@@ -280,4 +287,5 @@ class Webhook(object):
                         p_obj.save_to_db('tl_event', tl_event)
                     first = False
 
-            self.result = json.dumps({'msg': 'OK!'})
+            if not self.result:
+                self.result = json.dumps({'msg': 'OK!'})
