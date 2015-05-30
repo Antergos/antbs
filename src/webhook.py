@@ -226,13 +226,13 @@ class Webhook(object):
             logger.info("Build hook triggered. Updating build queue.")
             has_pkgs = False
             no_dups = []
-            logger.info(self.changes)
+            # logger.info(self.changes)
 
             for changed in self.changes:
-                logger.info(changed)
+                # logger.info(changed)
                 if changed is not None and changed != [] and changed != '':
                     for item in changed:
-                        logger.info(item)
+                        # logger.info(item)
                         if self.is_phab and not self.phab_payload:
                             pak = item
                         else:
@@ -269,7 +269,7 @@ class Webhook(object):
                         p_ul.append(p_li)
                     if p == last_pkg:
                         last = True
-                    self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=0)
+                    self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=84600)
                     if last:
                         if self.is_phab:
                             source = 'Phabricator'

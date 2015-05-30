@@ -719,7 +719,7 @@ def build_pkg_now():
 
             db.rpush('queue', pkgname)
             db.set('build:pkg:now', "True")
-            queue.enqueue_call(builder.handle_hook, args=args, timeout=0)
+            queue.enqueue_call(builder.handle_hook, args=args, timeout=84600)
             logconf.new_timeline_event(
                 '<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname))
 

@@ -89,7 +89,8 @@ def maybe_build_mkarchiso():
 def build_makepkg():
     dockerfile = os.path.join(DOC_DIR, 'makepkg')
     try:
-        build_it = [line for line in doc.build(dockerfile, 'antergos/makepkg', False, None, True, False, True)]
+        build_it = [line for line in doc.build(dockerfile, 'antergos/makepkg', quiet=False, nocache=True, rm=True,
+                                               stream=True, forcerm=True)]
         if build_it:
             push_to_hub('antergos/makepkg')
     except Exception as err:
@@ -102,7 +103,8 @@ def build_makepkg():
 def build_mkarchiso():
     dockerfile = '/opt/archlinux-mkarchiso'
     try:
-        build_it = [line for line in doc.build(dockerfile, 'antergos/mkarchiso', False, None, True, False, True)]
+        build_it = [line for line in doc.build(dockerfile, tag='antergos/mkarchiso', quiet=False, nocache=True, rm=True,
+                                               stream=True, forcerm=True)]
         if build_it:
             push_to_hub('antergos/mkarchiso')
     except Exception as err:
@@ -118,9 +120,11 @@ def push_to_hub(repo=None):
         return
     try:
         doc.login(username=doc_user, password=doc_pass, email='dustin@falgout.us')
-        response = [line for line in doc.push(repo, stream=True)]
+        response = [line for line in doc.push(repo, stream=True, insecure_registry=True)]
         if not response:
             return False
+        else:
+            logger.info(response)
     except Exception as err:
         logger.error('@@-docker_util.py-@@ | Pushing to docker hub failed with error: %s', err)
 

@@ -20,7 +20,6 @@ body {
   background-color: #F0F0F0;
   font-family: 'Open Sans', sans-serif;
   font-size: 12px;
-  color: #555;
 }
 h1,
 h2,
@@ -35,7 +34,7 @@ h6,
 .h5,
 .h6 {
   font-family: 'Open Sans', sans-serif;
-  font-weight: 300;
+  font-weight: 400;
 }
 a {
   color: #54ade9;
@@ -185,16 +184,13 @@ code {
 }
 .hthin {
   font-family: "Raleway", Helvetica, sans-serif !important;
-  font-weight: 100 !important;
+  font-weight: 400 !important;
 }
 blockquote {
   border-left: 5px solid #4aa3df;
 }
 blockquote.pull-right {
   border-right: 5px solid #4aa3df;
-}
-.fa-spin {
-  animation: 1.2s linear 0s normal none infinite spin;
 }
 /*Pre & Code*/
 pre {
@@ -206,19 +202,19 @@ pre {
 .cont h2 {
   font-family: "Raleway", Helvetica, sans-serif;
   font-size: 32px;
-  font-weight: 100;
+  font-weight: 400;
   line-height: 38px;
   margin: 0 0 10px 0;
 }
 .cont h5 {
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
   line-height: 21px;
 }
 .cont p {
   color: #333;
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
   line-height: 23px;
 }
 .cont b {
@@ -347,7 +343,7 @@ pre {
   color: #2c3e50;
   background: url(../images/logo.png) no-repeat 0 11px;
   text-shadow: 1px 1px 0 rgba(0, 0, 0, 0.2);
-  font-weight: 300;
+  font-weight: 400;
   font-size: 19px;
   line-height: 18px;
 }
@@ -422,7 +418,7 @@ pre {
   padding: 0;
 }
 .navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
-  font-weight: 300;
+  font-weight: 400;
   color: #444;
   padding: 11px 10px;
   padding-left: 33px;
@@ -490,7 +486,7 @@ pre {
 }
 .navbar-default .navbar-nav > li.button .dropdown-menu .title {
   font-size: 12px;
-  font-weight: 300;
+  font-weight: 400;
   border-bottom: 1px solid #DDDDDF;
   padding: 8px 17px;
   color: #444;
@@ -624,7 +620,7 @@ pre {
   margin-bottom: 0;
   margin-top: 6px;
   font-family: 'Open Sans', sans-serif;
-  font-weight: 300;
+  font-weight: 400;
   letter-spacing: -1px;
 }
 .breadcrumb {
@@ -895,7 +891,7 @@ input::-webkit-input-speech-button {
   background-color: #F0F0F0;
   color: inherit;
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
   line-height: 21px;
   padding: 15px 30px 30px 30px;
   margin-top: 0;
@@ -954,7 +950,7 @@ input::-webkit-input-speech-button {
 #cl-wrapper .cl-sidebar .side-user .info p {
   color: #FFF;
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
   margin-bottom: 2px;
 }
 #cl-wrapper .cl-sidebar .side-user .info p b {
@@ -962,7 +958,7 @@ input::-webkit-input-speech-button {
 }
 #cl-wrapper .cl-sidebar .side-user .info p a {
   color: #FFF;
-  font-weight: 300;
+  font-weight: 400;
   display: inline-block;
   float: right;
 }
@@ -1542,7 +1538,7 @@ body.texture {
 .page-aside.email .compose {
   margin-top: 10px;
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
   text-transform: uppercase;
   text-align: center;
   padding: 20px 25px;
@@ -1633,7 +1629,7 @@ body.texture {
 .mail-inbox .head h3 span,
 .main-app .head h3 span {
   color: #888;
-  font-weight: 300;
+  font-weight: 400;
   font-size: 16px;
 }
 .mail-inbox .head input[type="text"],
@@ -1717,7 +1713,7 @@ body.texture {
   margin: 9px 0 15px 0;
 }
 .message .head h3 span {
-  font-weight: 300;
+  font-weight: 400;
   font-size: 20px;
   float: right;
 }
@@ -1726,7 +1722,7 @@ body.texture {
   margin-right: 15px;
 }
 .message .head h4 span {
-  font-weight: 100;
+  font-weight: 300;
   font-size: 15px;
   float: right;
 }
@@ -1742,7 +1738,7 @@ body.texture {
 }
 .message .mail p {
   font-size: 15px;
-  font-weight: 100;
+  font-weight: 300;
 }
 .message .mails .item {
   border-bottom: 1px solid #E5E5E5;
@@ -1784,7 +1780,7 @@ body.texture {
   margin: 0;
 }
 .message .head .subject input {
-  font-weight: 300;
+  font-weight: 400;
   font-size: 25px;
   height: auto;
   padding: 10px 0;
@@ -1871,7 +1867,7 @@ body.texture {
 .page-aside.codeditor .compose {
   margin-top: 10px;
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
   text-transform: uppercase;
   text-align: center;
   padding: 20px 25px;
@@ -1948,7 +1944,7 @@ body.texture {
 }
 .mail-inbox .head h3 span {
   color: #888;
-  font-weight: 300;
+  font-weight: 400;
   font-size: 16px;
 }
 .mail-inbox .head input[type="text"] {
@@ -2017,7 +2013,7 @@ body.texture {
   margin: 9px 0 15px 0;
 }
 .message .head h3 span {
-  font-weight: 300;
+  font-weight: 400;
   font-size: 20px;
   float: right;
 }
@@ -2026,7 +2022,7 @@ body.texture {
   margin-right: 15px;
 }
 .message .head h4 span {
-  font-weight: 100;
+  font-weight: 300;
   font-size: 15px;
   float: right;
 }
@@ -2042,7 +2038,7 @@ body.texture {
 }
 .message .mail p {
   font-size: 15px;
-  font-weight: 100;
+  font-weight: 300;
 }
 .message .mails .item {
   border-bottom: 1px solid #E5E5E5;
@@ -2301,7 +2297,7 @@ table.information > tbody > tr > td {
 }
 .main-app .items.products .item .price {
   font-size: 22px;
-  font-weight: 300;
+  font-weight: 400;
 }
 .main-app .items.products .item .product-image {
   float: left;
@@ -3174,7 +3170,7 @@ table.information > tbody > tr > td {
 .btn-lg {
   padding: 12px 14px;
   font-size: 15px;
-  font-weight: 300;
+  font-weight: 400;
 }
 .btn-lg i {
   font-size: 18px;
@@ -3619,7 +3615,7 @@ fieldset[disabled] .btn-primary.active {
 }
 .cbp-spmenu > .header h3 {
   color: #fff;
-  font-weight: 300;
+  font-weight: 400;
   font-size: 1.9em;
   margin: 0;
 }
@@ -3642,7 +3638,7 @@ fieldset[disabled] .btn-primary.active {
   display: block;
   color: #fff;
   font-size: 1.1em;
-  font-weight: 300;
+  font-weight: 400;
 }
 .cbp-spmenu a:hover {
   background: #22242B;
@@ -3975,7 +3971,7 @@ fieldset[disabled] .btn-primary.active {
   height: 47px;
   padding: 10px;
   font-size: 15px;
-  font-weight: 200;
+  font-weight: 400;
   color: #555;
 }
 .chat-wi .chat-tools {
@@ -4830,7 +4826,7 @@ a.list-group-item:hover + a.list-group-item {
 }
 .modal-content h3,
 .modal-content h3 {
-  font-weight: 300;
+  font-weight: 400;
   margin-top: 0;
   display: inline;
 }
@@ -4861,7 +4857,7 @@ a.list-group-item:hover + a.list-group-item {
 }
 .md-content h3,
 .modal-content h3 {
-  font-weight: 300;
+  font-weight: 400;
   margin-top: 0;
 }
 .md-content h2 {
@@ -5207,20 +5203,20 @@ body.modal-open,
 .block-flat .header h2 {
   margin: 0;
   font-family: "Raleway", Helvetica, sans-serif;
-  font-weight: 100;
+  font-weight: 300;
   font-size: 29px;
   line-height: 38px;
 }
 .block .header h3 {
   margin: 3px 0;
   font-family: "Raleway", Helvetica, sans-serif;
-  font-weight: 200;
+  font-weight: 400;
 }
 .widget-block .header h3,
 .block-flat .header h3 {
   margin-top: 3px;
   font-family: "Raleway", Helvetica, sans-serif;
-  font-weight: 200;
+  font-weight: 400;
 }
 .block-flat .actions,
 .block .actions {
@@ -5730,7 +5726,7 @@ table.dashed td {
 table thead th {
   padding: 5px;
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
 }
 table tbody td {
   padding: 7px 8px;
@@ -6385,7 +6381,7 @@ h1:first-child {
 }
 .fd-tile .content h1 {
   margin: 0 0 0;
-  font-weight: 300;
+  font-weight: 400;
   font-size: 40px;
 }
 /*Stats*/
@@ -6631,7 +6627,7 @@ ul.timeline >  li > .date {
   color: #fff;
   padding: 2em;
   font-size: 1.2em;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.4;
   position: relative;
   border-radius: 5px;
@@ -6919,7 +6915,7 @@ ul.timeline >  li > .date {
 .widget-block.weather-box .day {
   text-align: center;
   font-size: 24px;
-  font-weight: 300;
+  font-weight: 400;
   text-shadow: 1px 2px 2px rgba(0, 0, 0, 0.5);
   margin-bottom: 70px;
   margin-top: 3px;
@@ -6946,7 +6942,7 @@ ul.timeline >  li > .date {
 }
 .fb-box h3 {
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
   margin: 0 0 20px 0;
 }
 .fb-box h4 {
@@ -7043,7 +7039,7 @@ ul.timeline >  li > .date {
 .widget-block .header h3 {
   margin: 0;
   font-size: 13px;
-  font-weight: 200;
+  font-weight: 400;
   line-height: 21px;
   color: #666;
 }
@@ -7135,7 +7131,7 @@ ul.timeline >  li > .date {
   margin: 0;
   font-size: 35px;
   color: #444;
-  font-weight: 300;
+  font-weight: 400;
 }
 .cl-mcont .block .stat-data .stat-number span,
 .cl-mcont .block-flat .stat-data .stat-number span {
@@ -7236,19 +7232,19 @@ ul.timeline >  li > .date {
 .widget-block .total-data h2 {
   margin: 0;
   font-size: 24px;
-  font-weight: 300;
+  font-weight: 400;
   line-height: 32px;
 }
 .block .total-data h3,
 .widget-block .total-data h3 {
   font-size: 18px;
-  font-weight: 300;
+  font-weight: 400;
   margin: 0;
 }
 .block .total-data h4,
 .widget-block .total-data h4 {
   font-size: 14px;
-  font-weight: 300;
+  font-weight: 400;
   margin: 0;
 }
 .widget-block .fact-data {
@@ -7261,13 +7257,13 @@ ul.timeline >  li > .date {
 .widget-block .fact-data h2 {
   margin: 0;
   font-size: 32px;
-  font-weight: 300;
+  font-weight: 400;
 }
 .block .fact-data h3,
 .widget-block .fact-data h3 {
   text-transform: uppercase;
   margin: 0;
-  font-weight: 200;
+  font-weight: 400;
   font-size: 13px;
 }
 .widget-block .fact-data h3 {
@@ -7286,11 +7282,11 @@ ul.timeline >  li > .date {
 .widget-block h3 {
   font-size: 17px;
   margin: 5px 0 0 0;
-  font-weight: 200;
+  font-weight: 400;
 }
 .widget-block h2 {
   font-size: 32px;
-  font-weight: 300;
+  font-weight: 400;
 }
 .block h2 i {
   font-size: 24px;

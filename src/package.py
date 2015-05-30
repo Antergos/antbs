@@ -32,6 +32,7 @@ from github3 import login
 from src.redis_connection import db
 
 logger = logconf.logger
+REPO_DIR = "/opt/antergos-packages"
 
 
 class Package(object):
@@ -49,7 +50,6 @@ class Package(object):
             db.incr('pkg:id:next')
             pkgid = db.get('pkg:id:next')
             db.set('%s:%s' % (self.key, 'pkgid'), pkgid)
-
             db.set('%s:%s' % (self.key, 'name'), self.name)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
             db.set('%s:%s' % (self.key, 'autosum'), "False")
@@ -75,6 +75,18 @@ class Package(object):
         self.success_rate = self.get_from_db('success_rate')
         self.failure_rate = self.get_from_db('failure_rate')
         self.short_name = self.get_from_db('short_name')
+        self.path = self.get_from_db('path')
+        self.pbpath = self.get_from_db('pbpath')
+
+        # TODO: Need to come up with a way to standardized database schema updates/changes
+        if not db.exists('%s:%s' % (self.key, 'allowed_in')):
+            self.determine_pkg_path()
+            repos = self.get_from_pkgbuild('_allowed_in', self.pbpath)
+            repos = repos.split()
+            for r in repos:
+                self.save_to_db('allowed_in', r, 'list')
+
+        self.allowed_in = self.get_from_db('allowed_in')
 
     def delete(self):
         self.db.delete(self.key)
@@ -255,4 +267,21 @@ class Package(object):
         res = (self.name, depends)
 
         return res
+
+    def determine_pkg_path(self):
+        if not os.path.exists(os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name:
+            subdir = ['deepin_desktop', 'cinnamon']
+            for d in subdir:
+                if os.path.exists(os.path.join(REPO_DIR, d, self.name)):
+                    self.save_to_db(d, 'True')
+                    path = os.path.join(REPO_DIR, d, self.name)
+                    pbfile = os.path.join(path, 'PKGBUILD')
+                    break
+
+        else:
+            path = os.path.join(REPO_DIR, self.name)
+            pbfile = os.path.join(path, 'PKGBUILD')
+
+        self.save_to_db('pbpath', pbfile)
+        self.save_to_db('path', path)
 

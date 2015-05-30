@@ -177,15 +177,6 @@ def process_package_queue(the_queue=None):
                         logger.error(err)
 
             pkgobj = package(pkg, db)
-            if not os.path.exists(os.path.join(REPO_DIR, pkgobj.name)) and 'antergos-iso' not in pkgobj.name:
-                pkgobj.save_to_db('deepin', 'True')
-                pbfile = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name, 'PKGBUILD')
-                path = os.path.join(REPO_DIR, 'deepin_desktop', pkgobj.name)
-            else:
-                pbfile = os.path.join(REPO_DIR, pkgobj.name, 'PKGBUILD')
-                path = os.path.join(REPO_DIR, pkgobj.name)
-            pkgobj.save_to_db('pbpath', pbfile)
-            pkgobj.save_to_db('path', path)
             version = pkgobj.get_version()
             if not version:
                 db.lrem('queue', 0, 'cnchi-dev')
@@ -482,7 +473,8 @@ def build_pkgs(last=False, pkg_info=None):
                     continue
                 for pfile in os.listdir(pcache):
                     pfile = os.path.join(pcache, pfile)
-                    if os.stat(pfile).st_mtime < datetime.time() - 7 * 86400:
+                    dtime = time.time()
+                    if os.stat(pfile).st_mtime < (dtime - 7 * 86400):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
@@ -513,7 +505,6 @@ def build_pkgs(last=False, pkg_info=None):
             db.set('building_start', dt)
             db.set('%s:pkg' % this_log, pkg)
             db.set('%s:version' % this_log, version)
-            pkgdir = pkg_info.get_from_db('path')
             pkg_deps = pkg_info.depends or []
             pkg_deps_str = ' '.join(pkg_deps)
             logger.info('pkg_deps_str is %s' % pkg_deps_str)
@@ -523,12 +514,18 @@ def build_pkgs(last=False, pkg_info=None):
                 build_env = ['_AUTOSUMS=True']
             else:
                 build_env = ['_AUTOSUMS=False']
+            if '/cinnamon' in pkg_info.path:
+                build_env.append('_ALEXPKG=True')
+            else:
+                build_env.append('_ALEXPKG=False')
             logger.info('@@-build_pkg.py-@@ | build_env is %s' % build_env)
             try:
                 container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
                                                  name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
                                                                     '/root/.gnupg', '/staging', '/32bit', '/32build',
-                                                                    '/result'], environment=build_env)
+                                                                    '/result'], environment=build_env, cpuset='0-3')
+                if container.get('Warnings') and container.get('Warnings') != '':
+                    logger.error(container.get('Warnings'))
             except Exception as err:
                 logger.error('Create container failed. Error Msg: %s' % err)
                 failed = True
@@ -551,17 +548,17 @@ def build_pkgs(last=False, pkg_info=None):
                             'bind': '/makepkg',
                             'ro': False
                         },
-                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging':
                         {
                             'bind': '/staging',
                             'ro': False
                         },
-                    '/srv/antergos.info/repo/antergos/':
+                    '/srv/antergos.info/repo/antergos':
                         {
                             'bind': '/main',
                             'ro': False
                         },
-                    pkgdir:
+                    pkg_info.path:
                         {
                             'bind': '/pkg',
                             'ro': False
@@ -590,7 +587,7 @@ def build_pkgs(last=False, pkg_info=None):
                 cont = db.get('container')
                 stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
                 stream_process.start()
-                result = doc.wait(container)
+                result = doc.wait(cont)
                 if result is not 0:
                     failed = True
                     db.set('build_failed', "True")
@@ -640,7 +637,12 @@ def build_pkgs(last=False, pkg_info=None):
                 # db.incr('pkg_count', (in_dir - last_count))
                 db.rpush('completed', build_id)
                 db.set('%s:result' % this_log, 'completed')
-                db.set('%s:review_stat' % this_log, '1')
+                if 'main' in pkg_info.allowed_in:
+                    db.set('%s:review_stat' % this_log, '1')
+                elif 'staging' in pkg_info.allowed_in:
+                    db.set('%s:review_stat' % this_log, '0')
+                else:
+                    logger.error('@@-build_pkg.py-@@ 642 | pkgobj.allowed_in is empty')
             else:
                 logger.error('No package found after container exit.')
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
@@ -657,7 +659,7 @@ def build_pkgs(last=False, pkg_info=None):
                                                                               prestyles="background:#272822;color:#fff;",
                                                                               encoding='utf-8'))
                     db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-            doc.remove_container(container)
+            #doc.remove_container(container)
             end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             db.set('%s:end' % this_log, end)
             db.set('container', '')
@@ -669,8 +671,8 @@ def build_pkgs(last=False, pkg_info=None):
             if last:
                 db.set('idle', "True")
                 db.set('building', 'Idle')
-                for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
-                    remove(f)
+                #for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
+                #    remove(f)
             else:
                 db.set('building', 'Starting next build in queue...')
 
@@ -785,7 +787,7 @@ def build_iso():
                                          "Name": "on-failure"})
         try:
             iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh', tty=True,
-                                                 name=nm, host_config=hconfig)
+                                                 name=nm, host_config=hconfig, cpuset='0-3')
             db.set('container', iso_container.get('Id'))
         except Exception as err:
             logger.error("Cant connect to Docker daemon. Error msg: %s", err)
