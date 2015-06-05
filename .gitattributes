@@ -1,1 +1,4 @@
-static/* linguist-vendored
+static/*** linguist-vendored
+templates/400.html
+templates/500.html
+templates/test.html
