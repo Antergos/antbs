@@ -2,3 +2,7 @@ static/*** linguist-vendored
 templates/400.html linguist-vendored
 templates/500.html linguist-vendored
 templates/test.html linguist-vendored
+templates/login.html linguist-vendored
+templates/package.html linguist-vendored
+templates/repo***.html linguist-vendored
+templates/scheduled.html linguist-vendored
