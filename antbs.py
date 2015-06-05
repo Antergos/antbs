@@ -22,7 +22,10 @@
 
 """Main AntBS (Antergos Build Server) Module"""
 
-import ast
+import newrelic.agent
+settings = newrelic.agent.global_settings()
+settings.app_name = 'AntBS'
+newrelic.agent.initialize()
 
 import json
 import re
@@ -78,9 +81,6 @@ stormpath_manager = StormpathManager(app)
 app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
-
-# settings = newrelic.agent.global_settings()
-# settings.app_name = 'AntBS'
 
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
@@ -350,7 +350,6 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     errmsg = dict(error=False, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
-        db.set('build_log:%s:review_stat' % bnum, result)
         if result == "4":
             return errmsg
         db.set('build_log:%s:review_dev' % bnum, dev)
@@ -358,6 +357,15 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         db.set('idle', 'False')
         result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
+        if pkg:
+            pobj = package.Package(pkg, db)
+            if 'main' not in pobj.allowed_in and result == 2:
+                msg = '%s is not allowed in main repo.' % pkg
+                errmsg.update(error=True, msg=msg)
+                return errmsg
+            else:
+                db.set('build_log:%s:review_stat' % bnum, result)
+
         # logger.info('Updating pkg review status for %s.' % pkg)
         # logger.info('[UPDATE REPO]: pkg is %s' % pkg)
         # logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
@@ -549,13 +557,13 @@ def scheduled():
     except Exception:
         pkgs = None
     building = db.get('building')
-    the_queue = {}
+    the_queue = []
     if pkgs is not None:
         for pak in pkgs:
             name = db.get('pkg:%s:name' % pak)
             version = db.get('pkg:%s:version' % pak)
-            all_info = dict(name=name, version=version)
-            the_queue[pak] = all_info
+            all_info = (name, version)
+            the_queue.append(all_info)
 
     return render_template("scheduled.html", idle=is_idle, building=building, queue=the_queue, user=user)
 
@@ -667,7 +675,7 @@ def dev_pkg_check(page=None):
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')
-                message = dict(error=set_rev_error)
+                message = dict(msg=set_rev_error)
                 return json.dumps(message)
             else:
                 message = dict(msg='ok')

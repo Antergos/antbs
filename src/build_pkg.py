@@ -42,6 +42,7 @@ import src.package as pkgclass
 import src.sign_pkgs as sign_pkgs
 import glob
 
+
 logger = logconf.logger
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -50,6 +51,7 @@ REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
+
 
 
 def remove(src):
@@ -147,6 +149,8 @@ def process_package_queue(the_queue=None):
             }]
         all_deps = []
         for pkg in the_queue:
+            if pkg == '':
+                continue
             special = [x for x in special_cases if pkg in x.keys()]
             #logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
             if special and len(special) > 0:
@@ -185,9 +189,11 @@ def process_package_queue(the_queue=None):
             db.set('building', 'Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
             depends = pkgobj.get_deps()
             p, d = depends
-            if len(d) > 0:
-                all_deps.append(depends)
+            logger.info('@@-build_pkg.py-@@ 189 | depends before topsort: %s, %s' % (p, d))
 
+            if len(the_queue) > 1:
+                all_deps.append(depends)
+        logger.info('@@-build_pkg.py-@@ 189 | all_deps before topsort: %s' % all_deps)
         return all_deps
 
 
@@ -197,6 +203,17 @@ def handle_hook(first=False, last=False):
     # pull_from = db.get('pullFrom')
     pull_from = 'antergos'
     packages = db.lrange('queue', 0, -1)
+
+    if not os.path.exists(REPO_DIR):
+        try:
+            subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages.git'], cwd='/opt')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+    else:
+        try:
+            subprocess.check_call(['git', 'pull'], cwd=REPO_DIR)
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
 
     if iso_flag == 'True':
         db.set('building', 'Building docker image.')
@@ -248,9 +265,12 @@ def handle_hook(first=False, last=False):
         db.set('building', 'Determining build order by sorting package depends')
         if len(all_deps) > 1:
             topsort = check_deps(all_deps)
+            logger.info('@@-build_pkg.py-@@ 254 | depends AFTER topsort: %s' % topsort)
+            logger.info('@@-build_pkg.py-@@ 255 | queue before regen: %s' % packages)
             check = []
             db.delete('queue')
             for p in topsort:
+                logger.info('@@-build_pkg.py-@@ 259 | p in topsort: %s' % p)
                 db.rpush('queue', p)
                 check.append(p)
             logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
@@ -260,13 +280,6 @@ def handle_hook(first=False, last=False):
 
     if iso_flag == 'False' and len(packages) > 0:
         pack = package(db.lpop('queue'), db)
-        try:
-            subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
-        except subprocess.CalledProcessError as err:
-            logger.error(err.output)
-        except Exception as err:
-            logger.error(err)
-
         logger.info('[FIRST IS SET]: %s' % first)
         logger.info('[LAST IS SET]: %s' % last)
         built = build_pkgs(last, pack)
@@ -637,12 +650,7 @@ def build_pkgs(last=False, pkg_info=None):
                 # db.incr('pkg_count', (in_dir - last_count))
                 db.rpush('completed', build_id)
                 db.set('%s:result' % this_log, 'completed')
-                if 'main' in pkg_info.allowed_in:
-                    db.set('%s:review_stat' % this_log, '1')
-                elif 'staging' in pkg_info.allowed_in:
-                    db.set('%s:review_stat' % this_log, '0')
-                else:
-                    logger.error('@@-build_pkg.py-@@ 642 | pkgobj.allowed_in is empty')
+                db.set('%s:review_stat' % this_log, '1')
             else:
                 logger.error('No package found after container exit.')
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
@@ -851,7 +859,7 @@ def build_iso():
             db.set('%s:result' % this_log, 'failed')
             db.rpush('failed', build_id)
         remove('/opt/archlinux-mkarchiso/antergos-iso')
-        doc.remove_container(cont)
+        doc.remove_container(cont, v=True)
         # log_string = db.hget('%s:content' % this_log, 'content')
         # if log_string and log_string != '':
         # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',

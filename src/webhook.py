@@ -139,7 +139,7 @@ class Webhook(object):
         elif phab_repo == "payload":
             self.phab_payload = True
             try:
-                key = db.lrange('payloads:index', -1, -1)
+                key = db.lrange('payloads:index', -3, -3)
                 self.payload = db.hgetall(key[0])
             except Exception as err:
                 logger.error(err)

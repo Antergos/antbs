@@ -15,30 +15,35 @@
                             <td>Queue is empty.</td>
                         </tr>
                     {% else %}
-                    <table id="noDt" class="table no-border hover">
-                    <thead class="no-border">
-                    <tr>
-                        <th>Pos.</th>
-                        <th>Name</th>
-                        <th>Version</th>
-                    </tr>
-                    </thead>
-                    <tbody class="no-border-y">
-                        {% for pkg, info in queue.items()|reverse() %}
+                        <table id="noDt" class="table no-border hover">
+                            <thead class="no-border">
                             <tr>
-                                <td>{{ loop.index }}</td>
-                                <td>{{ info['name'] }}</td>
-                                <td>{{ info['version'] }}</td>
+                                <th>Pos.</th>
+                                <th>Name</th>
+                                <th>Version</th>
                             </tr>
-                        {% endfor %}
+                            </thead>
+                            <tbody class="no-border-y">
+                            {% if queue is not mapping %}
+                                {% for p in queue %}
+
+                                    {% set pkg, version = p %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ pkg }}</td>
+                                            <td>{{ version }}</td>
+                                        </tr>
+                                    {% endfor %}
+
+                            {% endif %}
 
 
-                    </tbody>
-                </table>
+                            </tbody>
+                        </table>
                     {% endif %}
+                </div>
             </div>
-            </div>
-            </div>
+        </div>
 
     </div>
 {%- endblock bottomcontent %}

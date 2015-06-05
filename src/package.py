@@ -42,11 +42,15 @@ class Package(object):
     db.setnx('pkg:id:next', 0)
 
     def __init__(self, name, db=db):
+        if name is None:
+            logger.error('@@-package.py-@@ 46| A pkg name is required to init an object on this class')
+            return
         self.name = name
         self.key = 'pkg:%s' % self.name
         #logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
         if not db.exists(self.key):
             db.set(self.key, True)
+            db.sadd('pkgs:all', self.name)
             db.incr('pkg:id:next')
             pkgid = db.get('pkg:id:next')
             db.set('%s:%s' % (self.key, 'pkgid'), pkgid)
@@ -77,14 +81,24 @@ class Package(object):
         self.short_name = self.get_from_db('short_name')
         self.path = self.get_from_db('path')
         self.pbpath = self.get_from_db('pbpath')
+        self.schema_v1 = self.get_from_db('schema_v1')
 
         # TODO: Need to come up with a way to standardized database schema updates/changes
-        if not db.exists('%s:%s' % (self.key, 'allowed_in')):
-            self.determine_pkg_path()
-            repos = self.get_from_pkgbuild('_allowed_in', self.pbpath)
-            repos = repos.split()
-            for r in repos:
-                self.save_to_db('allowed_in', r, 'list')
+        if not self.db.exists('%s:%s' % (self.key, 'allowed_in')) and not self.db.exists('%s:%s' % (self.key, 'schema_v1')):
+            if 'antergos-iso' in self.name:
+                self.save_to_db('allowed_in', 'n/a', 'list')
+            else:
+                pb = self.determine_pkg_path()
+                repos = self.get_from_pkgbuild('_allowed_in', pb)
+                if repos and repos != '':
+                    logger.info('@@-package.py-@@ 88 | FIRED!! %s' % repos)
+                    repos = repos.split()
+                    for r in repos:
+                        self.save_to_db('allowed_in', r, 'list')
+                else:
+                    if self.builds:
+                        logger.info('@@-package.py-@@ 88 | FIRED!!!!! %s' % self.builds)
+                        self.save_to_db('allowed_in', 'main', 'list')
 
         self.allowed_in = self.get_from_db('allowed_in')
 
@@ -98,8 +112,8 @@ class Package(object):
             if db.exists(key):
                 if self.db.type(key) == 'string':
                     val = self.db.get(key)
-                elif self.db.type(key) == 'list' and self.db.llen(key) > 0:
-                    val = list(self.db.lrange(key, 0, -1))
+                elif self.db.type(key) == 'list' and int(self.db.llen(key)) > 0:
+                    val = self.db.lrange(key, 0, -1)
                 elif self.db.type(key) == 'set' and self.db.scard(key) > 0:
                     val = self.db.smembers(key)
                 #logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
@@ -108,7 +122,7 @@ class Package(object):
 
         return val
 
-    def save_to_db(self, attr=None, value=None, type=None):
+    def save_to_db(self, attr=None, value=None, ktype=None):
         if attr is not None and value is not None:
             # TODO: This needs to be moved into its own method.
             if self.push_version and self.push_version == "True" and attr == "pkgver":
@@ -117,20 +131,29 @@ class Package(object):
 
             key = '%s:%s' % (self.key, attr)
 
-            if (self.db.type(key) == 'string' or self.db.type(key) == 'none') and type is None:
+            if (self.db.type(key) == 'string' or self.db.type(key) == 'none') and ktype is None:
                 self.db.set(key, value)
 
-            elif self.db.type(key) == 'list':
+            elif self.db.type(key) == 'list' or ktype == 'list':
                 self.db.rpush(key, value)
 
-            elif self.db.type(key) == 'set' or type == 'set':
+            elif self.db.type(key) == 'set' or ktype == 'set':
                 self.db.sadd(key, value)
 
             return value
 
     def get_from_pkgbuild(self, var=None, path=None):
-        if var is None or path is None:
-            return ''
+        for i in [var, path]:
+            if i is None or i == '':
+                logger.error('get_from_pkgbuild path is none')
+        try:
+            if not os.path.exists('/var/tmp/antergos-packages'):
+                subprocess.check_call(['git', 'clone', 'http://github.com/antergos-packages'], cwd='/var/tmp')
+            else:
+                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+        path = path.replace('/opt/', '/var/tmp/')
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
@@ -145,7 +168,8 @@ class Package(object):
             del(sys.modules["info"])
             err = []
         else:
-            cmd = 'source ' + path + '; echo $' + var
+            cmd = 'source ' + path + '; echo ${' + var + '[*]}'
+            logger.info('@@-package.py-@@ 88 | FIRED3! %s' % cmd)
             if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
                 if 'numix-icon-theme' not in parse:
                     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -241,8 +265,9 @@ class Package(object):
 
     def get_deps(self):
         depends = []
-        pbfile = self.get_from_db('pbpath')
+        pbfile = self.pbpath
         deps = self.get_from_pkgbuild('depends', pbfile).split()
+        logger.info('@@-package.py-@@ 250| deps are %s' % deps)
         mkdeps = self.get_from_pkgbuild('makedepends', pbfile).split()
         q = db.lrange('queue', 0, -1)
 
@@ -253,7 +278,7 @@ class Package(object):
             if db.sismember('pkgs:all', dep) and dep in q:
                 depends.append(dep)
 
-            self.save_to_db('depends', dep, type='set')
+            self.save_to_db('depends', dep, ktype='set')
 
         for mkdep in mkdeps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
@@ -262,20 +287,23 @@ class Package(object):
             if db.sismember('pkgs:all', mkdep) and mkdep in q:
                 depends.append(mkdep)
 
-            self.save_to_db('depends', mkdep, type='set')
+            self.save_to_db('depends', mkdep, ktype='set')
 
         res = (self.name, depends)
 
         return res
 
     def determine_pkg_path(self):
-        if not os.path.exists(os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name:
+        if (not os.path.exists(os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name) or 'cinnamon' == self.name:
             subdir = ['deepin_desktop', 'cinnamon']
             for d in subdir:
-                if os.path.exists(os.path.join(REPO_DIR, d, self.name)):
+                pdir = os.path.join(REPO_DIR, d)
+                if os.path.isdir(os.path.join(pdir, self.name)):
                     self.save_to_db(d, 'True')
-                    path = os.path.join(REPO_DIR, d, self.name)
+                    path = os.path.join(pdir, self.name)
+                    logger.info('@@-package.py-@@ 281| path is %s' % path)
                     pbfile = os.path.join(path, 'PKGBUILD')
+                    logger.info('@@-package.py-@@ 281| path is %s' % pbfile)
                     break
 
         else:
@@ -284,4 +312,6 @@ class Package(object):
 
         self.save_to_db('pbpath', pbfile)
         self.save_to_db('path', path)
+
+        return pbfile
 

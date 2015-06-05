@@ -28,6 +28,7 @@ import subprocess
 import os
 import docker
 from docker.utils import create_host_config
+import shutil
 
 logger = src.logging_config.logger
 db = src.redis_connection.db
@@ -56,9 +57,12 @@ def maybe_build_base_devel():
     build_script = os.path.join(DOC_DIR, 'base-devel.sh')
     try:
         build_it = subprocess.check_output([build_script])
+        shutil.rmtree('/opt/antergos-packages')
     except subprocess.CalledProcessError as err:
         logger.error('@@-docker_util.py-@@ | Image build script failed with error: %s', err.output)
         return False
+    except shutil.Error as err2:
+        logger(err2)
 
     if build_it:
         # Image was built successfully. Push it to docker hub.
