@@ -148,7 +148,7 @@ class Package(object):
                 logger.error('get_from_pkgbuild path is none')
         try:
             if not os.path.exists('/var/tmp/antergos-packages'):
-                subprocess.check_call(['git', 'clone', 'http://github.com/antergos-packages'], cwd='/var/tmp')
+                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
             else:
                 subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
         except subprocess.CalledProcessError as err:
