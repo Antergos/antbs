@@ -213,19 +213,37 @@ def get_paginated(item_list, per_page, page, timeline):
 
     return this_page, all_pages
 
+def match_pkg_name_build_log(bnum=None, match=None):
+    if not bnum or not match:
+        return False
+    pname = db.get('build_log:%s:pkg' % bnum)
+    logger.info(bnum)
+    if pname:
+        return match in pname
+    else:
+        return False
 
-def get_build_info(page=None, status=None, logged_in=False):
+
+def get_build_info(page=None, status=None, logged_in=False, search=None, spage=None):
     if page is None or status is None:
         abort(500)
-    pinfo_key = 'cache:pkg_info:%s:%s' % (status, page)
-    revinfo_key = 'cache:rev_info:%s:%s' % (status, page)
-    pkg_info_cache = db.exists(pinfo_key)
-    rev_info_cache = db.exists(revinfo_key)
+    if search:
+        sinfo_key = 'cache:search_info:%s:%s:%s' % (status, search, spage)
+        search_info_cache = db.exists(sinfo_key)
+        srevinfo_key = 'cache:srev_info:%s:%s:%s' % (status, search, spage)
+        check_cache = search_info_cache
+    else:
+        pinfo_key = 'cache:pkg_info:%s:%s' % (status, page)
+        revinfo_key = 'cache:rev_info:%s:%s' % (status, page)
+        pkg_info_cache = db.exists(pinfo_key)
+        rev_info_cache = db.exists(revinfo_key)
+        check_cache = all(i for i in (pkg_info_cache, rev_info_cache))
+
     pkg_list = {}
     rev_pending = {}
 
     # logger.info('@@-antbs.py-@@ 221 | GET_BUILD_INFO - FIRED')
-    if not all(i for i in (pkg_info_cache, rev_info_cache)):
+    if not check_cache:
         logger.info('@@-antbs.py-@@ 223 | GET_BUILD_INFO - "ALL" CONDITION FAILED. WE ARE NOT USING CACHED INFO')
         try:
             all_builds = db.lrange(status, 0, -1)
@@ -234,55 +252,86 @@ def get_build_info(page=None, status=None, logged_in=False):
             abort(500)
 
         if all_builds is not None:
-            builds, all_pages = get_paginated(all_builds, 10, page, False)
-            db.set('%s:all_pages' % pinfo_key, all_pages)
-            # logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s' % all_pages)
-            for build in builds:
-                # logger.info(build)
-                try:
-                    pkg = db.get('build_log:%s:pkg' % build)
-                    # logger.info(pkg)
-                except Exception:
-                    logger.error('exception')
-                    continue
-                bnum = build
-                version = db.get('build_log:%s:version' % bnum)
-                if not version or version is None:
-                    version = db.get('pkg:%s:version' % pkg)
-                start = db.get('build_log:%s:start' % bnum)
-                end = db.get('build_log:%s:end' % bnum)
-                review_stat = db.get('build_log:%s:review_stat' % bnum)
-                review_stat = db.get('review_stat:%s:string' % review_stat)
-                review_dev = db.get('build_log:%s:review_dev' % bnum)
-                review_date = db.get('build_log:%s:review_date' % bnum)
-                all_info = dict(bnum=bnum, name=pkg, version=version, start=start, end=end,
-                                review_stat=review_stat, review_dev=review_dev, review_date=review_date)
-                pkg_list[bnum] = all_info
-                db.hmset('%s:%s' % (pinfo_key, bnum), all_info)
-                db.expire('%s:%s' % (pinfo_key, bnum), 902)
-                db.rpush(pinfo_key, bnum)
-                db.expire(pinfo_key, 901)
-                # db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
-                if logged_in and review_stat == "pending":
-                    rev_pending[bnum] = all_info
-                    db.hmset('%s:%s' % (revinfo_key, bnum), all_info)
-                    db.expire('%s:%s' % (revinfo_key, bnum), 901)
-                    db.rpush(revinfo_key, bnum)
-                    db.expire(revinfo_key, 900)
-                    # db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
+            if search:
+                search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
+                logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s' % search_all_builds)
+                all_builds = search_all_builds
+                pinfo_key = sinfo_key
+            if all_builds is not None:
+
+                builds, all_pages = get_paginated(all_builds, 10, page, False)
+                db.set('%s:all_pages' % pinfo_key, all_pages)
+                logger.info('@@-antbs.py-@@ [completed route] | builds is %s' % builds)
+                for build in builds:
+                    # logger.info(build)
+                    try:
+                        pkg = db.get('build_log:%s:pkg' % build)
+                        # logger.info(pkg)
+                    except Exception:
+                        logger.error('exception')
+                        continue
+                    bnum = build
+                    version = db.get('build_log:%s:version' % bnum)
+                    if not version or version is None:
+                        version = db.get('pkg:%s:version' % pkg)
+                    start = db.get('build_log:%s:start' % bnum)
+                    end = db.get('build_log:%s:end' % bnum)
+                    review_stat = db.get('build_log:%s:review_stat' % bnum)
+                    review_stat = db.get('review_stat:%s:string' % review_stat)
+                    review_dev = db.get('build_log:%s:review_dev' % bnum)
+                    review_date = db.get('build_log:%s:review_date' % bnum)
+                    all_info = dict(bnum=bnum, name=pkg, version=version, start=start, end=end,
+                                    review_stat=review_stat, review_dev=review_dev, review_date=review_date)
+                    pkg_list[bnum] = all_info
+                    if search:
+                        db.hmset('%s:%s' % (sinfo_key, bnum), all_info)
+                        db.expire('%s:%s' % (sinfo_key, bnum), 902)
+                        db.rpush(sinfo_key, bnum)
+                        db.expire(sinfo_key, 901)
+                    else:
+                        db.hmset('%s:%s' % (pinfo_key, bnum), all_info)
+                        db.expire('%s:%s' % (pinfo_key, bnum), 902)
+                        db.rpush(pinfo_key, bnum)
+                        db.expire(pinfo_key, 901)
+                    # db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
+                    if logged_in and review_stat == "pending" and search:
+                        rev_pending[bnum] = all_info
+                        db.hmset('%s:%s' % (srevinfo_key, bnum), all_info)
+                        db.expire('%s:%s' % (srevinfo_key, bnum), 901)
+                        db.rpush(srevinfo_key, bnum)
+                        db.expire(srevinfo_key, 900)
+                    elif logged_in and review_stat == "pending":
+                        rev_pending[bnum] = all_info
+                        db.hmset('%s:%s' % (revinfo_key, bnum), all_info)
+                        db.expire('%s:%s' % (revinfo_key, bnum), 901)
+                        db.rpush(revinfo_key, bnum)
+                        db.expire(revinfo_key, 900)
+                        # db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
 
     else:
         logger.info('@@-antbs.py-@@ 276 | GET_BUILD_INFO - "ALL" CONDITION MET. WE ARE USING CACHED INFO')
-        revindex = db.lrange(revinfo_key, 0, -1)
-        pindex = db.lrange(pinfo_key, 0, -1)
-        for p in pindex:
-            h = db.hgetall('%s:%s' % (pinfo_key, p))
-            pkg_list[p] = h
-        for rev in revindex:
-            h = db.hgetall('%s:%s' % (revinfo_key, rev))
-            rev_pending[rev] = h
-        # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
-        all_pages = db.get('%s:all_pages' % pinfo_key)
+        if search:
+            srevindex = db.lrange(srevinfo_key, 0, -1)
+            sindex = db.lrange(sinfo_key, 0, -1)
+            for p in sindex:
+                h = db.hgetall('%s:%s' % (sinfo_key, p))
+                pkg_list[p] = h
+            for rev in srevindex:
+                h = db.hgetall('%s:%s' % (srevinfo_key, rev))
+                rev_pending[rev] = h
+            # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
+            all_pages = db.get('%s:all_pages' % pinfo_key)
+        else:
+            revindex = db.lrange(revinfo_key, 0, -1)
+            pindex = db.lrange(pinfo_key, 0, -1)
+            for p in pindex:
+                h = db.hgetall('%s:%s' % (pinfo_key, p))
+                pkg_list[p] = h
+            for rev in revindex:
+                h = db.hgetall('%s:%s' % (revinfo_key, rev))
+                rev_pending[rev] = h
+            # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
+            all_pages = db.get('%s:all_pages' % pinfo_key)
 
     return pkg_list, int(all_pages), rev_pending
 
@@ -569,15 +618,19 @@ def scheduled():
 
 
 @app.route('/completed/<int:page>')
+@app.route('/completed/search/<name>')
+@app.route('/completed/search/<name>/<int:spage>')
 @app.route('/completed')
-def completed(page=None):
+def completed(page=None, name=None, spage=None):
     is_idle = db.get('idle')
     status = 'completed'
     is_logged_in = user.is_authenticated()
     if page is None:
         page = 1
+    if name and not spage:
+        spage = 1
     building = db.get('building')
-    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
+    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in, name, spage)
     # logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
     pagination = src.pagination.Pagination(page, 10, all_pages)
     # logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (

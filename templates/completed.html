@@ -15,6 +15,17 @@
                 {% if not completed or completed == "0" %}
                     None
                 {% else %}
+                    <div class="col-md-3 pull-right">
+                        <div class="form-group">
+                            <div class="input-group">
+                                <input id="search_input" type="text" class="form-control">
+                                            <span class="input-group-btn">
+                                            <button id="search_btn" class="btn btn-primary" type="button">Search!</button>
+                                            </span>
+                            </div>
+
+                        </div>
+                    </div>
                     <table class="table no-border hover">
                         <thead class="no-border">
                         <tr>
@@ -73,10 +84,14 @@
                                         <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                         {{ info['review_stat'] }}
                                     {% endif %}</td>
-                                    <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
-                                        {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                    <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
-                                        {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                    <td>
+                                        {% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
+                                            <i class="fa fa-user"></i>
+                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>
+                                        {% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
+                                            <i class="fa fa-calendar"></i>
+                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
                                 </tr>
 
                             {% else %}
@@ -93,10 +108,14 @@
                                         {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
                                         <i class="fa fa-exclamation-circle" style="color:red;"></i>
                                         {{ info['review_stat'] }}{% endif %}</td>
-                                    <td>{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}<i class="fa fa-user"></i>
-                                                                                {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
-                                                                            <td>{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}<i class="fa fa-calendar"></i>
-                                                                                {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+                                    <td>
+                                        {% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
+                                            <i class="fa fa-user"></i>
+                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+                                    <td>
+                                        {% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
+                                            <i class="fa fa-calendar"></i>
+                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
                                 </tr>
                             {% endif %}
                         {% endfor %}
@@ -139,6 +158,10 @@
         {{ super() }}
         <script type="text/javascript">
             jQuery(document).ready(function () {
+                jQuery('#search_btn').on('click', function() {
+                    var search = jQuery('#search_input').val();
+                    window.location = '/completed/search/' + search;
+                });
                 jQuery('.set_result').on('click', 'a', function (e) {
                     e.preventDefault();
                     jQuery(this).addClass('clicked');
