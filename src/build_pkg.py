@@ -41,6 +41,7 @@ from multiprocessing import Process
 import src.package as pkgclass
 import src.sign_pkgs as sign_pkgs
 import glob
+from rq import get_current_job
 
 
 logger = logconf.logger
@@ -185,7 +186,7 @@ def process_package_queue(the_queue=None):
             if not version:
                 db.lrem('queue', 0, 'cnchi-dev')
                 continue
-            logger.info('Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
+            logger.info('Updating pkgver in database for %s to %s' % (pkgobj.name, version))
             db.set('building', 'Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
             depends = pkgobj.get_deps()
             p, d = depends
@@ -279,17 +280,26 @@ def handle_hook(first=False, last=False):
         db.set('building', 'Check deps complete. Starting build container.')
 
     if iso_flag == 'False' and len(packages) > 0:
-        pack = package(db.lpop('queue'), db)
-        logger.info('[FIRST IS SET]: %s' % first)
-        logger.info('[LAST IS SET]: %s' % last)
-        built = build_pkgs(last, pack)
+        pack = db.lpop('queue')
+        if pack and pack is not None and pack != '':
+            pkgobj = package(pack, db)
+        else:
+            return False
+
+        rqjob = get_current_job(db)
+        rqjob.meta['is_first'] = first
+        rqjob.meta['is_last'] = last
+        rqjob.meta['package'] = pkgobj.name
+        rqjob.save()
+
+        built = build_pkgs(last, pkgobj)
         # TODO: Move this into its own method
         if built:
             completed = db.lrange('completed', 0, -1)
             failed = db.lrange('failed', 0, -1)
-            success = len([x for x in pack.builds if x in completed])
-            failure = len([x for x in pack.builds if x in failed])
-            total = len(pack.builds)
+            success = len([x for x in pkgobj.builds if x in completed])
+            failure = len([x for x in pkgobj.builds if x in failed])
+            total = len(pkgobj.builds)
             if total > 0:
                 if success > 0:
                     success = 100 * success / total
@@ -299,8 +309,8 @@ def handle_hook(first=False, last=False):
                     failure = 100 * failure / total
                 else:
                     failure = 0
-                pack.save_to_db('success_rate', success)
-                pack.save_to_db('failure_rate', failure)
+                pkgobj.save_to_db('success_rate', success)
+                pkgobj.save_to_db('failure_rate', failure)
     if last:
         try:
             shutil.rmtree('/opt/antergos-packages')
@@ -485,9 +495,13 @@ def build_pkgs(last=False, pkg_info=None):
                     logger.error('@@-build_pkg.py-@@ 479 | pcache is not a directory')
                     continue
                 for pfile in os.listdir(pcache):
+                    pname = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', pfile)
+                    if not pname or pname == '':
+                        continue
+                    pname = pname.group(0)
                     pfile = os.path.join(pcache, pfile)
                     dtime = time.time()
-                    if os.stat(pfile).st_mtime < (dtime - 7 * 86400):
+                    if os.stat(pfile).st_mtime < (dtime - 7 * 86400) or db.sismember('pkgs:all', pname):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
