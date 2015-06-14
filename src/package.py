@@ -23,7 +23,6 @@
 """ Package Class """
 
 import src.logging_config as logconf
-import src.redis_connection
 import subprocess
 import os
 import re
@@ -37,7 +36,7 @@ REPO_DIR = "/opt/antergos-packages"
 
 class Package(object):
 
-    db = src.redis_connection.db
+    db = db
     gh_user = db.get('ANTBS_GITHUB_TOKEN')
     db.setnx('pkg:id:next', 0)
 

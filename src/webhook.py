@@ -59,18 +59,18 @@ def rm_file_or_dir(src):
 
 class Webhook(object):
     def __init__(self, request=None, db=None, queue=None):
+        self.can_process = False
         if request is None or db is None or queue is None:
             logger.error('@@-webhook.py-@@ 40 | Cant process new webhook because request or db is None.')
-            self.can_process = False
-        elif request.method == 'GET':
-            self.can_process = False
         elif request.method == 'POST':
             self.queue = queue
             self.can_process = True
             self.db = db
             self.request = request
-            self.is_phab = False
+            self.is_manual = False
+            self.is_numix = False
             self.is_github = False
+            self.is_gitlab = False
             self.changes = []
             self.phab_payload = False
             self.the_queue = db.lrange('queue', 0, -1)
@@ -91,8 +91,8 @@ class Webhook(object):
 
             if self.is_authorized:
                 # Process Webhook
-                if self.is_phab:
-                    self.process_phab()
+                if self.is_manual:
+                    self.process_manual()
                 if self.is_github:
                     self.process_github()
                 if len(self.changes) > 0:
@@ -102,9 +102,16 @@ class Webhook(object):
 
     def is_from_authorized_sender(self):
         # Determine if the request sender is authorized to send us webhooks.
-        phab = int(self.request.args.get('phab', '0'))
-        if phab and phab > 0 and self.request.remote_addr == '173.230.141.187':
-            self.is_phab = True
+        manual = int(self.request.args.get('phab', '0'))
+        gitlab = self.request.headers.get('X-Gitlab-Event') or ''
+        if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
+            self.is_manual = True
+        elif '' != gitlab and 'Push Hook' == gitlab:
+            self.is_gitlab = True
+            self.repo = 'antergos-packages'
+            self.full_name = 'Antergos/antergos-packages'
+            self.changes = [['numix-icon-theme-square', 'numix-icon-theme-square-kde']]
+            logger.error(self.request.headers)
         else:
             # Store the IP address blocks that github uses for hook requests.
             hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
@@ -124,58 +131,63 @@ class Webhook(object):
 
         return True
 
-    def process_phab(self):
-        phab_repo = self.request.args['repo']
-        db.set('pullFrom', 'antergos')
-        match = None
-        nx_pkg = None
+    def process_manual(self):
 
-        if phab_repo == "NX":
-            nx_pkg = ['numix-icon-theme']
-        elif phab_repo == "NXSQ":
-            nx_pkg = ['numix-icon-theme-square', 'numix-icon-theme-square-kde']
-        elif phab_repo == "CN":
-            nx_pkg = ['cnchi-dev']
-        elif phab_repo == "payload":
-            self.phab_payload = True
-            try:
-                key = db.lrange('payloads:index', -3, -3)
-                self.payload = db.hgetall(key[0])
-            except Exception as err:
-                logger.error(err)
-                self.result = 500
-                return
-            self.commits = ast.literal_eval(self.payload['commits'])
-            self.is_github = True
-
+        try:
+            key = db.lrange('payloads:index', -3, -3)
+            self.payload = db.hgetall(key[0])
+        except Exception as err:
+            logger.error(err)
+            self.result = 500
+            return
+        self.commits = ast.literal_eval(self.payload['commits'])
+        self.is_github = True
         self.full_name = 'Antergos/antergos-packages'
         self.repo = 'antergos-packages'
 
-        # We enforce a rate limit to so we don't build the package more than once in 15 minutes.
-        if nx_pkg:
-            if self.the_queue and nx_pkg[0] in self.the_queue:
-                for p in self.the_queue:
-                    if p == nx_pkg[0] or p == self.building:
-                        match = True
-                        break
-                    else:
-                        continue
-            if match is None and not self.db.exists('phab-commit-flag'):
-                self.changes.append(nx_pkg)
-                self.db.setex('phab-commit-flag', 900, 'True')
-            else:
-                msg = 'RATE LIMIT IN EFFECT FOR %s' % nx_pkg[0]
+    def process_github(self):
+        self.payload = json.loads(self.request.data)
+        # Save payload in the database temporarily in case we need it later.
+        dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
+        key = 'payloads:%s' % dt
+        if db.exists(key):
+            for i in range(1, 5):
+                tmp = '%s:%s' % (key, i)
+                if not db.exists(tmp):
+                    key = tmp
+                    break
+        db.hmset(key, self.payload)
+        db.rpush('payloads:index', key)
+        db.expire(key, 172800)
+
+        self.full_name = self.payload['repository']['full_name']
+        self.repo = self.payload['repository']['name']
+        self.pusher = self.payload['pusher']['name']
+        self.commits = self.payload['commits']
+
+        if self.repo == 'numix-icon-theme':
+            rate_limit = True
+            if 'numix-icon-theme' not in self.the_queue and 'numix-icon-theme' != self.building:
+                if not db.exists('numix-commit-flag'):
+                    self.changes.append(['numix-icon-theme'])
+                    self.is_numix = True
+                    db.setex('numix-commit-flag', 1200, 'True')
+                    rate_limit = False
+
+            if rate_limit:
+                msg = 'RATE LIMIT IN EFFECT FOR numix-icon-theme'
                 logger.info(msg)
                 self.result = json.dumps({'msg': msg})
+            else:
+                self.repo = 'antergos-packages'
 
-        if phab_repo == "CN":
-            db.set('isPhab', "True")
+        elif self.repo == 'cnchi-dev':
             idle = db.get('idle')
             working = db.exists('creating-cnchi-archive-from-dev')
             check = 'cnchi-dev' != self.building or idle == "True"
             if not working and 'cnchi-dev' not in self.the_queue and check:
                 db.set('creating-cnchi-archive-from-dev', 'True')
-                cnchi_git = '/var/repo/CN'
+                cnchi_git = 'https://github.com/lots0logs/cnchi-dev.git'
                 cnchi_clone = '/tmp/cnchi'
                 git = '/tmp/cnchi/.git'
                 cnchi_tar_tmp = '/tmp/cnchi.tar'
@@ -193,29 +205,7 @@ class Webhook(object):
                     logger.error(err.output)
 
                 db.delete('creating-cnchi-archive-from-dev')
-
-    def process_github(self):
-        if not self.phab_payload:
-            self.payload = json.loads(self.request.data)
-            # Save payload in the database temporarily in case we need it later.
-            dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
-            key = 'payloads:%s' % dt
-            if db.exists(key):
-                for i in range(1, 5):
-                    tmp = '%s:%s' % (key, i)
-                    if not db.exists(tmp):
-                        key = tmp
-                        break
-            db.hmset(key, self.payload)
-            db.rpush('payloads:index', key)
-            db.expire(key, 172800)
-
-            self.full_name = self.payload['repository']['full_name']
-            self.repo = self.payload['repository']['name']
-            self.pusher = self.payload['pusher']['name']
-            self.commits = self.payload['commits']
-
-        if self.pusher != "antbs":
+        elif self.pusher != "antbs":
             for commit in self.commits:
                 self.changes.append(commit['modified'])
                 self.changes.append(commit['added'])
@@ -233,7 +223,7 @@ class Webhook(object):
                 if changed is not None and changed != [] and changed != '':
                     for item in changed:
                         # logger.info(item)
-                        if self.is_phab and not self.phab_payload:
+                        if self.is_gitlab or self.is_numix:
                             pak = item
                         else:
                             if "PKGBUILD" in item:
@@ -271,8 +261,8 @@ class Webhook(object):
                         last = True
                     self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=84600)
                     if last:
-                        if self.is_phab:
-                            source = 'Phabricator'
+                        if self.is_gitlab:
+                            source = 'Gitlab'
                             tltype = 2
                         else:
                             source = 'Github'

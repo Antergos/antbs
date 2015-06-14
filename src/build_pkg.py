@@ -216,6 +216,14 @@ def handle_hook(first=False, last=False):
         except subprocess.CalledProcessError as err:
             logger.error(err)
 
+    try:
+        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-f', '-exec', 'chmod a+rw {} \;'],
+                                cwd='/opt')
+        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-d', '-exec', 'chmod 777 {} \;'],
+                                cwd='/opt')
+    except subprocess.CalledProcessError as err:
+        logger.error(err.output)
+
     if iso_flag == 'True':
         db.set('building', 'Building docker image.')
         db.set('isoBuilding', 'True')
