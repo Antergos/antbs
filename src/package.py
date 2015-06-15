@@ -35,7 +35,6 @@ REPO_DIR = "/opt/antergos-packages"
 
 
 class Package(object):
-
     db = db
     gh_user = db.get('ANTBS_GITHUB_TOKEN')
     db.setnx('pkg:id:next', 0)
@@ -46,7 +45,7 @@ class Package(object):
             return
         self.name = name
         self.key = 'pkg:%s' % self.name
-        #logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
+        # logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
         if not db.exists(self.key):
             db.set(self.key, True)
             db.sadd('pkgs:all', self.name)
@@ -83,7 +82,8 @@ class Package(object):
         self.schema_v1 = self.get_from_db('schema_v1')
 
         # TODO: Need to come up with a way to standardized database schema updates/changes
-        if not self.db.exists('%s:%s' % (self.key, 'allowed_in')) and not self.db.exists('%s:%s' % (self.key, 'schema_v1')):
+        if not self.db.exists('%s:%s' % (self.key, 'allowed_in')) and not self.db.exists(
+                        '%s:%s' % (self.key, 'schema_v1')):
             if 'antergos-iso' in self.name:
                 self.save_to_db('allowed_in', 'n/a', 'list')
             else:
@@ -115,7 +115,7 @@ class Package(object):
                     val = self.db.lrange(key, 0, -1)
                 elif self.db.type(key) == 'set' and self.db.scard(key) > 0:
                     val = self.db.smembers(key)
-                #logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
+                    # logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
             else:
                 val = ''
 
@@ -153,18 +153,22 @@ class Package(object):
         except subprocess.CalledProcessError as err:
             logger.error(err)
         path = path.replace('/opt/', '/var/tmp/')
+        logger.info('@@-package.py-@@ 156| get_from_pkgbuild: path is %s' % path)
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
             if "info" in sys.modules:
-                del(sys.modules["info"])
+                del (sys.modules["info"])
             if "/tmp/cnchi/cnchi" not in sys.path:
                 sys.path.append('/tmp/cnchi/cnchi')
+            if "/tmp/cnchi-dev/cnchi" not in sys.path:
+                sys.path.append('/tmp/cnchi-dev/cnchi')
             import info
+
             out = info.CNCHI_VERSION
             out = out.replace('"', '')
-            del(info.CNCHI_VERSION)
-            del(sys.modules["info"])
+            del info.CNCHI_VERSION
+            del (sys.modules["info"])
             err = []
         else:
             cmd = 'source ' + path + '; echo ${' + var + '[*]}'
@@ -188,7 +192,7 @@ class Package(object):
 
         if len(out) > 0:
             out = out.strip()
-            #logger.info('@@-package.py-@@ | proc.out is %s' % out)
+            # logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
             logger.error('@@-package.py-@@ | proc.err is %s' % err)
 
@@ -256,7 +260,7 @@ class Package(object):
         version = pkgver + '-' + str(pkgrel)
         if version and version != '' and version is not None:
             self.save_to_db('version', version)
-            #logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
+            # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version
 
@@ -293,7 +297,8 @@ class Package(object):
         return res
 
     def determine_pkg_path(self):
-        if (not os.path.exists(os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name) or 'cinnamon' == self.name:
+        if (not os.path.exists(
+                os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name) or 'cinnamon' == self.name:
             subdir = ['deepin_desktop', 'cinnamon']
             for d in subdir:
                 pdir = os.path.join(REPO_DIR, d)
@@ -313,4 +318,3 @@ class Package(object):
         self.save_to_db('path', path)
 
         return pbfile
-

@@ -26,7 +26,7 @@
 
 import os
 import subprocess
-import sys
+
 import redis_connection as redconn
 import logging_config as logconf
 
@@ -68,7 +68,7 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
         logger.info('[SIGN PKG] Signing %s' % path)
         if not passphrase:
             return False
-            #passphrase = getpass.getpass("Enter passphrase for %s: " % uid).encode('utf-8')
+            # passphrase = getpass.getpass("Enter passphrase for %s: " % uid).encode('utf-8')
         cmd = [GPG_BIN, '-sbu', 'Antergos', '--batch', '--passphrase-fd', '0', path]
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         out, err = p.communicate(passphrase)

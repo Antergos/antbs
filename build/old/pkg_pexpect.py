@@ -8,7 +8,6 @@ child = pexpect.spawnu('/usr/bin/makepkg',
                        cwd='/pkg')
 child.logfile = sys.stdout
 child.waitnoecho(timeout=1800)
-#child.expect('Passphrase:', timeout=1800)
+# child.expect('Passphrase:', timeout=1800)
 child.sendline('RanDom!')
 child.expect(pexpect.EOF)
-

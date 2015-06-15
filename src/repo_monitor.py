@@ -30,12 +30,12 @@ from gitlab import Gitlab
 GITLAB_TOKEN = db.get('ANTBS_GITLAB_TOKEN')
 GITHUB_TOKEN = db.get('ANTBS_GITHUB_TOKEN')
 
-def maybe_check_for_new_items():
 
+def maybe_check_for_new_items():
     return not db.exists('FEED_CHECKED')
 
-def check_for_new_items():
 
+def check_for_new_items():
     new_items = []
     gh = login(username='lots0logs', token=GITHUB_TOKEN)
     last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''
@@ -65,5 +65,3 @@ def check_for_new_items():
     db.setex('FEED_CHECKED', 900, 'True')
 
     return new_items
-
-

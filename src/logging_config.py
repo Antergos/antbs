@@ -89,7 +89,7 @@ logging.config.dictConfig({
 })
 
 
-def new_timeline_event(msg=None, type=None):
+def new_timeline_event(msg=None, tl_type=None):
     if msg is not None:
         if not db.exists('next-timeline-id'):
             db.set('next-timeline-id', '0')
@@ -103,7 +103,7 @@ def new_timeline_event(msg=None, type=None):
             db.set('%s:date' % tl, dt_date)
             db.set('%s:time' % tl, dt_time)
             db.set('%s:msg' % tl, msg)
-            db.set('%s:type' % tl, type)
+            db.set('%s:type' % tl, tl_type)
             db.lpush('timeline:all', event_id)
             popid = db.rpop('timeline:all')
             success = True
@@ -119,7 +119,3 @@ def new_timeline_event(msg=None, type=None):
                 logger.error('@@-logging_config.py-@@ | Unable to delete oldest timeline event, error msg: %s' % err)
 
         return event_id
-
-
-
-

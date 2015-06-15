@@ -44,7 +44,3 @@ if db.exists('ran_once') == 0:
     init_db()
 else:
     logger.debug('Db exists, no initial setup required.')
-
-
-
-

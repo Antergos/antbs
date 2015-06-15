@@ -43,7 +43,6 @@ import src.sign_pkgs as sign_pkgs
 import glob
 from rq import get_current_job
 
-
 logger = logconf.logger
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -52,7 +51,6 @@ REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
-
 
 
 def remove(src):
@@ -80,6 +78,7 @@ def run_docker_clean(pkg=None):
     except Exception:
         pass
     return True
+
 
 def truncate_middle(s, n):
     if len(s) <= n:
@@ -127,15 +126,15 @@ def process_package_queue(the_queue=None):
     if the_queue is not None:
         special_cases = [
             {'numix-icon-theme': {
-                'callsign': 'NX',
+                'url': 'https://github.com/numixproject/numix-icon-theme.git',
                 'source': ''}
             },
             {'numix-icon-theme-square': {
-                'callsign': 'NXSQ',
+                'url': 'https://gitlab.com/numix/numix-icon-theme-square.git',
                 'source': ''}
             },
             {'numix-icon-theme-square-kde': {
-                'callsign': 'NXSQ',
+                'callsign': 'https://gitlab.com/numix/numix-icon-theme-square.git',
                 'source': ''}
             },
             {'cnchi-dev': {
@@ -153,16 +152,18 @@ def process_package_queue(the_queue=None):
             if pkg == '':
                 continue
             special = [x for x in special_cases if pkg in x.keys()]
-            #logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
+            # logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
             if special and len(special) > 0:
                 for case in special:
-                    callsign = case[pkg]['callsign']
+                    callsign = case[pkg]['url']
                     source = case[pkg]['source']
-                    #logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
+                    # logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
                     try:
                         if callsign and callsign != '':
-                            subprocess.call(['git', 'clone', '/var/repo/' + callsign, pkg],
+                            subprocess.call(['git', 'clone', callsign, pkg],
                                             cwd='/opt/antergos-packages/' + pkg)
+                            subprocess.call(['git', 'clone', callsign, pkg],
+                                            cwd='/var/tmp/antergos-packages/' + pkg)
                             logger.info('Creating tar archive for %s' % pkg)
                             subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg],
                                                   cwd='/opt/antergos-packages/' + pkg)
@@ -689,7 +690,7 @@ def build_pkgs(last=False, pkg_info=None):
                                                                               prestyles="background:#272822;color:#fff;",
                                                                               encoding='utf-8'))
                     db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-            #doc.remove_container(container)
+            # doc.remove_container(container)
             end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             db.set('%s:end' % this_log, end)
             db.set('container', '')
@@ -701,7 +702,7 @@ def build_pkgs(last=False, pkg_info=None):
             if last:
                 db.set('idle', "True")
                 db.set('building', 'Idle')
-                #for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
+                # for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
                 #    remove(f)
             else:
                 db.set('building', 'Starting next build in queue...')

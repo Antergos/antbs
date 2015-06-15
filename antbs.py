@@ -23,25 +23,22 @@
 """Main AntBS (Antergos Build Server) Module"""
 
 import newrelic.agent
+
 settings = newrelic.agent.global_settings()
 settings.app_name = 'AntBS'
 newrelic.agent.initialize()
 
 import json
 import re
-import subprocess
 import os
 import glob
 import shutil
 from datetime import datetime, timedelta
-import ipaddress
 from rq import Queue, Connection, Worker
 from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
-import requests
 import docker
-from flask.ext.stormpath import StormpathManager, groups_required, login_required
-from flask.ext.stormpath import user
+from flask.ext.stormpath import StormpathManager, groups_required, user
 import gevent
 import gevent.monkey
 import src.pagination
@@ -154,7 +151,7 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
             db.set('building_num', '')
             db.set('building_start', '')
 
-    logger.error('Caught Build Exception:', traceback)
+    logger.error('Caught Build Exception: %s' % traceback)
 
     return True
 
@@ -212,6 +209,7 @@ def get_paginated(item_list, per_page, page, timeline):
     all_pages = len(paginated)
 
     return this_page, all_pages
+
 
 def match_pkg_name_build_log(bnum=None, match=None):
     if not bnum or not match:
@@ -755,10 +753,10 @@ def build_pkg_now():
         pexists = db.exists('pkg:%s' % pkgname)
         is_logged_in = user.is_authenticated()
         p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
-        #logger.info(rev_pending)
+        # logger.info(rev_pending)
         pending = False
         for bnum in rev_pending.keys():
-            #logger.info(bnum)
+            # logger.info(bnum)
             if pkgname == rev_pending[bnum]['name']:
                 pending = True
                 break
@@ -811,7 +809,6 @@ def get_and_show_pkg_profile(pkgname=None):
     check = db.exists('pkg:%s:name' % pkgname)
     if not check:
         abort(404)
-
 
     # all_pkgs = db.scan_iter('pkg:*:name', 100)
     #
