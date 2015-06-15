@@ -151,7 +151,7 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
             db.set('building_num', '')
             db.set('building_start', '')
 
-    logger.error('Caught Build Exception: %s' % traceback)
+    logger.error('Caught Build Exception: %s', traceback)
 
     return True
 
@@ -252,14 +252,14 @@ def get_build_info(page=None, status=None, logged_in=False, search=None, spage=N
         if all_builds is not None:
             if search:
                 search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
-                logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s' % search_all_builds)
+                logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s', search_all_builds)
                 all_builds = search_all_builds
                 pinfo_key = sinfo_key
             if all_builds is not None:
 
                 builds, all_pages = get_paginated(all_builds, 10, page, False)
                 db.set('%s:all_pages' % pinfo_key, all_pages)
-                logger.info('@@-antbs.py-@@ [completed route] | builds is %s' % builds)
+                logger.info('@@-antbs.py-@@ [completed route] | builds is %s',  builds)
                 for build in builds:
                     # logger.info(build)
                     try:
@@ -423,7 +423,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         # logger.info('[PKG_FILES]:')
         if pkg_files and pkg_files is not None:
             # logger.info(pkg_files)
-            logger.info('Moving %s from staging to main repo.' % pkg)
+            logger.info('Moving %s from staging to main repo.', pkg)
 
             for f in pkg_files_64:
                 if result is 2 or result == '2':
@@ -446,7 +446,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             errmsg = dict(error=True, msg=err)
 
     except (OSError, Exception) as err:
-        logger.error('@@-antbs.py-@@ | Error while moving to main: ' + err)
+        logger.error('@@-antbs.py-@@ | Error while moving to main: %s', err)
         err = str(err)
         errmsg = dict(error=True, msg=err)
 

@@ -90,13 +90,13 @@ class Package(object):
                 pb = self.determine_pkg_path()
                 repos = self.get_from_pkgbuild('_allowed_in', pb)
                 if repos and repos != '':
-                    logger.info('@@-package.py-@@ 88 | FIRED!! %s' % repos)
+                    logger.info('@@-package.py-@@ 88 | FIRED!! %s', repos)
                     repos = repos.split()
                     for r in repos:
                         self.save_to_db('allowed_in', r, 'list')
                 else:
                     if self.builds:
-                        logger.info('@@-package.py-@@ 88 | FIRED!!!!! %s' % self.builds)
+                        logger.info('@@-package.py-@@ 88 | FIRED!!!!! %s', self.builds)
                         self.save_to_db('allowed_in', 'main', 'list')
 
         self.allowed_in = self.get_from_db('allowed_in')
@@ -153,7 +153,7 @@ class Package(object):
         except subprocess.CalledProcessError as err:
             logger.error(err)
         path = path.replace('/opt/', '/var/tmp/')
-        logger.info('@@-package.py-@@ 156| get_from_pkgbuild: path is %s' % path)
+        logger.info('@@-package.py-@@ 156| get_from_pkgbuild: path is %s', path)
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
@@ -194,7 +194,7 @@ class Package(object):
             out = out.strip()
             # logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
-            logger.error('@@-package.py-@@ | proc.err is %s' % err)
+            logger.error('@@-package.py-@@ | proc.err is %s', err)
 
         return out
 
@@ -215,7 +215,7 @@ class Package(object):
         commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
         if commit and commit['commit'] is not None:
             try:
-                logger.info('@@-package.py-@@ | commit hash is %s' % commit['commit'].sha)
+                logger.info('@@-package.py-@@ | commit hash is %s', commit['commit'].sha)
             except AttributeError:
                 pass
             return True
@@ -270,7 +270,7 @@ class Package(object):
         depends = []
         pbfile = self.pbpath
         deps = self.get_from_pkgbuild('depends', pbfile).split()
-        logger.info('@@-package.py-@@ 250| deps are %s' % deps)
+        logger.info('@@-package.py-@@ 250| deps are %s', deps)
         mkdeps = self.get_from_pkgbuild('makedepends', pbfile).split()
         q = db.lrange('queue', 0, -1)
 
@@ -305,9 +305,9 @@ class Package(object):
                 if os.path.isdir(os.path.join(pdir, self.name)):
                     self.save_to_db(d, 'True')
                     path = os.path.join(pdir, self.name)
-                    logger.info('@@-package.py-@@ 281| path is %s' % path)
+                    logger.info('@@-package.py-@@ 281| path is %s',  path)
                     pbfile = os.path.join(path, 'PKGBUILD')
-                    logger.info('@@-package.py-@@ 281| path is %s' % pbfile)
+                    logger.info('@@-package.py-@@ 281| path is %s',  pbfile)
                     break
 
         else:
