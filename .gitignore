@@ -2,8 +2,7 @@
 .idea
 *.pyc
 *expect.conf
-build.sh
 repo*.sh
 *pycache
 *expect*.conf
-antbs.log
+*.log
