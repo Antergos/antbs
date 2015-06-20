@@ -437,7 +437,7 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
         end = line[25:]
         if end not in nodup:
             nodup.add(end)
-            line = re.sub('(?<=[\w\d])\'(?=[\w\d]+)', '', line)
+            line = re.sub('(?<=[\w\d]) \'(?=[\w\d]+)', ' ', line)
             # if line[-1:] == "'" or line[-1:] == '"':
             #     line = line[:-1]
             line = re.sub('(?<=[\w\d])\' (?=[\w\d]+)', ' ', line)

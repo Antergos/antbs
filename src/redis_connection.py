@@ -3,7 +3,7 @@
 #
 # redis_connection.py
 #
-# Copyright 2013 Antergos
+# Copyright 2013-2015 Antergos
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-db = redis.StrictRedis(unix_socket_path='/var/run/redis.sock')
+db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock')
 
 
 def init_db():

@@ -45,8 +45,6 @@ function setup_environment() {
 	update_success='STAGING REPO UPDATE COMPLETE'
 	mkdir /var/cache/pacman/success
 	export HOME=/root
-	export _MKPKG_OPTS='-smfL --noconfirm --noprogressbar --needed'
-	echo "${_MKPKG_OPTS}" > /dev/null
 
 	if [[ -f /pkg/PKGBUILD ]]; then
 
@@ -84,6 +82,8 @@ function setup_environment() {
 	sed -i '/CFLAGS=/c\CFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
 	sed -i '/CXXFLAGS=/c\CXXFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
 	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j3"' /etc/makepkg.conf
+	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
+	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
 
 }
 
@@ -149,7 +149,7 @@ function copy_any() {
 		if [[ -f ${file} ]]; then
 			cp "${file}" /staging/i686/
 		fi
-	done && run_remove_pkg "${PKGNAME}" && return 0;
+	done && return 0;
 
 	return 1;
 
@@ -191,7 +191,6 @@ function build_32bit_pkg() {
 		fi
 
 		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = http://repo.antergos.info/$repo/$arch\n|g' /32bit/pacman.conf
-		export _MKPKG_OPTS='-smfL --noconfirm --noprogressbar --needed'
 
 	else
 
@@ -200,11 +199,9 @@ function build_32bit_pkg() {
 		cd /32bit
 		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = http://repo.antergos.info/$repo/$arch\n%' /32bit/pacman.conf
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /32bit/makepkg.conf
-		export _MKPKG_OPTS='-smfL --noconfirm --noprogressbar --needed'
 
 	fi
 
-	echo "${_MKPKG_OPTS}" > /dev/null
 	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
 	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
 	mkdir /run/shm || true
@@ -232,7 +229,7 @@ function build_32bit_pkg() {
 	check_pkg_sums 32bit
 	cd /makepkg;
 
-	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; sudo -u antbs /usr/bin/makepkg ${_MKPKG_OPTS}" 2>&1 && \
+	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; sudo -u antbs /usr/bin/makepkg -smfL --noconfirm --noprogressbar --needed" 2>&1 && \
       cp /32build/root/pkg/*-i686.pkg.* /staging/i686 && return 0; } || return 1
 
 }
@@ -255,7 +252,7 @@ function try_build() {
 		cd /pkg
 		print2log 'UPDATING SOURCE CHECKSUMS';
 		check_pkg_sums &&
-		{ sudo -u antbs makepkg "${_MKPKG_OPTS}" 2>&1 && copy_any && return 0; } || return 1
+		{ sudo -u antbs makepkg -smfL --noconfirm --noprogressbar --needed 2>&1 && copy_any && return 0; } || return 1
 
 	fi
 
@@ -278,7 +275,7 @@ if [[ "${_UPDREPO}" != "True" ]]; then
 
 	print2log 'SYNCING REPO DATABASES'
 	#pacman-key --init && pacman-key --populate archlinux antergos
-	pacman -Scc --noconfirm --noprogressbar --color never 2>&1
+	yaourt -Scc --noconfirm --noprogressbar --color never 2>&1
 	pacman -Syy wget --noconfirm --noprogressbar --color never 2>&1
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64
@@ -346,4 +343,4 @@ else
 
 fi
 
-chown -R www-data:www-data /"${repo_dir}" && touch /result/"${PKGNAME}" && exit 0
+chown -R 33:33 /"${repo_dir}" && touch /result/"${PKGNAME}" && exit 0

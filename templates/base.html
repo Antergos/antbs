@@ -1,773 +1,783 @@
 {% block doc -%}
-    <!DOCTYPE html>
-    <html{% block html_attribs %} lang="en"{% endblock html_attribs %}>
+	<!DOCTYPE html>
+	<html{% block html_attribs %} lang="en"{% endblock html_attribs %}>
     {%- block html %}
-        <head>
+		<head>
             {%- block head %}
-                <meta charset="utf-8">
-                <meta name="description" content="Antergos Automated Build Server">
-                <meta name="author" content="Antergos Developers">
-                <link rel="shortcut icon" href="/static/img/fav.png">
-                <title>AntBS | {% block pagetitle %}{% endblock pagetitle %}</title>
+				<meta charset="utf-8">
+				<meta name="description" content="Antergos Automated Build Server">
+				<meta name="author" content="Antergos Developers">
+				<link rel="shortcut icon" href="/static/img/fav.png">
+				<title>AntBS | {% block pagetitle %}{% endblock pagetitle %}</title>
 
                 {%- block metas %}
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+					<meta name="viewport" content="width=device-width, initial-scale=1.0">
                 {%- endblock metas %}
 
                 {%- block styles %}
-                    <link href='//fonts.googleapis.com/css?family=Open+Sans:400,300,600,400italic,700,800'
-                          rel='stylesheet' type='text/css'>
-                    <link href='//fonts.googleapis.com/css?family=Raleway:400,300,200,100,700' rel='stylesheet'
-                          type='text/css'>
-                    <!-- Bootstrap core CSS -->
-                    <link href="/static/js/bootstrap/dist/css/bootstrap.css" rel="stylesheet">
-                    <link rel="stylesheet" type="text/css" href="/static/js/jquery.gritter/css/jquery.gritter.css" />
-                    <link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
-                    <link rel="stylesheet" type="text/css"
-                          href="/static/js/jquery.datatables/bootstrap-adapter/css/datatables.css"/>
-                    <!--<link rel="stylesheet" type="text/css" href="/static/js/jquery.niftymodals/css/component.css" /> -->
+					<link href='//fonts.googleapis.com/css?family=Open+Sans:400,300,600,400italic,700,800'
+					      rel='stylesheet' type='text/css'>
+					<link href='//fonts.googleapis.com/css?family=Raleway:400,300,200,100,700' rel='stylesheet'
+					      type='text/css'>
+					<!-- Bootstrap core CSS -->
+					<link href="/static/js/bootstrap/dist/css/bootstrap.css" rel="stylesheet">
+					<link rel="stylesheet" type="text/css" href="/static/js/jquery.gritter/css/jquery.gritter.css"/>
+					<link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
+					<link rel="stylesheet" type="text/css"
+					      href="/static/js/jquery.datatables/bootstrap-adapter/css/datatables.css"/>
+					<!--<link rel="stylesheet" type="text/css" href="/static/js/jquery.niftymodals/css/component.css" /> -->
 
-                    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-                    <!--[if lt IE 9]>
+					<!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+					<!--[if lt IE 9]>
                       <script src="../../assets/js/html5shiv.js"></script>
                       <script src="../../assets/js/respond.min.js"></script>
                     <![endif]-->
 
-                    <link href="/static/css/skin-blue.css" rel="stylesheet"/>
-                    <link href="/static/css/monokai.css" rel="stylesheet">
-                    <link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
-                    <style type="text/css">
-                        body, .cl-mcont {
-                            background-color: #EFEFEF;
-                        }
+					<link href="/static/css/skin-blue.css" rel="stylesheet"/>
+					<link href="/static/css/monokai.css" rel="stylesheet">
+					<link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
+					<style type="text/css">
+						body, .cl-mcont {
+							background-color: #EFEFEF;
+						}
 
-                        .cl-sidebar, .cl-sidebar .collapse-button {
-                            width: 225px;
-                            max-width: 225px;
-                        }
+						.cl-sidebar, .cl-sidebar .collapse-button {
+							width: 225px;
+							max-width: 225px;
+						}
 
-                        .cl-mcont {
-                            margin-left: 50px;
-                            margin-right: 50px;
-                            padding-top: 40px;
-                        }
+						.cl-mcont {
+							margin-left: 50px;
+							margin-right: 50px;
+							padding-top: 40px;
+						}
 
-                        .sidebar-logo {
-                            background: #272930;
-                        }
+						.sidebar-logo {
+							background: #272930;
+						}
 
-                        .cl-sidebar .collapse-button .search {
-                            width: 163px;
-                        }
+						.cl-sidebar .collapse-button .search {
+							width: 163px;
+						}
 
-                        .sb-collapsed .sidebar-logo {
+						.sb-collapsed .sidebar-logo {
 
-                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930;
-                        }
+							background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930;
+						}
 
-                        .pre-scrollable {
-                            white-space: pre-wrap;
-                            margin-top: 0px;
-                            border: none;
+						.pre-scrollable {
+							white-space: pre-wrap;
+							margin-top: 0px;
+							border: none;
 
-                        }
+						}
 
-                        .block .header h3 {
-                            margin: 3px 0;
-                            font-family: "Raleway", Helvetica, sans-serif;
-                            font-weight: 400;
-                        }
+						.block .header h3 {
+							margin: 3px 0;
+							font-family: "Raleway", Helvetica, sans-serif;
+							font-weight: 400;
+						}
 
-                        .hfloat {
-                            float: left;
-                        }
+						.hfloat {
+							float: left;
+						}
 
-                        h3.hfloat {
-                            width: 240px;
-                        }
+						h3.hfloat {
+							width: 240px;
+						}
 
-                        .hclear {
-                            clear: right;
-                        }
+						.hclear {
+							clear: right;
+						}
 
-                        .sidebar-logo {
-                            padding: 8px 20px;
-                        }
+						.sidebar-logo {
+							padding: 8px 20px;
+						}
 
-                        .sidebar-logo .logo {
-                            display: block;
-                            margin: 0 auto;
-                        }
+						.sidebar-logo .logo {
+							display: block;
+							margin: 0 auto;
+						}
 
-                        .sb-collapsed .sidebar-logo .logo {
-                            display: initial;
-                            margin: initial;
-                        }
+						.sb-collapsed .sidebar-logo .logo {
+							display: initial;
+							margin: initial;
+						}
 
-                        .sb-collapsed .sidebar-logo {
-                            background: url("/static/images/antergos-everyone.png") no-repeat scroll 12px 5px #272930;
-                            background-size: 300%;
-                        }
+						.sb-collapsed .sidebar-logo {
+							background: url("/static/images/antergos-everyone.png") no-repeat scroll 12px 5px #272930;
+							background-size: 300%;
+						}
 
-                        .sidebar-logo .logo a img {
-                            max-width: 79%;
-                            height: auto;
-                            display: block;
-                            margin: 0 auto;
-                            position: relative;
-                            right: 8px;
-                            top: 17px;
-                        }
+						.sidebar-logo .logo a img {
+							max-width: 79%;
+							height: auto;
+							display: block;
+							margin: 0 auto;
+							position: relative;
+							right: 8px;
+							top: 17px;
+						}
 
-                        .sb-collapsed .sidebar-logo .logo a img {
-                            display: none;
-                        }
+						.sb-collapsed .sidebar-logo .logo a img {
+							display: none;
+						}
 
-                        .sb-collapsed .logo:after {
-                            content: "";
-                            display: block;
-                            position: absolute;
-                            right: 0;
-                            height: 35px;
-                            width: 10px;
-                            background: #272930;
-                            z-index: 99999;
-                            top: 8px;
-                        }
+						.sb-collapsed .logo:after {
+							content: "";
+							display: block;
+							position: absolute;
+							right: 0;
+							height: 35px;
+							width: 10px;
+							background: #272930;
+							z-index: 99999;
+							top: 8px;
+						}
 
-                        .profile_menu .dropdown-toggle {
-                            padding: 22px;
-                        }
+						.profile_menu .dropdown-toggle {
+							padding: 22px;
+						}
 
-                        #build_now_form {
-                            display: inline-block;
-                        }
+						#build_now_form {
+							display: inline-block;
+						}
 
-                        #status_bar {
-                            display: none;
-                        }
+						#status_bar {
+							display: none;
+						}
 
-                        #status_bar span {
-                            float: left;
-                        }
+						#status_bar span {
+							float: left;
+						}
 
-                        #cl-wrapper .cl-sidebar .side-user {
-                            font-size: 13px;
-                        }
+						#cl-wrapper .cl-sidebar .side-user {
+							font-size: 13px;
+						}
 
-                        .fd-tile .content h1 {
-                            font-size: 45px;
-                        }
+						.fd-tile .content h1 {
+							font-size: 45px;
+						}
 
-                        #status_bar_pre {
-                            margin-top: 6px;
-                            margin-bottom: 0px;
-                            float: left;
-                            padding-top: 4px;
-                            padding-bottom: 1px;
-                        }
+						#status_bar_pre {
+							margin-top: 6px;
+							margin-bottom: 0px;
+							float: left;
+							padding-top: 4px;
+							padding-bottom: 1px;
+						}
 
-                        @media only screen and (min-width: 1200px) and (max-width: 1366px) {
-                            .fd-tile .content p {
-                                font-weight: 600;
-                                font-size: 9px;
-                            }
-                        }
+						@media only screen and (min-width: 1200px) and (max-width: 1366px) {
+							.fd-tile .content p {
+								font-weight: 600;
+								font-size: 9px;
+							}
+						}
 
-                        @media only screen and (max-width: 568px) {
-                            .cl-sidebar {
-                                max-width: 100%;
-                            }
-                        }
+						@media only screen and (max-width: 568px) {
+							.cl-sidebar {
+								max-width: 100%;
+							}
+						}
 
-                        ul.timeline > li > .date {
-                            width: 52px;
-                        }
+						ul.timeline > li > .date {
+							width: 52px;
+						}
 
-                        ul.timeline {
-                            margin-bottom: 0px;
-                            font-size: 14px;
-                        }
+						ul.timeline {
+							margin-bottom: 0px;
+							font-size: 14px;
+						}
 
-                        ul.pagination {
-                            margin: 0 auto;
-                        }
+						ul.pagination {
+							margin: 0 auto;
+						}
 
-                        ul.timeline > li > .date {
-                            background: #D0D0D0;
-                            position: absolute;
-                            top: 49px;
-                            display: block;
-                            padding: 0 5px;
-                            text-align: center;
-                            border: 1px solid #D0D0D0;
-                            font-size: 11px;
-                            border-radius: 1px;
-                            text-shadow: 0 1px 0 #fafafa;
-                            color: #000;
-                            line-height: 19px;
-                        }
+						ul.timeline > li > .date {
+							background: #D0D0D0;
+							position: absolute;
+							top: 49px;
+							display: block;
+							padding: 0 5px;
+							text-align: center;
+							border: 1px solid #D0D0D0;
+							font-size: 11px;
+							border-radius: 1px;
+							text-shadow: 0 1px 0 #fafafa;
+							color: #000;
+							line-height: 19px;
+						}
 
-                        ul.timeline > li .content {
-                            position: relative;
-                            border-radius: 3px;
-                            background: #FFF;
-                            margin-left: 75px;
-                            padding: 12px 10px;
-                            border: 1px solid #D0D0D0;
-                            line-height: 15px;
-                        }
+						ul.timeline > li .content {
+							position: relative;
+							border-radius: 3px;
+							background: #FFF;
+							margin-left: 75px;
+							padding: 12px 10px;
+							border: 1px solid #D0D0D0;
+							line-height: 15px;
+						}
 
-                        ul.timeline:before {
-                            background-color: #D0D0D0;
-                        }
+						ul.timeline:before {
+							background-color: #D0D0D0;
+						}
 
-                        ul.timeline > li .content p {
-                            margin: 0;
-                            padding-bottom: 5px;
-                        }
+						ul.timeline > li .content p {
+							margin: 0;
+							padding-bottom: 5px;
+						}
 
-                        ul.timeline > li .content:before {
-                            background: #FFF;
-                            position: absolute;
-                            top: 14px;
-                            content: "";
-                            width: 10px;
-                            height: 10px;
-                            left: -6px;
-                            border-left: 1px solid #D0D0D0;
-                            border-bottom: 1px solid #D0D0D0;
-                        }
+						ul.timeline > li .content:before {
+							background: #FFF;
+							position: absolute;
+							top: 14px;
+							content: "";
+							width: 10px;
+							height: 10px;
+							left: -6px;
+							border-left: 1px solid #D0D0D0;
+							border-bottom: 1px solid #D0D0D0;
+						}
 
-                        .timeline {
-                            text-align: left;
-                        }
+						.timeline {
+							text-align: left;
+						}
 
-                        .tlwrap {
-                            text-align: center;
-                        }
+						.tlwrap {
+							text-align: center;
+						}
 
-                        .tlwrap h4 {
-                            text-align: left;
-                        }
+						.tlwrap h4 {
+							text-align: left;
+						}
 
-                        ul.custom {
-                            float: right !important;
-                        }
+						ul.custom {
+							float: right !important;
+						}
 
-                        ul.hook-pkg-list {
-                            margin-top: 20px;
-                            margin-bottom: 20px;
-                        }
+						ul.hook-pkg-list {
+							margin-top: 20px;
+							margin-bottom: 20px;
+						}
 
-                        ul.hook-pkg-list li {
-                            list-style-type: none;
-                            font-size: 14px;
-                        }
+						ul.hook-pkg-list li {
+							list-style-type: none;
+							font-size: 14px;
+						}
 
-                        .phab {
-                            position: absolute;
-                            width: 40px;
-                            height: 40px;
-                            background-image: url('/static/img/phab.png') !important;
-                            background-repeat: no-repeat !important;
-                            background-size: 22px 14px !important;
-                            background-position: center center !important;
-                            background-color: #21415B !important;
-                            top: 2px;
-                        }
+						.phab {
+							position: absolute;
+							width: 40px;
+							height: 40px;
+							background-image: url('/static/img/phab.png') !important;
+							background-repeat: no-repeat !important;
+							background-size: 22px 14px !important;
+							background-position: center center !important;
+							background-color: #21415B !important;
+							top: 2px;
+						}
 
-                        .fa-github {
-                            background-color: #1f1f1f !important;
-                            font-size: 19px !important;
-                        }
+						.fa-github {
+							background-color: #1f1f1f !important;
+							font-size: 19px !important;
+						}
 
-                        .fa-github:before {
-                            content: "\f09b";
-                            position: relative;
-                            bottom: 2px;
-                            right: 1px;
-                        }
+						.fa-github:before {
+							content: "\f09b";
+							position: relative;
+							bottom: 2px;
+							right: 1px;
+						}
 
-                        ul.timeline > li > .fa-times {
-                            background: #EA6153;
-                        }
+						ul.timeline > li > .fa-times {
+							background: #EA6153;
+						}
 
-                        ul.timeline > li > .fa-check {
-                            background: #2CC36B;
-                        }
+						ul.timeline > li > .fa-check {
+							background: #2CC36B;
+						}
 
-                        ul.timeline > li > .fa-rocket {
-                            background: #7761A7;
-                        }
+						ul.timeline > li > .fa-rocket {
+							background: #7761A7;
+						}
 
-                        ul.hook-pkg-list li:before {
-                            display: inline-block;
-                            font-family: FontAwesome;
-                            font-style: normal;
-                            font-weight: normal;
-                            line-height: 1;
-                            -webkit-font-smoothing: antialiased;
-                            -moz-osx-font-smoothing: grayscale;
-                            content: "\f187";
-                            margin-right: 8px;
-                            font-size: 10px;
-                        }
+						ul.hook-pkg-list li:before {
+							display: inline-block;
+							font-family: FontAwesome;
+							font-style: normal;
+							font-weight: normal;
+							line-height: 1;
+							-webkit-font-smoothing: antialiased;
+							-moz-osx-font-smoothing: grayscale;
+							content: "\f187";
+							margin-right: 8px;
+							font-size: 10px;
+						}
 
-                        .profile-info .avatar {
-                            padding-top: 10px;
-                            text-align: right;
-                        }
+						.profile-info .avatar {
+							padding-top: 10px;
+							text-align: right;
+						}
 
-                        .profile-info .avatar img {
-                            max-width: 64px;
-                            max-height: 64px;
-                        }
-                        .block-flat .actions a {
-                          color: rgba(0, 0, 0, 0.7);
-                        }
-                        .block-flat .actions a:hover {
-                            color: #fff;
-                        }
-                        b {
-                          font-weight: 600;
-                        }
-                        .navbar-nav > li.button:first-child .dropdown-menu {
-                          padding: 0;
-                          min-width: 280px;
-                          max-width: 300px;
-                        }
-                        .navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
-                        text-overflow: ellipsis;
-                          white-space: nowrap;
-                          overflow: hidden;
-                          max-width: 280px;
-                        }
-                        .gritter-item-wrapper.clean.error .gritter-close {
-                            background: #ea6153;
-                        }
-                        #gritter-notice-wrapper {
-                            width: 460px;
-                            max-width: 100%;
-                        }
-                        .gritter-without-image, .gritter-with-image {
-                            padding-left: 7px;
-                            width: 450px;
-                            max-width: 100%;
-                        }
-                        .nano > .nano-pane {
-                          width: 7px;
-                          border-radius: 0px;
-                        }
-                        .dataTables_filter {
-                            display: none;
-                        }
+						.profile-info .avatar img {
+							max-width: 64px;
+							max-height: 64px;
+						}
+
+						.block-flat .actions a {
+							color: rgba(0, 0, 0, 0.7);
+						}
+
+						.block-flat .actions a:hover {
+							color: #fff;
+						}
+
+						b {
+							font-weight: 600;
+						}
+
+						.navbar-nav > li.button:first-child .dropdown-menu {
+							padding: 0;
+							min-width: 280px;
+							max-width: 300px;
+						}
+
+						.navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
+							text-overflow: ellipsis;
+							white-space: nowrap;
+							overflow: hidden;
+							max-width: 280px;
+						}
+
+						.gritter-item-wrapper.clean.error .gritter-close {
+							background: #ea6153;
+						}
+
+						#gritter-notice-wrapper {
+							width: 460px;
+							max-width: 100%;
+						}
+
+						.gritter-without-image, .gritter-with-image {
+							padding-left: 7px;
+							width: 450px;
+							max-width: 100%;
+						}
+
+						.nano > .nano-pane {
+							width: 7px;
+							border-radius: 0px;
+						}
+
+						.dataTables_filter {
+							display: none;
+						}
 
 
-
-                    </style>
+					</style>
                 {%- endblock styles %}
             {%- endblock head %}
-        </head>
-        <body{% block body_attribs %} class="animated"{% endblock body_attribs %}>
+		</head>
+		<body{% block body_attribs %} class="animated"{% endblock body_attribs %}>
         {% block body -%}
             {% block sidebar %}
 
-                <div id="cl-wrapper">
+				<div id="cl-wrapper">
 
-                <div class="cl-sidebar">
-                    <div class="cl-toggle"><i class="fa fa-bars"></i></div>
-                    <div class="cl-navblock">
-                        <div class="menu-space">
-                            <div class="content">
-                                <div class="sidebar-logo">
-                                    <div class="logo">
-                                        <a href="/"><img src="/static/images/antergos-everyone.png"/></a>
-                                    </div>
-                                </div>
-                                <div class="side-user">
-                                    <dl style="color:rgba(255, 255, 255, 0.6);">
-                                        <dt>Antergos Build Server</dt>
-                                        <dd>Automated repo management application that builds packages and iso
-                                            images.
-                                        </dd>
-                                    </dl>
-                                </div>
-                                <ul class="cl-vnavigation">
-                                    <li {% if request.path == "/" %}class="active"{% endif %}><a href="/"><i
-                                            class="fa fa-home"></i><span>Overview</span></a>
-                                    </li>
-                                    <li {% if request.path == "/building" %}class="active"{% endif %}><a
-                                            href="/building"><i
-                                            class="fa fa-eye"></i><span>Live Build Output</span></a>
-                                    </li>
-                                    <li class="parent"><a href="#"><i
-                                            class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
-                                        <ul class="sub-menu">
-                                            <li {% if request.path == "/scheduled" %}class="active"{% endif %}><a
-                                                    href="/scheduled"><i
-                                                    class="fa  fa-clock-o"></i><span>Build Queue</span></a>
-                                            </li>
-                                            <li {% if request.path == "/completed" or res == "completed" %}class="active"{% endif %}>
-                                                <a
-                                                        href="/completed"><i
-                                                        class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
-                                            </li>
-                                            <li {% if request.path == "/failed" or res == "failed" %}
-                                                class="active"{% endif %}><a
-                                                    href="/failed"><i
-                                                    class="fa fa-exclamation-circle"></i><span>Failed</span></a>
-                                            </li>
-                                        </ul>
-                                    </li>
+				<div class="cl-sidebar">
+					<div class="cl-toggle"><i class="fa fa-bars"></i></div>
+					<div class="cl-navblock">
+						<div class="menu-space">
+							<div class="content">
+								<div class="sidebar-logo">
+									<div class="logo">
+										<a href="/"><img src="/static/images/antergos-everyone.png"/></a>
+									</div>
+								</div>
+								<div class="side-user">
+									<dl style="color:rgba(255, 255, 255, 0.6);">
+										<dt>Antergos Build Server</dt>
+										<dd>Automated repo management application that builds packages and iso
+											images.
+										</dd>
+									</dl>
+								</div>
+								<ul class="cl-vnavigation">
+									<li {% if request.path == "/" %}class="active"{% endif %}><a href="/"><i
+										class="fa fa-home"></i><span>Overview</span></a>
+									</li>
+									<li {% if request.path == "/building" %}class="active"{% endif %}><a
+										href="/building"><i
+										class="fa fa-eye"></i><span>Live Build Output</span></a>
+									</li>
+									<li class="parent"><a href="#"><i
+										class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
+										<ul class="sub-menu">
+											<li {% if request.path == "/scheduled" %}class="active"{% endif %}><a
+												href="/scheduled"><i
+												class="fa  fa-clock-o"></i><span>Build Queue</span></a>
+											</li>
+											<li {% if request.path == "/completed" or res == "completed" %}class="active"{% endif %}>
+												<a
+													href="/completed"><i
+													class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
+											</li>
+											<li {% if request.path == "/failed" or res == "failed" %}
+												class="active"{% endif %}><a
+												href="/failed"><i
+												class="fa fa-exclamation-circle"></i><span>Failed</span></a>
+											</li>
+										</ul>
+									</li>
 
-                                    <li {% if request.path == "/browse" %}class="active"{% endif %}><a href="/browse"><i
-                                            class="fa  fa-archive"></i><span>Packages</span></a>
-                                        <ul class="sub-menu">
-                                            <li {% if request.path == "/browse/main" %}class="active"{% endif %}><a
-                                                    href="/browse/main"><i
-                                                    class="fa   fa-cloud"></i><span>Main Repo</span></a>
-                                            </li>
-                                            <li {% if request.path == "/browse" %}class="active"{% endif %}><a
-                                                    href="/browse"><i
-                                                    class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
-                                            </li>
+									<li {% if request.path == "/browse" %}class="active"{% endif %}><a href="/browse"><i
+										class="fa  fa-archive"></i><span>Packages</span></a>
+										<ul class="sub-menu">
+											<li {% if request.path == "/browse/main" %}class="active"{% endif %}><a
+												href="/browse/main"><i
+												class="fa   fa-cloud"></i><span>Main Repo</span></a>
+											</li>
+											<li {% if request.path == "/browse" %}class="active"{% endif %}><a
+												href="/browse"><i
+												class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
+											</li>
                                             {% if user.is_authenticated() %}
-                                                <li {% if 'repo_pkgs' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
-                                                    <a
-                                                            href="/repo_packages/antergos"><i
-                                                            class="fa   fa-list"></i><span>Repo Pkgs (Main)</span></a>
-                                                </li>
-                                                <li {% if 'repo_pkgs' in request.path and 'staging' in request.path %}class="active"{% endif %}>
-                                                    <a
-                                                            href="/repo_packages/antergos-staging"><i
-                                                            class="fa   fa-list"></i><span>Repo Pkgs (Staging)</span></a>
-                                                </li>
+												<li {% if 'repo_pkgs' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
+													<a
+														href="/repo_packages/antergos"><i
+														class="fa   fa-list"></i><span>Repo Pkgs (Main)</span></a>
+												</li>
+												<li {% if 'repo_pkgs' in request.path and 'staging' in request.path %}class="active"{% endif %}>
+													<a
+														href="/repo_packages/antergos-staging"><i
+														class="fa   fa-list"></i><span>Repo Pkgs (Staging)</span></a>
+												</li>
                                             {% endif %}
-                                        </ul>
-                                        <!--<li><a href="#" class="md-trigger" data-modal="md-3dSign"><i class="fa  fa-archive"></i><span>Packages</span></a>-->
+										</ul>
+										<!--<li><a href="#" class="md-trigger" data-modal="md-3dSign"><i class="fa  fa-archive"></i><span>Packages</span></a>-->
 
-                                    </li>
-                                    <li {% if request.path == "/browse/releases" %}class="active"{% endif %}><a
-                                            href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
+									</li>
+									<li {% if request.path == "/browse/releases" %}class="active"{% endif %}><a
+										href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
-                                    </li>
-                                    <li {% if request.path == "/browse/testing" %}class="active"{% endif %}><a
-                                            href="/browse/testing"><i
-                                            class="fa fa-wrench"></i><span>Testing</span></a></li>
+									</li>
+									<li {% if request.path == "/browse/testing" %}class="active"{% endif %}><a
+										href="/browse/testing"><i
+										class="fa fa-wrench"></i><span>Testing</span></a></li>
                                     {% if user.is_authenticated() %}
-                                        <li {% if request.path == "/issues" %}class="active"{% endif %}><a
-                                                href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
+										<li {% if request.path == "/issues" %}class="active"{% endif %}><a
+											href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
 
-                                        </li>{% endif %}
+										</li>{% endif %}
 
 
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-right collapse-button" style="padding:7px 9px;">
+								</ul>
+							</div>
+						</div>
+					</div>
+					<div class="text-right collapse-button" style="padding:7px 9px;">
                         {% if user.is_authenticated() %}
-                            <form action="/build_pkg_now" role="form" id="build_now_form" method="post">
-                                <input type="text" class="form-control search" name="pkgname" id="pkgname"
-                                       placeholder="Build Now..."/>
-                                <input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
-                            </form>
+							<form action="/build_pkg_now" role="form" id="build_now_form" method="post">
+								<input type="text" class="form-control search" name="pkgname" id="pkgname"
+								       placeholder="Build Now..."/>
+								<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
+							</form>
                         {% endif %}
-                        <button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
-                                                                                          class="fa fa-angle-left"></i>
-                        </button>
-                    </div>
-                </div>
+						<button id="sidebar-collapse" class="btn btn-default" style=""><i style="color:#fff;"
+						                                                                  class="fa fa-angle-left"></i>
+						</button>
+					</div>
+				</div>
             {% endblock sidebar %}
-        <div class="container-fluid" id="pcont">
+		<div class="container-fluid" id="pcont">
 
             {% block topbar %}
-                <!-- TOP BAR -->
-                <div id="head-nav" class="navbar navbar-default">
-                    <div class="container-fluid">
-                        <div class="navbar-collapse">
-                            <ul class="nav navbar-nav navbar-right user-nav">
+				<!-- TOP BAR -->
+				<div id="head-nav" class="navbar navbar-default">
+					<div class="container-fluid">
+						<div class="navbar-collapse">
+							<ul class="nav navbar-nav navbar-right user-nav">
                                 {% if user.is_authenticated() %}
-                                    <li class="dropdown profile_menu">
-                                        <a href="#" class="dropdown-toggle" data-toggle="dropdown"><i
-                                                class="fa fa-user"></i> {{ user.username }}
-                                            <b class="caret"></b></a>
+									<li class="dropdown profile_menu">
+										<a href="#" class="dropdown-toggle" data-toggle="dropdown"><i
+											class="fa fa-user"></i> {{ user.username }}
+											<b class="caret"></b></a>
 
-                                        <ul class="dropdown-menu">
-                                            <li><a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a></li>
-                                        </ul>
+										<ul class="dropdown-menu">
+											<li><a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a></li>
+										</ul>
 
-                                    </li>
-                                    </ul>
-                                    <ul class="nav navbar-nav not-nav">
-                                        <li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}"
-                                            data-toggle="tooltip"
-                                            title="Pending Review"
-                                            data-placement="right">
-                                            <a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle"
-                                               data-toggle="dropdown"{% endif %}><i
-                                                    class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
-                                                <span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
-                                            </a>
+									</li>
+									</ul>
+									<ul class="nav navbar-nav not-nav">
+										<li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}"
+										    data-toggle="tooltip"
+										    title="Pending Review"
+										    data-placement="right">
+											<a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle"
+											   data-toggle="dropdown"{% endif %}><i
+												class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
+												<span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
+											</a>
                                             {% if rev_pending|count() > 0 %}
-                                                <ul class="dropdown-menu">
-                                                    <li>
-                                                        <div class="nano" style="width:280px;">
-                                                                         <div class="nano-content content">
-                                                                <ul>
+												<ul class="dropdown-menu">
+													<li>
+														<div class="nano" style="width:280px;">
+															<div class="nano-content content">
+																<ul>
                                                                     {#                                                                    {% for item in rev_pending %}#}
                                                                     {% for pkg, info in rev_pending.items() %}
-                                                                        <li><a href="/pkg_review"><i
-                                                                                class="fa fa-archive"></i><b>{{ info['name'] }}</b>
+																		<li><a href="/pkg_review"><i
+																			class="fa fa-archive"></i><b>{{ info['name'] }}</b>
                                                                             {{ info['version'] }} <span
-                                                                                    class="date">{{ info['end'] }}</span></a>
-                                                                        </li>
+																				class="date">{{ info['end'] }}</span></a>
+																		</li>
 
                                                                     {% endfor %}
                                                                     {#                                                                    {% endfor %}#}
 
-                                                                </ul>
-                                                            </div>
-                                                        </div>
-                                                        <ul class="foot">
-                                                            <li><a href="/pkg_review">View All </a></li>
-                                                        </ul>
-                                                    </li>
-                                                </ul>
+																</ul>
+															</div>
+														</div>
+														<ul class="foot">
+															<li><a href="/pkg_review">View All </a></li>
+														</ul>
+													</li>
+												</ul>
                                             {% endif %}
-                                        </li>
-                                        <li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
-                                            title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
-                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-                                        </li>
-                                        <li id="status_bar"
-                                            class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-                                            <pre id="status_bar_pre">Idle</pre>
-                                        </li>
-                                    </ul>
+										</li>
+										<li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
+										    title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
+											class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+										</li>
+										<li id="status_bar"
+										    class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+											<pre id="status_bar_pre">Idle</pre>
+										</li>
+									</ul>
 
 
                                 {% else %}
-                                    <li class="dropdown profile_menu">
-                                        <a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
+									<li class="dropdown profile_menu">
+										<a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
                                         {#<b class="caret"></b></a>
 
                                     <ul class="dropdown-menu">
                                         <li class="disabled"><a href="#">Not Implemented</a></li>
                                     </ul>#}
 
-                                    </li>
-                                    </ul>
-                                    <ul class="nav navbar-nav not-nav">
-                                        <li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
-                                            title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
-                                                class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-                                        </li>
-                                        <li id="status_bar"
-                                            class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-                                            <pre id="status_bar_pre">Idle</pre>
-                                        </li>
-                                    </ul>
+									</li>
+									</ul>
+									<ul class="nav navbar-nav not-nav">
+										<li class="button status" {% if idle == 'True' %}data-toggle="tooltip"
+										    title="Status: Idle" data-placement="right"{% endif %}><a href="#"><i
+											class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+										</li>
+										<li id="status_bar"
+										    class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+											<pre id="status_bar_pre">Idle</pre>
+										</li>
+									</ul>
                                 {% endif %}
 
 
-                        </div>
-                    </div>
-                </div>
+						</div>
+					</div>
+				</div>
             {%- endblock topbar %}
-            <!-- Main -->
+			<!-- Main -->
             {% block maincontainer %}
-                <div id="main" class="cl-mcont">
+				<div id="main" class="cl-mcont">
                     {% block subheader %}
                         {% if request.path != "/" %}
-                            <div class="page-head"><h2>{{ self.pagetitle() }}</h2>
-                                <ol class="breadcrumb">
-                                    <li><a href="/">Home</a></li>
+							<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+								<ol class="breadcrumb">
+									<li><a href="/">Home</a></li>
 
-                                    <li class="active">{{ self.pagetitle() }}</li>
-                                </ol>
-                            </div>
+									<li class="active">{{ self.pagetitle() }}</li>
+								</ol>
+							</div>
                         {% endif %}
                     {% endblock subheader %}
 
-                    <!-- upper section -->
-                    <div class="row">
+					<!-- upper section -->
+					<div class="row">
                         {% block topcontent -%}
 
 
                         {%- endblock topcontent %}
-                    </div>
-                    <div class="row">
+					</div>
+					<div class="row">
                         {% block bottomcontent -%}
 
 
                         {%- endblock bottomcontent %}
-                    </div>
-                    <!--/row-->
+					</div>
+					<!--/row-->
 
-                    <!-- /upper section -->
+					<!-- /upper section -->
 
-                </div><!--/container-->
+				</div><!--/container-->
             {% endblock maincontainer %}
-        </div> <!-- /Main -->
-        </div>
+		</div> <!-- /Main -->
+		</div>
 
 
             {% block scripts %}
-                <script src="/static/js/jquery.js"></script>
-                <script src="/static/js/jquery.cookie/jquery.cookie.js"></script>
-                <script src="/static/js/jquery.pushmenu/js/jPushMenu.js"></script>
+				<script src="/static/js/jquery.js"></script>
+				<script src="/static/js/jquery.cookie/jquery.cookie.js"></script>
+				<script src="/static/js/jquery.pushmenu/js/jPushMenu.js"></script>
 
-                <!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
+				<!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
 
-                <script type="text/javascript" src="/static/js/jquery.ui/jquery-ui.js"></script>
-                <script type="text/javascript" src="/static/js/jquery.nanoscroller/jquery.nanoscroller.min.js"></script>
-
-
-                <!-- Bootstrap core JavaScript
-                ================================================== -->
-                <!-- Placed at the end of the document so the pages load faster -->
-                <script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
-                <script type="text/javascript" src="/static/js/jquery.gritter/js/jquery.gritter.js"></script>
-                <script type="text/javascript" src="/static/js/behaviour/core.js"></script>
-                <script type="text/javascript" src="/static/js/jquery.datatables/jquery.datatables.min.js"></script>
-                <script type="text/javascript"
-                        src="/static/js/jquery.datatables/bootstrap-adapter/js/datatables.js"></script>
-                <script type="text/javascript"
-                        src="/static/js/jquery.datatables/bootstrap-adapter/js/dataTables.bootstrap.js"></script>
-                <script type="text/javascript"
-                        src="/static/js/jquery.datatables/media/js/num-html.js"></script>
-                <script type="text/javascript">
-                    //sets up numeric sorting of links
-                    jQuery(document).ready(function () {
-
-                        {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                        {% for category, message in messages %}
-                            setTimeout(function() {
-                                $.gritter.add({
-                                    title: '{{ category|upper() }}',
-                                    text: '{{ message }}',
-                                    class_name: 'clean {% if category == "error" %}error{% else %}info{% endif %} {{ category }}',
-                                    sticky: '{% if category == "error" %}true{% else %}false{% endif %}'
-                                });
-                            }, {{ loop.index * 500 }} );
-                        {% endfor %}
-                        {% endif %}
-                        {% endwith %}
+				<script type="text/javascript" src="/static/js/jquery.ui/jquery-ui.js"></script>
+				<script type="text/javascript" src="/static/js/jquery.nanoscroller/jquery.nanoscroller.min.js"></script>
 
 
-                        jQuery('#main pre').addClass('pre-scrollable');
-                        jQuery('.not-idle').show();
-                        function getStatus() {
-                            $.getJSON('/get_status', function (data) {
-                                var current = jQuery('#status_bar_pre').text();
-                                if (data['msg'] !== current) {
-                                    jQuery('.idle').addClass('not-idle').removeClass('idle');
-                                    jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
-                                    jQuery('#status_bar').show();
-                                    jQuery('#status_bar_pre').text(data['msg']);
-                                    current = jQuery('#status_bar_pre').text();
-                                }
-                                if (data['msg'] == 'Idle' || current == 'Idle') {
+				<!-- Bootstrap core JavaScript
+				================================================== -->
+				<!-- Placed at the end of the document so the pages load faster -->
+				<script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
+				<script type="text/javascript" src="/static/js/jquery.gritter/js/jquery.gritter.js"></script>
+				<script type="text/javascript" src="/static/js/behaviour/core.js"></script>
+				<script type="text/javascript" src="/static/js/jquery.datatables/jquery.datatables.min.js"></script>
+				<script type="text/javascript"
+				        src="/static/js/jquery.datatables/bootstrap-adapter/js/datatables.js"></script>
+				<script type="text/javascript"
+				        src="/static/js/jquery.datatables/bootstrap-adapter/js/dataTables.bootstrap.js"></script>
+				<script type="text/javascript"
+				        src="/static/js/jquery.datatables/media/js/num-html.js"></script>
+				<script type="text/javascript">
+					//sets up numeric sorting of links
+					jQuery(document).ready(function () {
 
-                                    jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
-                                    jQuery('#status_bar').hide();
-
-                                }
-                            })
-
-                        }
-
-                        getStatus();
-                        setInterval(getStatus, 10000);
-                    });
-                    jQuery(window).load(function () {
-                                jQuery('[data-toggle="tooltip"]').tooltip();
-
-                                jQuery('.loading').fadeIn();
-                                if (jQuery('table').length && !jQuery('#noDt').length) {
-
-                                    jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
-                                        var x = a.replace(/<.*?>/g, "");
-                                        var y = b.replace(/<.*?>/g, "");
-                                        x = parseFloat(x);
-                                        y = parseFloat(y);
-                                        return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
-                                    };
-
-                                    jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
-                                        var x = a.replace(/<.*?>/g, "");
-                                        var y = b.replace(/<.*?>/g, "");
-                                        x = parseFloat(x);
-                                        y = parseFloat(y);
-                                        return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
-                                    };
-                                    jQuery('table').not('#issuetable')
-                                            .on('init.dt', function (e, settings, data) {
-                                                setTimeout(function () {
-                                                    jQuery('.loading').fadeOut();
-                                                }, 750)
-                                            })
-                                            .dataTable({
-                                                "aoColumns": [
-                                                    {"sType": "num-html"},
-                                                    null,
-                                                    null,
-                                                    null,{% if 'repo_packages' in request.path %}
-                                                        null,
-                                                        null,
-                                                    {% endif %}
-                                                    null{% if '/completed' in request.path or '/pkg_review' in request.path %},
-                                                    null,
-                                                    null,
-                                                    null{% endif %}{% if '/issues' in request.path %},
-                                                    null{% endif %}
-                                                ],
-                                                "aaSorting": [
-                                                        [{% if 'repo_packages' in request.path %}1, "asc"{% else %}0, "desc"{% endif %}]
-                                                ]
-
-                                            });
-                                    jQuery('#issuetable').bind('issuesReady', function () {
-                                        jQuery('#issuetable')
-                                                .on('init.dt', function (e, settings, data) {
-                                                    setTimeout(function () {
-                                                        jQuery('.loading').fadeOut();
-                                                    }, 750)
-                                                })
-                                                .dataTable({
-                                                    "aoColumns": [
-                                                        {"sType": "num-html"},
-                                                        null,
-                                                        null,
-                                                        null,
-                                                        null{% if '/completed' in request.path or '/pkg_review' in request.path %},
-                                                        null,
-                                                        null,
-                                                        null{% endif %}{% if '/issues' in request.path %},
-                                                        null{% endif %}
-                                                    ],
-                                                    "aaSorting": [
-                                                        [0, "desc"]
-                                                    ]
-
-                                                });
-
-                                    });
-                                    {% if 'repo_packages' not in request.path %}if (!jQuery('#issuetable').length) {
-                                        jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
-                                    }{% endif %}
-                                }
-                            }
-                    )
+						{% with messages = get_flashed_messages(with_categories=true) %}
+							{% if messages %}
+								{% for category, message in messages %}
+									setTimeout(function () {
+										$.gritter.add({
+											title: '{{ category|upper() }}',
+											text: '{{ message }}',
+											class_name: 'clean {% if category == "error" %}error{% else %}info{% endif %} {{ category }}',
+											sticky: '{% if category == "error" %}true{% else %}false{% endif %}'
+										});
+									}, {{ loop.index * 500 }});
+								{% endfor %}
+							{% endif %}
+						{% endwith %}
 
 
-                </script>
+						jQuery('#main pre').addClass('pre-scrollable');
+						jQuery('.not-idle').show();
+						function getStatus() {
+							$.getJSON('/get_status', function (data) {
+								var current = jQuery('#status_bar_pre').text();
+								if (data['msg'] !== current) {
+									jQuery('.idle').addClass('not-idle').removeClass('idle');
+									jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
+									jQuery('#status_bar').show();
+									jQuery('#status_bar_pre').text(data['msg']);
+									current = jQuery('#status_bar_pre').text();
+								}
+								if (data['msg'] == 'Idle' || current == 'Idle') {
+
+									jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
+									jQuery('#status_bar').hide();
+
+								}
+							})
+
+						}
+
+						getStatus();
+						setInterval(getStatus, 10000);
+					});
+					jQuery(window).load(function () {
+							jQuery('[data-toggle="tooltip"]').tooltip();
+
+							jQuery('.loading').fadeIn();
+							if (jQuery('table').length && !jQuery('#noDt').length) {
+
+								jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
+									var x = a.replace(/<.*?>/g, "");
+									var y = b.replace(/<.*?>/g, "");
+									x = parseFloat(x);
+									y = parseFloat(y);
+									return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
+								};
+
+								jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
+									var x = a.replace(/<.*?>/g, "");
+									var y = b.replace(/<.*?>/g, "");
+									x = parseFloat(x);
+									y = parseFloat(y);
+									return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
+								};
+								jQuery('table').not('#issuetable')
+									.on('init.dt', function (e, settings, data) {
+										setTimeout(function () {
+											jQuery('.loading').fadeOut();
+										}, 750)
+									})
+									.dataTable({
+										"aoColumns": [
+											{"sType": "num-html"},
+											null,
+											null,
+											null,{% if 'repo_packages' in request.path %}
+												null,
+												null,
+											{% endif %}
+											null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+											null,
+											null,
+											null{% endif %}{% if '/issues' in request.path %},
+											null{% endif %}
+										],
+										"aaSorting": [
+											[{% if 'repo_packages' in request.path %}
+												1, "asc"{% else %}0, "desc"{% endif %}]
+										]
+
+									});
+								jQuery('#issuetable').bind('issuesReady', function () {
+									jQuery('#issuetable')
+										.on('init.dt', function (e, settings, data) {
+											setTimeout(function () {
+												jQuery('.loading').fadeOut();
+											}, 750)
+										})
+										.dataTable({
+											"aoColumns": [
+												{"sType": "num-html"},
+												null,
+												null,
+												null,
+												null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+												null,
+												null,
+												null{% endif %}{% if '/issues' in request.path %},
+												null{% endif %}
+											],
+											"aaSorting": [
+												[0, "desc"]
+											]
+
+										});
+
+								});
+								{% if 'repo_packages' not in request.path %}if (!jQuery('#issuetable').length) {
+									jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
+								}{% endif %}
+							}
+						}
+					)
+
+
+				</script>
             {%- endblock scripts %}
         {%- endblock body %}
-        </body>
+		</body>
     {%- endblock html %}
-    </html>
+	</html>
 {% endblock doc -%}

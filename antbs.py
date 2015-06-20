@@ -222,13 +222,13 @@ def match_pkg_name_build_log(bnum=None, match=None):
         return False
 
 
-def get_build_info(page=None, status=None, logged_in=False, search=None, spage=None):
+def get_build_info(page=None, status=None, logged_in=False, search=None):
     if page is None or status is None:
         abort(500)
-    if search:
-        sinfo_key = 'cache:search_info:%s:%s:%s' % (status, search, spage)
+    if search is not None:
+        sinfo_key = 'cache:search_info:%s:%s:%s' % (status, search, page)
         search_info_cache = db.exists(sinfo_key)
-        srevinfo_key = 'cache:srev_info:%s:%s:%s' % (status, search, spage)
+        srevinfo_key = 'cache:srev_info:%s:%s:%s' % (status, search, page)
         check_cache = search_info_cache
     else:
         pinfo_key = 'cache:pkg_info:%s:%s' % (status, page)
@@ -236,6 +236,8 @@ def get_build_info(page=None, status=None, logged_in=False, search=None, spage=N
         pkg_info_cache = db.exists(pinfo_key)
         rev_info_cache = db.exists(revinfo_key)
         check_cache = all(i for i in (pkg_info_cache, rev_info_cache))
+        if 'antergos' in status:
+            status = 'completed'
 
     pkg_list = {}
     rev_pending = {}
@@ -250,16 +252,17 @@ def get_build_info(page=None, status=None, logged_in=False, search=None, spage=N
             abort(500)
 
         if all_builds is not None:
-            if search:
+            if search is not None:
                 search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
-                logger.info('@@-antbs.py-@@ [completed route] | all_pages is %s', search_all_builds)
+                logger.info('@@-antbs.py-@@ [completed route search] | search_all_builds is %s', search_all_builds)
                 all_builds = search_all_builds
                 pinfo_key = sinfo_key
             if all_builds is not None:
 
                 builds, all_pages = get_paginated(all_builds, 10, page, False)
                 db.set('%s:all_pages' % pinfo_key, all_pages)
-                logger.info('@@-antbs.py-@@ [completed route] | builds is %s',  builds)
+                logger.info('@@-antbs.py-@@ [completed route search] | builds is %s',  builds)
+                logger.info('@@-antbs.py-@@ [completed route search] | all_pages is %s', all_pages)
                 for build in builds:
                     # logger.info(build)
                     try:
@@ -292,7 +295,7 @@ def get_build_info(page=None, status=None, logged_in=False, search=None, spage=N
                         db.rpush(pinfo_key, bnum)
                         db.expire(pinfo_key, 901)
                     # db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
-                    if logged_in and review_stat == "pending" and search:
+                    if logged_in and review_stat == "pending" and search is not None:
                         rev_pending[bnum] = all_info
                         db.hmset('%s:%s' % (srevinfo_key, bnum), all_info)
                         db.expire('%s:%s' % (srevinfo_key, bnum), 901)
@@ -318,7 +321,7 @@ def get_build_info(page=None, status=None, logged_in=False, search=None, spage=N
                 h = db.hgetall('%s:%s' % (srevinfo_key, rev))
                 rev_pending[rev] = h
             # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
-            all_pages = db.get('%s:all_pages' % pinfo_key)
+            all_pages = db.get('%s:all_pages' % sinfo_key)
         else:
             revindex = db.lrange(revinfo_key, 0, -1)
             pindex = db.lrange(pinfo_key, 0, -1)
@@ -340,7 +343,7 @@ def get_repo_info(repo=None, logged_in=False):
     rinfo_key = 'cache:repo_info:%s' % repo
     repo_info_cache = db.exists(rinfo_key)
     pkg_list = {}
-    p, a, rev_pending = get_build_info(1, 'completed', logged_in)
+    p, a, rev_pending = get_build_info(1, repo, logged_in)
 
     # logger.info('@@-antbs.py-@@ 293 | GET_REPO_INFO - FIRED')
     if not repo_info_cache:
@@ -352,9 +355,10 @@ def get_repo_info(repo=None, logged_in=False):
                 # logger.info(item)
                 item = item.split('/')[-1]
                 item = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', item)
+
+                item = item.group(0) or ''
                 if not item or item == '':
                     continue
-                item = item.group(0)
                 logger.info(item)
                 pkg = package.Package(item, db)
                 builds = pkg.builds
@@ -491,7 +495,7 @@ def flask_error(e):
 @app.errorhandler(Exception)
 def unhandled_exception(e):
     if e is not None:
-        logger.debug(e.message)
+        logger.debug(e)
     return render_template('500.html'), 500
 
 
@@ -617,18 +621,18 @@ def scheduled():
 
 @app.route('/completed/<int:page>')
 @app.route('/completed/search/<name>')
-@app.route('/completed/search/<name>/<int:spage>')
+@app.route('/completed/search/<name>/<int:page>')
 @app.route('/completed')
-def completed(page=None, name=None, spage=None):
+def completed(page=None, name=None):
     is_idle = db.get('idle')
     status = 'completed'
     is_logged_in = user.is_authenticated()
-    if page is None:
+    if page is None and name is None:
         page = 1
-    if name and not spage:
-        spage = 1
+    if name is not None and page is None:
+        page = 1
     building = db.get('building')
-    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in, name, spage)
+    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in, name)
     # logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
     pagination = src.pagination.Pagination(page, 10, all_pages)
     # logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
@@ -846,5 +850,5 @@ def repo_packages(repo=None):
 # Some boilerplate code that just says "if you're running this from the command
 # line, start here." It's not critical to know what this means yet.
 if __name__ == "__main__":
-    app.debug = True
+    app.debug = False
     app.run(port=8020)

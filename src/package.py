@@ -31,7 +31,7 @@ from github3 import login
 from src.redis_connection import db
 
 logger = logconf.logger
-REPO_DIR = "/opt/antergos-packages"
+REPO_DIR = "/var/tmp/antergos-packages"
 
 
 class Package(object):
@@ -145,13 +145,7 @@ class Package(object):
         for i in [var, path]:
             if i is None or i == '':
                 logger.error('get_from_pkgbuild path is none')
-        try:
-            if not os.path.exists('/var/tmp/antergos-packages'):
-                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
-            else:
-                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
+        self.check_update_pkgbuild_repo()
         path = path.replace('/opt/', '/var/tmp/')
         logger.info('@@-package.py-@@ 156| get_from_pkgbuild: path is %s', path)
         parse = open(path).read()
@@ -182,7 +176,10 @@ class Package(object):
                         gitnm = 'pamac'
                     else:
                         gitnm = self.name
-                    subprocess.check_call(['git', 'clone', giturl, gitnm], cwd=pkgdir)
+                    try:
+                        subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=pkgdir)
+                    except subprocess.CalledProcessError as err:
+                        logger.error(err.output)
 
                 cmd = 'source ' + path + '; ' + var
 
@@ -197,6 +194,16 @@ class Package(object):
             logger.error('@@-package.py-@@ | proc.err is %s', err)
 
         return out
+
+    @staticmethod
+    def check_update_pkgbuild_repo():
+        try:
+            if not os.path.exists('/var/tmp/antergos-packages'):
+                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
+            else:
+                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if self.push_version != "True" or old_val == new_val:
@@ -297,6 +304,9 @@ class Package(object):
         return res
 
     def determine_pkg_path(self):
+        self.check_update_pkgbuild_repo()
+        pbfile = None
+        path = None
         if (not os.path.exists(
                 os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name) or 'cinnamon' == self.name:
             subdir = ['deepin_desktop', 'cinnamon']
@@ -313,6 +323,12 @@ class Package(object):
         else:
             path = os.path.join(REPO_DIR, self.name)
             pbfile = os.path.join(path, 'PKGBUILD')
+
+        for index, var in enumerate([pbfile, path]):
+            if self.name is None or self.name == '':
+                logger.error(self)
+            if var is None or var == '':
+                logger.error('@@-package.py-@@ 328| pkg: %s var index %s', (self.name, index))
 
         self.save_to_db('pbpath', pbfile)
         self.save_to_db('path', path)

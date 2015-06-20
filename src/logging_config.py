@@ -55,7 +55,7 @@ logging.config.dictConfig({
             'formatter': 'file'
         },
         'file': {
-            'level': 'DEBUG',
+            'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
             'maxBytes': 200000,
