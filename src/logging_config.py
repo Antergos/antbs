@@ -108,7 +108,7 @@ class Logger(object):
             log = getattr(self._logger, msg_type)
             log(msg, *args)
 
-
+logger_tl = Logger()
 
 def new_timeline_event(msg=None, tl_type=None):
     if msg is not None:
@@ -129,7 +129,7 @@ def new_timeline_event(msg=None, tl_type=None):
             popid = db.rpop('timeline:all')
             success = True
         except Exception as err:
-            logger.error('@@-logging_config.py-@@ | Unable to save timeline event, error msg: %s' % err)
+            logger_tl.error('@@-logging_config.py-@@ | Unable to save timeline event, error msg: %s' % err)
 
         if success:
             try:
@@ -137,6 +137,6 @@ def new_timeline_event(msg=None, tl_type=None):
                 for pev in pop_event:
                     db.delete(pev)
             except Exception as err:
-                logger.error('@@-logging_config.py-@@ | Unable to delete oldest timeline event, error msg: %s' % err)
+                logger_tl.error('@@-logging_config.py-@@ | Unable to delete oldest timeline event, error msg: %s' % err)
 
         return event_id
