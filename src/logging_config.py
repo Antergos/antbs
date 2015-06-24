@@ -27,9 +27,7 @@ import logging.config
 import redis_connection
 import datetime
 
-
 db = redis_connection.db
-logger = logging.getLogger()
 
 logging.config.dictConfig({
     'version': 1,
@@ -87,6 +85,29 @@ logging.config.dictConfig({
         }
     }
 })
+
+
+class Logger(object):
+
+    _logger = logging.getLogger()
+
+    def __init__(self):
+        self.name = 'Logging Object'
+
+    def error(self, msg, *args):
+        self.maybe_output_log_msg(msg, 'error', *args)
+
+    def info(self, msg, *args):
+        self.maybe_output_log_msg(msg, 'info', *args)
+
+    def debug(self, msg, *args):
+        self.maybe_output_log_msg(msg, 'debug', *args)
+
+    def maybe_output_log_msg(self, msg, msg_type, *args):
+        if db.exists('LOGGING:ENABLED:GLOBAL') or 'error' == msg_type:
+            log = getattr(self._logger, msg_type)
+            log(msg, *args)
+
 
 
 def new_timeline_event(msg=None, tl_type=None):

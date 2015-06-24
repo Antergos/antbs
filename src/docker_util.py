@@ -22,7 +22,7 @@
 
 """ Docker Utilities """
 
-import src.logging_config
+from src.logging_config import Logger
 import src.redis_connection
 import subprocess
 import os
@@ -30,7 +30,6 @@ import docker
 from docker.utils import create_host_config
 import shutil
 
-logger = src.logging_config.logger
 db = src.redis_connection.db
 
 doc_user = db.get('docker-images:username')
@@ -39,6 +38,7 @@ doc_pass = db.get('docker-images:password')
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build/docker')
+logger = Logger()
 
 # Initiate communication with build daemon
 try:

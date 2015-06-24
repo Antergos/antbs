@@ -29,7 +29,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 from src.redis_connection import db
 import src.docker_util as docker_utils
 import subprocess
-import src.logging_config as logconf
+from src.logging_config import Logger
 import datetime
 import shutil
 from pygments import highlight
@@ -43,7 +43,7 @@ import src.sign_pkgs as sign_pkgs
 import glob
 from rq import get_current_job
 
-logger = logconf.logger
+
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
@@ -51,6 +51,7 @@ REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
+logger = Logger()
 
 
 def remove(src):

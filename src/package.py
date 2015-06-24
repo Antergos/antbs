@@ -22,7 +22,7 @@
 
 """ Package Class """
 
-import src.logging_config as logconf
+from src.logging_config import Logger
 import subprocess
 import os
 import re
@@ -30,8 +30,8 @@ import sys
 from github3 import login
 from src.redis_connection import db
 
-logger = logconf.logger
 REPO_DIR = "/var/tmp/antergos-packages"
+logger = Logger()
 
 
 class Package(object):

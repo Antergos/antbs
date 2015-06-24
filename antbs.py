@@ -44,7 +44,7 @@ import gevent.monkey
 import src.pagination
 import src.build_pkg as builder
 from src.redis_connection import db
-import src.logging_config as logconf
+from src.logging_config import Logger
 import src.package as package
 import src.webhook as webhook
 # import newrelic
@@ -82,8 +82,7 @@ app.jinja_options['trim_blocks'] = True
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
-# Setup logging
-logger = logconf.logger
+logger = Logger()
 
 
 def copy(src, dst):

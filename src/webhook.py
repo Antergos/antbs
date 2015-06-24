@@ -34,10 +34,8 @@ from redis_connection import db
 import ipaddress
 import ast
 import requests
-import logging_config as logconf
+import logging_config as logger
 import package as package
-
-logger = logconf.logger
 
 
 def rm_file_or_dir(src):
