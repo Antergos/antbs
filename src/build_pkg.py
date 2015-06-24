@@ -135,17 +135,20 @@ def process_package_queue(the_queue=None):
             },
             {'numix-icon-theme-square-kde': {
                 'callsign': 'https://gitlab.com/numix/numix-icon-theme-square.git',
-                'source': ''}
+                'source': '',
+                'url': ''}
             },
             {'cnchi-dev': {
                 'cwd': '/srv/antergos.org/cnchi.tar',
                 'callsign': '',
-                'source': ''}
+                'source': '',
+                'url': ''}
             },
             {'cnchi': {
                 'cwd': '',
                 'callsign': '',
-                'source': ''}
+                'source': '',
+                'url': ''}
             }]
         all_deps = []
         for pkg in the_queue:
@@ -218,12 +221,12 @@ def handle_hook(first=False, last=False):
             logger.error(err)
 
     try:
-        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-f', '-exec', 'chmod a+rw {} \;'],
+        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-f', '-exec', 'chmod', 'a+rw', '{}', ';'],
                                 cwd='/opt')
-        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-d', '-exec', 'chmod 777 {} \;'],
+        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-d', '-exec', 'chmod', '777', '{}', ';'],
                                 cwd='/opt')
     except subprocess.CalledProcessError as err:
-        logger.error(err.output)
+        logger.error(err)
 
     if iso_flag == 'True':
         db.set('building', 'Building docker image.')
@@ -257,13 +260,13 @@ def handle_hook(first=False, last=False):
         gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
         logger.info('Pulling changes from github.')
         db.set('building', 'Pulling PKGBUILD changes from github.')
-        if os.path.exists(REPO_DIR):
-            shutil.rmtree(REPO_DIR)
-        try:
-            subprocess.check_call(['git', 'clone', gh_repo], cwd='/opt')
-        except subprocess.CalledProcessError as err:
-            logger.error(err.output)
-            return False
+        # if os.path.exists(REPO_DIR):
+        #     shutil.rmtree(REPO_DIR)
+        # try:
+        #     subprocess.check_call(['git', 'clone', gh_repo], cwd='/opt')
+        # except subprocess.CalledProcessError as err:
+        #     logger.error(err.output)
+        #     return False
 
         logger.info('Checking database for packages.')
         db.set('building', 'Checking database for queued packages')
@@ -521,6 +524,7 @@ def build_pkgs(last=False, pkg_info=None):
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
+            pkgbuild_dir = os.path.join(REPO_DIR, pkg)
             db.set('building', 'Building %s with makepkg' % pkg)
             failed = False
             logger.info('Building %s' % pkg)
@@ -594,7 +598,7 @@ def build_pkgs(last=False, pkg_info=None):
                             'bind': '/main',
                             'ro': False
                         },
-                    pkg_info.path:
+                    pkgbuild_dir:
                         {
                             'bind': '/pkg',
                             'ro': False

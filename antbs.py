@@ -832,6 +832,9 @@ def get_and_show_pkg_profile(pkgname=None):
     #     except Exception as err:
     #         logger.error(err)
     pkgobj = package.Package(pkgname)
+    if '' == pkgobj.description:
+        desc = pkgobj.get_from_pkgbuild('pkgdesc')
+        pkgobj.save_to_db('description', desc)
 
     return render_template('package.html', pkg=pkgobj)
 

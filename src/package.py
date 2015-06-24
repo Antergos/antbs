@@ -80,6 +80,7 @@ class Package(object):
         self.path = self.get_from_db('path')
         self.pbpath = self.get_from_db('pbpath')
         self.schema_v1 = self.get_from_db('schema_v1')
+        self.description = self.get_from_db('description')
 
         # TODO: Need to come up with a way to standardized database schema updates/changes
         if not self.db.exists('%s:%s' % (self.key, 'allowed_in')) and not self.db.exists(
@@ -88,7 +89,7 @@ class Package(object):
                 self.save_to_db('allowed_in', 'n/a', 'list')
             else:
                 pb = self.determine_pkg_path()
-                repos = self.get_from_pkgbuild('_allowed_in', pb)
+                repos = self.get_from_pkgbuild('_allowed_in')
                 if repos and repos != '':
                     logger.info('@@-package.py-@@ 88 | FIRED!! %s', repos)
                     repos = repos.split()
@@ -141,13 +142,20 @@ class Package(object):
 
             return value
 
-    def get_from_pkgbuild(self, var=None, path=None):
-        for i in [var, path]:
-            if i is None or i == '':
-                logger.error('get_from_pkgbuild path is none')
+    def get_from_pkgbuild(self, var=None):
+        if var is None:
+            logger.error('get_from_pkgbuild var is none')
         self.check_update_pkgbuild_repo()
-        path = path.replace('/opt/', '/var/tmp/')
-        logger.info('@@-package.py-@@ 156| get_from_pkgbuild: path is %s', path)
+        path = None
+        paths = [os.path.join('/var/tmp/antergos-packages/', self.name),
+                 os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.name),
+                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.name)]
+        for p in paths:
+            if os.path.exists(p):
+                path = p
+                break
+        else:
+            logger.error('get_from_pkgbuild cant determine pkgbuild path')
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
@@ -231,8 +239,7 @@ class Package(object):
             return False
 
     def get_version(self):
-        pbfile = self.get_from_db('pbpath')
-        pkgver = self.get_from_pkgbuild('pkgver', pbfile)
+        pkgver = self.get_from_pkgbuild('pkgver')
         if self.name == "cnchi-dev" and pkgver[-1] != "0":
             event = self.tl_event
             results = db.scan_iter('timeline:%s:*' % event, 100)
@@ -242,8 +249,8 @@ class Package(object):
             return False
         old_pkgver = self.pkgver
         self.save_to_db('pkgver', pkgver)
-        epoch = self.get_from_pkgbuild('epoch', pbfile)
-        pkgrel = self.get_from_pkgbuild('pkgrel', pbfile)
+        epoch = self.get_from_pkgbuild('epoch')
+        pkgrel = self.get_from_pkgbuild('pkgrel')
         if pkgrel and pkgrel != '' and pkgrel is not None:
             pkgrel_upd = False
             old_pkgrel = pkgrel
@@ -276,9 +283,9 @@ class Package(object):
     def get_deps(self):
         depends = []
         pbfile = self.pbpath
-        deps = self.get_from_pkgbuild('depends', pbfile).split()
+        deps = self.get_from_pkgbuild('depends').split()
         logger.info('@@-package.py-@@ 250| deps are %s', deps)
-        mkdeps = self.get_from_pkgbuild('makedepends', pbfile).split()
+        mkdeps = self.get_from_pkgbuild('makedepends').split()
         q = db.lrange('queue', 0, -1)
 
         for dep in deps:

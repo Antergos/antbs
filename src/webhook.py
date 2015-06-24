@@ -98,7 +98,8 @@ class Webhook(object):
                 if len(self.changes) > 0:
                     self.process_changes()
             else:
-                self.result = self.result or 'Nothing to see here, move along ...'
+                if self.result is None:
+                    self.result = 'Nothing to see here, move along ...'
 
     def is_from_authorized_sender(self):
         # Determine if the request sender is authorized to send us webhooks.
@@ -126,8 +127,10 @@ class Webhook(object):
 
             if self.request.headers.get('X-GitHub-Event') == "ping":
                 self.result = json.dumps({'msg': 'Hi!'})
-            if self.request.headers.get('X-GitHub-Event') != "push":
+                return False
+            elif self.request.headers.get('X-GitHub-Event') != "push":
                 self.result = json.dumps({'msg': "wrong event type"})
+                return False
 
         return True
 
