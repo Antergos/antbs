@@ -48,10 +48,10 @@ class Package(object):
         self.pkgname = self.name
         all_keys = dict(
             keys_of_type_str=['name', 'pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
-                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel', 'builds',
+                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel',
                               'saved_commit', 'success_rate', 'failure_rate', 'short_name',
                               'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in'],
-            keys_of_type_list=['tl_event', 'build_logs'],
+            keys_of_type_list=['tl_event', 'build_logs', 'builds'],
             keys_of_type_set=['depends', 'groups'])
 
         if not db.exists(self.key):
