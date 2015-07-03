@@ -22,7 +22,7 @@
 
 """ Package Class """
 
-from src.logging_config import Logger
+from src.logging_config import logger
 import subprocess
 import os
 import re
@@ -31,7 +31,6 @@ from github3 import login
 from src.redis_connection import db
 
 REPO_DIR = "/var/tmp/antergos-packages"
-logger = Logger()
 
 
 class Package(object):
@@ -41,66 +40,49 @@ class Package(object):
 
     def __init__(self, name, db=db):
         if name is None:
-            logger.error('@@-package.py-@@ 46| A pkg name is required to init an object on this class')
+            logger.error(
+                '@@-package.py-@@ 46| A pkg name is required to init an object on this class')
             return
         self.name = name
         self.key = 'pkg:%s' % self.name
-        # logger.debug('@@-package.py-@@ | self.key is %s' % self.key)
+        self.pkgname = self.name
+        all_keys = dict(
+            keys_of_type_str=['name', 'pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
+                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel',
+                              'saved_commit', 'success_rate', 'failure_rate', 'short_name',
+                              'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in'],
+            keys_of_type_list=['tl_event', 'build_logs'],
+            keys_of_type_set=['depends', 'groups'])
+
         if not db.exists(self.key):
             db.set(self.key, True)
-            db.sadd('pkgs:all', self.name)
+
+            for ktype, keys in all_keys:
+                if ktype.endswith('str'):
+                    for key in keys:
+                        db.set('%s:%s' % (self.key, key), '')
+                elif ktype.endswith('list'):
+                    for key in keys:
+                        db.rpush('%s:%s' % (self.key, key), '')
+                elif ktype.endswith('set'):
+                    for key in keys:
+                        db.sadd('%s:%s' % (self.key, key), '')
+
             db.incr('pkg:id:next')
             pkgid = db.get('pkg:id:next')
+            db.sadd('pkgs:all', self.name)
             db.set('%s:%s' % (self.key, 'pkgid'), pkgid)
             db.set('%s:%s' % (self.key, 'name'), self.name)
             db.set('%s:%s' % (self.key, 'push_version'), "False")
             db.set('%s:%s' % (self.key, 'autosum'), "False")
-            db.delete('%s:%s' % (self.key, 'depends'))
-            db.sadd('%s:%s' % (self.key, 'depends'), '')
-        if self.name in ['pycharm-pro-eap', 'pycharm-com-eap']:
-            db.set('%s:%s' % (self.key, 'autosum'), "True")
-        else:
-            db.set('%s:%s' % (self.key, 'autosum'), "False")
-        self.pkgid = self.get_from_db('pkgid')
-        self.version = self.get_from_db('version')
-        self.epoch = self.get_from_db('epoch')
-        self.depends = self.get_from_db('depends')
-        self.groups = self.get_from_db('groups')
-        self.builds = self.get_from_db('build_logs')
-        self.push_version = self.get_from_db('push_version')
-        self.pkgrel = self.get_from_db('pkgrel')
-        self.pkgver = self.get_from_db('pkgver')
-        self.saved_commit = self.get_from_db('saved_commit')
-        self.tl_event = self.get_from_db('tl_event')
-        self.autosum = self.get_from_db('autosum')
-        self.depends = self.get_from_db('depends')
-        self.success_rate = self.get_from_db('success_rate')
-        self.failure_rate = self.get_from_db('failure_rate')
-        self.short_name = self.get_from_db('short_name')
-        self.path = self.get_from_db('path')
-        self.pbpath = self.get_from_db('pbpath')
-        self.schema_v1 = self.get_from_db('schema_v1')
-        self.description = self.get_from_db('description')
 
-        # TODO: Need to come up with a way to standardized database schema updates/changes
-        if not self.db.exists('%s:%s' % (self.key, 'allowed_in')) and not self.db.exists(
-                        '%s:%s' % (self.key, 'schema_v1')):
-            if 'antergos-iso' in self.name:
-                self.save_to_db('allowed_in', 'n/a', 'list')
-            else:
-                pb = self.determine_pkg_path()
-                repos = self.get_from_pkgbuild('_allowed_in')
-                if repos and repos != '':
-                    logger.info('@@-package.py-@@ 88 | FIRED!! %s', repos)
-                    repos = repos.split()
-                    for r in repos:
-                        self.save_to_db('allowed_in', r, 'list')
-                else:
-                    if self.builds:
-                        logger.info('@@-package.py-@@ 88 | FIRED!!!!! %s', self.builds)
-                        self.save_to_db('allowed_in', 'main', 'list')
+        key_lists = [all_keys['keys_of_type_str'], all_keys['keys_of_type_list'],
+                     all_keys['keys_of_type_set']]
+        for key_list in key_lists:
+            for key in key_list:
+                setattr(self, key, self.get_from_db(key))
 
-        self.allowed_in = self.get_from_db('allowed_in')
+        self.pkgbuild_repo_cached = self.db.exists('pkgbuild_repo_cached')
 
     def delete(self):
         self.db.delete(self.key)
@@ -152,13 +134,13 @@ class Package(object):
                  os.path.join('/var/tmp/antergos-packages/cinnamon', self.name)]
         for p in paths:
             if os.path.exists(p):
-                path = p
+                path = os.path.join(p, 'PKGBUILD')
                 break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path')
         parse = open(path).read()
         dirpath = os.path.dirname(path)
-        if var == "pkgver" and 'pkgname=cnchi-dev' in parse:
+        if var == "pkgver" and self.name == 'cnchi-dev':
             if "info" in sys.modules:
                 del (sys.modules["info"])
             if "/tmp/cnchi/cnchi" not in sys.path:
@@ -175,8 +157,8 @@ class Package(object):
         else:
             cmd = 'source ' + path + '; echo ${' + var + '[*]}'
             logger.info('@@-package.py-@@ 88 | FIRED3! %s' % cmd)
-            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in parse):
-                if 'numix-icon-theme' not in parse:
+            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in self.name):
+                if 'numix-icon-theme' not in self.name:
                     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
                     giturl = giturl.group(0)
                     pkgdir, pkgbuild = os.path.split(path)
@@ -191,8 +173,8 @@ class Package(object):
 
                 cmd = 'source ' + path + '; ' + var
 
-            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath, stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
+            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             out, err = proc.communicate()
 
         if len(out) > 0:
@@ -203,15 +185,19 @@ class Package(object):
 
         return out
 
-    @staticmethod
-    def check_update_pkgbuild_repo():
-        try:
-            if not os.path.exists('/var/tmp/antergos-packages'):
-                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
-            else:
-                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
+    def check_update_pkgbuild_repo(self):
+        if not self.pkgbuild_repo_cached:
+            try:
+                if not os.path.exists('/var/tmp/antergos-packages'):
+                    subprocess.check_call(
+                        ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
+                        cwd='/var/tmp')
+                else:
+                    subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
+                                          cwd='/var/tmp/antergos-packages')
+                self.db.setex('pkgbuild_repo_cached', 1800, "True")
+            except subprocess.CalledProcessError as err:
+                logger.error(err)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if self.push_version != "True" or old_val == new_val:
@@ -227,7 +213,8 @@ class Package(object):
         with open(ppath, 'w') as pbuild:
             pbuild.write(content)
         pbuild.close()
-        commit = tf.update('[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
+        commit = tf.update(
+            '[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
         if commit and commit['commit'] is not None:
             try:
                 logger.info('@@-package.py-@@ | commit hash is %s', commit['commit'].sha)
@@ -239,39 +226,24 @@ class Package(object):
             return False
 
     def get_version(self):
-        pkgver = self.get_from_pkgbuild('pkgver')
-        if self.name == "cnchi-dev" and pkgver[-1] != "0":
+        for key in ['pkgver', 'pkgrel', 'epoch']:
+            old_val = getattr(self, key)
+            new_val = self.get_from_pkgbuild(key)
+            if new_val != old_val:
+                self.save_to_db(key, new_val, 'string')
+
+        if self.name == "cnchi-dev" and self.pkgver[-1] != "0":
             event = self.tl_event
             results = db.scan_iter('timeline:%s:*' % event, 100)
             for k in results:
                 db.delete(k)
             db.lrem('timeline:all', 0, event)
             return False
-        old_pkgver = self.pkgver
-        self.save_to_db('pkgver', pkgver)
-        epoch = self.get_from_pkgbuild('epoch')
-        pkgrel = self.get_from_pkgbuild('pkgrel')
-        if pkgrel and pkgrel != '' and pkgrel is not None:
-            pkgrel_upd = False
-            old_pkgrel = pkgrel
-            if db.exists('build:pkg:now') and db.get('build:pkg:now') == "True":
-                if pkgver == old_pkgver and pkgrel == self.pkgrel:
-                    pkgrel = str(int(pkgrel) + 1)
-                    pkgrel_upd = True
-                elif pkgver != old_pkgver and pkgrel != "1":
-                    pkgrel = "1"
-                    pkgrel_upd = True
-                db.set('build:pkg:now', "False")
 
-            if pkgrel_upd:
-                self.update_and_push_github('pkgrel', old_pkgrel, pkgrel)
+        if self.epoch and self.epoch != '' and self.epoch is not None:
+            version = self.epoch + ':' + self.pkgver
 
-            self.save_to_db('pkgrel', pkgrel)
-
-        if epoch and epoch != '' and epoch is not None:
-            pkgver = epoch + ':' + pkgver
-
-        version = pkgver + '-' + str(pkgrel)
+        version = self.version + '-' + self.pkgrel
         if version and version != '' and version is not None:
             self.save_to_db('version', version)
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
@@ -311,33 +283,45 @@ class Package(object):
         return res
 
     def determine_pkg_path(self):
-        self.check_update_pkgbuild_repo()
+        repodir = '/opt/antergos-packages'
         pbfile = None
         path = None
-        if (not os.path.exists(
-                os.path.join(REPO_DIR, self.name)) and 'antergos-iso' not in self.name) or 'cinnamon' == self.name:
-            subdir = ['deepin_desktop', 'cinnamon']
-            for d in subdir:
-                pdir = os.path.join(REPO_DIR, d)
-                if os.path.isdir(os.path.join(pdir, self.name)):
-                    self.save_to_db(d, 'True')
-                    path = os.path.join(pdir, self.name)
-                    logger.info('@@-package.py-@@ 281| path is %s',  path)
-                    pbfile = os.path.join(path, 'PKGBUILD')
-                    logger.info('@@-package.py-@@ 281| path is %s',  pbfile)
-                    break
+        pkgbuild_dir = os.path.join(repodir, self.name)
+        if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
+            pkgbuild_dir = os.path.join(repodir, 'deepen_desktop')
+            if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
+                pkgbuild_dir = os.path.join(repodir, 'cinnamon')
+                if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
+                    raise Exception
 
-        else:
-            path = os.path.join(REPO_DIR, self.name)
-            pbfile = os.path.join(path, 'PKGBUILD')
-
-        for index, var in enumerate([pbfile, path]):
-            if self.name is None or self.name == '':
-                logger.error(self)
-            if var is None or var == '':
-                logger.error('@@-package.py-@@ 328| pkg: %s var index %s', (self.name, index))
+        if os.path.exists(pkgbuild_dir):
+            path = pkgbuild_dir
+            logger.info('@@-package.py-@@ 281| path is %s', path)
+            pbfile = os.path.join(pkgbuild_dir, 'PKGBUILD')
+            logger.info('@@-package.py-@@ 281| path is %s', pbfile)
 
         self.save_to_db('pbpath', pbfile)
         self.save_to_db('path', path)
 
         return pbfile
+
+# self.pkgid = self.get_from_db('pkgid')
+# self.version = self.get_from_db('version')
+# self.epoch = self.get_from_db('epoch')
+# self.depends = self.get_from_db('depends')
+# self.groups = self.get_from_db('groups')
+# self.builds = self.get_from_db('build_logs')
+# self.push_version = self.get_from_db('push_version')
+# self.pkgrel = self.get_from_db('pkgrel')
+# self.pkgver = self.get_from_db('pkgver')
+# self.saved_commit = self.get_from_db('saved_commit')
+# self.tl_event = self.get_from_db('tl_event')
+# self.autosum = self.get_from_db('autosum')
+# self.depends = self.get_from_db('depends')
+# self.success_rate = self.get_from_db('success_rate')
+# self.failure_rate = self.get_from_db('failure_rate')
+# self.short_name = self.get_from_db('short_name')
+# self.path = self.get_from_db('path')
+# self.pbpath = self.get_from_db('pbpath')
+# self.schema_v1 = self.get_from_db('schema_v1')
+# self.description = self.get_from_db('description')

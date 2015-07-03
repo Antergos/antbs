@@ -34,7 +34,7 @@ pkg_deps="$*"
 
 function print2log() {
 
-	echo '[\^/\^/^\^/^\^/] ' "${1}" ' [\^/\^/^\^/^\^/]'
+	echo '[\^/\^/^\^/^\^/\^/\^/^\^/^\^/] ' "${1}" ' [\^/\^/^\^/^\^/\^/\^/^\^/^\^/]'
 
 }
 
@@ -51,6 +51,7 @@ function setup_environment() {
 		source /pkg/PKGBUILD && export PKGNAME="${pkgname}"
 		chmod -R a+rw /pkg
 		cd /pkg && git pull
+		pacman -S wget --noconfirm
 
 	elif [[ "${_UPDREPO}" != "True" ]]; then
 

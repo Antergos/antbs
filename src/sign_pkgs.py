@@ -28,14 +28,14 @@ import os
 import subprocess
 
 import redis_connection as redconn
-from src.logging_config import Logger
+from src.logging_config import logger
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'
 db = redconn.db
 password = db.get('ANTBS_GPG_PASS')
 gpg_key = db.get('ANTBS_GPG_KEY')
-logger = Logger()
+
 
 
 def batch_sign(paths, uid=gpg_key, passphrase=password):

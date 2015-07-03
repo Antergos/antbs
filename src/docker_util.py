@@ -22,7 +22,7 @@
 
 """ Docker Utilities """
 
-from src.logging_config import Logger
+from src.logging_config import logger
 import src.redis_connection
 import subprocess
 import os
@@ -38,7 +38,8 @@ doc_pass = db.get('docker-images:password')
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build/docker')
-logger = Logger()
+BUILD_DIR = os.path.join(BASE_DIR, 'build')
+
 
 # Initiate communication with build daemon
 try:
@@ -48,8 +49,64 @@ except Exception as err:
     logger.error("Cant connect to Docker daemon. Error msg: %s", err)
 
 
-def maybe_build_base_devel():
+def create_pkgs_host_config(cache, pkgbuild_dir, result):
+    pkgs_hconfig = create_host_config(
+        binds={
+            cache:
+                {
+                    'bind': '/var/cache/pacman',
+                    'ro': False
+                },
+            BUILD_DIR:
+                {
+                    'bind': '/makepkg',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging':
+                {
+                    'bind': '/staging',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/antergos':
+                {
+                    'bind': '/main',
+                    'ro': False
+                },
+            pkgbuild_dir:
+                {
+                    'bind': '/pkg',
+                    'ro': False
+                },
+            '/root/.gnupg':
+                {
+                    'bind': '/root/.gnupg',
+                    'ro': False
+                },
+            '/var/tmp/32bit':
+                {
+                    'bind': '/32bit',
+                    'ro': False
+                },
+            '/var/tmp/32build':
+                {
+                    'bind': '/32build',
+                    'ro': False
+                },
+            result:
+                {
+                    'bind': '/result',
+                    'ro': False
+                }
+        },
+        restart_policy={
+            "MaximumRetryCount": 2,
+            "Name": "on-failure"
+        }, privileged=True, cap_add=['ALL'])
 
+    return pkgs_hconfig
+
+
+def maybe_build_base_devel():
     if db.exists('docker-images:base-devel:built-today'):
         return True
 
@@ -93,8 +150,9 @@ def maybe_build_mkarchiso():
 def build_makepkg():
     dockerfile = os.path.join(DOC_DIR, 'makepkg')
     try:
-        build_it = [line for line in doc.build(dockerfile, 'antergos/makepkg', quiet=False, nocache=True, rm=True,
-                                               stream=True, forcerm=True)]
+        build_it = [line for line in
+                    doc.build(dockerfile, 'antergos/makepkg', quiet=False, nocache=True, rm=True,
+                              stream=True, forcerm=True)]
         if build_it:
             push_to_hub('antergos/makepkg')
     except Exception as err:
@@ -107,8 +165,10 @@ def build_makepkg():
 def build_mkarchiso():
     dockerfile = '/opt/archlinux-mkarchiso'
     try:
-        build_it = [line for line in doc.build(dockerfile, tag='antergos/mkarchiso', quiet=False, nocache=True, rm=True,
-                                               stream=True, forcerm=True)]
+        build_it = [line for line in
+                    doc.build(dockerfile, tag='antergos/mkarchiso', quiet=False, nocache=True,
+                              rm=True,
+                              stream=True, forcerm=True)]
         if build_it:
             push_to_hub('antergos/mkarchiso')
     except Exception as err:
@@ -119,7 +179,6 @@ def build_mkarchiso():
 
 
 def push_to_hub(repo=None):
-
     if repo is None:
         return
     try:
@@ -131,6 +190,3 @@ def push_to_hub(repo=None):
             logger.info(response)
     except Exception as err:
         logger.error('@@-docker_util.py-@@ | Pushing to docker hub failed with error: %s', err)
-
-
-

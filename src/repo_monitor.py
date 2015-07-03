@@ -22,14 +22,14 @@
 
 """ Monitor commit activity on 3rd-party repos. Schedule a build when new commits are detected. """
 
-from src.logging_config import Logger
+from src.logging_config import logger
 from src.redis_connection import db
 from github3 import login
 from gitlab import Gitlab
 
 GITLAB_TOKEN = db.get('ANTBS_GITLAB_TOKEN')
 GITHUB_TOKEN = db.get('ANTBS_GITHUB_TOKEN')
-logger = Logger()
+
 
 
 def maybe_check_for_new_items():

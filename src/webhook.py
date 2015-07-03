@@ -34,8 +34,10 @@ from redis_connection import db
 import ipaddress
 import ast
 import requests
-import logging_config as logger
+import logging_config as logconf
 import package as package
+
+logger = logconf.logger
 
 
 def rm_file_or_dir(src):
@@ -78,6 +80,7 @@ class Webhook(object):
             self.full_name = None
             self.pusher = None
             self.commits = None
+            self.result = None
             try:
                 self.building = db.hget('now_building', 'pkg')
             except Exception as err:
@@ -135,7 +138,9 @@ class Webhook(object):
     def process_manual(self):
 
         try:
-            key = db.lrange('payloads:index', -3, -3)
+            key = db.lrange('payloads:index', -1, -1)
+            logger.info(key)
+            logger.info(key[0])
             self.payload = db.hgetall(key[0])
         except Exception as err:
             logger.error(err)
@@ -147,24 +152,25 @@ class Webhook(object):
         self.repo = 'antergos-packages'
 
     def process_github(self):
-        self.payload = json.loads(self.request.data)
-        # Save payload in the database temporarily in case we need it later.
-        dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
-        key = 'payloads:%s' % dt
-        if db.exists(key):
-            for i in range(1, 5):
-                tmp = '%s:%s' % (key, i)
-                if not db.exists(tmp):
-                    key = tmp
-                    break
-        db.hmset(key, self.payload)
-        db.rpush('payloads:index', key)
-        db.expire(key, 172800)
+        if not self.is_manual:
+            self.payload = json.loads(self.request.data)
+            # Save payload in the database temporarily in case we need it later.
+            dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
+            key = 'payloads:%s' % dt
+            if db.exists(key):
+                for i in range(1, 5):
+                    tmp = '%s:%s' % (key, i)
+                    if not db.exists(tmp):
+                        key = tmp
+                        break
+            db.hmset(key, self.payload)
+            db.rpush('payloads:index', key)
+            db.expire(key, 172800)
 
-        self.full_name = self.payload['repository']['full_name']
-        self.repo = self.payload['repository']['name']
-        self.pusher = self.payload['pusher']['name']
-        self.commits = self.payload['commits']
+            self.full_name = self.payload['repository']['full_name']
+            self.repo = self.payload['repository']['name']
+            self.pusher = self.payload['pusher']['name']
+            self.commits = self.payload['commits']
 
         if self.repo == 'numix-icon-theme':
             rate_limit = True

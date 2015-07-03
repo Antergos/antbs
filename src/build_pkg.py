@@ -29,7 +29,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.
 from src.redis_connection import db
 import src.docker_util as docker_utils
 import subprocess
-from src.logging_config import Logger
+import src.logging_config as logconf
 import datetime
 import shutil
 from pygments import highlight
@@ -51,7 +51,7 @@ REPO_DIR = "/opt/antergos-packages"
 package = pkgclass.Package
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
-logger = Logger()
+logger = logconf.logger
 
 
 def remove(src):
@@ -212,20 +212,20 @@ def handle_hook(first=False, last=False):
 
     if not os.path.exists(REPO_DIR):
         try:
-            subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages.git'], cwd='/opt')
+            subprocess.check_call(
+                ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
+                cwd='/opt')
         except subprocess.CalledProcessError as err:
             logger.error(err)
     else:
         try:
+            subprocess.check_call(['git', 'reset', '--hard', 'origin/master'], cwd=REPO_DIR)
             subprocess.check_call(['git', 'pull'], cwd=REPO_DIR)
         except subprocess.CalledProcessError as err:
             logger.error(err)
 
     try:
-        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-f', '-exec', 'chmod', 'a+rw', '{}', ';'],
-                                cwd='/opt')
-        subprocess.check_output(['find', '/opt/antergos-packages', '-type', '-d', '-exec', 'chmod', '777', '{}', ';'],
-                                cwd='/opt')
+        subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
     except subprocess.CalledProcessError as err:
         logger.error(err)
 
@@ -325,10 +325,8 @@ def handle_hook(first=False, last=False):
                 pkgobj.save_to_db('success_rate', success)
                 pkgobj.save_to_db('failure_rate', failure)
     if last:
-        try:
-            shutil.rmtree('/opt/antergos-packages')
-        except Exception:
-            pass
+
+        remove('/opt/antergos-packages')
         db.set('idle', "True")
         db.set('building', 'Idle')
         db.set('container', '')
@@ -361,6 +359,11 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         command = "/makepkg/build.sh"
         pkgenv = ["_PKGNAME=%s" % pkg, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo,
                   "_REPO_DIR=%s" % repodir]
+        building = db.get('building')
+        idle = db.get('idle')
+        building_saved = False
+        if 'True' == idle and 'Idle' != building:
+            building_saved = building
         db.set('building', 'Updating repo database.')
         container = None
         run_docker_clean("update_repo")
@@ -415,9 +418,15 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
 
-        doc.remove_container(container)
-        db.set('idle', 'True')
-        db.set('building', 'Idle')
+        doc.remove_container(container, v=True)
+        idle = db.get('idle')
+        building_saved = False
+        if 'True' != idle and 'Idle' != building:
+            if building_saved:
+                db.set('building', building_saved)
+            else:
+                db.set('idle', 'True')
+                db.set('building', 'Idle')
         db.delete('repo-count-staging')
         db.delete('repo-count-main')
 
@@ -525,7 +534,12 @@ def build_pkgs(last=False, pkg_info=None):
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
-            pkgbuild_dir = os.path.join(REPO_DIR, pkg)
+            pkgbuild_dir = pkg_info.path
+            if pkgbuild_dir.startswith('/var/tmp'):
+                pkgbuild_dir = pkgbuild_dir.replace('/var/tmp/', '/opt/')
+                pkg_info.save_to_db('path', pkgbuild_dir)
+            db.publish('log_stream', 'pkgbuild_path is %s' % pkgbuild_dir)
+
             db.set('building', 'Building %s with makepkg' % pkg)
             failed = False
             logger.info('Building %s' % pkg)
@@ -560,17 +574,22 @@ def build_pkgs(last=False, pkg_info=None):
             else:
                 build_env.append('_ALEXPKG=False')
             logger.info('@@-build_pkg.py-@@ | build_env is %s' % build_env)
+            hconfig = docker_utils.create_pkgs_host_config(cache, pkgbuild_dir, result)
             try:
-                container = doc.create_container("antergos/makepkg", command="/makepkg/build.sh " + pkg_deps_str,
-                                                 name=pkg, volumes=['/var/cache/pacman', '/makepkg', '/repo', '/pkg',
-                                                                    '/root/.gnupg', '/staging', '/32bit', '/32build',
-                                                                    '/result'], environment=build_env, cpuset='0-3')
+                container = doc.create_container("antergos/makepkg",
+                                                 command="/makepkg/build.sh " + pkg_deps_str,
+                                                 volumes=['/var/cache/pacman', '/makepkg', '/repo',
+                                                          '/pkg', '/root/.gnupg', '/staging',
+                                                          '/32bit', '/32build', '/result'],
+                                                 environment=build_env, cpuset='0-3', name=pkg,
+                                                 host_config=hconfig)
                 if container.get('Warnings') and container.get('Warnings') != '':
                     logger.error(container.get('Warnings'))
             except Exception as err:
                 logger.error('Create container failed. Error Msg: %s' % err)
                 failed = True
                 continue
+
             db.set('container', container.get('Id'))
             dirs = ['/var/tmp/32build', '/var/tmp/32bit']
             for d in dirs:
@@ -578,53 +597,7 @@ def build_pkgs(last=False, pkg_info=None):
                     shutil.rmtree(d)
                 os.mkdir(d, 0o777)
             try:
-                doc.start(container, binds={
-                    cache:
-                        {
-                            'bind': '/var/cache/pacman',
-                            'ro': False
-                        },
-                    DOC_DIR:
-                        {
-                            'bind': '/makepkg',
-                            'ro': False
-                        },
-                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging':
-                        {
-                            'bind': '/staging',
-                            'ro': False
-                        },
-                    '/srv/antergos.info/repo/antergos':
-                        {
-                            'bind': '/main',
-                            'ro': False
-                        },
-                    pkgbuild_dir:
-                        {
-                            'bind': '/pkg',
-                            'ro': False
-                        },
-                    '/root/.gnupg':
-                        {
-                            'bind': '/root/.gnupg',
-                            'ro': False
-                        },
-                    '/var/tmp/32bit':
-                        {
-                            'bind': '/32bit',
-                            'ro': False
-                        },
-                    '/var/tmp/32build':
-                        {
-                            'bind': '/32build',
-                            'ro': False
-                        },
-                    result:
-                        {
-                            'bind': '/result',
-                            'ro': False
-                        }
-                }, privileged=True)
+                doc.start(container.get('Id'))
                 cont = db.get('container')
                 stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
                 stream_process.start()

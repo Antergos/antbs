@@ -29,6 +29,8 @@ import datetime
 
 db = redis_connection.db
 
+logger = logging.getLogger()
+
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': False,
@@ -108,7 +110,7 @@ class Logger(object):
             log = getattr(self._logger, msg_type)
             log(msg, *args)
 
-logger_tl = Logger()
+logger_tl = logger
 
 def new_timeline_event(msg=None, tl_type=None):
     if msg is not None:

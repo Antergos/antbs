@@ -44,9 +44,10 @@ import gevent.monkey
 import src.pagination
 import src.build_pkg as builder
 from src.redis_connection import db
-from src.logging_config import Logger
+import src.logging_config as logconf
 import src.package as package
 import src.webhook as webhook
+import src.slack_bot as slack_bot
 # import newrelic
 
 gevent.monkey.patch_all()
@@ -82,7 +83,7 @@ app.jinja_options['trim_blocks'] = True
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
-logger = Logger()
+logger = logconf.logger
 
 
 def copy(src, dst):
@@ -849,8 +850,24 @@ def repo_packages(repo=None):
     return render_template("repo_pkgs.html", idle=is_idle, building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)
 
+
+@app.route('/slack/overflow', methods=['post'])
+@app.route('/slack/todo', methods=['post'])
+def overflow():
+    token = request.values.get('token')
+    if not token or '' == token:
+        abort(404)
+    text = request.values.get('text')
+    command = request.values.get('command')
+
+    res = slack_bot.overflow(command, text)
+
+    return Response(res['msg'], content_type=res['content_type'])
+
+
+
 # Some boilerplate code that just says "if you're running this from the command
 # line, start here." It's not critical to know what this means yet.
 if __name__ == "__main__":
-    app.debug = False
+    app.debug = True
     app.run(port=8020)
