@@ -362,7 +362,7 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         building = db.get('building')
         idle = db.get('idle')
         building_saved = False
-        if 'True' == idle and 'Idle' != building:
+        if 'True' != idle and 'Idle' != building:
             building_saved = building
         db.set('building', 'Updating repo database.')
         container = None
@@ -420,7 +420,6 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
 
         doc.remove_container(container, v=True)
         idle = db.get('idle')
-        building_saved = False
         if 'True' != idle and 'Idle' != building:
             if building_saved:
                 db.set('building', building_saved)

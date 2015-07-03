@@ -48,7 +48,7 @@ class Package(object):
         self.pkgname = self.name
         all_keys = dict(
             keys_of_type_str=['name', 'pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
-                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel',
+                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel', 'builds',
                               'saved_commit', 'success_rate', 'failure_rate', 'short_name',
                               'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in'],
             keys_of_type_list=['tl_event', 'build_logs'],
@@ -81,8 +81,6 @@ class Package(object):
         for key_list in key_lists:
             for key in key_list:
                 setattr(self, key, self.get_from_db(key))
-
-        self.pkgbuild_repo_cached = self.db.exists('pkgbuild_repo_cached')
 
     def delete(self):
         self.db.delete(self.key)
@@ -155,7 +153,10 @@ class Package(object):
             del (sys.modules["info"])
             err = []
         else:
-            cmd = 'source ' + path + '; echo ${' + var + '[*]}'
+            if var in ['source', 'depends', 'makedepends', 'arch']:
+                cmd = 'source ' + path + '; echo ${' + var + '[*]}'
+            else:
+                cmd = 'source ' + path + '; echo ${' + var + '}'
             logger.info('@@-package.py-@@ 88 | FIRED3! %s' % cmd)
             if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in self.name):
                 if 'numix-icon-theme' not in self.name:
@@ -179,14 +180,15 @@ class Package(object):
 
         if len(out) > 0:
             out = out.strip()
-            # logger.info('@@-package.py-@@ | proc.out is %s' % out)
+            logger.info('@@-package.py-@@ | proc.out is %s' % out)
         if len(err) > 0:
             logger.error('@@-package.py-@@ | proc.err is %s', err)
 
         return out
 
-    def check_update_pkgbuild_repo(self):
-        if not self.pkgbuild_repo_cached:
+    @staticmethod
+    def check_update_pkgbuild_repo():
+        if not db.exists('pkgbuild_repo_cached'):
             try:
                 if not os.path.exists('/var/tmp/antergos-packages'):
                     subprocess.check_call(
@@ -195,7 +197,7 @@ class Package(object):
                 else:
                     subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
                                           cwd='/var/tmp/antergos-packages')
-                self.db.setex('pkgbuild_repo_cached', 1800, "True")
+                db.setex('pkgbuild_repo_cached', 1800, "True")
             except subprocess.CalledProcessError as err:
                 logger.error(err)
 
@@ -240,10 +242,11 @@ class Package(object):
             db.lrem('timeline:all', 0, event)
             return False
 
+        version = self.pkgver
         if self.epoch and self.epoch != '' and self.epoch is not None:
-            version = self.epoch + ':' + self.pkgver
+            version = self.epoch + ':' + version
 
-        version = self.version + '-' + self.pkgrel
+        version = version + '-' + self.pkgrel
         if version and version != '' and version is not None:
             self.save_to_db('version', version)
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
