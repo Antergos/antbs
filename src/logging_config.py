@@ -30,6 +30,7 @@ import datetime
 db = redis_connection.db
 
 logger = logging.getLogger()
+logging.getLogger('stormpath.http').setLevel(logging.WARNING)
 
 logging.config.dictConfig({
     'version': 1,

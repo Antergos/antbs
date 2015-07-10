@@ -28,8 +28,6 @@ from stackexchange import Site, StackOverflow, Sort, DESC
 from github3 import login
 from src.logging_config import logger
 
-
-
 se_key = db.get('SLACK:API-KEY')
 gh_user = db.get('ANTBS_GITHUB_TOKEN')
 
@@ -45,6 +43,7 @@ def get_response_string(q):
     check = ' :white_check_mark:' if q.json['is_answered'] else ''
     return "|%d|%s <%s|%s> (%d answers)" % (q_data['score'], check, q.url,
                                             q.title, q_data['answer_count'])
+
 
 def overflow(command=None, text=None):
     if command is None or text is None:
