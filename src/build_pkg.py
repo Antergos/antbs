@@ -337,7 +337,6 @@ def handle_hook(first=False, last=False):
 
 def update_main_repo(pkg=None, rev_result=None, this_log=None):
     if pkg and rev_result:
-        run_docker_clean()
         repo = 'antergos'
         repodir = 'main'
         if rev_result == '2':
@@ -351,7 +350,6 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         else:
             logger.error('[UPDATE REPO FAILED]')
             return
-        db.set('idle', 'False')
         result = '/tmp/result'
         if os.path.exists(result):
             shutil.rmtree(result)
@@ -362,8 +360,10 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         building = db.get('building')
         idle = db.get('idle')
         building_saved = False
-        if 'True' != idle and 'Idle' != building:
+        if 'True' != idle:
             building_saved = building
+        else:
+            db.set('idle', 'False')
         db.set('building', 'Updating repo database.')
         container = None
         run_docker_clean("update_repo")
@@ -420,7 +420,7 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
 
         doc.remove_container(container, v=True)
         idle = db.get('idle')
-        if 'True' != idle and 'Idle' != building:
+        if 'True' != idle:
             if building_saved:
                 db.set('building', building_saved)
             else:

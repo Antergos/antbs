@@ -47,6 +47,7 @@ from src.redis_connection import db
 import src.logging_config as logconf
 import src.package as package
 import src.webhook as webhook
+import src.repo_monitor as repo_mon
 import src.slack_bot as slack_bot
 # import newrelic
 
@@ -261,7 +262,7 @@ def get_build_info(page=None, status=None, logged_in=False, search=None):
 
                 builds, all_pages = get_paginated(all_builds, 10, page, False)
                 db.set('%s:all_pages' % pinfo_key, all_pages)
-                logger.info('@@-antbs.py-@@ [completed route search] | builds is %s',  builds)
+                logger.info('@@-antbs.py-@@ [completed route search] | builds is %s', builds)
                 logger.info('@@-antbs.py-@@ [completed route search] | all_pages is %s', all_pages)
                 for build in builds:
                     # logger.info(build)
@@ -593,11 +594,18 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
-    hook = webhook.Webhook(request, db, queue)
+    hook = webhook.Webhook(request, db)
     if hook.result is int:
         abort(hook.result)
     else:
-        return hook.result
+        return json.dumps(hook.result)
+
+
+@app.before_request
+def maybe_check_for_remote_commits():
+    check = repo_mon.maybe_check_for_new_items()
+    if not check:
+        repo_mon.check_for_new_items()
 
 
 @app.route('/scheduled')
@@ -863,7 +871,6 @@ def overflow():
     res = slack_bot.overflow(command, text)
 
     return Response(res['msg'], content_type=res['content_type'])
-
 
 
 # Some boilerplate code that just says "if you're running this from the command

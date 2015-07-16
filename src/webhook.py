@@ -31,6 +31,7 @@ import shutil
 import datetime
 import build_pkg as builder
 from redis_connection import db
+from rq import Queue, Connection, Worker
 import ipaddress
 import ast
 import requests
@@ -38,6 +39,10 @@ import logging_config as logconf
 import package as package
 
 logger = logconf.logger
+
+with Connection(db):
+    queue = Queue('build_queue')
+    w = Worker([queue])
 
 
 def rm_file_or_dir(src):
@@ -58,12 +63,17 @@ def rm_file_or_dir(src):
 
 
 class Webhook(object):
-    def __init__(self, request=None, db=None, queue=None):
+    def __init__(self, request=None, db=None):
         self.can_process = False
-        if request is None or db is None or queue is None:
+        self.is_monitor = False
+        try:
+            self.request = request.method
+        except AttributeError:
+            self.request = False
+            self.is_monitor = True
+        if self.request is None or db is None or queue is None:
             logger.error('@@-webhook.py-@@ 40 | Cant process new webhook because request or db is None.')
-        elif request.method == 'POST':
-            self.queue = queue
+        elif self.request == 'POST' or self.is_monitor is True:
             self.can_process = True
             self.db = db
             self.request = request
@@ -76,7 +86,6 @@ class Webhook(object):
             self.the_queue = db.lrange('queue', 0, -1)
             self.repo = 'antergos-packages'
             self.payload = None
-            self.phab_payload = False
             self.full_name = None
             self.pusher = None
             self.commits = None
@@ -104,6 +113,8 @@ class Webhook(object):
 
     def is_from_authorized_sender(self):
         # Determine if the request sender is authorized to send us webhooks.
+        if self.is_monitor is True:
+            return True
         manual = int(self.request.args.get('phab', '0'))
         gitlab = self.request.headers.get('X-Gitlab-Event') or ''
         if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
@@ -113,7 +124,6 @@ class Webhook(object):
             self.repo = 'antergos-packages'
             self.full_name = 'Antergos/antergos-packages'
             self.changes = [['numix-icon-theme-square', 'numix-icon-theme-square-kde']]
-            logger.error(self.request.headers)
         else:
             # Store the IP address blocks that github uses for hook requests.
             hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
@@ -266,7 +276,7 @@ class Webhook(object):
                         p_ul.append(p_li)
                     if p == last_pkg:
                         last = True
-                    self.queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=84600)
+                    queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=84600)
                     if last:
                         if self.is_gitlab:
                             source = 'Gitlab'

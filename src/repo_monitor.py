@@ -24,6 +24,7 @@
 
 from src.logging_config import logger
 from src.redis_connection import db
+import src.webhook as webhook
 from github3 import login
 from gitlab import Gitlab
 
@@ -31,38 +32,52 @@ GITLAB_TOKEN = db.get('ANTBS_GITLAB_TOKEN')
 GITHUB_TOKEN = db.get('ANTBS_GITHUB_TOKEN')
 
 
-
 def maybe_check_for_new_items():
-    return not db.exists('FEED_CHECKED')
+    return db.exists('FEED_CHECKED')
 
 
 def check_for_new_items():
     new_items = []
-    gh = login(username='lots0logs', token=GITHUB_TOKEN)
+    gh = login(token=GITHUB_TOKEN)
     last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''
-    events = gh.events.repos.list(user="numixproject", repo="numix-icon-theme")
-    events = events.all()
-    latest = events[0]
+    repo = gh.repository('numixproject', "numix-icon-theme")
+    events = repo.events()
+    latest = events.etag
 
-    if latest.get('id') != last_id:
-        db.set('ANTBS_GITHUB_LAST_EVENT', latest.get('id'))
-        new_items.append('numix-icon-theme')
+    if latest != last_id:
+        db.set('ANTBS_GITHUB_LAST_EVENT', latest)
+        new_items.append(['numix-icon-theme'])
 
-    gl = Gitlab('https://gitlab.com/api', private_token=GITLAB_TOKEN)
+    gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
     gl.auth()
     nxsq = gl.Project(id='61284')
     last_updated = db.get('ANTBS_GITLAB_LAST_UPDATED')
     events = nxsq.Event()
 
     for event in events:
-        if event.get('action_name') == 'pushed to':
-            if event.get('created_at') != last_updated:
-                db.set('ANTBS_GITLAB_LAST_UPDATED', event.get('created_at'))
-                new_items.append('numix-icon-theme-square')
-                new_items.append('numix-icon-theme-square-kde')
+        if event.action_name == 'pushed to':
+            if event.created_at != last_updated:
+                db.set('ANTBS_GITLAB_LAST_UPDATED', event.created_at)
+                new_items.append(['numix-icon-theme-square'])
+                new_items.append(['numix-icon-theme-square-kde'])
 
             break
 
     db.setex('FEED_CHECKED', 900, 'True')
 
-    return new_items
+    if len(new_items) > 0:
+        add_to_build_queue(new_items)
+
+
+def add_to_build_queue(pkgs=None):
+    if pkgs is None:
+        return False
+    req = dict(method='POST', args={})
+
+    wh = webhook.Webhook(req, db)
+
+    wh.is_numix = True
+    wh.repo = 'antergos-packages'
+    wh.changes = pkgs
+
+    wh.process_changes()
