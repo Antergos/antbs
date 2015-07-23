@@ -402,8 +402,6 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     errmsg = dict(error=False, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
-        if result == "4":
-            return errmsg
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
         db.set('idle', 'False')
@@ -426,6 +424,8 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         pkg_files = pkg_files_64 + pkg_files_32
         # logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
         # logger.info('[PKG_FILES]:')
+        if result == 4:
+            return errmsg
         if pkg_files and pkg_files is not None:
             # logger.info(pkg_files)
             logger.info('Moving %s from staging to main repo.', pkg)

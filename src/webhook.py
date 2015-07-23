@@ -66,6 +66,7 @@ class Webhook(object):
     def __init__(self, request=None, db=None):
         self.can_process = False
         self.is_monitor = False
+        self.is_cnchi = False
         try:
             self.request = request.method
         except AttributeError:
@@ -73,7 +74,7 @@ class Webhook(object):
             self.is_monitor = True
         if self.request is None or db is None or queue is None:
             logger.error('@@-webhook.py-@@ 40 | Cant process new webhook because request or db is None.')
-        elif self.request == 'POST' or self.is_monitor is True:
+        elif self.request or self.is_monitor is True:
             self.can_process = True
             self.db = db
             self.request = request
@@ -103,6 +104,8 @@ class Webhook(object):
                 # Process Webhook
                 if self.is_manual:
                     self.process_manual()
+                if self.is_cnchi:
+                    self.process_cnchi()
                 if self.is_github:
                     self.process_github()
                 if len(self.changes) > 0:
@@ -117,8 +120,13 @@ class Webhook(object):
             return True
         manual = int(self.request.args.get('phab', '0'))
         gitlab = self.request.headers.get('X-Gitlab-Event') or ''
+        cnchi = self.request.args.get('cnchi', False)
         if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
             self.is_manual = True
+        elif cnchi and cnchi == db.get('CNCHI_TOKEN'):
+            self.is_cnchi = True
+        elif cnchi and cnchi != db.get('CNCHI_TOKEN'):
+            logger.error('CNCHI_A_B_TEST: ' + cnchi)
         elif '' != gitlab and 'Push Hook' == gitlab:
             self.is_gitlab = True
             self.repo = 'antergos-packages'
@@ -296,3 +304,13 @@ class Webhook(object):
 
             if not self.result:
                 self.result = json.dumps({'msg': 'OK!'})
+
+    def process_cnchi(self):
+        a_b_test = db.get('CNCHI_A_B_TEST')
+
+        if a_b_test == 'A':
+            db.set('CNCHI_A_B_TEST', 'B')
+        elif a_b_test == 'B':
+            db.set('CNCHI_A_B_TEST', 'A')
+
+        self.result = json.dumps({'msg': a_b_test})

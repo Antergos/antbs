@@ -111,7 +111,7 @@ class Package(object):
 
             key = '%s:%s' % (self.key, attr)
 
-            if (self.db.type(key) == 'string' or self.db.type(key) == 'none') and ktype is None:
+            if self.db.type(key) == 'string' or (self.db.type(key) == 'none' and ktype is None):
                 self.db.set(key, value)
 
             elif self.db.type(key) == 'list' or ktype == 'list':
@@ -248,7 +248,7 @@ class Package(object):
 
         version = version + '-' + self.pkgrel
         if version and version != '' and version is not None:
-            self.save_to_db('version', version)
+            self.save_to_db('version', version, 'string')
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version

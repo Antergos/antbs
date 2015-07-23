@@ -37,12 +37,18 @@ def maybe_check_for_new_items():
 
 
 def check_for_new_items():
+    db.setex('FEED_CHECKED', 900, 'True')
     new_items = []
     gh = login(token=GITHUB_TOKEN)
     last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''
     repo = gh.repository('numixproject', "numix-icon-theme")
     events = repo.events()
-    latest = events.etag
+    latest = None
+    for event in events:
+        event = event.as_dict()
+        event = event['payload']['head']
+        latest = event
+        break
 
     if latest != last_id:
         db.set('ANTBS_GITHUB_LAST_EVENT', latest)
@@ -62,8 +68,6 @@ def check_for_new_items():
                 new_items.append(['numix-icon-theme-square-kde'])
 
             break
-
-    db.setex('FEED_CHECKED', 900, 'True')
 
     if len(new_items) > 0:
         add_to_build_queue(new_items)

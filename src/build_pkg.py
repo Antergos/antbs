@@ -271,7 +271,7 @@ def handle_hook(first=False, last=False):
 
         logger.info('Checking database for packages.')
         db.set('building', 'Checking database for queued packages')
-        subprocess.call(['chmod', '-R', '777', 'antergos-packages'], cwd='/opt')
+        subprocess.call(['chmod', '-R', 'a+rw', 'antergos-packages'], cwd='/opt')
 
         all_deps = process_package_queue(packages)
 
@@ -279,15 +279,15 @@ def handle_hook(first=False, last=False):
         db.set('building', 'Determining build order by sorting package depends')
         if len(all_deps) > 1:
             topsort = check_deps(all_deps)
-            logger.info('@@-build_pkg.py-@@ 254 | depends AFTER topsort: %s' % topsort)
-            logger.info('@@-build_pkg.py-@@ 255 | queue before regen: %s' % packages)
+            # logger.info('@@-build_pkg.py-@@ 254 | depends AFTER topsort: %s' % topsort)
+            # logger.info('@@-build_pkg.py-@@ 255 | queue before regen: %s' % packages)
             check = []
             db.delete('queue')
             for p in topsort:
-                logger.info('@@-build_pkg.py-@@ 259 | p in topsort: %s' % p)
+                # logger.info('@@-build_pkg.py-@@ 259 | p in topsort: %s' % p)
                 db.rpush('queue', p)
                 check.append(p)
-            logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
+            # logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
 
         logger.info('Check deps complete. Starting build_pkgs')
         db.set('building', 'Check deps complete. Starting build container.')
