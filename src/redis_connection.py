@@ -22,25 +22,45 @@
 
 """ Database module """
 import redis
+import walrus as DB
 import logging
 
 logger = logging.getLogger(__name__)
 
-db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock')
+# db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock')
+db = DB.Database(unix_socket_path='/var/run/redis/redis.sock', db=2)
 
 
-def init_db():
-    logger.debug('First run detected. Created initial db entries.')
+class BuildServerStatus(DB.Model):
+    database = db
+    namespace = 'antbs'
+    index_separator = ':'
+    status = DB.BooleanField(primary_key=True, default=False)
 
-    status = {'idle': True}
+    idle = DB.BooleanField(default=True)
+    current_status = DB.TextField()
 
-    for key, value in status.items():
-        db.set(key, value)
-    db.set('ran_once', True)
-    logger.debug('Initial db creation complete.')
+    all_packages = DB.ZSetField()
+
+    now_building = DB.TextField()
+    container = DB.TextField()
+    building_num = DB.IntegerField()
+    building_start = DB.DateTimeField()
+
+    completed = DB.ListField()
+    failed = DB.ListField()
+    queue = DB.ListField()
+    pending_review = DB.ListField()
+
+
 
 # Check if this is our first run, create initial tables if needed
-if db.exists('ran_once') == 0:
-    init_db()
-else:
+try:
+    status = BuildServerStatus.get(BuildServerStatus.status is True)
     logger.debug('Db exists, no initial setup required.')
+except ValueError:
+    logger.debug('First run detected. Created initial db entries.')
+
+    status = BuildServerStatus.create(status=True)
+
+    logger.debug('Initial db creation complete.')

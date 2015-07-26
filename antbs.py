@@ -43,7 +43,8 @@ import gevent
 import gevent.monkey
 import src.pagination
 import src.build_pkg as builder
-from src.redis_connection import db
+# from src.redis_connection import db
+from src.redis_connection import db, status
 import src.logging_config as logconf
 import src.package as package
 import src.webhook as webhook
@@ -145,8 +146,10 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
             remove(cache)
             remove('/opt/antergos-packages')
 
-            db.set('idle', "True")
-            db.set('building', 'Idle')
+            # db.set('idle', "True")
+            status.idle = True
+            # db.set('building', 'Idle')
+            status.current_status = 'Idle'
             db.hset('now_building', 'pkg', '')
             db.set('container', '')
             db.set('building_num', '')
@@ -361,7 +364,7 @@ def get_repo_info(repo=None, logged_in=False):
                 if not item or item == '':
                     continue
                 logger.info(item)
-                pkg = package.Package(item, db)
+                pkg = package.Package(item)
                 builds = pkg.builds
                 try:
                     bnum = builds[0]
@@ -408,7 +411,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
         if pkg:
-            pobj = package.Package(pkg, db)
+            pobj = package.Package(pkg)
             if 'main' not in pobj.allowed_in and result == 2:
                 msg = '%s is not allowed in main repo.' % pkg
                 errmsg.update(error=True, msg=msg)
@@ -762,7 +765,7 @@ def build_pkg_now():
         dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        pexists = db.exists('pkg:%s' % pkgname)
+        pexists = db.exists('pkg:%s' % pkgname) or True
         is_logged_in = user.is_authenticated()
         p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
         # logger.info(rev_pending)

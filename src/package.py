@@ -38,8 +38,8 @@ class Package(object):
     gh_user = db.get('ANTBS_GITHUB_TOKEN')
     db.setnx('pkg:id:next', 0)
 
-    def __init__(self, name, db=db):
-        if name is None:
+    def __init__(self, name):
+        if not name:
             logger.error(
                 '@@-package.py-@@ 46| A pkg name is required to init an object on this class')
             return
@@ -50,22 +50,25 @@ class Package(object):
             keys_of_type_str=['name', 'pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
                               'version', 'pkgver', 'epoch', 'push_version', 'pkgrel',
                               'saved_commit', 'success_rate', 'failure_rate', 'short_name',
-                              'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in'],
+                              'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in', 'build_path'],
             keys_of_type_list=['tl_event', 'build_logs', 'builds'],
             keys_of_type_set=['depends', 'groups'])
 
         if not db.exists(self.key):
             db.set(self.key, True)
 
-            for ktype, keys in all_keys:
+            for ktype, keys in all_keys.items():
                 if ktype.endswith('str'):
                     for key in keys:
-                        db.set('%s:%s' % (self.key, key), '')
+                        if key != 'name':
+                            db.set('%s:%s' % (self.key, key), '')
                 elif ktype.endswith('list'):
                     for key in keys:
+                        db.delete('%s:%s' % (self.key, key))
                         db.rpush('%s:%s' % (self.key, key), '')
                 elif ktype.endswith('set'):
                     for key in keys:
+                        db.delete('%s:%s' % (self.key, key))
                         db.sadd('%s:%s' % (self.key, key), '')
 
             db.incr('pkg:id:next')
@@ -76,11 +79,12 @@ class Package(object):
             db.set('%s:%s' % (self.key, 'push_version'), "False")
             db.set('%s:%s' % (self.key, 'autosum'), "False")
 
-        key_lists = [all_keys['keys_of_type_str'], all_keys['keys_of_type_list'],
-                     all_keys['keys_of_type_set']]
+        key_lists = [all_keys['keys_of_type_str'], all_keys['keys_of_type_list'], all_keys['keys_of_type_set']]
         for key_list in key_lists:
             for key in key_list:
                 setattr(self, key, self.get_from_db(key))
+
+        self.check_update_pkgbuild_repo()
 
     def delete(self):
         self.db.delete(self.key)
@@ -136,6 +140,7 @@ class Package(object):
                 break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path')
+        self.save_to_db('path', path)
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and self.name == 'cnchi-dev':
@@ -188,7 +193,8 @@ class Package(object):
 
     @staticmethod
     def check_update_pkgbuild_repo():
-        if not db.exists('pkgbuild_repo_cached'):
+        if not db.exists('pkgbuild_repo_cached') or not os.path.exists('/var/tmp/antergos-packages'):
+            db.setex('pkgbuild_repo_cached', 1800, "True")
             try:
                 if not os.path.exists('/var/tmp/antergos-packages'):
                     subprocess.check_call(
@@ -197,9 +203,10 @@ class Package(object):
                 else:
                     subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
                                           cwd='/var/tmp/antergos-packages')
-                db.setex('pkgbuild_repo_cached', 1800, "True")
+                    subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
             except subprocess.CalledProcessError as err:
                 logger.error(err)
+                db.delete('pkgbuild_repo_cached')
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if self.push_version != "True" or old_val == new_val:

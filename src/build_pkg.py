@@ -526,17 +526,26 @@ def build_pkgs(last=False, pkg_info=None):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
+    dirs = ['/var/tmp/32build', '/var/tmp/32bit']
+    for d in dirs:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+        os.mkdir(d, 0o777)
     # pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
+        pinfo = pkg_info
         if pkg and pkg is not None and pkg != '':
-            pkgbuild_dir = pkg_info.path
+            pkgbuild_dir = pinfo.build_path if pinfo.build_path and pinfo.build_path != '' else pkg_info.path
             if pkgbuild_dir.startswith('/var/tmp'):
                 pkgbuild_dir = pkgbuild_dir.replace('/var/tmp/', '/opt/')
-                pkg_info.save_to_db('path', pkgbuild_dir)
+                pkg_info.save_to_db('build_path', pkgbuild_dir)
+            if 'PKGBUILD' in pkgbuild_dir:
+                pkgbuild_dir = os.path.dirname(pkgbuild_dir)
+                pkg_info.save_to_db('build_path', pkgbuild_dir)
             db.publish('log_stream', 'pkgbuild_path is %s' % pkgbuild_dir)
 
             db.set('building', 'Building %s with makepkg' % pkg)
@@ -590,11 +599,7 @@ def build_pkgs(last=False, pkg_info=None):
                 continue
 
             db.set('container', container.get('Id'))
-            dirs = ['/var/tmp/32build', '/var/tmp/32bit']
-            for d in dirs:
-                if os.path.exists(d):
-                    shutil.rmtree(d)
-                os.mkdir(d, 0o777)
+
             try:
                 doc.start(container.get('Id'))
                 cont = db.get('container')

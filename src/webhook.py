@@ -298,7 +298,7 @@ class Webhook(object):
                         tl_event = logconf.new_timeline_event(
                             'Webhook triggered by <strong>%s.</strong> Packages added to'
                             ' the build queue: %s' % (source, the_pkgs_str), tltype)
-                        p_obj = package.Package(p, db)
+                        p_obj = package.Package(p)
                         p_obj.save_to_db('tl_event', tl_event)
                     first = False
 
