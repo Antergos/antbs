@@ -29,8 +29,9 @@ import datetime
 
 db = redis_connection.db
 
-logger = logging.getLogger()
-logging.getLogger('stormpath.http').setLevel(logging.WARNING)
+logging.getLogger('stormpath.http').setLevel(logging.ERROR)
+
+logger = logging.getLogger('AntBS')
 
 logging.config.dictConfig({
     'version': 1,
@@ -38,15 +39,14 @@ logging.config.dictConfig({
 
     'formatters': {
         'file': {
-            'format': '%(asctime)s [%(levelname)s]: %(message)s -[in %(pathname)s: %(lineno)d]'
+            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : $(funcname)s | %(message)s'
         },
         'email': {
             'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\nFUNCTION: '
                       '%(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
         },
         'redis': {
-            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\nFUNCTION: '
-                      '%(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
+            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : $(funcname)s | %(message)s'
         }
     },
     'handlers': {
@@ -59,8 +59,8 @@ logging.config.dictConfig({
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
-            'maxBytes': 200000,
-            'backupCount': 5
+            'maxBytes': 5000000,
+            'backupCount': 3
         },
         'redis': {
             'level': 'DEBUG',
@@ -112,6 +112,7 @@ class Logger(object):
             log(msg, *args)
 
 logger_tl = logger
+
 
 def new_timeline_event(msg=None, tl_type=None):
     if msg is not None:

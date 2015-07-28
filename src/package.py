@@ -28,108 +28,56 @@ import os
 import re
 import sys
 from github3 import login
-from src.redis_connection import db
+from src.redis_connection import db, DB, status
 
 REPO_DIR = "/var/tmp/antergos-packages"
 
 
-class Package(object):
-    db = db
-    gh_user = db.get('ANTBS_GITHUB_TOKEN')
-    db.setnx('pkg:id:next', 0)
+class PackageMeta(DB.Model):
+    """ This is the base class for the "package" model. It initalizes the fields for
+    the package metadata that is stored in the database. """
+    def __init__(self, *args, **kwargs):
+        super(PackageMeta, self).__init__(*args, **kwargs)
+        database = db
+        namespace = 'antbs:package'
+        index_separator = ':'
+        gh_user = db.get('ANTBS_GITHUB_TOKEN')
 
-    def __init__(self, name):
-        if not name:
-            logger.error(
-                '@@-package.py-@@ 46| A pkg name is required to init an object on this class')
-            return
-        self.name = name
-        self.key = 'pkg:%s' % self.name
-        self.pkgname = self.name
-        all_keys = dict(
-            keys_of_type_str=['name', 'pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
-                              'version', 'pkgver', 'epoch', 'push_version', 'pkgrel',
-                              'saved_commit', 'success_rate', 'failure_rate', 'short_name',
-                              'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in', 'build_path'],
-            keys_of_type_list=['tl_event', 'build_logs', 'builds'],
-            keys_of_type_set=['depends', 'groups'])
+        pkg_id = DB.AutoIncrementField(index=True)
+        name = DB.TextField(index=True, primary_key=True)
 
-        if not db.exists(self.key):
-            db.set(self.key, True)
+        all_fields_dict = dict(
+            TextField=['pkgname', 'pkgid', 'push_version', 'autosum', 'depends',
+                       'version', 'pkgver', 'epoch', 'push_version', 'pkgrel', 'saved_commit', 'short_name',
+                       'path', 'pbpath', 'description', 'pkgdesc', 'allowed_in', 'build_path'],
+            ZSetField=['tl_event', 'build_logs', 'builds', 'success_rate', 'failure_rate'],
+            SetField=['depends', 'groups'])
 
-            for ktype, keys in all_keys.items():
-                if ktype.endswith('str'):
-                    for key in keys:
-                        if key != 'name':
-                            db.set('%s:%s' % (self.key, key), '')
-                elif ktype.endswith('list'):
-                    for key in keys:
-                        db.delete('%s:%s' % (self.key, key))
-                        db.rpush('%s:%s' % (self.key, key), '')
-                elif ktype.endswith('set'):
-                    for key in keys:
-                        db.delete('%s:%s' % (self.key, key))
-                        db.sadd('%s:%s' % (self.key, key), '')
+        all_fields = [all_fields_dict['TextField'], all_fields_dict['ZSetField'], all_fields_dict['SetField']]
+        indexed = ['name', 'pkgname', 'pkgid', 'depends', 'version', 'pkgver', 'description', 'pkgdesc', 'allowed_in']
 
-            db.incr('pkg:id:next')
-            pkgid = db.get('pkg:id:next')
-            db.sadd('pkgs:all', self.name)
-            db.set('%s:%s' % (self.key, 'pkgid'), pkgid)
-            db.set('%s:%s' % (self.key, 'name'), self.name)
-            db.set('%s:%s' % (self.key, 'push_version'), "False")
-            db.set('%s:%s' % (self.key, 'autosum'), "False")
+        for fields_list in all_fields:
+            for field_type, fields in fields_list.items():
+                for field in fields:
+                    if field in indexed:
+                        index = True
+                    else:
+                        index = False
+                    field_type_obj = getattr(DB, field_type)
+                    setattr(self, field, field_type_obj(index=index))
+                    logger.debug('%s, %s' % (field, getattr(DB, field_type)))
 
-        key_lists = [all_keys['keys_of_type_str'], all_keys['keys_of_type_list'], all_keys['keys_of_type_set']]
-        for key_list in key_lists:
-            for key in key_list:
-                setattr(self, key, self.get_from_db(key))
 
-        self.check_update_pkgbuild_repo()
-
-    def delete(self):
-        self.db.delete(self.key)
-
-    def get_from_db(self, attr=None):
-        val = ''
-        if attr is not None:
-            key = '%s:%s' % (self.key, attr)
-            if db.exists(key):
-                if self.db.type(key) == 'string':
-                    val = self.db.get(key)
-                elif self.db.type(key) == 'list' and int(self.db.llen(key)) > 0:
-                    val = self.db.lrange(key, 0, -1)
-                elif self.db.type(key) == 'set' and self.db.scard(key) > 0:
-                    val = self.db.smembers(key)
-                    # logger.debug('@@-package.py-@@ | get_from_db %s is %s' % (attr, val))
-            else:
-                val = ''
-
-        return val
-
-    def save_to_db(self, attr=None, value=None, ktype=None):
-        if attr is not None and value is not None:
-            # TODO: This needs to be moved into its own method.
-            if self.push_version and self.push_version == "True" and attr == "pkgver":
-                if self.pkgver != value:
-                    self.update_and_push_github(attr, self.pkgver, value)
-
-            key = '%s:%s' % (self.key, attr)
-
-            if self.db.type(key) == 'string' or (self.db.type(key) == 'none' and ktype is None):
-                self.db.set(key, value)
-
-            elif self.db.type(key) == 'list' or ktype == 'list':
-                self.db.rpush(key, value)
-
-            elif self.db.type(key) == 'set' or ktype == 'set':
-                self.db.sadd(key, value)
-
-            return value
+class Package(PackageMeta):
+    """ This class represents a "package" throughout the build server app. It is used to
+    get and set package data to the database as well as from PKGBUILDs. """
+    def __init__(self, *args, **kwargs):
+        super(Package, self).__init__(*args, **kwargs)
 
     def get_from_pkgbuild(self, var=None):
         if var is None:
             logger.error('get_from_pkgbuild var is none')
-        self.check_update_pkgbuild_repo()
+        Package.maybe_update_pkgbuild_repo()
         path = None
         paths = [os.path.join('/var/tmp/antergos-packages/', self.name),
                  os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.name),
@@ -140,7 +88,7 @@ class Package(object):
                 break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path')
-        self.save_to_db('path', path)
+
         parse = open(path).read()
         dirpath = os.path.dirname(path)
         if var == "pkgver" and self.name == 'cnchi-dev':
@@ -162,7 +110,7 @@ class Package(object):
                 cmd = 'source ' + path + '; echo ${' + var + '[*]}'
             else:
                 cmd = 'source ' + path + '; echo ${' + var + '}'
-            logger.info('@@-package.py-@@ 88 | FIRED3! %s' % cmd)
+
             if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in self.name):
                 if 'numix-icon-theme' not in self.name:
                     giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -192,7 +140,7 @@ class Package(object):
         return out
 
     @staticmethod
-    def check_update_pkgbuild_repo():
+    def maybe_update_pkgbuild_repo():
         if not db.exists('pkgbuild_repo_cached') or not os.path.exists('/var/tmp/antergos-packages'):
             db.setex('pkgbuild_repo_cached', 1800, "True")
             try:
@@ -235,11 +183,15 @@ class Package(object):
             return False
 
     def get_version(self):
+        changed = []
         for key in ['pkgver', 'pkgrel', 'epoch']:
             old_val = getattr(self, key)
             new_val = self.get_from_pkgbuild(key)
             if new_val != old_val:
-                self.save_to_db(key, new_val, 'string')
+                changed.append((key, new_val))
+
+        if not changed:
+            return self.version
 
         if self.name == "cnchi-dev" and self.pkgver[-1] != "0":
             event = self.tl_event
@@ -264,74 +216,29 @@ class Package(object):
 
     def get_deps(self):
         depends = []
-        pbfile = self.pbpath
         deps = self.get_from_pkgbuild('depends').split()
-        logger.info('@@-package.py-@@ 250| deps are %s', deps)
+        logger.info('deps are %s', deps)
         mkdeps = self.get_from_pkgbuild('makedepends').split()
-        q = db.lrange('queue', 0, -1)
+        queue = status.queue
 
         for dep in deps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver is not None:
                 dep = has_ver.group(0)
-            if db.sismember('pkgs:all', dep) and dep in q:
-                depends.append(dep)
+                if dep in status.all_packages and dep in queue:
+                    depends.append(dep)
 
-            self.save_to_db('depends', dep, ktype='set')
+                self.depends.add(dep)
 
         for mkdep in mkdeps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
             if has_ver is not None:
                 mkdep = has_ver.group(0)
-            if db.sismember('pkgs:all', mkdep) and mkdep in q:
-                depends.append(mkdep)
+                if mkdep in status.all_packages and mkdep in queue:
+                    depends.append(mkdep)
 
-            self.save_to_db('depends', mkdep, ktype='set')
+                self.depends.add(mkdep)
 
         res = (self.name, depends)
 
         return res
-
-    def determine_pkg_path(self):
-        repodir = '/opt/antergos-packages'
-        pbfile = None
-        path = None
-        pkgbuild_dir = os.path.join(repodir, self.name)
-        if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
-            pkgbuild_dir = os.path.join(repodir, 'deepen_desktop')
-            if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
-                pkgbuild_dir = os.path.join(repodir, 'cinnamon')
-                if not os.path.exists(os.path.join(pkgbuild_dir, 'PKGBUILD')):
-                    raise Exception
-
-        if os.path.exists(pkgbuild_dir):
-            path = pkgbuild_dir
-            logger.info('@@-package.py-@@ 281| path is %s', path)
-            pbfile = os.path.join(pkgbuild_dir, 'PKGBUILD')
-            logger.info('@@-package.py-@@ 281| path is %s', pbfile)
-
-        self.save_to_db('pbpath', pbfile)
-        self.save_to_db('path', path)
-
-        return pbfile
-
-# self.pkgid = self.get_from_db('pkgid')
-# self.version = self.get_from_db('version')
-# self.epoch = self.get_from_db('epoch')
-# self.depends = self.get_from_db('depends')
-# self.groups = self.get_from_db('groups')
-# self.builds = self.get_from_db('build_logs')
-# self.push_version = self.get_from_db('push_version')
-# self.pkgrel = self.get_from_db('pkgrel')
-# self.pkgver = self.get_from_db('pkgver')
-# self.saved_commit = self.get_from_db('saved_commit')
-# self.tl_event = self.get_from_db('tl_event')
-# self.autosum = self.get_from_db('autosum')
-# self.depends = self.get_from_db('depends')
-# self.success_rate = self.get_from_db('success_rate')
-# self.failure_rate = self.get_from_db('failure_rate')
-# self.short_name = self.get_from_db('short_name')
-# self.path = self.get_from_db('path')
-# self.pbpath = self.get_from_db('pbpath')
-# self.schema_v1 = self.get_from_db('schema_v1')
-# self.description = self.get_from_db('description')

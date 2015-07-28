@@ -21,7 +21,7 @@
 #  MA 02110-1301, USA.
 
 """ Database module """
-import redis
+# import redis
 import walrus as DB
 import logging
 
@@ -33,7 +33,7 @@ db = DB.Database(unix_socket_path='/var/run/redis/redis.sock', db=2)
 
 class BuildServerStatus(DB.Model):
     database = db
-    namespace = 'antbs'
+    namespace = 'antbs:status'
     index_separator = ':'
     status = DB.BooleanField(primary_key=True, default=False)
 
