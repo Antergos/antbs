@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block pagetitle -%}Scheduled{%- endblock pagetitle %}
+{% block stats %}{% endblock stats %}
+{% block bottomcontent -%}
+    <div class="row">
+        <div class="col-md-10">
+            <div id="bottom-wrap" class="block-flat">
+                <div class="header">
+                    <h3>Scheduled Builds</h3>
+                </div>
+                <div class="content">
+                    {% if idle == "True" %}
+                        <tr>
+                            <td>Queue is empty.</td>
+                        </tr>
+                    {% else %}
+                        <table id="noDt" class="table no-border hover">
+                            <thead class="no-border">
+                            <tr>
+                                <th>Pos.</th>
+                                <th>Name</th>
+                                <th>Version</th>
+                            </tr>
+                            </thead>
+                            <tbody class="no-border-y">
+                            {% if queue is not mapping %}
+                                {% for p in queue %}
+
+                                    {% set pkg, version = p %}
+                                        <tr>
+                                            <td>{{ loop.index }}</td>
+                                            <td>{{ pkg }}</td>
+                                            <td>{{ version }}</td>
+                                        </tr>
+                                    {% endfor %}
+
+                            {% endif %}
+
+
+                            </tbody>
+                        </table>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+    </div>
+{%- endblock bottomcontent %}

@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block pagetitle -%}Issue Tracker | Antergos{%- endblock pagetitle %}
+{% block styles %}
+{{ super() }}
+<script src="/static/js/showissues.js" type="text/javascript"></script>
+{% endblock styles %}
+{% block stats %}{% endblock stats %}
+{% block subheader %}
+    <div class="page-head"><h2>Open Issues (WIP - Not displayed to public)</h2>
+        <ol class="breadcrumb">
+            <li><a href="/">Home</a></li>
+            <li><a href="#">Issue Tracker</a></li>
+            <li class="active">Open Issues</li>
+        </ol>
+    </div>
+{% endblock subheader %}
+
+{% block bottomcontent -%}
+    <div class="row">
+        <div class="col-md-10">
+            <div id="bottom-wrap" class="block-flat">
+                <div class="header">
+                    <h3>Open Issues</h3>
+                </div>
+                <div class="content">
+                               <table id="issuetable" class="table no-border hover">
+                <thead class="no-border">
+                <tr>
+                    <th>ID</th>
+                    <th>Title</th>
+                    <th>State</th>
+                    <th>Assignee</th>
+                    <th>Milestone</th>
+                    <th>Last Updated</th>
+                </tr>
+                </thead>
+                <tbody id="issue-table-body" class="no-border-y">
+
+
+<script>
+                        showIssues();
+                       </script>
+
+
+                </tbody>
+            </table>
+
+            {#{% if all_pages > 1 %}
+                <div class="btn-group">
+                    {% if page >= 2 %}
+                        <a href="/failed/{{ page - 1 }}" class="btn btn-primary">&laquo;</a>
+                    {% else %}
+                        <a href="#" class="btn btn-primary">&laquo;</a>
+                    {% endif %}
+                    {% for i in range(0, all_pages) %}
+                        <a href="/failed/{{ loop.index0 + 1 }}" class="btn btn-primary">{{ loop.index0 + 1 }}</a>
+                    {% endfor %}
+
+                    <a href="/failed/{{ page + 1 }}" class="btn btn-primary">&raquo;</a>
+                </div>
+            {% endif %}#}
+
+        </div>
+                <div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
+
+            </div>
+        </div>
+
+    </div>
+{%- endblock bottomcontent %}

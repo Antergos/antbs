@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block pagetitle -%}Build Record{%- endblock pagetitle %}
+{% block stats %}{% endblock stats %}
+{% block subheader %}
+<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+    <ol class="breadcrumb">
+        <li><a href="/">Home</a></li>
+        <li><a href="#">Build Reports</a></li>
+        <li><a href="/{{ res }}">{{ res|capitalize() }}</a></li>
+        <li class="active">{{ self.pagetitle() }}</li>
+    </ol>
+</div>
+{% endblock subheader %}
+{%- block topcontent -%}
+        <div class="col-md-4">
+            <div id="summary"
+                 class="block no-padding block-color {% if res == "completed" %}success{% else %}danger{% endif %}">
+                <div class="header">
+                    <div class="actions">
+                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
+                    </div>
+                    <h3>{% if res == "completed" %}
+                        <i class="glyphicon glyphicon-thumbs-up"></i>
+                    {% else %}
+                        <i class="glyphicon glyphicon-thumbs-down"></i>
+                    {% endif %}
+                        Build Number: {{ bnum }}</h3>
+                </div>
+                <div class="content no-padding">
+                    <table id="noDt" class="table no-border hover">
+                        <tbody class="no-border-y">
+                        <tr>
+                            <td>Package:</td>
+                            <td>{{ pkg }}</td>
+                        </tr>
+                        <tr>
+                            <td>Version:</td>
+                            <td>{{ ver }}</td>
+                        </tr>
+                        <tr>
+                            <td>Start:</td>
+                            <td>{{ start }}</td>
+                        </tr>
+                        <tr>
+                            <td>Finish:</td>
+                            <td>{{ end }}</td>
+                        </tr>
+                        <tr>
+                            <td>Result:</td>
+                            <td>{{ res }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+ 
+{%- endblock topcontent -%}
+
+{%- block bottomcontent %}
+    <div class="row">
+        <div class="col-md-10">
+            <div id="" class="block block-color">
+                <div class="header">
+                <div class="actions">
+                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
+                    </div>
+                    <h3>Build Log</h3>
+                </div>
+                <div class="content no-padding">
+
+                    <div id="data" class="no-padding">{{ log|safe() }}</div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock bottomcontent -%}
+{% block scripts %}
+    {{ super() }}
+        
+    {# <script type="text/javascript">
+        $(window).load(
+                function () {
+        sse = new EventSource('/get_log?num={{ bnum }}');
+        var noBuilds = false;
+        sse.onmessage = function (message) {
+            //var msg = data.message;
+            if (message.data.indexOf('ENDOFLOG') >= 0) {
+                sse.close();
+                prettyPrint();
+                return;
+            }
+            $('#data').append(message.data + '<br/>');
+            $('#data').scrollTop($('#data')[0].scrollHeight);
+            if (message.data.indexOf("Unable to retrieve build log.") >= 0) {
+                sse.close();
+                prettyPrint();
+                return;
+            }
+        };
+    });
+</script>#}
+    {#{% endif -%}#}
+{% endblock scripts %}

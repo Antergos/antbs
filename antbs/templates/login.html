@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="/static/img/fav.png">
+    <title>AntBS | {% block pagetitle %}{% endblock pagetitle %}</title>
+
+
+    <link href='//fonts.googleapis.com/css?family=Open+Sans:400,300,600,400italic,700,800'
+          rel='stylesheet' type='text/css'>
+    <link href='//fonts.googleapis.com/css?family=Raleway:400,300,200,100,700' rel='stylesheet'
+          type='text/css'>
+    <!-- Bootstrap core CSS -->
+    <link href="/static/js/bootstrap/dist/css/bootstrap.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
+
+    <!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!--[if lt IE 9]>
+	  <script src="../../assets/js/html5shiv.js"></script>
+	  <script src="../../assets/js/respond.min.js"></script>
+	<![endif]-->
+
+    <!-- Custom styles for this template -->
+    <link href="/static/css/skin-blue.css" rel="stylesheet"/>
+
+</head>
+
+<body class="texture">
+
+<div id="cl-wrapper" class="login-container">
+
+
+    <div class="middle-login">
+        <div class="block-flat">
+            <div class="header">
+                <h3 class="text-center"><img class="logo-img" src="/static/images/logo.png" alt="logo"/></h3>
+            </div>
+            <div>
+                <form style="margin-bottom: 0px !important;" class="form-horizontal" method="post">
+                    {{ form.hidden_tag() }}
+                    <div class="content">
+                        <h4 class="title">Login Access</h4>
+
+                        <div class="form-group">
+                            <div class="col-sm-12">
+                                <div class="input-group">
+                                    <span class="input-group-addon"><i class="fa fa-user"></i></span>
+                                    <input type="text" placeholder="Username or E-mail" id="login" name="login" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <div class="col-sm-12">
+                                <div class="input-group">
+                                    <span class="input-group-addon"><i class="fa fa-lock"></i></span>
+                                    <input type="password" placeholder="Password" id="password" name="password" class="form-control">
+                                </div>
+                            </div>
+                        </div>
+{# This bit of code displays a list of error messages if anything bad happens. #}
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-danger">
+                    <button data-dismiss="alert" class="close" type="button" aria-hidden="true">×</button>
+                    <i class="fa fa-exclamation-triangle sign"></i>
+                    <strong> Error! </strong> {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+                    </div>
+                    <div class="foot" style="position: relative;">
+                        <button class="btn btn-default" type="button">Register</button>
+                        <button class="btn btn-primary" data-dismiss="modal" type="submit">Log In</button>
+                        <div style="width:100%;position:absolute;text-align:left;bottom:5px;bottom: 20px;font-size: 13px;font-weight: 400;font-family: Lato, 'Open Sans', Helvetica, Arial;"><a href="/forgot">Reset Password</a></div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="text-center out-links"><a href="#">&copy; 2014 Antergos</a></div>
+    </div>
+
+</div>
+
+<script src="/static/js/jquery.js"></script>
+<script type="text/javascript">
+    $(function () {
+        $("#cl-wrapper").css({opacity: 1, 'margin-left': 0});
+    });
+</script>
+
+<!-- Bootstrap core JavaScript
+================================================== -->
+<!-- Placed at the end of the document so the pages load faster -->
+<script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
+<script type="text/javascript" src="/static/js/jquery.flot/jquery.flot.js"></script>
+<script type="text/javascript" src="/static/js/jquery.flot/jquery.flot.pie.js"></script>
+<script type="text/javascript" src="/static/js/jquery.flot/jquery.flot.resize.js"></script>
+<script type="text/javascript" src="/static/js/jquery.flot/jquery.flot.labels.js"></script>
+</body>
+</html>
