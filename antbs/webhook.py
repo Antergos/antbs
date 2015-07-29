@@ -29,13 +29,15 @@ import os
 import subprocess
 import shutil
 import datetime
-import build_pkg as builder
-from redis_connection import db
+import ast
+
 from rq import Queue, Connection, Worker
 import ipaddress
-import ast
 import requests
-import logging_config as logconf
+
+import build_pkg as builder
+from utils.redis_connection import db
+import utils.logging_config as logconf
 import package as package
 
 logger = logconf.logger
@@ -298,7 +300,7 @@ class Webhook(object):
                         tl_event = logconf.new_timeline_event(
                             'Webhook triggered by <strong>%s.</strong> Packages added to'
                             ' the build queue: %s' % (source, the_pkgs_str), tltype)
-                        p_obj = package.Package(p, db)
+                        p_obj = package.Package(p)
                         p_obj.save_to_db('tl_event', tl_event)
                     first = False
 

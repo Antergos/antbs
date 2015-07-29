@@ -28,7 +28,7 @@ import os
 import subprocess
 
 import redis_connection as redconn
-from src.logging_config import logger
+from logging_config import logger
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'

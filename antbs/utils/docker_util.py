@@ -22,15 +22,17 @@
 
 """ Docker Utilities """
 
-from src.logging_config import logger
-import src.redis_connection
 import subprocess
 import os
-import docker
-from docker.utils import create_host_config
 import shutil
 
-db = src.redis_connection.db
+import docker
+from docker.utils import create_host_config
+
+from logging_config import logger
+import redis_connection
+
+db = redis_connection.db
 
 doc_user = db.get('docker-images:username')
 doc_pass = db.get('docker-images:password')

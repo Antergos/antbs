@@ -23,10 +23,10 @@
 """ Bot utilities for Slack """
 
 import os
-from src.redis_connection import db
+from redis_connection import db
 from stackexchange import Site, StackOverflow, Sort, DESC
 from github3 import login
-from src.logging_config import logger
+from logging_config import logger
 
 se_key = db.get('SLACK:API-KEY')
 gh_user = db.get('ANTBS_GITHUB_TOKEN')

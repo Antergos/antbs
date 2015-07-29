@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# build_pkg.py
+# build.py
 #
 # Copyright 2014-2015 Antergos
 #
@@ -20,4 +20,36 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
 # MA 02110-1301, USA.
 
-""" Build packages when triggered by /hook """
+""" Build Class - Represents a single build """
+
+import datetime
+
+from utils.redis_connection import db, DB
+
+
+class Build(DB.Model):
+    database = db
+    namespace = 'antbs:build'
+    index_separator = ':'
+    bnum = DB.AutoIncrementField(primary_key=True)
+
+    pkgname = DB.TextField(fts=True)
+    pkgver = DB.FloatField(index=True)
+    pkgrel = DB.IntegerField()
+    epoch = DB.IntegerField()
+    version_str = DB.TextField()
+
+    start = DB.DateTimeField(default=datetime.datetime.now)
+    end = DB.DateTimeField()
+
+    start_str = DB.TextField(index=True)
+    end_str = DB.TextField(index=True)
+
+    container = DB.TextField(index=True)
+
+    log = DB.ListField(fts=True)
+
+    @staticmethod
+    def datetime_to_string(dt):
+        return dt.strftime("%m/%d/%Y %I:%M%p")
+

@@ -22,14 +22,14 @@
 
 """ Monitor commit activity on 3rd-party repos. Schedule a build when new commits are detected. """
 
-from src.logging_config import logger
-from src.redis_connection import db
-import src.webhook as webhook
+from utils.logging_config import logger
+from utils.redis_connection import db, status
+import webhook
 from github3 import login
 from gitlab import Gitlab
 
-GITLAB_TOKEN = db.get('ANTBS_GITLAB_TOKEN')
-GITHUB_TOKEN = db.get('ANTBS_GITHUB_TOKEN')
+GITLAB_TOKEN = status.github_token
+GITHUB_TOKEN = status.gitlab_token
 
 
 def maybe_check_for_new_items():
@@ -37,7 +37,8 @@ def maybe_check_for_new_items():
 
 
 def check_for_new_items():
-    db.setex('FEED_CHECKED', 900, 'True')
+    db.set('FEED_CHECKED', 'True')
+    db.expire('FEED_CHECKED', 900)
     new_items = []
     gh = login(token=GITHUB_TOKEN)
     last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''

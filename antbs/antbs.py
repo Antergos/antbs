@@ -41,15 +41,14 @@ import docker
 from flask.ext.stormpath import StormpathManager, groups_required, user
 import gevent
 import gevent.monkey
-import src.pagination
-import src.build_pkg as builder
-from src.redis_connection import db
-import src.logging_config as logconf
-import src.package as package
-import src.webhook as webhook
-import src.repo_monitor as repo_mon
-import src.slack_bot as slack_bot
-# import newrelic
+import utils.pagination
+import build_pkg as builder
+from utils.redis_connection import db, status
+import utils.logging_config as logconf
+import package
+import webhook
+import repo_monitor as repo_mon
+import utils.slack_bot as slack_bot
 
 gevent.monkey.patch_all()
 
@@ -85,6 +84,7 @@ app.jinja_options['trim_blocks'] = True
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
 logger = logconf.logger
+tl_event = logconf.TimelineEvent()
 
 
 def copy(src, dst):
@@ -145,12 +145,14 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
             remove(cache)
             remove('/opt/antergos-packages')
 
-            db.set('idle', "True")
-            db.set('building', 'Idle')
-            db.hset('now_building', 'pkg', '')
-            db.set('container', '')
-            db.set('building_num', '')
-            db.set('building_start', '')
+            # db.set('idle', "True")
+            status.idle = True
+            # db.set('building', 'Idle')
+            status.current_status = 'Idle'
+            # db.hset('now_building', 'pkg', '')
+            # db.set('container', '')
+            # db.set('building_num', '')
+            # db.set('building_start', '')
 
     logger.error('Caught Build Exception: %s', traceback)
 
@@ -361,7 +363,7 @@ def get_repo_info(repo=None, logged_in=False):
                 if not item or item == '':
                     continue
                 logger.info(item)
-                pkg = package.Package(item, db)
+                pkg = package.Package(item)
                 builds = pkg.builds
                 try:
                     bnum = builds[0]
@@ -404,11 +406,12 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     try:
         db.set('build_log:%s:review_dev' % bnum, dev)
         db.set('build_log:%s:review_date' % bnum, dt)
-        db.set('idle', 'False')
+        # db.set('idle', 'False')
+        status.idle = False
         result = int(result)
         pkg = db.get('build_log:%s:pkg' % bnum)
         if pkg:
-            pobj = package.Package(pkg, db)
+            pobj = package.Package(pkg)
             if 'main' not in pobj.allowed_in and result == 2:
                 msg = '%s is not allowed in main repo.' % pkg
                 errmsg.update(error=True, msg=msg)
@@ -459,13 +462,14 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
 
 
 def get_timeline(tlpage=None):
-    event_ids = db.lrange('timeline:all', 0, -1)
+    event_ids = status.all_tl_events
     timeline = []
     for event_id in event_ids:
-        date = db.get('timeline:%s:date' % event_id)
-        time = db.get('timeline:%s:time' % event_id)
-        msg = db.get('timeline:%s:msg' % event_id)
-        tltype = db.get('timeline:%s:type' % event_id)
+        event_obj = tl_event.get(tl_event.event_id is event_id)
+        date = event_obj.date_str
+        time = event_obj.time_str
+        msg = event_obj.text
+        tltype = event_obj.event_type
         allinfo = dict(event_id=event_id, date=date, msg=msg, time=time, tltype=tltype)
         event = {event_id: allinfo}
         timeline.append(event)
@@ -493,11 +497,11 @@ def flask_error(e):
     return render_template('500.html'), 400
 
 
-@app.errorhandler(Exception)
-def unhandled_exception(e):
-    if e is not None:
-        logger.debug(e)
-    return render_template('500.html'), 500
+# @app.errorhandler(Exception)
+# def unhandled_exception(e):
+#     if e is not None:
+#         logger.debug(e)
+#     return render_template('500.html'), 500
 
 
 @app.route("/timeline/<int:tlpage>")
@@ -505,29 +509,39 @@ def unhandled_exception(e):
 def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
-    is_idle = db.get('idle')
+    # is_idle = db.get('idle')
+    is_idle = status.idle
     check_stats = ['queue', 'completed', 'failed']
-    building = db.get('building')
+    # building = db.get('building')
+    building = status.current_status
     this_page, all_pages = get_timeline(tlpage)
     is_logged_in = user.is_authenticated()
-    c, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
+    # c, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
     # logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
     stats = {}
     for stat in check_stats:
-        res = db.llen(stat)
+        # res = db.llen(stat)
+        builds = getattr(status, stat)
+        res = len(builds) > 0
         if stat is not "queue":
-            builds = db.lrange(stat, 0, -1)
+            # builds = db.lrange(stat, 0, -1)
+            # builds = db.lrange(stat, 0, -1)
             builds = [x for x in builds if x is not None]
             within = []
             nodup = []
-            for build in builds:
-                end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
-                end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
-                ver = db.get('build_log:%s:version' % build) or '0.00'
-                name = db.get('build_log:%s:pkg' % build) or 'None'
-                ver = '%s:%s' % (name, ver)
-                if (datetime.now() - end_fmt) < timedelta(hours=48) and ver not in nodup and name != 'None':
-                    within.append(build)
+            for bnum in builds:
+                try:
+                    build = build.Build.get(build.Build.bnum == bnum)
+                except ValueError:
+                    continue
+                # end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
+                # end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
+                # end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
+                # ver = db.get('build_log:%s:version' % build) or '0.00'
+                # name = db.get('build_log:%s:pkg' % build) or 'None'
+                ver = '%s:%s' % (build.pkgname, build.version_str)
+                if (datetime.now() - build.end) < timedelta(hours=48) and ver not in nodup and build.pkgname:
+                    within.append(build.bnum)
                     nodup.append(ver)
 
             stats[stat] = len(within)
@@ -566,16 +580,27 @@ def homepage(tlpage=None):
 
 @app.route("/building")
 def build():
-    is_idle = db.get('idle')
-    now_building = db.hget('now_building', 'pkg')
-    cont = db.get('container')
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    # now_building = db.hget('now_building', 'pkg')
+    now_building = status.now_building
+    # cont = db.get('container')
+    cont = status.container
     if cont:
         container = cont[:20]
     else:
         container = None
-    bnum = db.get('building_num')
-    start = db.get('building_start')
-    ver = db.get('build_log:%s:version' % bnum)
+    # bnum = db.get('building_num')
+    # start = db.get('building_start')
+    # ver = db.get('build_log:%s:version' % bnum)
+    bnum = status.building_num
+    start = status.building_start
+    try:
+        build_obj = build.Build.get(build.Build.bnum == bnum)
+        ver = build_obj.version_str
+    except ValueError as err:
+        logger.error(err)
+        ver = ''
 
     return render_template("building.html", idle=is_idle, building=now_building, container=container, bnum=bnum,
                            start=start, ver=ver)
@@ -585,8 +610,9 @@ def build():
 
 @app.route('/get_log')
 def get_log():
-    is_idle = db.get('idle')
-    if is_idle == "True":
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    if is_idle:
         abort(404)
 
     return Response(get_live_build_ouput(), direct_passthrough=True, mimetype='text/event-stream')
@@ -610,19 +636,30 @@ def maybe_check_for_remote_commits():
 
 @app.route('/scheduled')
 def scheduled():
-    is_idle = db.get('idle')
+    # is_idle = db.get('idle')
+    is_idle = status.idle
     try:
-        pkgs = db.lrange('queue', 0, -1)
+        # pkgs = db.lrange('queue', 0, -1)
+        queued = status.queue
     except Exception:
-        pkgs = None
-    building = db.get('building')
+        queued = None
+    # building = db.get('building')
+    building = status.now_building
     the_queue = []
-    if pkgs is not None:
-        for pak in pkgs:
-            name = db.get('pkg:%s:name' % pak)
-            version = db.get('pkg:%s:version' % pak)
-            all_info = (name, version)
-            the_queue.append(all_info)
+    if queued:
+        for pak_id in queued:
+            # name = db.get('pkg:%s:name' % pak)
+            # version = db.get('pkg:%s:version' % pak)
+            # all_info = (name, version)
+            # the_queue.append(all_info)
+            try:
+                pkg_obj = package.Package.get(package.Package.pkg_id == pak_id)
+                name = pkg_obj.pkgname
+                version = pkg_obj.version_str
+                all_info = (name, version)
+                the_queue.append(all_info)
+            except ValueError as err:
+                logger.error(err)
 
     return render_template("scheduled.html", idle=is_idle, building=building, queue=the_queue, user=user)
 
@@ -632,17 +669,19 @@ def scheduled():
 @app.route('/completed/search/<name>/<int:page>')
 @app.route('/completed')
 def completed(page=None, name=None):
-    is_idle = db.get('idle')
-    status = 'completed'
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    build_status = 'completed'
     is_logged_in = user.is_authenticated()
     if page is None and name is None:
         page = 1
     if name is not None and page is None:
         page = 1
-    building = db.get('building')
-    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in, name)
+    # building = db.get('building')
+    building = status.now_building
+    completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     # logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
-    pagination = src.pagination.Pagination(page, 10, all_pages)
+    pagination = utils.pagination.Pagination(page, 10, all_pages)
     # logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
     #    pagination.page, pagination.per_page, pagination.total_count))
 
@@ -653,15 +692,17 @@ def completed(page=None, name=None):
 @app.route('/failed/<int:page>')
 @app.route('/failed')
 def failed(page=None):
-    is_idle = db.get('idle')
-    status = 'failed'
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    build_status = 'failed'
     if page is None:
         page = 1
-    building = db.get('building')
+    # building = db.get('building')
+    building = status.now_building
     is_logged_in = user.is_authenticated()
 
-    failed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
-    pagination = src.pagination.Pagination(page, 10, all_pages)
+    failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
+    pagination = utils.pagination.Pagination(page, 10, all_pages)
     return render_template("failed.html", idle=is_idle, building=building, failed=failed, all_pages=all_pages,
                            page=page, rev_pending=rev_pending, user=user, pagination=pagination)
 
@@ -699,8 +740,10 @@ def build_info(num):
 @app.route('/browse/<goto>')
 @app.route('/browse')
 def repo_browser(goto=None):
-    is_idle = db.get('idle')
-    building = db.get('building')
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    # building = db.get('building')
+    building = status.now_building
     release = False
     testing = False
     main = False
@@ -721,8 +764,9 @@ def repo_browser(goto=None):
 @app.route('/pkg_review', methods=['POST', 'GET'])
 @groups_required(['admin'])
 def dev_pkg_check(page=None):
-    is_idle = db.get('idle')
-    status = 'completed'
+    # is_idle = db.get('idle')
+    is_idle = status.idle
+    build_status = 'completed'
     set_rev_error = False
     set_rev_error_msg = None
     review = True
@@ -747,8 +791,8 @@ def dev_pkg_check(page=None):
                 db.delete('pending_rev_cache')
                 return json.dumps(message)
 
-    completed, all_pages, rev_pending = get_build_info(page, status, is_logged_in)
-    pagination = src.pagination.Pagination(page, 10, len(rev_pending))
+    completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
+    pagination = utils.pagination.Pagination(page, 10, len(rev_pending))
     return render_template("pkg_review.html", idle=is_idle, completed=completed, all_pages=all_pages,
                            set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, user=user,
                            rev_pending=rev_pending, pagination=pagination)
@@ -762,7 +806,7 @@ def build_pkg_now():
         dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        pexists = db.exists('pkg:%s' % pkgname)
+        pexists = db.exists('pkg:%s' % pkgname) or True
         is_logged_in = user.is_authenticated()
         p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
         # logger.info(rev_pending)
@@ -799,9 +843,11 @@ def build_pkg_now():
 
 @app.route('/get_status', methods=['GET'])
 def get_status():
-    idle = db.get('idle')
-    building = db.get('building')
-    if idle == 'True':
+    # idle = db.get('idle')
+    idle = status.idle
+    # building = db.get('building')
+    building = status.now_building
+    if idle:
         message = dict(msg='Idle')
     else:
         message = dict(msg=building)
@@ -851,9 +897,11 @@ def get_and_show_pkg_profile(pkgname=None):
 def repo_packages(repo=None):
     if repo is None or repo not in ['antergos', 'antergos-staging']:
         abort(404)
-    is_idle = db.get('idle')
+    # is_idle = db.get('idle')
+    is_idle = status.idle
     is_logged_in = user.is_authenticated()
-    building = db.get('building')
+    # building = db.get('building')
+    building = status.now_building
     packages, rev_pending = get_repo_info(repo, is_logged_in)
     return render_template("repo_pkgs.html", idle=is_idle, building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)
@@ -873,8 +921,5 @@ def overflow():
     return Response(res['msg'], content_type=res['content_type'])
 
 
-# Some boilerplate code that just says "if you're running this from the command
-# line, start here." It's not critical to know what this means yet.
 if __name__ == "__main__":
-    app.debug = True
-    app.run(port=8020)
+    app.run(host='127.0.0.1', port=8020, debug=True, use_reloader=False)

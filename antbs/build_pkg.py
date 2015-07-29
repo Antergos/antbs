@@ -26,10 +26,10 @@ import os
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
-from src.redis_connection import db
-import src.docker_util as docker_utils
+from utils.redis_connection import db
+import utils.docker_util as docker_utils
 import subprocess
-import src.logging_config as logconf
+import utils.logging_config as logconf
 import datetime
 import shutil
 from pygments import highlight
@@ -38,11 +38,10 @@ from pygments.formatters import HtmlFormatter
 import re
 import time
 from multiprocessing import Process
-import src.package as pkgclass
-import src.sign_pkgs as sign_pkgs
+import package as pkgclass
+import utils.sign_pkgs as sign_pkgs
 import glob
 from rq import get_current_job
-
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -287,7 +286,7 @@ def handle_hook(first=False, last=False):
                 # logger.info('@@-build_pkg.py-@@ 259 | p in topsort: %s' % p)
                 db.rpush('queue', p)
                 check.append(p)
-            # logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
+                # logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
 
         logger.info('Check deps complete. Starting build_pkgs')
         db.set('building', 'Check deps complete. Starting build container.')
@@ -325,7 +324,6 @@ def handle_hook(first=False, last=False):
                 pkgobj.save_to_db('success_rate', success)
                 pkgobj.save_to_db('failure_rate', failure)
     if last:
-
         remove('/opt/antergos-packages')
         db.set('idle', "True")
         db.set('building', 'Idle')
@@ -526,17 +524,26 @@ def build_pkgs(last=False, pkg_info=None):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
+    dirs = ['/var/tmp/32build', '/var/tmp/32bit']
+    for d in dirs:
+        if os.path.exists(d):
+            shutil.rmtree(d)
+        os.mkdir(d, 0o777)
     # pkglist = db.lrange('queue', 0, -1)
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
+        pinfo = pkg_info
         if pkg and pkg is not None and pkg != '':
-            pkgbuild_dir = pkg_info.path
+            pkgbuild_dir = pinfo.build_path if pinfo.build_path and pinfo.build_path != '' else pkg_info.path
             if pkgbuild_dir.startswith('/var/tmp'):
                 pkgbuild_dir = pkgbuild_dir.replace('/var/tmp/', '/opt/')
-                pkg_info.save_to_db('path', pkgbuild_dir)
+                pkg_info.save_to_db('build_path', pkgbuild_dir)
+            if 'PKGBUILD' in pkgbuild_dir:
+                pkgbuild_dir = os.path.dirname(pkgbuild_dir)
+                pkg_info.save_to_db('build_path', pkgbuild_dir)
             db.publish('log_stream', 'pkgbuild_path is %s' % pkgbuild_dir)
 
             db.set('building', 'Building %s with makepkg' % pkg)
@@ -590,11 +597,7 @@ def build_pkgs(last=False, pkg_info=None):
                 continue
 
             db.set('container', container.get('Id'))
-            dirs = ['/var/tmp/32build', '/var/tmp/32bit']
-            for d in dirs:
-                if os.path.exists(d):
-                    shutil.rmtree(d)
-                os.mkdir(d, 0o777)
+
             try:
                 doc.start(container.get('Id'))
                 cont = db.get('container')
