@@ -1,8 +1,8 @@
-static/*** linguist-vendored
-templates/400.html linguist-vendored
-templates/500.html linguist-vendored
-templates/test.html linguist-vendored
-templates/login.html linguist-vendored
-templates/package.html linguist-vendored
-templates/repo***.html linguist-vendored
-templates/scheduled.html linguist-vendored
+antbs/static/*** linguist-vendored
+antbs/templates/400.html linguist-vendored
+antbs/templates/500.html linguist-vendored
+antbs/templates/test.html linguist-vendored
+antbs/templates/login.html linguist-vendored
+antbs/templates/package.html linguist-vendored
+antbs/templates/repo***.html linguist-vendored
+antbs/templates/scheduled.html linguist-vendored
