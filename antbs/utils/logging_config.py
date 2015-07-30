@@ -25,9 +25,8 @@
 import logging
 import logging.config
 import datetime
-import redis_connection
-
-db = redis_connection.db
+from redis_connection import db, RedisObject
+from server_status import status
 
 stmpath = logging.getLogger('stormpath.http')
 stmpath.setLevel(logging.ERROR)
@@ -115,25 +114,37 @@ logging.config.dictConfig({
 logger_tl = logger
 
 
-# class TimelineEvent(DB.Model):
-#     database = db
-#     namespace = 'antbs:timeline'
-#     index_separator = ':'
-#     event_id = DB.AutoIncrementField(index=True, primary_key=True)
-#     event_type = DB.TextField(index=True)
-#     date = DB.DateTimeField(default=datetime.datetime.now())
-#     time = DB.DateTimeField(default=datetime.datetime.now())
-#     date_str = DB.TextField()
-#     time_str = DB.TextField()
-#     text = DB.TextField(index=True)
-#
-#     @staticmethod
-#     def dt_date_to_string(dt):
-#         return dt.strftime("%b %d")
-#
-#     @staticmethod
-#     def dt_time_to_string(dt):
-#         return dt.strftime("%I:%M%p")
+class Timeline(RedisObject):
+
+    def __init__(self, msg=None, tl_type=None, event_id=None):
+        if (not msg or not tl_type) and not event_id:
+            raise AttributeError
+
+        super(Timeline, self).__init__()
+
+        self.all_keys = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
+                             redis_string_int=['event_id'])
+
+        if not event_id:
+            next_id = db.incr('antbs:misc:event_id:next')
+            self.namespace = 'antbs:timeline:%s:' % next_id
+            self.event_id = next_id
+            status.all_tl_events = [self.event_id]
+            self.event_type = tl_type
+            self.message = msg
+            dt = datetime.datetime.now()
+            self.date_str = self.dt_date_to_string(dt)
+            self.date_str = self.dt_time_to_string(dt)
+        else:
+            self.namespace = 'antbs:timeline:%s:' % event_id
+
+    @staticmethod
+    def dt_date_to_string(dt):
+        return dt.strftime("%b %d")
+
+    @staticmethod
+    def dt_time_to_string(dt):
+        return dt.strftime("%I:%M%p")
 
 # def new_timeline_event(msg=None, tl_type=None):
 #     if msg is not None:

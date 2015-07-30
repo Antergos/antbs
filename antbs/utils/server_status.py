@@ -22,8 +22,8 @@
 
 """ A singleton class for the server status """
 
-from utils.redis_connection import RedisObject
-from utils.logging_config import logger
+from antbs.utils.redis_connection import RedisObject
+from antbs.utils.logging_config import logger
 
 
 class Singleton(RedisObject):
@@ -46,8 +46,8 @@ class ServerStatus(Singleton):
                                            'gitlab_token', 'building_start'],
                              redis_string_bool=['status', 'idle'],
                              redis_string_int=['building_num'],
-                             redis_list=['completed', 'failed', 'queue', 'pending_review'],
-                             redis_zset=['all_packages', 'all_tl_events'])
+                             redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
+                             redis_zset=['all_packages'])
 
 
 # Check if this is our first run, create initial tables if needed

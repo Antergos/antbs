@@ -39,6 +39,7 @@ from flask import Flask, request, Response, abort, render_template, url_for, red
 from werkzeug.contrib.fixers import ProxyFix
 import docker
 from flask.ext.stormpath import StormpathManager, groups_required, user
+from flask.ext.cache import Cache
 import gevent
 import gevent.monkey
 import utils.pagination
@@ -61,8 +62,7 @@ MAIN_64 = os.path.join(MAIN_REPO, 'x86_64')
 MAIN_32 = os.path.join(MAIN_REPO, 'i686')
 
 
-# Create the variable `app` which is an instance of the Flask class that
-# we just imported.
+# Create the variable `app` which is an instance of the Flask class
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('STORMPATH_SESSION_KEY')
 app.config['STORMPATH_API_KEY_ID'] = os.environ.get('STORMPATH_API_KEY_ID')
@@ -83,8 +83,12 @@ app.jinja_options['trim_blocks'] = True
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
+cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3, 'CACHE_KEY_PREFIX': 'antbs:cache:',
+                           'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
+cache.init_app(app)
+
 logger = logconf.logger
-tl_event = logconf.TimelineEvent()
+tl_event = logconf.Timeline
 
 
 def copy(src, dst):
@@ -126,8 +130,8 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
         container = db.get('repo_container')
     else:
         container = ''
-    queue = db.lrange('queue', 0, -1)
-    now_building = db.hgetall('now_building')
+    queue = status.queue
+    now_building = status.now_building
     try:
         doc.kill(container)
         doc.remove_container(container)
@@ -225,117 +229,55 @@ def match_pkg_name_build_log(bnum=None, match=None):
         return False
 
 
-def get_build_info(page=None, status=None, logged_in=False, search=None):
-    if page is None or status is None:
+def cache_buster():
+    if db.exists('antbs:misc:cache_buster:flag'):
+        db.delete('antbs:misc:cache_buster:flag')
+        return True
+
+    return False
+
+
+@cache.cached(timeout=900, key_prefix='build_info', unless=cache_buster)
+def get_build_info(page=None, build_status=None, logged_in=False, search=None):
+    if page is None or build_status is None:
         abort(500)
-    if search is not None:
-        sinfo_key = 'cache:search_info:%s:%s:%s' % (status, search, page)
-        search_info_cache = db.exists(sinfo_key)
-        srevinfo_key = 'cache:srev_info:%s:%s:%s' % (status, search, page)
-        check_cache = search_info_cache
-    else:
-        pinfo_key = 'cache:pkg_info:%s:%s' % (status, page)
-        revinfo_key = 'cache:rev_info:%s:%s' % (status, page)
-        pkg_info_cache = db.exists(pinfo_key)
-        rev_info_cache = db.exists(revinfo_key)
-        check_cache = all(i for i in (pkg_info_cache, rev_info_cache))
-        if 'antergos' in status:
-            status = 'completed'
+
+    if 'antergos' in build_status:
+        build_status = 'completed'
 
     pkg_list = {}
     rev_pending = {}
+    all_builds = None
+    all_pages = None
 
-    # logger.info('@@-antbs.py-@@ 221 | GET_BUILD_INFO - FIRED')
-    if not check_cache:
-        logger.info('@@-antbs.py-@@ 223 | GET_BUILD_INFO - "ALL" CONDITION FAILED. WE ARE NOT USING CACHED INFO')
-        try:
-            all_builds = db.lrange(status, 0, -1)
-        except Exception:
-            logger.error('@@-antbs.py-@@ 227 | GET_BUILD_INFO - DATABASE ERROR')
-            abort(500)
+    try:
+        all_builds = getattr(status, build_status)
+    except Exception as err:
+        logger.error('GET_BUILD_INFO - %s', err)
+        abort(500)
 
-        if all_builds is not None:
-            if search is not None:
-                search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
-                logger.info('@@-antbs.py-@@ [completed route search] | search_all_builds is %s', search_all_builds)
-                all_builds = search_all_builds
-                pinfo_key = sinfo_key
-            if all_builds is not None:
+    if all_builds:
+        if search is not None:
+            search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
+            logger.info('search_all_builds is %s', search_all_builds)
+            all_builds = search_all_builds
 
-                builds, all_pages = get_paginated(all_builds, 10, page, False)
-                db.set('%s:all_pages' % pinfo_key, all_pages)
-                logger.info('@@-antbs.py-@@ [completed route search] | builds is %s', builds)
-                logger.info('@@-antbs.py-@@ [completed route search] | all_pages is %s', all_pages)
-                for build in builds:
-                    # logger.info(build)
-                    try:
-                        pkg = db.get('build_log:%s:pkg' % build)
-                        # logger.info(pkg)
-                    except Exception:
-                        logger.error('exception')
-                        continue
-                    bnum = build
-                    version = db.get('build_log:%s:version' % bnum)
-                    if not version or version is None:
-                        version = db.get('pkg:%s:version' % pkg)
-                    start = db.get('build_log:%s:start' % bnum)
-                    end = db.get('build_log:%s:end' % bnum)
-                    review_stat = db.get('build_log:%s:review_stat' % bnum)
-                    review_stat = db.get('review_stat:%s:string' % review_stat)
-                    review_dev = db.get('build_log:%s:review_dev' % bnum)
-                    review_date = db.get('build_log:%s:review_date' % bnum)
-                    all_info = dict(bnum=bnum, name=pkg, version=version, start=start, end=end,
-                                    review_stat=review_stat, review_dev=review_dev, review_date=review_date)
-                    pkg_list[bnum] = all_info
-                    if search:
-                        db.hmset('%s:%s' % (sinfo_key, bnum), all_info)
-                        db.expire('%s:%s' % (sinfo_key, bnum), 902)
-                        db.rpush(sinfo_key, bnum)
-                        db.expire(sinfo_key, 901)
-                    else:
-                        db.hmset('%s:%s' % (pinfo_key, bnum), all_info)
-                        db.expire('%s:%s' % (pinfo_key, bnum), 902)
-                        db.rpush(pinfo_key, bnum)
-                        db.expire(pinfo_key, 901)
-                    # db.rpush('pkg_info_cache:%s:list:%s' % (status, page), pkg_info)
-                    if logged_in and review_stat == "pending" and search is not None:
-                        rev_pending[bnum] = all_info
-                        db.hmset('%s:%s' % (srevinfo_key, bnum), all_info)
-                        db.expire('%s:%s' % (srevinfo_key, bnum), 901)
-                        db.rpush(srevinfo_key, bnum)
-                        db.expire(srevinfo_key, 900)
-                    elif logged_in and review_stat == "pending":
-                        rev_pending[bnum] = all_info
-                        db.hmset('%s:%s' % (revinfo_key, bnum), all_info)
-                        db.expire('%s:%s' % (revinfo_key, bnum), 901)
-                        db.rpush(revinfo_key, bnum)
-                        db.expire(revinfo_key, 900)
-                        # db.rpush('pending_rev_cache:list:%s' % page, pkg_info)
+        if all_builds:
+            builds, all_pages = get_paginated(all_builds, 10, page, False)
+            for bnum in builds:
+                try:
+                    build_obj = build.Build(bnum=bnum)
+                except Exception as err:
+                    logger.error('Unable to ge build object - %s' % err)
+                    continue
 
-    else:
-        logger.info('@@-antbs.py-@@ 276 | GET_BUILD_INFO - "ALL" CONDITION MET. WE ARE USING CACHED INFO')
-        if search:
-            srevindex = db.lrange(srevinfo_key, 0, -1)
-            sindex = db.lrange(sinfo_key, 0, -1)
-            for p in sindex:
-                h = db.hgetall('%s:%s' % (sinfo_key, p))
-                pkg_list[p] = h
-            for rev in srevindex:
-                h = db.hgetall('%s:%s' % (srevinfo_key, rev))
-                rev_pending[rev] = h
-            # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
-            all_pages = db.get('%s:all_pages' % sinfo_key)
-        else:
-            revindex = db.lrange(revinfo_key, 0, -1)
-            pindex = db.lrange(pinfo_key, 0, -1)
-            for p in pindex:
-                h = db.hgetall('%s:%s' % (pinfo_key, p))
-                pkg_list[p] = h
-            for rev in revindex:
-                h = db.hgetall('%s:%s' % (revinfo_key, rev))
-                rev_pending[rev] = h
-            # logger.info('@@-antbs.py-@@ 280 | GET_BUILD_INFO - pkg_list hash is %s' % str(pkg_list))
-            all_pages = db.get('%s:all_pages' % pinfo_key)
+                all_info = dict(bnum=build_obj.bnum, name=build_obj.pkgname, version=build_obj.version_str,
+                                start=build_obj.start_str, end=build_obj.end_str, review_stat=build_obj.review_status,
+                                review_dev=build_obj.review_dev, review_date=build_obj.review_date)
+                pkg_list[bnum] = all_info
+
+                if logged_in and build_obj.review_stat == "pending":
+                    rev_pending[bnum] = all_info
 
     return pkg_list, int(all_pages), rev_pending
 
@@ -401,55 +343,47 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     # TODO: This is garbage. Needs rewrite.
     if any(i is None for i in (bnum, dev, result)):
         abort(500)
-    errmsg = dict(error=False, msg=None)
+    errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
-        db.set('build_log:%s:review_dev' % bnum, dev)
-        db.set('build_log:%s:review_date' % bnum, dt)
-        # db.set('idle', 'False')
+        build_obj = build.Build(bnum=bnum)
         status.idle = False
-        result = int(result)
-        pkg = db.get('build_log:%s:pkg' % bnum)
-        if pkg:
-            pobj = package.Package(pkg)
-            if 'main' not in pobj.allowed_in and result == 2:
-                msg = '%s is not allowed in main repo.' % pkg
+        pkg_obj = package.Package(name=build_obj.pkgname)
+        if pkg_obj:
+            if 'main' not in pkg_obj.allowed_in and result == 'passed':
+                msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
                 errmsg.update(error=True, msg=msg)
                 return errmsg
             else:
-                db.set('build_log:%s:review_stat' % bnum, result)
+                build_obj.review_dev = dev
+                build_obj.review_date = dt
+                build_obj.review_status = result
 
-        # logger.info('Updating pkg review status for %s.' % pkg)
-        # logger.info('[UPDATE REPO]: pkg is %s' % pkg)
-        # logger.info('[UPDATE REPO]: STAGING_64 is %s' % STAGING_64)
-        pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg))
-        pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg))
+        pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg_obj.pkgname))
+        pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg_obj.pkgname))
         pkg_files = pkg_files_64 + pkg_files_32
-        # logger.info('[UPDATE REPO]: pkg_files is %s' % pkg_files)
-        # logger.info('[PKG_FILES]:')
-        if result == 4:
-            return errmsg
-        if pkg_files and pkg_files is not None:
-            # logger.info(pkg_files)
-            logger.info('Moving %s from staging to main repo.', pkg)
 
+        if result == 'skip':
+            return errmsg
+        if pkg_files:
+            logger.info('Moving %s from staging to main repo.', pkg_obj.pkgname)
             for f in pkg_files_64:
-                if result is 2 or result == '2':
+                if result == 'passed':
                     copy(f, MAIN_64)
                     copy(f, '/tmp')
-                elif result is 3 or result == '3':
+                elif result == 'failed':
                     os.remove(f)
             for f in pkg_files_32:
-                if result is 2 or result == '2':
+                if result == 'passed':
                     copy(f, MAIN_32)
                     copy(f, '/tmp')
-                elif result is 3 or result == '3':
+                elif result == 'failed':
                     os.remove(f)
-            if result and result is not 4 and result != '4':
-                repo_queue.enqueue_call(builder.update_main_repo, args=(pkg, str(result)), timeout=9600)
+            if result and result != 'skip':
+                repo_queue.enqueue_call(builder.update_main_repo, args=(pkg_obj.pkgname, result), timeout=9600)
 
         else:
-            logger.error('@@-antbs.py-@@ | While moving to main, no packages were found to move.')
+            logger.error('While moving to main, no packages were found to move.')
             err = 'While moving to main, no packages were found to move.'
             errmsg = dict(error=True, msg=err)
 
@@ -465,12 +399,9 @@ def get_timeline(tlpage=None):
     event_ids = status.all_tl_events
     timeline = []
     for event_id in event_ids:
-        event_obj = tl_event.get(tl_event.event_id is event_id)
-        date = event_obj.date_str
-        time = event_obj.time_str
-        msg = event_obj.text
-        tltype = event_obj.event_type
-        allinfo = dict(event_id=event_id, date=date, msg=msg, time=time, tltype=tltype)
+        ev_obj = tl_event(event_id=event_id)
+        allinfo = dict(event_id=ev_obj.event_id, date=ev_obj.date_str, msg=ev_obj.msg, time=ev_obj.time_str,
+                       tltype=ev_obj.tl_type)
         event = {event_id: allinfo}
         timeline.append(event)
     this_page, all_pages = get_paginated(timeline, 6, tlpage, True)
@@ -506,111 +437,81 @@ def flask_error(e):
 
 @app.route("/timeline/<int:tlpage>")
 @app.route("/")
+@cache.cached(timeout=900, unless=cache_buster)
 def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
-    # is_idle = db.get('idle')
     is_idle = status.idle
     check_stats = ['queue', 'completed', 'failed']
-    # building = db.get('building')
     building = status.current_status
     this_page, all_pages = get_timeline(tlpage)
-    is_logged_in = user.is_authenticated()
-    # c, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
-    # logger.info('@@-antbs.py-@@ | this_page is %s' % all_pages)
+
     stats = {}
     for stat in check_stats:
-        # res = db.llen(stat)
         builds = getattr(status, stat)
-        res = len(builds) > 0
-        if stat is not "queue":
-            # builds = db.lrange(stat, 0, -1)
-            # builds = db.lrange(stat, 0, -1)
+        res = len(builds)
+        if stat != "queue":
             builds = [x for x in builds if x is not None]
             within = []
             nodup = []
             for bnum in builds:
                 try:
-                    build = build.Build.get(build.Build.bnum == bnum)
+                    bld_obj = build.Build(bnum=bnum)
                 except ValueError:
                     continue
-                # end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
-                # end = db.get('build_log:%s:start' % build) or '12/15/2014 06:12PM'
-                # end_fmt = datetime.strptime(end, '%m/%d/%Y %I:%M%p')
-                # ver = db.get('build_log:%s:version' % build) or '0.00'
-                # name = db.get('build_log:%s:pkg' % build) or 'None'
-                ver = '%s:%s' % (build.pkgname, build.version_str)
-                if (datetime.now() - build.end) < timedelta(hours=48) and ver not in nodup and build.pkgname:
-                    within.append(build.bnum)
+                ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
+                end = datetime.strptime(bld_obj.end_str, '%m/%d/%Y %I:%M%p')
+                if (datetime.now() - end) < timedelta(hours=48) and ver not in nodup and bld_obj.pkgname:
+                    within.append(bld_obj.bnum)
                     nodup.append(ver)
 
             stats[stat] = len(within)
         else:
             stats[stat] = res
 
-    repos = ['main', 'staging']
-    for repo in repos:
-        x86_64 = None
-        cached = None
-        if repo == 'main':
-            x86_64 = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
-            cached = db.exists('repo-count-main')
-            if cached and cached is not None:
-                stats['repo_main'] = db.get('repo-count-main')
-        elif repo == 'staging':
-            x86_64 = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.pkg.tar.xz')
-            cached = db.exists('repo-count-staging')
-            if cached and cached is not None:
-                stats['repo_staging'] = db.get('repo-count-staging')
+    main_repo = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
+    staging_repo = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.pkg.tar.xz')
 
-        all_p = x86_64
+    for repo in [main_repo, staging_repo]:
         filtered = []
-
-        if not cached or cached is None:
-            for fp in all_p:
-                new_fp = os.path.basename(fp)
-                if 'dummy-package' not in new_fp:
-                    filtered.append(new_fp)
-            stats['repo_' + repo] = len(set(filtered))
-            db.setex('repo-count-%s' % repo, 1800, stats['repo_' + repo])
+        for file_path in repo:
+            new_fp = os.path.basename(file_path)
+            if 'dummy-package' not in new_fp:
+                filtered.append(new_fp)
+        if '-staging' not in repo[0]:
+            repo_name = 'repo_main'
+        else:
+            repo_name = 'repo_staging'
+        stats[repo_name] = len(set(filtered))
 
     return render_template("overview.html", idle=is_idle, stats=stats, user=user, building=building,
-                           this_page=this_page, all_pages=all_pages, page=tlpage, rev_pending=rev_pending)
+                           this_page=this_page, all_pages=all_pages, page=tlpage, rev_pending=[])
 
 
 @app.route("/building")
 def build():
-    # is_idle = db.get('idle')
     is_idle = status.idle
-    # now_building = db.hget('now_building', 'pkg')
     now_building = status.now_building
-    # cont = db.get('container')
     cont = status.container
     if cont:
         container = cont[:20]
     else:
         container = None
-    # bnum = db.get('building_num')
-    # start = db.get('building_start')
-    # ver = db.get('build_log:%s:version' % bnum)
     bnum = status.building_num
     start = status.building_start
     try:
-        build_obj = build.Build.get(build.Build.bnum == bnum)
-        ver = build_obj.version_str
+        bld_obj = build.Build(bnum=bnum)
+        ver = bld_obj.version_str
     except ValueError as err:
         logger.error(err)
         ver = ''
 
     return render_template("building.html", idle=is_idle, building=now_building, container=container, bnum=bnum,
                            start=start, ver=ver)
-    # return Response(stream_template('building.html', idle=is_idle, bnum=bnum, start=start, building=now_building,
-    #                                container=container))
 
 
 @app.route('/get_log')
 def get_log():
-    # is_idle = db.get('idle')
     is_idle = status.idle
     if is_idle:
         abort(404)
@@ -636,24 +537,17 @@ def maybe_check_for_remote_commits():
 
 @app.route('/scheduled')
 def scheduled():
-    # is_idle = db.get('idle')
     is_idle = status.idle
     try:
-        # pkgs = db.lrange('queue', 0, -1)
         queued = status.queue
     except Exception:
         queued = None
-    # building = db.get('building')
     building = status.now_building
     the_queue = []
     if queued:
-        for pak_id in queued:
-            # name = db.get('pkg:%s:name' % pak)
-            # version = db.get('pkg:%s:version' % pak)
-            # all_info = (name, version)
-            # the_queue.append(all_info)
+        for pak in queued:
             try:
-                pkg_obj = package.Package.get(package.Package.pkg_id == pak_id)
+                pkg_obj = package.Package(name=pak)
                 name = pkg_obj.pkgname
                 version = pkg_obj.version_str
                 all_info = (name, version)
@@ -669,7 +563,6 @@ def scheduled():
 @app.route('/completed/search/<name>/<int:page>')
 @app.route('/completed')
 def completed(page=None, name=None):
-    # is_idle = db.get('idle')
     is_idle = status.idle
     build_status = 'completed'
     is_logged_in = user.is_authenticated()
@@ -677,13 +570,9 @@ def completed(page=None, name=None):
         page = 1
     if name is not None and page is None:
         page = 1
-    # building = db.get('building')
     building = status.now_building
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
-    # logger.info('@@-antbs.py-@@ [completed route] | %s' % all_pages)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
-    # logger.info('@@-antbs.py-@@ [completed route] | %s, %s, %s' % (
-    #    pagination.page, pagination.per_page, pagination.total_count))
 
     return render_template("completed.html", idle=is_idle, building=building, completed=completed, all_pages=all_pages,
                            rev_pending=rev_pending, user=user, pagination=pagination)
@@ -692,17 +581,16 @@ def completed(page=None, name=None):
 @app.route('/failed/<int:page>')
 @app.route('/failed')
 def failed(page=None):
-    # is_idle = db.get('idle')
     is_idle = status.idle
     build_status = 'failed'
     if page is None:
         page = 1
-    # building = db.get('building')
     building = status.now_building
     is_logged_in = user.is_authenticated()
 
     failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
+
     return render_template("failed.html", idle=is_idle, building=building, failed=failed, all_pages=all_pages,
                            page=page, rev_pending=rev_pending, user=user, pagination=pagination)
 
@@ -711,21 +599,14 @@ def failed(page=None):
 def build_info(num):
     if not num:
         abort(404)
-    pkg = db.get('build_log:%s:pkg' % num)
-    if not pkg:
+    try:
+        bld_obj = build.Build(bnum=num)
+    except Exception:
         abort(404)
-    ver = db.get('pkg:%s:version' % pkg)
-    res = db.get('build_log:%s:result' % num)
-    start = db.get('build_log:%s:start' % num)
-    end = db.get('build_log:%s:end' % num)
-    bnum = num
-    cont = db.get('container')
-    check_log = db.hexists('build_log:%s:content' % bnum, 'content')
-    if not check_log:
-        log = db.get('build_log:%s:content' % bnum)
-    else:
-        log = db.hget('build_log:%s:content' % bnum, 'content')
-    if log is None or log == '':
+
+    cont = status.container
+    log = bld_obj.log
+    if not log:
         log = 'Unavailable'
     log = log.decode("utf8")
     if cont:
@@ -733,16 +614,15 @@ def build_info(num):
     else:
         container = None
 
-    return render_template("build_info.html", pkg=pkg, ver=ver, res=res, start=start, end=end,
-                           bnum=bnum, container=container, log=log, user=user)
+    return render_template("build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str, res=bld_obj.result,
+                           start=bld_obj.start_str, end=bld_obj.end_str, bnum=bld_obj.bnum, container=container,
+                           log=log, user=user)
 
 
 @app.route('/browse/<goto>')
 @app.route('/browse')
 def repo_browser(goto=None):
-    # is_idle = db.get('idle')
     is_idle = status.idle
-    # building = db.get('building')
     building = status.now_building
     release = False
     testing = False
@@ -764,7 +644,6 @@ def repo_browser(goto=None):
 @app.route('/pkg_review', methods=['POST', 'GET'])
 @groups_required(['admin'])
 def dev_pkg_check(page=None):
-    # is_idle = db.get('idle')
     is_idle = status.idle
     build_status = 'completed'
     set_rev_error = False
@@ -786,9 +665,6 @@ def dev_pkg_check(page=None):
                 return json.dumps(message)
             else:
                 message = dict(msg='ok')
-                db.delete('rev_info_cache')
-                db.delete('pkg_info_cache:completed')
-                db.delete('pending_rev_cache')
                 return json.dumps(message)
 
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
@@ -843,9 +719,7 @@ def build_pkg_now():
 
 @app.route('/get_status', methods=['GET'])
 def get_status():
-    # idle = db.get('idle')
     idle = status.idle
-    # building = db.get('building')
     building = status.now_building
     if idle:
         message = dict(msg='Idle')

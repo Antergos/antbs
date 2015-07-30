@@ -31,7 +31,7 @@ from github3 import login
 
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject
-from server_status import status
+from antbs.utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
 
@@ -41,9 +41,10 @@ class PackageMeta(RedisObject):
     the package metadata that is stored in the database. """
 
     def __init__(self, *args, **kwargs):
+        super(PackageMeta, self).__init__()
 
         self.all_keys = dict(
-            redis_string=['name', 'pkgname', 'version', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
+            redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit'],
             redis_string_int=['pkgid'],
@@ -55,8 +56,6 @@ class PackageMeta(RedisObject):
             raise AttributeError
 
         self.namespace = 'antbs:pkg:%s:' % name
-
-        super(PackageMeta, self).__init__()
 
 
 class Package(PackageMeta):
@@ -101,6 +100,8 @@ class Package(PackageMeta):
         for p in paths:
             if os.path.exists(p):
                 path = os.path.join(p, 'PKGBUILD')
+                if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
+                    self.allowed_in = ['main']
                 break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path')
@@ -224,10 +225,10 @@ class Package(PackageMeta):
 
         version = version + '-' + self.pkgrel
         if version and version != '' and version is not None:
-            self.version = version
+            self.version_str = version
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
-            version = self.version
+            version = self.version_str
 
         return version
 

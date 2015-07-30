@@ -24,30 +24,51 @@
 
 import datetime
 
-from utils.redis_connection import db, DB
+from utils.redis_connection import db, RedisObject
 
 
-class Build(DB.Model):
-    database = db
-    namespace = 'antbs:build'
-    index_separator = ':'
-    bnum = DB.AutoIncrementField(primary_key=True)
+class Build(RedisObject):
+    """ This class represents a "build" throughout the build server app. It is used to
+    get and set build data to the database. """
 
-    pkgname = DB.TextField(fts=True)
-    pkgver = DB.FloatField(index=True)
-    pkgrel = DB.IntegerField()
-    epoch = DB.IntegerField()
-    version_str = DB.TextField()
+    def __init__(self, pkg_obj=None, bnum=None):
+        if not pkg_obj:
+            raise AttributeError
 
-    start = DB.DateTimeField(default=datetime.datetime.now)
-    end = DB.DateTimeField()
+        super(Build, self).__init__()
 
-    start_str = DB.TextField(index=True)
-    end_str = DB.TextField(index=True)
+        self.all_keys = dict(
+            redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
+                          'version_str', 'container', 'review_status', 'review_dev', 'review_date'],
+            redis_string_bool=['failed', 'completed'],
+            redis_string_int=['pkgid'],
+            redis_list=['log'],
+            redis_zset=[])
 
-    container = DB.TextField(index=True)
+        if not bnum:
+            next_bnum = db.incr('antbs:misc:bnum:next')
+            self.namespace = 'antbs:build:%s:' % next_bnum
+            self.bnum = next_bnum
 
-    log = DB.ListField(fts=True)
+        key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
+        for key_list_name in key_lists:
+            key_list = self.all_keys[key_list_name]
+            for key in key_list:
+                if key_list_name.endswith('string'):
+                    value = getattr(pkg_obj, key, '')
+                    setattr(self, key, value)
+                elif key_list_name.endswith('bool'):
+                    value = getattr(pkg_obj, key, False)
+                    setattr(self, key, value)
+                elif key_list_name.endswith('int'):
+                    value = getattr(pkg_obj, key, 0)
+                    setattr(self, key, value)
+                elif key_list_name.endswith('list'):
+                    value = getattr(pkg_obj, key, [])
+                    setattr(self, key, value)
+                elif key_list_name.endswith('zset'):
+                    value = getattr(pkg_obj, key, [])
+                    setattr(self, key, value)
 
     @staticmethod
     def datetime_to_string(dt):
