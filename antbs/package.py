@@ -31,7 +31,7 @@ from github3 import login
 
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject
-from antbs.utils.server_status import status
+from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
 

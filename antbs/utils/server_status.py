@@ -22,8 +22,10 @@
 
 """ A singleton class for the server status """
 
-from antbs.utils.redis_connection import RedisObject
-from antbs.utils.logging_config import logger
+import datetime
+from redis_connection import RedisObject, db
+from logging_config import logger
+import os
 
 
 class Singleton(RedisObject):
@@ -50,13 +52,43 @@ class ServerStatus(Singleton):
                              redis_zset=['all_packages'])
 
 
+class Timeline(RedisObject):
+
+    def __init__(self, msg=None, tl_type=None, event_id=None):
+        if (not msg or not tl_type) and not event_id:
+            raise AttributeError
+
+        super(Timeline, self).__init__()
+
+        self.all_keys = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
+                             redis_string_int=['event_id'])
+
+        if not event_id:
+            next_id = db.incr('antbs:misc:event_id:next')
+            self.namespace = 'antbs:timeline:%s:' % next_id
+            self.event_id = next_id
+            status.all_tl_events = [self.event_id]
+            self.event_type = tl_type
+            self.message = msg
+            dt = datetime.datetime.now()
+            self.date_str = self.dt_date_to_string(dt)
+            self.date_str = self.dt_time_to_string(dt)
+        else:
+            self.namespace = 'antbs:timeline:%s:' % event_id
+
+    @staticmethod
+    def dt_date_to_string(dt):
+        return dt.strftime("%b %d")
+
+    @staticmethod
+    def dt_time_to_string(dt):
+        return dt.strftime("%I:%M%p")
+
 # Check if this is our first run, create initial tables if needed
 status = ServerStatus()
 idle = status.idle
-if idle is not None and idle != '':
-    logger.debug('idle is: %s. Db exists, no initial setup required.' % idle)
-else:
+if not idle:
     status.current_status = 'Idle'
     status.idle = True
     status.now_building = 'Idle'
-    logger.debug('Initial db creation complete.')
+

@@ -85,7 +85,8 @@ def truncate_middle(s, n):
         # string is already short-enough
         return s
     # half of the size, minus the 3 .'s
-    n_2 = int(n) / 2 - 3
+    n_2 = int(n) / 3 - 3
+    n_2 *= 2
     # whatever's left
     n_1 = n - n_2 - 3
     return '{0}...{1}'.format(s[:n_1], s[-n_2:])
@@ -93,7 +94,7 @@ def truncate_middle(s, n):
 
 def check_deps(source):
     # # TODO: This still needs to be improved.
-    """perform topo sort on elements.
+    """perform topological sort on elements.
 
     :arg source: list of ``(name, [list of dependancies])`` pairs
     :returns: list of names, with dependancies listed first
@@ -124,69 +125,12 @@ def check_deps(source):
 
 def process_package_queue(the_queue=None):
     if the_queue is not None:
-        special_cases = [
-            {'numix-icon-theme': {
-                'url': 'https://github.com/numixproject/numix-icon-theme.git',
-                'source': ''}
-            },
-            {'numix-icon-theme-square': {
-                'url': 'https://gitlab.com/numix/numix-icon-theme-square.git',
-                'source': ''}
-            },
-            {'numix-icon-theme-square-kde': {
-                'callsign': 'https://gitlab.com/numix/numix-icon-theme-square.git',
-                'source': '',
-                'url': ''}
-            },
-            {'cnchi-dev': {
-                'cwd': '/srv/antergos.org/cnchi.tar',
-                'callsign': '',
-                'source': '',
-                'url': ''}
-            },
-            {'cnchi': {
-                'cwd': '',
-                'callsign': '',
-                'source': '',
-                'url': ''}
-            }]
         all_deps = []
         for pkg in the_queue:
             if pkg == '':
                 continue
-            special = [x for x in special_cases if pkg in x.keys()]
-            # logger.info('@@-build_pkg.py-@@ | special is: %s' % special)
-            if special and len(special) > 0:
-                for case in special:
-                    callsign = case[pkg]['url']
-                    source = case[pkg]['source']
-                    # logger.info('@@-build_pkg.py-@@ | callsign is: %s, source is: %s' % (callsign, source))
-                    try:
-                        if callsign and callsign != '':
-                            subprocess.call(['git', 'clone', callsign, pkg],
-                                            cwd='/opt/antergos-packages/' + pkg)
-                            subprocess.call(['git', 'clone', callsign, pkg],
-                                            cwd='/var/tmp/antergos-packages/' + pkg)
-                            logger.info('Creating tar archive for %s' % pkg)
-                            subprocess.check_call(['tar', '-cf', pkg + '.tar', pkg],
-                                                  cwd='/opt/antergos-packages/' + pkg)
-                        elif source and source != '':
-                            logger.info('Copying numix-frost source file into build directory.')
-                            subprocess.check_call(['cp', '/opt/numix/' + pkg + '.zip', os.path.join(REPO_DIR, pkg)],
-                                                  cwd='/opt/numix')
-                        elif 'cnchi-dev' == pkg:
-                            logger.info('Copying cnchi-dev source file into build directory.')
-                            shutil.copy('/srv/antergos.org/cnchi.tar', os.path.join(REPO_DIR, pkg))
-                        elif 'cnchi' == pkg:
-                            subprocess.check_call(['git', 'clone', 'http://github.com/antergos/cnchi.git', pkg],
-                                                  cwd='/opt/antergos-packages/cnchi')
-                            get_latest_translations()
-
-                    except Exception as err:
-                        logger.error(err)
-
-            pkgobj = package(pkg, db)
-            version = pkgobj.get_version()
+            pkg_obj = package.Package(name=pkg)
+            version = pkg_obj.get_version()
             if not version:
                 db.lrem('queue', 0, 'cnchi-dev')
                 continue

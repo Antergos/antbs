@@ -44,12 +44,18 @@ import gevent
 import gevent.monkey
 import utils.pagination
 import build_pkg as builder
-from utils.redis_connection import db, status
+from utils.redis_connection import db
+from utils.server_status import status as status, Timeline as tl_event
 import utils.logging_config as logconf
 import package
 import webhook
-import repo_monitor as repo_mon
 import utils.slack_bot as slack_bot
+import build
+
+if not status.github_token:
+    status.github_token = os.environ.get('GITHUB_TOKEN')
+    status.gitlab_token = os.environ.get('GITLAB_TOKEN')
+import repo_monitor as repo_mon
 
 gevent.monkey.patch_all()
 
@@ -88,7 +94,6 @@ cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3, 'CACHE_KE
 cache.init_app(app)
 
 logger = logconf.logger
-tl_event = logconf.Timeline
 
 
 def copy(src, dst):
@@ -208,9 +213,10 @@ def get_live_build_ouput():
 
 
 def get_paginated(item_list, per_page, page, timeline):
+    if len(item_list) < 1:
+        return [], []
     page -= 1
-    if not timeline:
-        item_list.reverse()
+    item_list.reverse()
     paginated = [item_list[i:i + per_page] for i in range(0, len(item_list), per_page)]
     this_page = paginated[page]
     all_pages = len(paginated)
@@ -248,7 +254,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     pkg_list = {}
     rev_pending = {}
     all_builds = None
-    all_pages = None
+    all_pages = 0
 
     try:
         all_builds = getattr(status, build_status)

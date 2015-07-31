@@ -24,9 +24,8 @@
 
 import logging
 import logging.config
-import datetime
-from redis_connection import db, RedisObject
-from server_status import status
+
+from redis_connection import db
 
 stmpath = logging.getLogger('stormpath.http')
 stmpath.setLevel(logging.ERROR)
@@ -66,7 +65,7 @@ logging.config.dictConfig({
             'level': 'DEBUG',
             'class': 'rlog.RedisHandler',
             'channel': 'log_stream',
-            'redis_client': redis_connection.db,
+            'redis_client': db,
             'formatter': 'redis'
         },
         'email': {
@@ -89,90 +88,3 @@ logging.config.dictConfig({
     }
 })
 
-
-# class Logger(object):
-#     _logger = logging.getLogger()
-#
-#     def __init__(self):
-#         self.name = 'Logging Object'
-#
-#     def error(self, msg, *args):
-#         self.maybe_output_log_msg(msg, 'error', *args)
-#
-#     def info(self, msg, *args):
-#         self.maybe_output_log_msg(msg, 'info', *args)
-#
-#     def debug(self, msg, *args):
-#         self.maybe_output_log_msg(msg, 'debug', *args)
-#
-#     def maybe_output_log_msg(self, msg, msg_type, *args):
-#         if db.exists('LOGGING:ENABLED:GLOBAL') or 'error' == msg_type:
-#             log = getattr(self._logger, msg_type)
-#             log(msg, *args)
-
-
-logger_tl = logger
-
-
-class Timeline(RedisObject):
-
-    def __init__(self, msg=None, tl_type=None, event_id=None):
-        if (not msg or not tl_type) and not event_id:
-            raise AttributeError
-
-        super(Timeline, self).__init__()
-
-        self.all_keys = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                             redis_string_int=['event_id'])
-
-        if not event_id:
-            next_id = db.incr('antbs:misc:event_id:next')
-            self.namespace = 'antbs:timeline:%s:' % next_id
-            self.event_id = next_id
-            status.all_tl_events = [self.event_id]
-            self.event_type = tl_type
-            self.message = msg
-            dt = datetime.datetime.now()
-            self.date_str = self.dt_date_to_string(dt)
-            self.date_str = self.dt_time_to_string(dt)
-        else:
-            self.namespace = 'antbs:timeline:%s:' % event_id
-
-    @staticmethod
-    def dt_date_to_string(dt):
-        return dt.strftime("%b %d")
-
-    @staticmethod
-    def dt_time_to_string(dt):
-        return dt.strftime("%I:%M%p")
-
-# def new_timeline_event(msg=None, tl_type=None):
-#     if msg is not None:
-#         if not db.exists('next-timeline-id'):
-#             db.set('next-timeline-id', '0')
-#         event_id = db.incr('next-timeline-id')
-#         dt_date = datetime.datetime.now().strftime("%b %d")
-#         dt_time = datetime.datetime.now().strftime("%I:%M%p")
-#         tl = 'timeline:%s' % event_id
-#         success = False
-#         try:
-#             db.set(tl, 'True')
-#             db.set('%s:date' % tl, dt_date)
-#             db.set('%s:time' % tl, dt_time)
-#             db.set('%s:msg' % tl, msg)
-#             db.set('%s:type' % tl, tl_type)
-#             db.lpush('timeline:all', event_id)
-#             popid = db.rpop('timeline:all')
-#             success = True
-#         except Exception as err:
-#             logger_tl.error('@@-logging_config.py-@@ | Unable to save timeline event, error msg: %s' % err)
-#
-#         if success:
-#             try:
-#                 pop_event = db.scan_iter('timeline:%s:**' % popid, 20)
-#                 for pev in pop_event:
-#                     db.delete(pev)
-#             except Exception as err:
-#                 logger_tl.error('@@-logging_config.py-@@ | Unable to delete oldest timeline event, error msg: %s' % err)
-#
-#         return event_id

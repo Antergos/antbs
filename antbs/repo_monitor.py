@@ -23,13 +23,14 @@
 """ Monitor commit activity on 3rd-party repos. Schedule a build when new commits are detected. """
 
 from utils.logging_config import logger
-from utils.redis_connection import db, status
+from utils.redis_connection import db
+from utils.server_status import status
 import webhook
 from github3 import login
 from gitlab import Gitlab
 
-GITLAB_TOKEN = status.github_token
-GITHUB_TOKEN = status.gitlab_token
+GITLAB_TOKEN = status.gitlab_token
+GITHUB_TOKEN = status.github_token
 
 
 def maybe_check_for_new_items():

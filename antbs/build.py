@@ -28,7 +28,7 @@ from utils.redis_connection import db, RedisObject
 
 
 class Build(RedisObject):
-    """ This class represents a "build" throughout the build server app. It is used to
+    """ This class represents a "build" object throughout the build server app. It is used to
     get and set build data to the database. """
 
     def __init__(self, pkg_obj=None, bnum=None):
