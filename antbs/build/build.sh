@@ -289,12 +289,12 @@ if [[ "${_UPDREPO}" != "True" ]]; then
 		print2log '[i686 DETECTED]'
 		cp --copy-contents -t /32bit /pkg/***
 
-		{ try_build 2>&1 && try_build "i686" 2>&1 && exit 0; } ||
-		{ try_install_deps 2>&1 && try_build 2>&1 && try_build "i686" 2>&1 && exit 0; }
+		{ try_build 2>&1 && try_build "i686" 2>&1 && touch /result && exit 0; } ||
+		{ try_install_deps 2>&1 && try_build 2>&1 && try_build "i686" 2>&1 && touch /result && exit 0; }
 
 	else
 
-		{ try_build 2>&1 && exit 0; } || { try_install_deps 2>&1 && try_build 2>&1 && exit 0; }
+		{ try_build 2>&1 && touch /result && exit 0; } || { try_install_deps 2>&1 && try_build 2>&1 && touch /result && exit 0; }
 
 	fi
 

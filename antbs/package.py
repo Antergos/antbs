@@ -30,7 +30,7 @@ import sys
 from github3 import login
 
 from utils.logging_config import logger
-from utils.redis_connection import db, RedisObject
+from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
 from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
@@ -80,14 +80,15 @@ class Package(PackageMeta):
                     elif key_list_name.endswith('int'):
                         setattr(self, key, 0)
                     elif key_list_name.endswith('list'):
-                        setattr(self, key, [])
+                        setattr(self, key, RedisList.as_child(self, key, str))
                     elif key_list_name.endswith('zset'):
-                        setattr(self, key, [])
+                        setattr(self, key, RedisZSet.as_child(self, key, str))
 
             self.name = name
             next_id = db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
-            status.all_packages = self.name
+            all_pkgs = status.all_packages()
+            all_pkgs.add(self.name)
 
     def get_from_pkgbuild(self, var=None):
         if var is None:

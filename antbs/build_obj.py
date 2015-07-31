@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# build.py
+# build_obj.py
 #
 # Copyright 2014-2015 Antergos
 #
@@ -24,22 +24,22 @@
 
 import datetime
 
-from utils.redis_connection import db, RedisObject
+from utils.redis_connection import db, RedisObject, RedisList, RedisZSet
 
 
-class Build(RedisObject):
+class BuildObject(RedisObject):
     """ This class represents a "build" object throughout the build server app. It is used to
     get and set build data to the database. """
 
     def __init__(self, pkg_obj=None, bnum=None):
-        if not pkg_obj:
+        if not pkg_obj and not bnum:
             raise AttributeError
 
-        super(Build, self).__init__()
+        super(BuildObject, self).__init__()
 
         self.all_keys = dict(
             redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
-                          'version_str', 'container', 'review_status', 'review_dev', 'review_date'],
+                          'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
             redis_string_bool=['failed', 'completed'],
             redis_string_int=['pkgid'],
             redis_list=['log'],
@@ -50,25 +50,23 @@ class Build(RedisObject):
             self.namespace = 'antbs:build:%s:' % next_bnum
             self.bnum = next_bnum
 
-        key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
-        for key_list_name in key_lists:
-            key_list = self.all_keys[key_list_name]
-            for key in key_list:
-                if key_list_name.endswith('string'):
-                    value = getattr(pkg_obj, key, '')
-                    setattr(self, key, value)
-                elif key_list_name.endswith('bool'):
-                    value = getattr(pkg_obj, key, False)
-                    setattr(self, key, value)
-                elif key_list_name.endswith('int'):
-                    value = getattr(pkg_obj, key, 0)
-                    setattr(self, key, value)
-                elif key_list_name.endswith('list'):
-                    value = getattr(pkg_obj, key, [])
-                    setattr(self, key, value)
-                elif key_list_name.endswith('zset'):
-                    value = getattr(pkg_obj, key, [])
-                    setattr(self, key, value)
+            key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
+            for key_list_name in key_lists:
+                key_list = self.all_keys[key_list_name]
+                for key in key_list:
+                    if key_list_name.endswith('string'):
+                        value = getattr(pkg_obj, key, '')
+                        setattr(self, key, value)
+                    elif key_list_name.endswith('bool'):
+                        value = getattr(pkg_obj, key, False)
+                        setattr(self, key, value)
+                    elif key_list_name.endswith('int'):
+                        value = getattr(pkg_obj, key, 0)
+                        setattr(self, key, value)
+                    elif key_list_name.endswith('list'):
+                        setattr(self, key, RedisList.as_child(self, key, str))
+                    elif key_list_name.endswith('zset'):
+                        setattr(self, key, RedisZSet.as_child(self, key, str))
 
     @staticmethod
     def datetime_to_string(dt):

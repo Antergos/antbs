@@ -44,13 +44,13 @@ def check_for_new_items():
     gh = login(token=GITHUB_TOKEN)
     last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''
     repo = gh.repository('numixproject', "numix-icon-theme")
-    events = repo.events()
+    commits = repo.commits()
     latest = None
-    for event in events:
-        event = event.as_dict()
-        event = event['payload']['head']
-        latest = event
-        break
+    try:
+        commit = commits.next()
+        latest = commit.sha
+    except StopIteration:
+        pass
 
     if latest != last_id:
         db.set('ANTBS_GITHUB_LAST_EVENT', latest)

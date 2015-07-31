@@ -42,6 +42,8 @@ import package as pkgclass
 import utils.sign_pkgs as sign_pkgs
 import glob
 from rq import get_current_job
+from utils.server_status import status, Timeline
+from build_obj import BuildObject as build
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -134,24 +136,20 @@ def process_package_queue(the_queue=None):
             if not version:
                 db.lrem('queue', 0, 'cnchi-dev')
                 continue
-            logger.info('Updating pkgver in database for %s to %s' % (pkgobj.name, version))
-            db.set('building', 'Updating pkgver in databse for %s to %s' % (pkgobj.name, version))
-            depends = pkgobj.get_deps()
-            p, d = depends
-            logger.info('@@-build_pkg.py-@@ 189 | depends before topsort: %s, %s' % (p, d))
+            logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
+            status.current_status = 'Updating pkgver in databse for %s to %s' % (pkg_obj.name, version)
+            depends = pkg_obj.get_deps()
 
-            if len(the_queue) > 1:
+            if depends and len(the_queue) > 1:
                 all_deps.append(depends)
         logger.info('@@-build_pkg.py-@@ 189 | all_deps before topsort: %s' % all_deps)
         return all_deps
 
 
 def handle_hook(first=False, last=False):
-    db.set('idle', 'False')
-    iso_flag = db.get('isoFlag')
-    # pull_from = db.get('pullFrom')
+    status.idle = False
     pull_from = 'antergos'
-    packages = db.lrange('queue', 0, -1)
+    packages = status.queue()
 
     if not os.path.exists(REPO_DIR):
         try:
@@ -172,11 +170,11 @@ def handle_hook(first=False, last=False):
     except subprocess.CalledProcessError as err:
         logger.error(err)
 
-    if iso_flag == 'True':
-        db.set('building', 'Building docker image.')
-        db.set('isoBuilding', 'True')
+    if status.iso_flag:
+        status.iso_flag = False
+        status.current_status = 'Building docker image.'
+        status.iso_building = True
         image = docker_utils.maybe_build_mkarchiso()
-        db.set('isoFlag', 'False')
         db.lrem('queue', 0, 'antergos-iso')
         db.lrem('queue', 0, 'antergos-iso.openbox')
         if image:
@@ -196,49 +194,34 @@ def handle_hook(first=False, last=False):
         db.set('idle', "True")
         return True
 
-    elif first and iso_flag == 'False':
-        db.set('building', 'Building docker image.')
+    elif first and not status.iso_flag:
+        status.current_status = 'Building docker image.'
         image = docker_utils.maybe_build_base_devel()
         if not image:
             return False
-        gh_repo = 'http://github.com/' + pull_from + '/antergos-packages.git'
-        logger.info('Pulling changes from github.')
-        db.set('building', 'Pulling PKGBUILD changes from github.')
-        # if os.path.exists(REPO_DIR):
-        #     shutil.rmtree(REPO_DIR)
-        # try:
-        #     subprocess.check_call(['git', 'clone', gh_repo], cwd='/opt')
-        # except subprocess.CalledProcessError as err:
-        #     logger.error(err.output)
-        #     return False
 
         logger.info('Checking database for packages.')
-        db.set('building', 'Checking database for queued packages')
-        subprocess.call(['chmod', '-R', 'a+rw', 'antergos-packages'], cwd='/opt')
+        status.current_status = 'Checking database for queued packages'
 
         all_deps = process_package_queue(packages)
 
         logger.info('All queued packages are in the database, checking deps to determine build order.')
-        db.set('building', 'Determining build order by sorting package depends')
+        status.current_status = 'Determining build order by sorting package depends'
         if len(all_deps) > 1:
             topsort = check_deps(all_deps)
-            # logger.info('@@-build_pkg.py-@@ 254 | depends AFTER topsort: %s' % topsort)
-            # logger.info('@@-build_pkg.py-@@ 255 | queue before regen: %s' % packages)
             check = []
-            db.delete('queue')
+            packages.delete()
             for p in topsort:
-                # logger.info('@@-build_pkg.py-@@ 259 | p in topsort: %s' % p)
-                db.rpush('queue', p)
-                check.append(p)
-                # logger.debug('@@-build_pkg.py-@@ | The Queue After TopSort -> ' + ', '.join(check))
+                # TODO: What if there is already a group of packages in queue prior to the current group?
+                packages.append(p)
 
         logger.info('Check deps complete. Starting build_pkgs')
-        db.set('building', 'Check deps complete. Starting build container.')
+        status.current_status = 'Check deps complete. Starting build container.'
 
-    if iso_flag == 'False' and len(packages) > 0:
+    if not status.iso_flag and len(packages) > 0:
         pack = db.lpop('queue')
         if pack and pack is not None and pack != '':
-            pkgobj = package(pack, db)
+            pkgobj = package(name=pack)
         else:
             return False
 
@@ -248,15 +231,17 @@ def handle_hook(first=False, last=False):
         rqjob.meta['package'] = pkgobj.name
         rqjob.save()
 
+        status.now_building = pkgobj.name
         built = build_pkgs(last, pkgobj)
         # TODO: Move this into its own method
         if built:
-            completed = db.lrange('completed', 0, -1)
-            failed = db.lrange('failed', 0, -1)
-            success = len([x for x in pkgobj.builds if x in completed])
-            failure = len([x for x in pkgobj.builds if x in failed])
-            total = len(pkgobj.builds)
+            completed = status.completed()
+            failed = status.failed()
+            blds = pkgobj.builds()
+            total = len(blds)
             if total > 0:
+                success = len([x for x in pkgobj.blds if x in completed])
+                failure = len([x for x in pkgobj.blds if x in failed])
                 if success > 0:
                     success = 100 * success / total
                 else:
@@ -265,15 +250,16 @@ def handle_hook(first=False, last=False):
                     failure = 100 * failure / total
                 else:
                     failure = 0
-                pkgobj.save_to_db('success_rate', success)
-                pkgobj.save_to_db('failure_rate', failure)
+                pkgobj.success_rate = success
+                pkgobj.failure_rate = failure
     if last:
         remove('/opt/antergos-packages')
-        db.set('idle', "True")
-        db.set('building', 'Idle')
-        db.set('container', '')
-        db.set('building_num', '')
-        db.set('building_start', '')
+        status.idle = True
+        status.building = 'Idle'
+        status.now_building = 'Idle'
+        status.container = ''
+        status.building_num = ''
+        status.building_start = ''
         logger.info('All builds completed.')
 
 
@@ -281,17 +267,10 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
     if pkg and rev_result:
         repo = 'antergos'
         repodir = 'main'
-        if rev_result == '2':
-            rev_result = 'passed'
-        elif rev_result == '3':
-            rev_result = 'failed'
-        elif rev_result == 'staging':
+        if rev_result == 'skip':
             rev_result = None
             repo = 'antergos-staging'
             repodir = 'staging'
-        else:
-            logger.error('[UPDATE REPO FAILED]')
-            return
         result = '/tmp/result'
         if os.path.exists(result):
             shutil.rmtree(result)
@@ -299,14 +278,12 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
         command = "/makepkg/build.sh"
         pkgenv = ["_PKGNAME=%s" % pkg, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo,
                   "_REPO_DIR=%s" % repodir]
-        building = db.get('building')
-        idle = db.get('idle')
         building_saved = False
-        if 'True' != idle:
-            building_saved = building
+        if not status.idle:
+            building_saved = status.current_status
         else:
-            db.set('idle', 'False')
-        db.set('building', 'Updating repo database.')
+            status.idle = False
+        status.current_status = 'Updating repo database.'
         container = None
         run_docker_clean("update_repo")
         try:
@@ -350,34 +327,27 @@ def update_main_repo(pkg=None, rev_result=None, this_log=None):
             stream_process = Process(target=publish_build_ouput, args=(cont, this_log, upd_repo))
             stream_process.start()
             doc.wait(container)
-            try:
-                cache_keys = db.scan_iter(match='cache:*', count=100)
-                for key in cache_keys:
-                    logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % key)
-                    db.delete(key)
-            except Exception as err:
-                logger.error(err)
+            db.set('antbs:misc:cache_buster:flag', True)
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s' % err)
 
         doc.remove_container(container, v=True)
-        idle = db.get('idle')
-        if 'True' != idle:
+
+        if not status.idle:
             if building_saved:
-                db.set('building', building_saved)
+                status.current_status = building_saved
             else:
-                db.set('idle', 'True')
-                db.set('building', 'Idle')
-        db.delete('repo-count-staging')
-        db.delete('repo-count-main')
+                status.idle = True
+                status.current_status = 'Idle'
 
 
-def publish_build_ouput(container=None, this_log=None, upd_repo=False):
-    if not container or not this_log:
+def publish_build_ouput(container=None, bld_obj=None, upd_repo=False):
+    if not container or not bld_obj:
         logger.error('Unable to publish build output. (Container is None)')
         return
-    proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
-    output = iter(proc.stdout.readline, '')
+    # proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
+    # output = iter(proc.stdout.readline, '')
+    output = doc.logs(container, stream=True)
     nodup = set()
     content = []
     for line in output:
@@ -407,16 +377,22 @@ def publish_build_ouput(container=None, this_log=None, upd_repo=False):
 
     if upd_repo:
         db.publish('build-output', 'ENDOFLOG')
-    content = '\n '.join(content)
+    # content = '\n '.join(content)
 
-    log_exists = db.hget('%s:content' % this_log, 'content')
+    log = bld_obj.log()
 
-    pretty = highlight(content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                           prestyles="background:#272822;color:#fff;",
-                                                           encoding='utf-8'))
-    if log_exists and log_exists != '':
-        pretty = log_exists + pretty
-    db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+    existing = True
+    if not log or len(log) < 1:
+        existing = False
+
+    log.rpush(content)
+
+    if existing:
+        log_content = '\n '.join(log)
+        pretty = highlight(log_content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
+                                                                   prestyles="background:#272822;color:#fff;",
+                                                                   encoding='utf-8'))
+        bld_obj.log_str = pretty
 
 
 def get_latest_translations():
@@ -434,9 +410,6 @@ def get_latest_translations():
                 shutil.copy(f, dest_dir)
         except Exception as err:
             logger.error(err)
-
-    subprocess.check_call(['tar', '-cf', '/tmp/Cnchi-master.tar', '-C', '/opt/antergos-packages/cnchi', 'cnchi'])
-    shutil.copy('/tmp/Cnchi-master.tar', '/opt/antergos-packages/cnchi')
 
 
 def build_pkgs(last=False, pkg_info=None):
@@ -488,42 +461,34 @@ def build_pkgs(last=False, pkg_info=None):
             if 'PKGBUILD' in pkgbuild_dir:
                 pkgbuild_dir = os.path.dirname(pkgbuild_dir)
                 pkg_info.save_to_db('build_path', pkgbuild_dir)
-            db.publish('log_stream', 'pkgbuild_path is %s' % pkgbuild_dir)
 
-            db.set('building', 'Building %s with makepkg' % pkg)
-            failed = False
-            logger.info('Building %s' % pkg)
-            version = pkg_info.version
-            db.incr('build_number')
-            dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-            build_id = db.get('build_number')
-            db.set('building_num', build_id)
+            status.current_status = 'Building %s with makepkg' % pkg
+            bld_obj = build(pkg_obj=pkg_info)
+            bld_obj.failed = False
+            bld_obj.completed = False
+            bld_obj.version_str = pkg_info.version
+            bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+            status.building_num = bld_obj.bnum
+            status.building_start = bld_obj.start_str
+            build_id = bld_obj.bnum
             tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg)
-            logconf.new_timeline_event(tlmsg, '3')
-            this_log = 'build_log:%s' % build_id
-            db.hset('now_building', 'build_id', build_id)
-            db.hset('now_building', 'key', this_log)
-            db.hset('now_building', 'pkg', pkg)
-            db.set(this_log, True)
-            db.rpush('pkg:%s:build_logs' % pkg, build_id)
-            db.set('%s:start' % this_log, dt)
-            db.set('building_start', dt)
-            db.set('%s:pkg' % this_log, pkg)
-            db.set('%s:version' % this_log, version)
+            Timeline(msg=tlmsg, tl_type='3')
+            pbuilds = pkg_info.builds()
+            pbuilds.append(build_id)
+            bld_obj.pkgname = pkg
+            bld_obj.version = pkg_info.version
             pkg_deps = pkg_info.depends or []
             pkg_deps_str = ' '.join(pkg_deps)
-            logger.info('pkg_deps_str is %s' % pkg_deps_str)
             run_docker_clean(pkg)
-            logger.info('@@-build_pkg.py-@@ | AUTOSUMS is %s' % pkg_info.autosum)
+
             if pkg_info is not None and pkg_info.autosum == "True":
                 build_env = ['_AUTOSUMS=True']
             else:
                 build_env = ['_AUTOSUMS=False']
-            if '/cinnamon' in pkg_info.path:
+            if '/cinnamon/' in pkg_info.path:
                 build_env.append('_ALEXPKG=True')
             else:
                 build_env.append('_ALEXPKG=False')
-            logger.info('@@-build_pkg.py-@@ | build_env is %s' % build_env)
             hconfig = docker_utils.create_pkgs_host_config(cache, pkgbuild_dir, result)
             try:
                 container = doc.create_container("antergos/makepkg",
@@ -537,27 +502,30 @@ def build_pkgs(last=False, pkg_info=None):
                     logger.error(container.get('Warnings'))
             except Exception as err:
                 logger.error('Create container failed. Error Msg: %s' % err)
-                failed = True
+                bld_obj.failed = True
+                bld_obj.completed = False
                 continue
 
-            db.set('container', container.get('Id'))
+            bld_obj.container = container.get('Id')
 
             try:
                 doc.start(container.get('Id'))
-                cont = db.get('container')
-                stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
+                cont = bld_obj.container
+                stream_process = Process(target=publish_build_ouput, args=(cont, bld_obj))
                 stream_process.start()
                 result = doc.wait(cont)
                 if result is not 0:
-                    failed = True
-                    db.set('build_failed', "True")
+                    bld_obj.failed = True
+                    bld_obj.completed = False
                     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                 else:
                     logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
-                    db.set('build_failed', "False")
+                    bld_obj.failed = False
+                    bld_obj.completed = True
             except Exception as err:
                 logger.error('Start container failed. Error Msg: %s' % err)
-                failed = True
+                bld_obj.failed = True
+                bld_obj.completed = False
                 continue
             # db.publish('build-ouput', 'ENDOFLOG')
             # stream = doc.logs(container, stdout=True, stderr=True, timestamps=True)
@@ -569,7 +537,7 @@ def build_pkgs(last=False, pkg_info=None):
             # logger.info('last count is %s %s' % (last_count, type(last_count)))
             # logger.info('in_dir is %s %s' % (in_dir, type(in_dir)))
             pkgs2sign = None
-            if not failed:
+            if not bld_obj.failed:
                 db.publish('build-output', 'Signing package..')
                 pkgs2sign = glob.glob(
                     '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkg)
@@ -585,63 +553,40 @@ def build_pkgs(last=False, pkg_info=None):
                     db.publish('build-output', 'Signature created successfully for %s' % pkg)
                     logger.info('[SIGN PKG] Signature created successfully for %s' % pkg)
                     db.publish('build-output', 'Updating staging repo database..')
-                    update_main_repo(pkg, 'staging', this_log)
+                    update_main_repo(pkg, 'staging', bld_obj)
                 else:
-                    failed = True
+                    bld_obj.failed = True
+                    bld_obj.completed = False
 
-            if not failed:
+            if not bld_obj.failed:
                 db.publish('build-output', 'Build completed successfully!')
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> completed.' % (
                     build_id, build_id, pkg)
-                logconf.new_timeline_event(tlmsg, '4')
+                Timeline(msg=tlmsg, tl_type='4')
                 # db.incr('pkg_count', (in_dir - last_count))
-                db.rpush('completed', build_id)
-                db.set('%s:result' % this_log, 'completed')
-                db.set('%s:review_stat' % this_log, '1')
+                completed = status.completed()
+                completed.rpush(build_id)
+                bld_obj.review_stat = 'pending'
             else:
-                logger.error('No package found after container exit.')
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
-                logconf.new_timeline_event(tlmsg, '5')
+                Timeline(msg=tlmsg, tl_type='5')
                 if pkgs2sign is not None:
                     for p in pkgs2sign:
                         remove(p)
                         remove(p + '.sig')
-                db.set('%s:result' % this_log, 'failed')
-                db.rpush('failed', build_id)
-                log_string = db.hget('%s:content' % this_log, 'content')
-                if log_string and log_string != '':
-                    pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                              prestyles="background:#272822;color:#fff;",
-                                                                              encoding='utf-8'))
-                    db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
-            # doc.remove_container(container)
-            end = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-            db.set('%s:end' % this_log, end)
-            db.set('container', '')
-            db.set('building_num', '')
-            db.set('building_start', '')
-            db.delete('repo-count-staging')
-            db.delete('repo-count-main')
+                failed = status.failed()
+                failed.rpush(build_id)
 
-            if last:
-                db.set('idle', "True")
-                db.set('building', 'Idle')
-                # for f in [result, cache, '/opt/antergos-packages', '/var/tmp/32bit', '/var/tmp/32build']:
-                #    remove(f)
-            else:
-                db.set('building', 'Starting next build in queue...')
+            bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
-            if not failed:
-                try:
-                    cache_keys = db.scan_iter(match='cache:*', count=100)
-                    for key in cache_keys:
-                        logger.info('[REPO COUNT CACHE KEY FOUND]: %s' % key)
-                        db.delete(key)
-                except Exception as err:
-                    logger.error(err)
+            status.container = ''
+            status.building_num = ''
+            status.building_start = ''
+
+            if not bld_obj.failed:
+                db.set('antbs:misc:cache_buster:flag', True)
                 return True
-
-    logger.info('Build completed. Repo has been updated.')
+            return False
 
 
 def build_iso():

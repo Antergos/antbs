@@ -50,7 +50,7 @@ import utils.logging_config as logconf
 import package
 import webhook
 import utils.slack_bot as slack_bot
-import build
+from build_obj import BuildObject as build
 
 if not status.github_token:
     status.github_token = os.environ.get('GITHUB_TOKEN')
@@ -135,8 +135,8 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
         container = db.get('repo_container')
     else:
         container = ''
-    queue = status.queue
-    now_building = status.now_building
+    queue = status.queue()
+    now_building = status.now_building()
     try:
         doc.kill(container)
         doc.remove_container(container)
@@ -227,7 +227,7 @@ def get_paginated(item_list, per_page, page, timeline):
 def match_pkg_name_build_log(bnum=None, match=None):
     if not bnum or not match:
         return False
-    pname = db.get('build_log:%s:pkg' % bnum)
+    pname = build(bnum=bnum)
     logger.info(bnum)
     if pname:
         return match in pname
@@ -258,6 +258,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
 
     try:
         all_builds = getattr(status, build_status)
+        all_builds = all_builds()
     except Exception as err:
         logger.error('GET_BUILD_INFO - %s', err)
         abort(500)
@@ -272,7 +273,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
                 try:
-                    build_obj = build.Build(bnum=bnum)
+                    build_obj = build(bnum=bnum)
                 except Exception as err:
                     logger.error('Unable to ge build object - %s' % err)
                     continue
@@ -352,7 +353,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
-        build_obj = build.Build(bnum=bnum)
+        build_obj = build(bnum=bnum)
         status.idle = False
         pkg_obj = package.Package(name=build_obj.pkgname)
         if pkg_obj:
@@ -402,7 +403,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
 
 
 def get_timeline(tlpage=None):
-    event_ids = status.all_tl_events
+    event_ids = status.all_tl_events()
     timeline = []
     for event_id in event_ids:
         ev_obj = tl_event(event_id=event_id)
@@ -455,6 +456,7 @@ def homepage(tlpage=None):
     stats = {}
     for stat in check_stats:
         builds = getattr(status, stat)
+        builds = builds()
         res = len(builds)
         if stat != "queue":
             builds = [x for x in builds if x is not None]
@@ -462,7 +464,7 @@ def homepage(tlpage=None):
             nodup = []
             for bnum in builds:
                 try:
-                    bld_obj = build.Build(bnum=bnum)
+                    bld_obj = build(bnum=bnum)
                 except ValueError:
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
@@ -497,7 +499,7 @@ def homepage(tlpage=None):
 @app.route("/building")
 def build():
     is_idle = status.idle
-    now_building = status.now_building
+    now_building = status.now_building()
     cont = status.container
     if cont:
         container = cont[:20]
@@ -506,7 +508,7 @@ def build():
     bnum = status.building_num
     start = status.building_start
     try:
-        bld_obj = build.Build(bnum=bnum)
+        bld_obj = build(bnum=bnum)
         ver = bld_obj.version_str
     except ValueError as err:
         logger.error(err)
@@ -545,10 +547,10 @@ def maybe_check_for_remote_commits():
 def scheduled():
     is_idle = status.idle
     try:
-        queued = status.queue
+        queued = status.queue()
     except Exception:
         queued = None
-    building = status.now_building
+    building = status.now_building()
     the_queue = []
     if queued:
         for pak in queued:
@@ -576,7 +578,7 @@ def completed(page=None, name=None):
         page = 1
     if name is not None and page is None:
         page = 1
-    building = status.now_building
+    building = status.now_building()
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
 
@@ -591,7 +593,7 @@ def failed(page=None):
     build_status = 'failed'
     if page is None:
         page = 1
-    building = status.now_building
+    building = status.now_building()
     is_logged_in = user.is_authenticated()
 
     failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
@@ -606,7 +608,7 @@ def build_info(num):
     if not num:
         abort(404)
     try:
-        bld_obj = build.Build(bnum=num)
+        bld_obj = build(bnum=num)
     except Exception:
         abort(404)
 
@@ -629,7 +631,7 @@ def build_info(num):
 @app.route('/browse')
 def repo_browser(goto=None):
     is_idle = status.idle
-    building = status.now_building
+    building = status.now_building()
     release = False
     testing = False
     main = False
@@ -726,7 +728,7 @@ def build_pkg_now():
 @app.route('/get_status', methods=['GET'])
 def get_status():
     idle = status.idle
-    building = status.now_building
+    building = status.now_building()
     if idle:
         message = dict(msg='Idle')
     else:
@@ -781,7 +783,7 @@ def repo_packages(repo=None):
     is_idle = status.idle
     is_logged_in = user.is_authenticated()
     # building = db.get('building')
-    building = status.now_building
+    building = status.now_building()
     packages, rev_pending = get_repo_info(repo, is_logged_in)
     return render_template("repo_pkgs.html", idle=is_idle, building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)

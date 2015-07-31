@@ -23,7 +23,7 @@
 """ A singleton class for the server status """
 
 import datetime
-from redis_connection import RedisObject, db
+from redis_connection import RedisObject, db, RedisList, RedisZSet
 from logging_config import logger
 import os
 
@@ -45,11 +45,33 @@ class ServerStatus(Singleton):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
 
         self.all_keys = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
-                                           'gitlab_token', 'building_start'],
-                             redis_string_bool=['status', 'idle'],
+                                           'gitlab_token', 'building_start', 'building_num'],
+                             redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building'],
                              redis_string_int=['building_num'],
                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
                              redis_zset=['all_packages'])
+
+        if '' == getattr(self, 'status', ''):
+            key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
+            for key_list_name in key_lists:
+                key_list = self.all_keys[key_list_name]
+                for key in key_list:
+                    if key_list_name.endswith('string'):
+                        setattr(self, key, '')
+                    elif key_list_name.endswith('bool'):
+                        setattr(self, key, False)
+                    elif key_list_name.endswith('int'):
+                        setattr(self, key, 0)
+                    elif key_list_name.endswith('list'):
+                        setattr(self, key, RedisList.as_child(self, key, str))
+                    elif key_list_name.endswith('zset'):
+                        setattr(self, key, RedisZSet.as_child(self, key, str))
+            self.status = True
+            self.current_status = 'Idle'
+            self.idle = True
+            self.now_building = 'Idle'
+            self.iso_flag = False
+            self.iso_building = False
 
 
 class Timeline(RedisObject):
@@ -84,11 +106,5 @@ class Timeline(RedisObject):
     def dt_time_to_string(dt):
         return dt.strftime("%I:%M%p")
 
-# Check if this is our first run, create initial tables if needed
 status = ServerStatus()
-idle = status.idle
-if not idle:
-    status.current_status = 'Idle'
-    status.idle = True
-    status.now_building = 'Idle'
 
