@@ -39,6 +39,7 @@ import build_pkg as builder
 from utils.redis_connection import db
 import utils.logging_config as logconf
 import package as package
+from utils.server_status import status, Timeline
 
 logger = logconf.logger
 
@@ -65,7 +66,7 @@ def rm_file_or_dir(src):
 
 
 class Webhook(object):
-    def __init__(self, request=None, db=None):
+    def __init__(self, request=None):
         self.can_process = False
         self.is_monitor = False
         self.is_cnchi = False
@@ -78,7 +79,6 @@ class Webhook(object):
             logger.error('@@-webhook.py-@@ 40 | Cant process new webhook because request or db is None.')
         elif self.request or self.is_monitor is True:
             self.can_process = True
-            self.db = db
             self.request = request
             self.is_manual = False
             self.is_numix = False
@@ -86,20 +86,16 @@ class Webhook(object):
             self.is_gitlab = False
             self.changes = []
             self.phab_payload = False
-            self.the_queue = db.lrange('queue', 0, -1)
+            self.the_queue = status.queue()
             self.repo = 'antergos-packages'
             self.payload = None
             self.full_name = None
             self.pusher = None
             self.commits = None
             self.result = None
-            try:
-                self.building = db.hget('now_building', 'pkg')
-            except Exception as err:
-                logger.error(err)
-                self.db.delete('now_building')
-                self.building = None
+            self.building = status.now_building
             self.result = None
+            self.allpkgs = status.all_packages()
             self.is_authorized = self.is_from_authorized_sender()
 
             if self.is_authorized:
@@ -176,7 +172,7 @@ class Webhook(object):
             self.payload = json.loads(self.request.data)
             # Save payload in the database temporarily in case we need it later.
             dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
-            key = 'payloads:%s' % dt
+            key = 'antbs:github:payloads:%s' % dt
             if db.exists(key):
                 for i in range(1, 5):
                     tmp = '%s:%s' % (key, i)
@@ -184,7 +180,7 @@ class Webhook(object):
                         key = tmp
                         break
             db.hmset(key, self.payload)
-            db.rpush('payloads:index', key)
+            db.rpush('antbs:github:payloads:index', key)
             db.expire(key, 172800)
 
             self.full_name = self.payload['repository']['full_name']
@@ -209,29 +205,32 @@ class Webhook(object):
                 self.repo = 'antergos-packages'
 
         elif self.repo == 'cnchi-dev':
-            idle = db.get('idle')
-            working = db.exists('creating-cnchi-archive-from-dev')
-            check = 'cnchi-dev' != self.building or idle == "True"
-            if not working and 'cnchi-dev' not in self.the_queue and check:
-                db.set('creating-cnchi-archive-from-dev', 'True')
-                cnchi_git = 'https://github.com/lots0logs/cnchi-dev.git'
-                cnchi_clone = '/tmp/cnchi'
-                git = '/tmp/cnchi/.git'
-                cnchi_tar_tmp = '/tmp/cnchi.tar'
-                cnchi_tar = '/srv/antergos.org/cnchi.tar'
-
-                for f in [cnchi_clone, cnchi_tar, cnchi_tar_tmp]:
-                    if os.path.exists(f):
-                        rm_file_or_dir(f)
-                try:
-                    subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
-                    shutil.rmtree(git)
-                    subprocess.check_call(['tar', '-cf', '/tmp/cnchi.tar', '-C', '/tmp', 'cnchi'])
-                    shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
-                except subprocess.CalledProcessError as err:
-                    logger.error(err.output)
-
-                db.delete('creating-cnchi-archive-from-dev')
+            self.changes.append(['cnchi-dev'])
+            self.repo = 'antergos-packages'
+            self.is_cnchi = True
+        #     idle = db.get('idle')
+        #     working = db.exists('creating-cnchi-archive-from-dev')
+        #     check = 'cnchi-dev' != self.building or idle == "True"
+        #     if not working and 'cnchi-dev' not in self.the_queue and check:
+        #         db.set('creating-cnchi-archive-from-dev', 'True')
+        #         cnchi_git = 'https://github.com/lots0logs/cnchi-dev.git'
+        #         cnchi_clone = '/tmp/cnchi'
+        #         git = '/tmp/cnchi/.git'
+        #         cnchi_tar_tmp = '/tmp/cnchi.tar'
+        #         cnchi_tar = '/srv/antergos.org/cnchi.tar'
+        #
+        #         for f in [cnchi_clone, cnchi_tar, cnchi_tar_tmp]:
+        #             if os.path.exists(f):
+        #                 rm_file_or_dir(f)
+        #         try:
+        #             subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
+        #             shutil.rmtree(git)
+        #             subprocess.check_call(['tar', '-cf', '/tmp/cnchi.tar', '-C', '/tmp', 'cnchi'])
+        #             shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
+        #         except subprocess.CalledProcessError as err:
+        #             logger.error(err.output)
+        #
+        #         db.delete('creating-cnchi-archive-from-dev')
         elif self.pusher != "antbs":
             for commit in self.commits:
                 self.changes.append(commit['modified'])
@@ -250,7 +249,7 @@ class Webhook(object):
                 if changed is not None and changed != [] and changed != '':
                     for item in changed:
                         # logger.info(item)
-                        if self.is_gitlab or self.is_numix:
+                        if self.is_gitlab or self.is_numix or self.is_cnchi:
                             pak = item
                         else:
                             if "PKGBUILD" in item:
@@ -263,7 +262,7 @@ class Webhook(object):
                         if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
                             logger.info('Adding %s to the build queue' % pak)
                             no_dups.append(pak)
-                            db.sadd('pkgs:all', pak)
+                            self.allpkgs.add(pak)
                             has_pkgs = True
 
             if has_pkgs:
@@ -278,7 +277,7 @@ class Webhook(object):
                     if p in self.the_queue:
                         continue
                     if p not in self.the_queue and p is not None and p != '' and p != []:
-                        self.db.rpush('queue', p)
+                        self.the_queue.rpush(p)
                         if len(the_pkgs) > 1:
                             p_li = '<li>%s</li>' % p
                         else:
@@ -297,11 +296,12 @@ class Webhook(object):
                         if len(the_pkgs) > 1:
                             p_ul.append('</ul>')
                         the_pkgs_str = ''.join(p_ul)
-                        tl_event = logconf.new_timeline_event(
-                            'Webhook triggered by <strong>%s.</strong> Packages added to'
-                            ' the build queue: %s' % (source, the_pkgs_str), tltype)
+                        tl_event = Timeline(
+                            msg='Webhook triggered by <strong>%s.</strong> Packages added to the build queue: %s' % (
+                            source, the_pkgs_str), tl_type=tltype)
                         p_obj = package.Package(p)
-                        p_obj.save_to_db('tl_event', tl_event)
+                        events = p_obj.tl_events()
+                        events.append(tl_event.event_id)
                     first = False
 
             if not self.result:

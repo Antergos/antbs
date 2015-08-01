@@ -25,6 +25,7 @@
 import datetime
 
 from utils.redis_connection import db, RedisObject, RedisList, RedisZSet
+from utils.logging_config import logger
 
 
 class BuildObject(RedisObject):
@@ -41,15 +42,11 @@ class BuildObject(RedisObject):
             redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
                           'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
             redis_string_bool=['failed', 'completed'],
-            redis_string_int=['pkgid'],
+            redis_string_int=['pkgid', 'bnum'],
             redis_list=['log'],
             redis_zset=[])
 
         if not bnum:
-            next_bnum = db.incr('antbs:misc:bnum:next')
-            self.namespace = 'antbs:build:%s:' % next_bnum
-            self.bnum = next_bnum
-
             key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
             for key_list_name in key_lists:
                 key_list = self.all_keys[key_list_name]
@@ -67,8 +64,21 @@ class BuildObject(RedisObject):
                         setattr(self, key, RedisList.as_child(self, key, str))
                     elif key_list_name.endswith('zset'):
                         setattr(self, key, RedisZSet.as_child(self, key, str))
+            next_bnum = db.incr('antbs:misc:bnum:next')
+            self.namespace = 'antbs:build:%s:' % next_bnum
+            self.bnum = next_bnum
+        else:
+            self.namespace = 'antbs:build:%s:' % bnum
 
     @staticmethod
     def datetime_to_string(dt):
         return dt.strftime("%m/%d/%Y %I:%M%p")
+
+
+def get_build_object(bnum=None, pkg_obj=None):
+    if not pkg_obj and not bnum:
+        logger.debug('build number is required to get build object.')
+        raise AttributeError
+    bld_obj = BuildObject(bnum=bnum, pkg_obj=pkg_obj)
+    return bld_obj
 

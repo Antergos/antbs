@@ -100,6 +100,16 @@ class RedisList(RedisField):
 
         return helper
 
+    def __str__(self):
+        """ Return this object as a string """
+
+        return str([x for x in self.__iter__()])
+
+    def __repr__(self):
+        """ Return this object as a string """
+
+        return str([x for x in self.__iter__()])
+
     def __getitem__(self, index):
         """ Load an item by index where index is either an int or a slice. """
 
@@ -161,6 +171,10 @@ class RedisList(RedisField):
 
     def delete(self):
         db.delete(self.id)
+
+    def reverse(self):
+        cp = list(db.lrange(self.id, 0, -1))
+        return cp.reverse()
 
 
 class RedisZSet(RedisField):
@@ -242,7 +256,8 @@ class RedisObject(object):
             return db.hget(key, attrib) if db.hexists(key, attrib) else ''
 
         elif attrib in all_keys['redis_string_bool']:
-            return bool(db.hget(key, attrib)) if db.hexists(key, attrib) else ''
+            val = db.hget(key, attrib) if db.hexists(key, attrib) else ''
+            return self.bool_string_helper(val)
 
         elif attrib in all_keys['redis_string_int']:
             return int(db.hget(key, attrib)) if db.hexists(key, attrib) else ''
@@ -250,7 +265,7 @@ class RedisObject(object):
         elif attrib in all_keys['redis_list']:
             key = self.namespace + attrib
             return RedisList.as_child(self, attrib, str)
-            #return db.lrange(key, 0, -1) if db.exists(key) else []
+            # return db.lrange(key, 0, -1) if db.exists(key) else []
 
         elif attrib in all_keys['redis_zset']:
             return RedisZSet.as_child(self, attrib, str)
@@ -272,7 +287,12 @@ class RedisObject(object):
             db.hset(key, attrib, value)
 
         elif attrib in all_keys['redis_string_bool']:
-            db.hset(key, attrib, str(value))
+            if isinstance(value, bool):
+                value = self.bool_string_helper(value)
+            if isinstance(value, str) and value in ['True', 'False']:
+                db.hset(key, attrib, value)
+            else:
+                raise ValueError
 
         elif attrib in all_keys['redis_string_int']:
             db.hset(key, attrib, str(value))
@@ -281,3 +301,10 @@ class RedisObject(object):
             if not callable(value):
                 raise ValueError(type(value))
             super(RedisObject, self).__setattr__(attrib, value)
+
+    @staticmethod
+    def bool_string_helper(value):
+        if isinstance(value, str):
+            return True if 'True' == value else False
+        elif isinstance(value, bool):
+            return 'True' if value else 'False'

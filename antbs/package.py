@@ -28,6 +28,7 @@ import re
 import sys
 
 from github3 import login
+import shutil
 
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
@@ -48,7 +49,7 @@ class PackageMeta(RedisObject):
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit'],
             redis_string_int=['pkgid'],
-            redis_list=['allowed_in', 'builds', 'tl_event'],
+            redis_list=['allowed_in', 'builds', 'tl_events'],
             redis_zset=['depends', 'groups'])
 
         name = kwargs.get('name')
@@ -67,7 +68,7 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self.name and os.path.exists(os.path.join(REPO_DIR, name)):
+        if self.name == '' or self.pkgname == '' and os.path.exists(os.path.join(REPO_DIR, name)):
 
             key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
             for key_list_name in key_lists:
@@ -101,53 +102,59 @@ class Package(PackageMeta):
         for p in paths:
             if os.path.exists(p):
                 path = os.path.join(p, 'PKGBUILD')
-                if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
-                    self.allowed_in = ['main']
+                if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in()) == 0:
+                    self.allowed_in().append('main')
                 break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path')
 
         parse = open(path).read()
         dirpath = os.path.dirname(path)
-        if var == "pkgver" and self.name == 'cnchi-dev':
-            if "info" in sys.modules:
-                del (sys.modules["info"])
-            if "/tmp/cnchi/cnchi" not in sys.path:
-                sys.path.append('/tmp/cnchi/cnchi')
-            if "/tmp/cnchi-dev/cnchi" not in sys.path:
-                sys.path.append('/tmp/cnchi-dev/cnchi')
-            import info
-
-            out = info.CNCHI_VERSION
-            out = out.replace('"', '')
-            del info.CNCHI_VERSION
-            del (sys.modules["info"])
-            err = []
+        # if var == "pkgver" and self.name == 'cnchi-dev':
+        #     if "info" in sys.modules:
+        #         del (sys.modules["info"])
+        #     if "/tmp/cnchi/cnchi" not in sys.path:
+        #         sys.path.append('/tmp/cnchi/cnchi')
+        #     if "/tmp/cnchi-dev/cnchi" not in sys.path:
+        #         sys.path.append('/tmp/cnchi-dev/cnchi')
+        #     import info
+        #
+        #     out = info.CNCHI_VERSION
+        #     out = out.replace('"', '')
+        #     del info.CNCHI_VERSION
+        #     del (sys.modules["info"])
+        #     err = []
+        #else:
+        if var in ['source', 'depends', 'makedepends', 'arch']:
+            cmd = 'source ' + path + '; echo ${' + var + '[*]}'
         else:
-            if var in ['source', 'depends', 'makedepends', 'arch']:
-                cmd = 'source ' + path + '; echo ${' + var + '[*]}'
-            else:
-                cmd = 'source ' + path + '; echo ${' + var + '}'
+            cmd = 'source ' + path + '; echo ${' + var + '}'
 
-            if var == "pkgver" and ('git+' in parse or 'numix-icon-theme' in self.name):
-                if 'numix-icon-theme' not in self.name:
-                    giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-                    giturl = giturl.group(0)
-                    pkgdir, pkgbuild = os.path.split(path)
-                    if self.name == 'pamac-dev':
-                        gitnm = 'pamac'
-                    else:
-                        gitnm = self.name
-                    try:
-                        subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=pkgdir)
-                    except subprocess.CalledProcessError as err:
-                        logger.error(err.output)
+        if var == "pkgver" and ('git+' in parse or self.name == 'cnchi-dev'):
+            giturl = re.search('(?<=git\\+).+(?="|\')', parse)
+            if giturl:
+                giturl = giturl.group(0)
+            pkgdir, pkgbuild = os.path.split(path)
+            gitnm = self.name
+            if self.name == 'pamac-dev':
+                gitnm = 'pamac'
+            elif self.name == 'cnchi-dev':
+                giturl = 'http://github.com/lots0logs/cnchi-dev.git'
 
-                cmd = 'source ' + path + '; ' + var
+            if os.path.exists(os.path.join(pkgdir, gitnm)):
+                shutil.rmtree(os.path.join(pkgdir, gitnm), ignore_errors=True)
+            try:
+                subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=pkgdir)
+                if self.name == 'cnchi-dev':
+                    subprocess.check_output(['tar', '-cf', 'cnchi-dev.tar', 'cnchi-dev'], cwd=pkgdir)
+            except subprocess.CalledProcessError as err:
+                logger.error(err.output)
 
-            proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
-                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            out, err = proc.communicate()
+            cmd = 'source ' + path + '; ' + var
+
+        proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        out, err = proc.communicate()
 
         if len(out) > 0:
             out = out.strip()
@@ -159,20 +166,20 @@ class Package(PackageMeta):
 
     @staticmethod
     def maybe_update_pkgbuild_repo():
-        if not db.exists('pkgbuild_repo_cached') or not os.path.exists('/var/tmp/antergos-packages'):
-            db.setex('pkgbuild_repo_cached', 1800, "True")
-            try:
-                if not os.path.exists('/var/tmp/antergos-packages'):
-                    subprocess.check_call(
-                        ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
-                        cwd='/var/tmp')
-                else:
-                    subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
-                                          cwd='/var/tmp/antergos-packages')
-                    subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
-            except subprocess.CalledProcessError as err:
-                logger.error(err)
-                db.delete('pkgbuild_repo_cached')
+        # if not db.exists('pkgbuild_repo_cached') or not os.path.exists('/var/tmp/antergos-packages'):
+        #     db.setex('pkgbuild_repo_cached', 600, "True")
+        try:
+            if not os.path.exists('/var/tmp/antergos-packages'):
+                subprocess.check_call(
+                    ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
+                    cwd='/var/tmp')
+            else:
+                subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
+                                      cwd='/var/tmp/antergos-packages')
+                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+            db.delete('pkgbuild_repo_cached')
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if self.push_version != "True" or old_val == new_val:
@@ -210,9 +217,9 @@ class Package(PackageMeta):
                 setattr(self, key, new_val)
 
         if not changed:
-            return self.version
+            return self.version_str
 
-        if self.name == "cnchi-dev" and self.pkgver[-1] != "0":
+        if self.name == "cnchi-dev" and not str(self.pkgver).endswith("0") and not True:
             event = self.tl_event
             results = db.scan_iter('timeline:%s:*' % event, 100)
             for k in results:
@@ -261,3 +268,11 @@ class Package(PackageMeta):
         res = (self.name, depends)
 
         return res
+
+
+def get_pkg_object(name=None):
+    if not name:
+        logger.debug('name is required to get package object.')
+        return False
+    pkg_obj = Package(name=name)
+    return pkg_obj

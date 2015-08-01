@@ -38,18 +38,17 @@ from pygments.formatters import HtmlFormatter
 import re
 import time
 from multiprocessing import Process
-import package as pkgclass
+import package
 import utils.sign_pkgs as sign_pkgs
 import glob
 from rq import get_current_job
 from utils.server_status import status, Timeline
-from build_obj import BuildObject as build
+import build_obj
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
-package = pkgclass.Package
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
 logger = logconf.logger
@@ -88,7 +87,6 @@ def truncate_middle(s, n):
         return s
     # half of the size, minus the 3 .'s
     n_2 = int(n) / 3 - 3
-    n_2 *= 2
     # whatever's left
     n_1 = n - n_2 - 3
     return '{0}...{1}'.format(s[:n_1], s[-n_2:])
@@ -131,14 +129,23 @@ def process_package_queue(the_queue=None):
         for pkg in the_queue:
             if pkg == '':
                 continue
-            pkg_obj = package.Package(name=pkg)
+            pkg_obj = package.get_pkg_object(name=pkg)
             version = pkg_obj.get_version()
             if not version:
-                db.lrem('queue', 0, 'cnchi-dev')
                 continue
             logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
             status.current_status = 'Updating pkgver in databse for %s to %s' % (pkg_obj.name, version)
             depends = pkg_obj.get_deps()
+
+            paths = [os.path.join('/opt/antergos-packages/', pkg),
+                     os.path.join('/opt/antergos-packages/deepin_desktop', pkg),
+                     os.path.join('/opt/antergos-packages/cinnamon', pkg)]
+            for p in paths:
+                if os.path.exists(p):
+                    pkg_obj.build_path = p
+                    break
+            if pkg == 'cnchi-dev':
+                shutil.copy2('/var/tmp/antergos-packages/cnchi-dev/cnchi-dev.tar', '/opt/antergos-packages/cnchi-dev')
 
             if depends and len(the_queue) > 1:
                 all_deps.append(depends)
@@ -151,21 +158,12 @@ def handle_hook(first=False, last=False):
     pull_from = 'antergos'
     packages = status.queue()
 
-    if not os.path.exists(REPO_DIR):
-        try:
-            subprocess.check_call(
-                ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
-                cwd='/opt')
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
-    else:
-        try:
-            subprocess.check_call(['git', 'reset', '--hard', 'origin/master'], cwd=REPO_DIR)
-            subprocess.check_call(['git', 'pull'], cwd=REPO_DIR)
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
-
+    if os.path.exists(REPO_DIR):
+        remove(REPO_DIR)
     try:
+        subprocess.check_call(
+            ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
+            cwd='/opt')
         subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
     except subprocess.CalledProcessError as err:
         logger.error(err)
@@ -186,7 +184,7 @@ def handle_hook(first=False, last=False):
             for arch in archs:
                 db.rpush('queue', iso_name + arch)
                 version = datetime.datetime.now().strftime('%Y.%m.%d')
-                pkgobj = package(iso_name + arch, db)
+                pkgobj = package.get_pkg_object(iso_name + arch)
                 pkgobj.save_to_db('version', version)
             build_iso()
         db.set('isoBuilding', 'False')
@@ -216,12 +214,13 @@ def handle_hook(first=False, last=False):
                 packages.append(p)
 
         logger.info('Check deps complete. Starting build_pkgs')
+        logger.debug((packages, status.iso_flag))
         status.current_status = 'Check deps complete. Starting build container.'
 
     if not status.iso_flag and len(packages) > 0:
-        pack = db.lpop('queue')
+        pack = status.queue().lpop()
         if pack and pack is not None and pack != '':
-            pkgobj = package(name=pack)
+            pkgobj = package.get_pkg_object(name=pack)
         else:
             return False
 
@@ -369,7 +368,7 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False):
             # if bad_date:
             # line = line.replace(bad_date.group(0), datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
             line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
-            if len(line) > 120:
+            if len(line) > 150:
                 line = truncate_middle(line, 120)
             content.append(line)
             db.publish('build-output', line)
@@ -437,7 +436,7 @@ def build_pkgs(last=False, pkg_info=None):
                     pname = pname.group(0)
                     pfile = os.path.join(pcache, pfile)
                     dtime = time.time()
-                    if os.stat(pfile).st_mtime < (dtime - 7 * 86400) or db.sismember('pkgs:all', pname):
+                    if os.stat(pfile).st_mtime < (dtime - 7 * 86400) or status.all_packages().ismember(pname):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
@@ -452,32 +451,23 @@ def build_pkgs(last=False, pkg_info=None):
     db.set('pkg_count', in_dir_last)
     for i in range(len(pkglist1)):
         pkg = pkg_info.name
-        pinfo = pkg_info
         if pkg and pkg is not None and pkg != '':
-            pkgbuild_dir = pinfo.build_path if pinfo.build_path and pinfo.build_path != '' else pkg_info.path
-            if pkgbuild_dir.startswith('/var/tmp'):
-                pkgbuild_dir = pkgbuild_dir.replace('/var/tmp/', '/opt/')
-                pkg_info.save_to_db('build_path', pkgbuild_dir)
-            if 'PKGBUILD' in pkgbuild_dir:
-                pkgbuild_dir = os.path.dirname(pkgbuild_dir)
-                pkg_info.save_to_db('build_path', pkgbuild_dir)
-
+            pkgbuild_dir = pkg_info.build_path
             status.current_status = 'Building %s with makepkg' % pkg
-            bld_obj = build(pkg_obj=pkg_info)
+            bld_obj = build_obj.get_build_object(pkg_obj=pkg_info)
             bld_obj.failed = False
             bld_obj.completed = False
-            bld_obj.version_str = pkg_info.version
+            bld_obj.version_str = pkg_info.version_str
             bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
             status.building_num = bld_obj.bnum
             status.building_start = bld_obj.start_str
             build_id = bld_obj.bnum
             tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg)
-            Timeline(msg=tlmsg, tl_type='3')
+            Timeline(msg=tlmsg, tl_type=3)
             pbuilds = pkg_info.builds()
             pbuilds.append(build_id)
             bld_obj.pkgname = pkg
-            bld_obj.version = pkg_info.version
-            pkg_deps = pkg_info.depends or []
+            pkg_deps = pkg_info.depends() or []
             pkg_deps_str = ' '.join(pkg_deps)
             run_docker_clean(pkg)
 
@@ -562,14 +552,14 @@ def build_pkgs(last=False, pkg_info=None):
                 db.publish('build-output', 'Build completed successfully!')
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> completed.' % (
                     build_id, build_id, pkg)
-                Timeline(msg=tlmsg, tl_type='4')
+                Timeline(msg=tlmsg, tl_type=4)
                 # db.incr('pkg_count', (in_dir - last_count))
                 completed = status.completed()
                 completed.rpush(build_id)
                 bld_obj.review_stat = 'pending'
             else:
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
-                Timeline(msg=tlmsg, tl_type='5')
+                Timeline(msg=tlmsg, tl_type=5)
                 if pkgs2sign is not None:
                     for p in pkgs2sign:
                         remove(p)
@@ -603,7 +593,7 @@ def build_iso():
     for arch in iso_arch:
         if db.exists('iso:one:arch') and arch == 'x86_64':
             continue
-        pkgobj = package(iso_name + arch, db)
+        pkgobj = package.get_pkg_object(iso_name + arch)
         failed = False
         db.incr('build_number')
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")

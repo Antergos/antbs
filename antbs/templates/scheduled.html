@@ -10,7 +10,7 @@
                     <h3>Scheduled Builds</h3>
                 </div>
                 <div class="content">
-                    {% if idle == "True" %}
+                    {% if idle %}
                         <tr>
                             <td>Queue is empty.</td>
                         </tr>
@@ -24,7 +24,6 @@
                             </tr>
                             </thead>
                             <tbody class="no-border-y">
-                            {% if queue is not mapping %}
                                 {% for p in queue %}
 
                                     {% set pkg, version = p %}
@@ -33,9 +32,7 @@
                                             <td>{{ pkg }}</td>
                                             <td>{{ version }}</td>
                                         </tr>
-                                    {% endfor %}
-
-                            {% endif %}
+                                {% endfor %}
 
 
                             </tbody>

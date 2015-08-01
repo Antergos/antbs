@@ -84,7 +84,7 @@
                 function () {
                     var editor = ace.edit("data");
                     editor.getSession().setMode("ace/mode/sh");
-                    editor.setValue("{% if idle == "True" %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
+                    editor.setValue("{% if idle %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
                     editor.setTheme("ace/theme/monokai");
                     editor.setShowPrintMargin(false);
                     editor.getSession().setUseWrapMode(true);

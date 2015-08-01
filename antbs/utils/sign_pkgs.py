@@ -27,15 +27,14 @@
 import os
 import subprocess
 
-import redis_connection as redconn
+from redis_connection import db
 from logging_config import logger
+from server_status import status
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'
-db = redconn.db
-password = db.get('ANTBS_GPG_PASS')
-gpg_key = db.get('ANTBS_GPG_KEY')
-
+password = status.gpg_password
+gpg_key = status.gpg_key
 
 
 def batch_sign(paths, uid=gpg_key, passphrase=password):
@@ -47,6 +46,7 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
     The passphrase is returned to avoid further prompts.
     """
     for path in paths:
+        status.current_status = 'Creating detached signature for %s' % path
         db.publish('build-output', 'Creating detached signature for %s' % path)
         logger.info('[SIGN PKG] Creating detached signature for %s' % path)
         # Verify existing signatures. This fails if the sig is invalid or

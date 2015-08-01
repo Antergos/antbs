@@ -30,17 +30,16 @@ import docker
 from docker.utils import create_host_config
 
 from logging_config import logger
-import redis_connection
+from redis_connection import db
+from server_status import status
 
-db = redis_connection.db
-
-doc_user = db.get('docker-images:username')
-doc_pass = db.get('docker-images:password')
+doc_user = status.docker_user
+doc_pass = status.docker_password
 
 SRC_DIR = os.path.dirname(__file__) or '.'
-BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
-DOC_DIR = os.path.join(BASE_DIR, 'build/docker')
-BUILD_DIR = os.path.join(BASE_DIR, 'build')
+DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
+BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
+logger.debug([('SRC_DIR', SRC_DIR), ('DOC_DIR', DOC_DIR), ('BUILD_DIR', BUILD_DIR)])
 
 
 # Initiate communication with build daemon
@@ -109,11 +108,12 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
 
 
 def maybe_build_base_devel():
-    if db.exists('docker-images:base-devel:built-today'):
+    if db.exists('antbs:docker-images:base-devel:built-today'):
         return True
 
     # No image was built in the past 24 hours, let's build one.
     build_script = os.path.join(DOC_DIR, 'base-devel.sh')
+    build_it = False
     try:
         build_it = subprocess.check_output([build_script])
         shutil.rmtree('/opt/antergos-packages')
@@ -129,14 +129,14 @@ def maybe_build_base_devel():
         mpkg = build_makepkg()
         if not mpkg:
             return False
-        db.psetex('docker-images:base-devel:built-today', 304800000, 'True')
+        db.psetex('antbs:docker-images:base-devel:built-today', 304800000, 'True')
         return True
     else:
         return False
 
 
 def maybe_build_mkarchiso():
-    if db.exists('docker-images:mkarchiso:built-today'):
+    if db.exists('antbs:docker-images:mkarchiso:built-today'):
         return True
 
     archiso = build_mkarchiso()
@@ -144,7 +144,7 @@ def maybe_build_mkarchiso():
     if not archiso or archiso is None:
         return False
 
-    db.psetex('docker-images:mkarchiso:built-today', 304800000, 'True')
+    db.psetex('antbs:docker-images:mkarchiso:built-today', 304800000, 'True')
 
     return True
 
@@ -187,8 +187,8 @@ def push_to_hub(repo=None):
         doc.login(username=doc_user, password=doc_pass, email='dustin@falgout.us')
         response = [line for line in doc.push(repo, stream=True, insecure_registry=True)]
         if not response:
-            return False
+            logger.info('Pushing to Docker hub might not have completed successfully.')
         else:
             logger.info(response)
     except Exception as err:
-        logger.error('@@-docker_util.py-@@ | Pushing to docker hub failed with error: %s', err)
+        logger.error('Pushing to docker hub failed with error: %s', err)

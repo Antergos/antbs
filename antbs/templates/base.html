@@ -675,6 +675,7 @@
 								if (data['msg'] !== current) {
 									jQuery('.idle').addClass('not-idle').removeClass('idle');
 									jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
+                                    jQuery('.fa-spinner').addClass('fa-spin');
 									jQuery('#status_bar').show();
 									jQuery('#status_bar_pre').text(data['msg']);
 									current = jQuery('#status_bar_pre').text();
@@ -682,6 +683,7 @@
 								if (data['msg'] == 'Idle' || current == 'Idle') {
 
 									jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
+                                    jQuery('.fa-spin').removeClass('fa-spin');
 									jQuery('#status_bar').hide();
 
 								}

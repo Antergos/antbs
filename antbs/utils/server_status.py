@@ -45,8 +45,9 @@ class ServerStatus(Singleton):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
 
         self.all_keys = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
-                                           'gitlab_token', 'building_start', 'building_num'],
-                             redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building'],
+                                           'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                                           'docker_password', 'gpg_key', 'gpg_password'],
+                             redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
                              redis_string_int=['building_num'],
                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
                              redis_zset=['all_packages'])
@@ -83,14 +84,18 @@ class Timeline(RedisObject):
         super(Timeline, self).__init__()
 
         self.all_keys = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                             redis_string_int=['event_id'])
+                             redis_string_int=['event_id', 'tl_type'],
+                             redis_string_bool=[],
+                             redis_list=[],
+                             redis_zset=[])
 
         if not event_id:
             next_id = db.incr('antbs:misc:event_id:next')
             self.namespace = 'antbs:timeline:%s:' % next_id
             self.event_id = next_id
-            status.all_tl_events = [self.event_id]
-            self.event_type = tl_type
+            all_events = status.all_tl_events()
+            all_events.append(self.event_id)
+            self.tl_type = tl_type
             self.message = msg
             dt = datetime.datetime.now()
             self.date_str = self.dt_date_to_string(dt)

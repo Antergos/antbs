@@ -80,7 +80,7 @@ def add_to_build_queue(pkgs=None):
         return False
     req = dict(method='POST', args={})
 
-    wh = webhook.Webhook(req, db)
+    wh = webhook.Webhook(req)
 
     wh.is_numix = True
     wh.repo = 'antergos-packages'
