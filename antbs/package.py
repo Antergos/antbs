@@ -57,6 +57,7 @@ class PackageMeta(RedisObject):
             raise AttributeError
 
         self.namespace = 'antbs:pkg:%s:' % name
+        self.name = name
 
 
 class Package(PackageMeta):
@@ -68,33 +69,37 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if self.name == '' or self.pkgname == '' and os.path.exists(os.path.join(REPO_DIR, name)):
+        try:
+            if (not self.pkgname or self.pkgname == '') and os.path.exists(os.path.join(REPO_DIR, name)):
 
-            key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
-            for key_list_name in key_lists:
-                key_list = self.all_keys[key_list_name]
-                for key in key_list:
-                    if key_list_name.endswith('string'):
-                        setattr(self, key, '')
-                    elif key_list_name.endswith('bool'):
-                        setattr(self, key, False)
-                    elif key_list_name.endswith('int'):
-                        setattr(self, key, 0)
-                    elif key_list_name.endswith('list'):
-                        setattr(self, key, RedisList.as_child(self, key, str))
-                    elif key_list_name.endswith('zset'):
-                        setattr(self, key, RedisZSet.as_child(self, key, str))
+                key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
+                for key_list_name in key_lists:
+                    key_list = self.all_keys[key_list_name]
+                    for key in key_list:
+                        if key_list_name.endswith('string') and key != 'name':
+                            setattr(self, key, '')
+                        elif key_list_name.endswith('bool'):
+                            setattr(self, key, False)
+                        elif key_list_name.endswith('int'):
+                            setattr(self, key, 0)
+                        elif key_list_name.endswith('list'):
+                            setattr(self, key, RedisList.as_child(self, key, str))
+                        elif key_list_name.endswith('zset'):
+                            setattr(self, key, RedisZSet.as_child(self, key, str))
 
-            self.name = name
+            self.pkgname = name
             next_id = db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
             all_pkgs = status.all_packages()
             all_pkgs.add(self.name)
+        except Exception:
+            logger.error('unable to init package object for %s', name)
 
     def get_from_pkgbuild(self, var=None):
         if var is None:
             logger.error('get_from_pkgbuild var is none')
-        Package.maybe_update_pkgbuild_repo()
+            return ''
+        self.maybe_update_pkgbuild_repo()
         path = None
         paths = [os.path.join('/var/tmp/antergos-packages/', self.name),
                  os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.name),
@@ -110,21 +115,7 @@ class Package(PackageMeta):
 
         parse = open(path).read()
         dirpath = os.path.dirname(path)
-        # if var == "pkgver" and self.name == 'cnchi-dev':
-        #     if "info" in sys.modules:
-        #         del (sys.modules["info"])
-        #     if "/tmp/cnchi/cnchi" not in sys.path:
-        #         sys.path.append('/tmp/cnchi/cnchi')
-        #     if "/tmp/cnchi-dev/cnchi" not in sys.path:
-        #         sys.path.append('/tmp/cnchi-dev/cnchi')
-        #     import info
-        #
-        #     out = info.CNCHI_VERSION
-        #     out = out.replace('"', '')
-        #     del info.CNCHI_VERSION
-        #     del (sys.modules["info"])
-        #     err = []
-        #else:
+
         if var in ['source', 'depends', 'makedepends', 'arch']:
             cmd = 'source ' + path + '; echo ${' + var + '[*]}'
         else:
@@ -166,8 +157,6 @@ class Package(PackageMeta):
 
     @staticmethod
     def maybe_update_pkgbuild_repo():
-        # if not db.exists('pkgbuild_repo_cached') or not os.path.exists('/var/tmp/antergos-packages'):
-        #     db.setex('pkgbuild_repo_cached', 600, "True")
         try:
             if not os.path.exists('/var/tmp/antergos-packages'):
                 subprocess.check_call(
@@ -179,7 +168,6 @@ class Package(PackageMeta):
                 subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
         except subprocess.CalledProcessError as err:
             logger.error(err)
-            db.delete('pkgbuild_repo_cached')
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if self.push_version != "True" or old_val == new_val:
