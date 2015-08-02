@@ -38,7 +38,7 @@ class BuildObject(RedisObject):
 
         super(BuildObject, self).__init__()
 
-        self.all_keys = dict(
+        self.key_lists = dict(
             redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
                           'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
             redis_string_bool=['failed', 'completed'],
@@ -46,27 +46,26 @@ class BuildObject(RedisObject):
             redis_list=['log'],
             redis_zset=[])
 
-        if not bnum:
-            key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
-            for key_list_name in key_lists:
-                key_list = self.all_keys[key_list_name]
-                for key in key_list:
-                    if key_list_name.endswith('string'):
-                        value = getattr(pkg_obj, key, '')
-                        setattr(self, key, value)
-                    elif key_list_name.endswith('bool'):
-                        value = getattr(pkg_obj, key, False)
-                        setattr(self, key, value)
-                    elif key_list_name.endswith('int'):
-                        value = getattr(pkg_obj, key, 0)
-                        setattr(self, key, value)
-                    elif key_list_name.endswith('list'):
-                        setattr(self, key, RedisList.as_child(self, key, str))
-                    elif key_list_name.endswith('zset'):
-                        setattr(self, key, RedisZSet.as_child(self, key, str))
+        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+
+        if not self:
             next_bnum = db.incr('antbs:misc:bnum:next')
             self.namespace = 'antbs:build:%s:' % next_bnum
             self.bnum = next_bnum
+            for key in self.all_keys:
+                if key in self.key_lists['redis_string']:
+                    value = getattr(pkg_obj, key, '')
+                    setattr(self, key, value)
+                elif key in self.key_lists['redis_bool']:
+                    value = getattr(pkg_obj, key, False)
+                    setattr(self, key, value)
+                elif key in self.key_lists['redis_int']:
+                    value = getattr(pkg_obj, key, 0)
+                    setattr(self, key, value)
+                elif key in self.key_lists['redis_list']:
+                    setattr(self, key, RedisList.as_child(self, key, str))
+                elif key in self.key_lists['redis_zset']:
+                    setattr(self, key, RedisZSet.as_child(self, key, str))
         else:
             self.namespace = 'antbs:build:%s:' % bnum
 
@@ -81,4 +80,3 @@ def get_build_object(bnum=None, pkg_obj=None):
         raise AttributeError
     bld_obj = BuildObject(bnum=bnum, pkg_obj=pkg_obj)
     return bld_obj
-

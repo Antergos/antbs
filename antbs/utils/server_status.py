@@ -38,35 +38,33 @@ class Singleton(RedisObject):
 
 
 class ServerStatus(Singleton):
-
     namespace = 'antbs:status:'
 
     def __init__(self, *args, **kwargs):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
 
-        self.all_keys = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
-                                           'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                                           'docker_password', 'gpg_key', 'gpg_password'],
-                             redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
-                             redis_string_int=['building_num'],
-                             redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
-                             redis_zset=['all_packages'])
+        self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
+                                            'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                                            'docker_password', 'gpg_key', 'gpg_password'],
+                              redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+                              redis_string_int=['building_num'],
+                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
+                              redis_zset=['all_packages'])
 
-        if '' == getattr(self, 'status', ''):
-            key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
-            for key_list_name in key_lists:
-                key_list = self.all_keys[key_list_name]
-                for key in key_list:
-                    if key_list_name.endswith('string'):
-                        setattr(self, key, '')
-                    elif key_list_name.endswith('bool'):
-                        setattr(self, key, False)
-                    elif key_list_name.endswith('int'):
-                        setattr(self, key, 0)
-                    elif key_list_name.endswith('list'):
-                        setattr(self, key, RedisList.as_child(self, key, str))
-                    elif key_list_name.endswith('zset'):
-                        setattr(self, key, RedisZSet.as_child(self, key, str))
+        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+
+        if not self:
+            for key in self.all_keys:
+                if key in self.key_lists['redis_string']:
+                    setattr(self, key, '')
+                elif key in self.key_lists['redis_bool']:
+                    setattr(self, key, False)
+                elif key in self.key_lists['redis_int']:
+                    setattr(self, key, 0)
+                elif key in self.key_lists['redis_list']:
+                    setattr(self, key, RedisList.as_child(self, key, str))
+                elif key in self.key_lists['redis_zset']:
+                    setattr(self, key, RedisZSet.as_child(self, key, str))
             self.status = True
             self.current_status = 'Idle'
             self.idle = True
@@ -76,18 +74,19 @@ class ServerStatus(Singleton):
 
 
 class Timeline(RedisObject):
-
     def __init__(self, msg=None, tl_type=None, event_id=None):
         if (not msg or not tl_type) and not event_id:
             raise AttributeError
 
         super(Timeline, self).__init__()
 
-        self.all_keys = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                             redis_string_int=['event_id', 'tl_type'],
-                             redis_string_bool=[],
-                             redis_list=[],
-                             redis_zset=[])
+        self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
+                              redis_string_int=['event_id', 'tl_type'],
+                              redis_string_bool=[],
+                              redis_list=[],
+                              redis_zset=[])
+
+        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not event_id:
             next_id = db.incr('antbs:misc:event_id:next')
@@ -111,5 +110,5 @@ class Timeline(RedisObject):
     def dt_time_to_string(dt):
         return dt.strftime("%I:%M%p")
 
-status = ServerStatus()
 
+status = ServerStatus()

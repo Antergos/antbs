@@ -44,13 +44,15 @@ class PackageMeta(RedisObject):
     def __init__(self, *args, **kwargs):
         super(PackageMeta, self).__init__()
 
-        self.all_keys = dict(
+        self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit'],
             redis_string_int=['pkgid'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
-            redis_zset=['depends', 'groups'])
+            redis_zset=['depends', 'groups', 'makedepends'])
+
+        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         name = kwargs.get('name')
         if not name:
@@ -69,31 +71,23 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        try:
-            if (not self.pkgname or self.pkgname == '') and os.path.exists(os.path.join(REPO_DIR, name)):
-
-                key_lists = ['redis_string', 'redis_string_bool', 'redis_string_int', 'redis_list', 'redis_zset']
-                for key_list_name in key_lists:
-                    key_list = self.all_keys[key_list_name]
-                    for key in key_list:
-                        if key_list_name.endswith('string') and key != 'name':
-                            setattr(self, key, '')
-                        elif key_list_name.endswith('bool'):
-                            setattr(self, key, False)
-                        elif key_list_name.endswith('int'):
-                            setattr(self, key, 0)
-                        elif key_list_name.endswith('list'):
-                            setattr(self, key, RedisList.as_child(self, key, str))
-                        elif key_list_name.endswith('zset'):
-                            setattr(self, key, RedisZSet.as_child(self, key, str))
-
+        if not self and os.path.exists(os.path.join(REPO_DIR, name)):
+            for key in self.all_keys:
+                if key in self.key_lists['redis_string'] and key != 'name':
+                    setattr(self, key, '')
+                elif key in self.key_lists['redis_bool']:
+                    setattr(self, key, False)
+                elif key in self.key_lists['redis_int']:
+                    setattr(self, key, 0)
+                elif key in self.key_lists['redis_list']:
+                    setattr(self, key, RedisList.as_child(self, key, str))
+                elif key in self.key_lists['redis_zset']:
+                    setattr(self, key, RedisZSet.as_child(self, key, str))
             self.pkgname = name
             next_id = db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
             all_pkgs = status.all_packages()
             all_pkgs.add(self.name)
-        except Exception:
-            logger.error('unable to init package object for %s', name)
 
     def get_from_pkgbuild(self, var=None):
         if var is None:
@@ -242,7 +236,7 @@ class Package(PackageMeta):
                 if dep in status.all_packages and dep in queue:
                     depends.append(dep)
 
-                self.depends = dep
+                self.depends().add(dep)
 
         for mkdep in mkdeps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
@@ -251,7 +245,7 @@ class Package(PackageMeta):
                 if mkdep in status.all_packages and mkdep in queue:
                     depends.append(mkdep)
 
-                self.depends = mkdep
+                self.makedepends().add(mkdep)
 
         res = (self.name, depends)
 
