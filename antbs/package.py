@@ -48,7 +48,7 @@ class PackageMeta(RedisObject):
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit'],
-            redis_string_int=['pkgid'],
+            redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
             redis_zset=['depends', 'groups', 'makedepends'])
 
@@ -71,13 +71,13 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self and os.path.exists(os.path.join(REPO_DIR, name)):
+        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
                     setattr(self, key, '')
-                elif key in self.key_lists['redis_bool']:
+                elif key in self.key_lists['redis_string_bool']:
                     setattr(self, key, False)
-                elif key in self.key_lists['redis_int']:
+                elif key in self.key_lists['redis_string_int']:
                     setattr(self, key, 0)
                 elif key in self.key_lists['redis_list']:
                     setattr(self, key, RedisList.as_child(self, key, str))
@@ -115,23 +115,24 @@ class Package(PackageMeta):
         else:
             cmd = 'source ' + path + '; echo ${' + var + '}'
 
-        if var == "pkgver" and ('git+' in parse or self.name == 'cnchi-dev'):
+        if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name):
             giturl = re.search('(?<=git\\+).+(?="|\')', parse)
             if giturl:
                 giturl = giturl.group(0)
-            pkgdir, pkgbuild = os.path.split(path)
             gitnm = self.name
             if self.name == 'pamac-dev':
                 gitnm = 'pamac'
             elif self.name == 'cnchi-dev':
                 giturl = 'http://github.com/lots0logs/cnchi-dev.git'
+            elif self.name == 'cnchi':
+                giturl = 'http://github.com/antergos/cnchi.git'
 
-            if os.path.exists(os.path.join(pkgdir, gitnm)):
-                shutil.rmtree(os.path.join(pkgdir, gitnm), ignore_errors=True)
+            if os.path.exists(os.path.join(dirpath, gitnm)):
+                shutil.rmtree(os.path.join(dirpath, gitnm), ignore_errors=True)
             try:
-                subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=pkgdir)
-                if self.name == 'cnchi-dev':
-                    subprocess.check_output(['tar', '-cf', 'cnchi-dev.tar', 'cnchi-dev'], cwd=pkgdir)
+                subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=dirpath)
+                if 'cnchi' in self.name:
+                    subprocess.check_output(['tar', '-cf', self.name + '.tar', self.name], cwd=dirpath)
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 
@@ -200,14 +201,6 @@ class Package(PackageMeta):
 
         if not changed:
             return self.version_str
-
-        if self.name == "cnchi-dev" and not str(self.pkgver).endswith("0") and not True:
-            event = self.tl_event
-            results = db.scan_iter('timeline:%s:*' % event, 100)
-            for k in results:
-                db.delete(k)
-            db.lrem('timeline:all', 0, event)
-            return False
 
         version = self.pkgver
         if self.epoch and self.epoch != '' and self.epoch is not None:

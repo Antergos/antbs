@@ -24,8 +24,10 @@
 
 """ Sign packages with gpg """
 
+import glob
 import os
 import subprocess
+import shutil
 
 from redis_connection import db
 from logging_config import logger
@@ -37,6 +39,25 @@ password = status.gpg_password
 gpg_key = status.gpg_key
 
 
+def remove(src):
+    if src != str(src):
+        return True
+    if os.path.isdir(src):
+        try:
+            shutil.rmtree(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    elif os.path.isfile(src):
+        try:
+            os.remove(src)
+        except Exception as err:
+            logger.error(err)
+            return True
+    else:
+        return True
+
+
 def batch_sign(paths, uid=gpg_key, passphrase=password):
     """
     Batch sign several files with the key matching the given UID.
@@ -46,7 +67,6 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
     The passphrase is returned to avoid further prompts.
     """
     for path in paths:
-        status.current_status = 'Creating detached signature for %s' % path
         db.publish('build-output', 'Creating detached signature for %s' % path)
         logger.info('[SIGN PKG] Creating detached signature for %s' % path)
         # Verify existing signatures. This fails if the sig is invalid or
@@ -78,6 +98,25 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
         if len(err) > 0:
             db.publish('build-output', 'Signing FAILED for %s. Error output: %s' % (path, err))
             logger.error('[SIGN PKG] Signing FAILED for %s. Error output: %s' % (path, err))
+            for p in paths:
+                remove(p)
+                remove(p + '.sig')
             return False
 
     return True
+
+
+def sign_packages(pkgname=None):
+    if pkgname:
+        db.publish('build-output', 'Signing package..')
+        pkgs2sign = glob.glob(
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkgname)
+        pkgs2sign32 = glob.glob(
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkgname)
+        pkgs2sign = pkgs2sign + pkgs2sign32
+        logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
+
+        if pkgs2sign is not None and pkgs2sign != []:
+            return batch_sign(pkgs2sign)
+
+    return False

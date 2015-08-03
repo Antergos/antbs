@@ -23,6 +23,7 @@
 """Main AntBS (Antergos Build Server) Module"""
 
 import newrelic.agent
+import requests
 
 settings = newrelic.agent.global_settings()
 settings.app_name = 'AntBS'
@@ -33,7 +34,7 @@ import re
 import os
 import glob
 import shutil
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from rq import Queue, Connection, Worker
 from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
@@ -223,8 +224,8 @@ def get_paginated(item_list, per_page, page, timeline):
     items = list(item_list)
     items.reverse()
     paginated = [items[i:i + per_page] for i in range(0, len(items), per_page)]
-    this_page = paginated[page]
     all_pages = len(paginated)
+    this_page = paginated[page] if not page > all_pages else paginated[-1]
 
     return this_page, all_pages
 
@@ -366,10 +367,10 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
     try:
         bld_obj = build_obj.get_build_object(bnum=bnum)
-        status.idle = False
         pkg_obj = package.Package(name=bld_obj.pkgname)
         if pkg_obj:
-            if 'main' not in pkg_obj.allowed_in and result == 'passed':
+            allowed = pkg_obj.allowed_in()
+            if 'main' not in allowed and result == 'passed':
                 msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
                 errmsg.update(error=True, msg=msg)
                 return errmsg
@@ -378,12 +379,14 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 bld_obj.review_date = dt
                 bld_obj.review_status = result
 
+        if result == 'skip':
+            errmsg = dict(error=False, msg=None)
+            return errmsg
+
         pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg_obj.pkgname))
         pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg_obj.pkgname))
         pkg_files = pkg_files_64 + pkg_files_32
 
-        if result == 'skip':
-            return errmsg
         if pkg_files:
             logger.info('Moving %s from staging to main repo.', pkg_obj.pkgname)
             for f in pkg_files_64:
@@ -399,7 +402,9 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 elif result == 'failed':
                     os.remove(f)
             if result and result != 'skip':
-                repo_queue.enqueue_call(builder.update_main_repo, args=(pkg_obj.pkgname, result), timeout=9600)
+                repo_queue.enqueue_call(builder.update_main_repo,
+                                        kwargs=dict(pkg=pkg_obj.pkgname, rev_result=result), timeout=9600)
+                errmsg = dict(error=False, msg=None)
 
         else:
             logger.error('While moving to main, no packages were found to move.')
@@ -417,6 +422,8 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
 def get_timeline(tlpage=None):
     event_ids = status.all_tl_events()
     timeline = []
+    if not tlpage:
+        tlpage = 1
     for event_id in event_ids:
         ev_obj = tl_event(event_id=event_id)
         allinfo = dict(event_id=ev_obj.event_id, date=ev_obj.date_str, msg=ev_obj.message, time=ev_obj.time_str,
@@ -510,19 +517,20 @@ def homepage(tlpage=None):
 @app.route("/building")
 def build():
     now_building = status.now_building
+    ver = ''
+    bnum = ''
+    start = ''
     cont = status.container
     if cont:
         container = cont[:20]
     else:
         container = None
-    bnum = status.building_num
-    start = status.building_start
-    try:
-        bld_obj = build_obj.get_build_object(bnum=bnum)
-        ver = bld_obj.version_str
-    except Exception as err:
-        logger.error(err)
-        ver = ''
+    if not status.idle:
+        bnum = status.building_num
+        start = status.building_start
+        if bnum and bnum != '':
+            bld_obj = build_obj.get_build_object(bnum=bnum)
+            ver = bld_obj.version_str
 
     return render_template("building.html", building=now_building, container=container, bnum=bnum,
                            start=start, ver=ver)
@@ -805,10 +813,20 @@ def repo_packages(repo=None):
 
 @app.route('/slack/overflow', methods=['post'])
 @app.route('/slack/todo', methods=['post'])
+@app.route('/slack/tableflip', methods=['post'])
 def overflow():
     token = request.values.get('token')
     if not token or '' == token:
         abort(404)
+    if 'tableflip' in request.url:
+        channel = request.values.get('channel_name')
+        from_user = request.values.get('user_name')
+        payload = {"text": "(╯°□°)╯︵ ┻━┻", "username": from_user, "icon_emoji": ":bam:", "channel": '#' + channel}
+        slack = 'https://hooks.slack.com/services/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'
+        requests.post(slack, data=json.dumps(payload))
+
+        return Response(status=200)
+
     text = request.values.get('text')
     command = request.values.get('command')
 

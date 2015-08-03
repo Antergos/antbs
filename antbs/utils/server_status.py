@@ -38,10 +38,11 @@ class Singleton(RedisObject):
 
 
 class ServerStatus(Singleton):
-    namespace = 'antbs:status:'
 
     def __init__(self, *args, **kwargs):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
+
+        self.namespace = 'antbs:status:'
 
         self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
                                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
@@ -57,9 +58,9 @@ class ServerStatus(Singleton):
             for key in self.all_keys:
                 if key in self.key_lists['redis_string']:
                     setattr(self, key, '')
-                elif key in self.key_lists['redis_bool']:
+                elif key in self.key_lists['redis_string_bool']:
                     setattr(self, key, False)
-                elif key in self.key_lists['redis_int']:
+                elif key in self.key_lists['redis_string_int']:
                     setattr(self, key, 0)
                 elif key in self.key_lists['redis_list']:
                     setattr(self, key, RedisList.as_child(self, key, str))

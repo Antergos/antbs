@@ -248,15 +248,12 @@ class RedisObject(object):
             redis_zset=[])
         self.all_keys = []
 
-    def __bool__(self):
-        """ Test if an object currently exists in database. """
-
-        return db.exists(self.namespace[:-1])
-
     def __nonzero__(self):
         """ Test if an object currently exists in database. """
 
         return db.exists(self.namespace[:-1])
+
+    __bool__ = __nonzero__
 
     def __getattribute__(self, attrib):
         if attrib in ['key_lists', 'all_keys', 'namespace', 'database'] or attrib not in self.all_keys:

@@ -42,30 +42,32 @@ class BuildObject(RedisObject):
             redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
                           'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
             redis_string_bool=['failed', 'completed'],
-            redis_string_int=['pkgid', 'bnum'],
+            redis_string_int=['pkg_id', 'bnum'],
             redis_list=['log'],
             redis_zset=[])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not self:
+        if not bnum:
             next_bnum = db.incr('antbs:misc:bnum:next')
             self.namespace = 'antbs:build:%s:' % next_bnum
-            self.bnum = next_bnum
             for key in self.all_keys:
                 if key in self.key_lists['redis_string']:
                     value = getattr(pkg_obj, key, '')
                     setattr(self, key, value)
-                elif key in self.key_lists['redis_bool']:
+                elif key in self.key_lists['redis_string_bool']:
                     value = getattr(pkg_obj, key, False)
                     setattr(self, key, value)
-                elif key in self.key_lists['redis_int']:
+                elif key in self.key_lists['redis_string_int']:
                     value = getattr(pkg_obj, key, 0)
                     setattr(self, key, value)
                 elif key in self.key_lists['redis_list']:
                     setattr(self, key, RedisList.as_child(self, key, str))
                 elif key in self.key_lists['redis_zset']:
                     setattr(self, key, RedisZSet.as_child(self, key, str))
+            self.bnum = next_bnum
+            self.failed = False
+            self.completed = False
         else:
             self.namespace = 'antbs:build:%s:' % bnum
 
@@ -74,9 +76,9 @@ class BuildObject(RedisObject):
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
 
-def get_build_object(bnum=None, pkg_obj=None):
+def get_build_object(pkg_obj=None, bnum=None):
     if not pkg_obj and not bnum:
-        logger.debug('build number is required to get build object.')
+        logger.debug('bnum or pkg_obj is required to get build object.')
         raise AttributeError
-    bld_obj = BuildObject(bnum=bnum, pkg_obj=pkg_obj)
+    bld_obj = BuildObject(pkg_obj=pkg_obj, bnum=bnum)
     return bld_obj

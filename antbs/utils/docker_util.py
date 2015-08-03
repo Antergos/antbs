@@ -39,7 +39,7 @@ doc_pass = status.docker_password
 SRC_DIR = os.path.dirname(__file__) or '.'
 DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
 BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
-logger.debug([('SRC_DIR', SRC_DIR), ('DOC_DIR', DOC_DIR), ('BUILD_DIR', BUILD_DIR)])
+#logger.debug([('SRC_DIR', SRC_DIR), ('DOC_DIR', DOC_DIR), ('BUILD_DIR', BUILD_DIR)])
 
 
 # Initiate communication with build daemon
@@ -105,6 +105,39 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
         }, privileged=True, cap_add=['ALL'])
 
     return pkgs_hconfig
+
+
+def create_repo_update_host_config():
+    repos_hconfig = create_host_config(
+        binds={
+            BUILD_DIR:
+                {
+                    'bind': '/makepkg',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/antergos':
+                {
+                    'bind': '/main',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+                {
+                    'bind': '/staging',
+                    'ro': False
+                },
+            '/root/.gnupg':
+                {
+                    'bind': '/root/.gnupg',
+                    'ro': False
+                },
+            '/tmp/result':
+                {
+                    'bind': '/result',
+                    'ro': False
+                }
+        }, privileged=True, cap_add=['ALL'])
+
+    return repos_hconfig
 
 
 def maybe_build_base_devel():
