@@ -403,7 +403,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(builder.update_main_repo,
-                                        kwargs=dict(pkg=pkg_obj.pkgname, rev_result=result), timeout=9600)
+                                        kwargs=dict(rev_result=result, bld_obj=bld_obj), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -709,7 +709,7 @@ def build_pkg_now():
         if not pexists:
             try:
                 package.Package(name=pkgname)
-                if os.path.exists('/var/tmp/antergos-packages/' + pkgname):
+                if os.path.exists('/var/tmp/antergos-packages/' + pkgname) or 'antergos-iso' in pkgname:
                     pexists = True
             except Exception:
                 pass
@@ -743,7 +743,8 @@ def build_pkg_now():
                 q.rpush(pkgname)
                 queue.enqueue_call(builder.handle_hook, args=args, timeout=84600)
                 tl_event(
-                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname), tl_type='0')
+                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname),
+                    tl_type='0')
         else:
             flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
 

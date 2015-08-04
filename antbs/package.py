@@ -71,7 +71,7 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
+        if not self or not self.pkg_id and (os.path.exists(os.path.join(REPO_DIR, name) or 'antergos-iso' in name)):
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
                     setattr(self, key, '')

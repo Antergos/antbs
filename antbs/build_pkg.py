@@ -162,41 +162,44 @@ def handle_hook(first=False, last=False):
     pull_from = 'antergos'
     packages = status.queue()
 
-    if os.path.exists(REPO_DIR):
-        remove(REPO_DIR)
-    try:
-        subprocess.check_call(
-            ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
-            cwd='/opt')
-        subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
-    except subprocess.CalledProcessError as err:
-        logger.error(err)
-
     if status.iso_flag:
         status.iso_flag = False
         status.current_status = 'Building docker image.'
         status.iso_building = True
         image = docker_utils.maybe_build_mkarchiso()
-        db.lrem('queue', 0, 'antergos-iso')
-        db.lrem('queue', 0, 'antergos-iso.openbox')
+        packages.remove('antergos-iso')
+        packages.remove('antergos-iso.openbox')
         if image:
             archs = ['x86_64', 'i686']
-            if db.get('isoMinimal') == 'True':
+            if status.iso_minimal:
                 iso_name = 'antergos-iso-minimal-'
             else:
                 iso_name = 'antergos-iso-'
             for arch in archs:
-                db.rpush('queue', iso_name + arch)
+                packages.append(iso_name + arch)
                 version = datetime.datetime.now().strftime('%Y.%m.%d')
                 pkgobj = package.get_pkg_object(iso_name + arch)
-                pkgobj.save_to_db('version', version)
-            build_iso()
-        db.set('isoBuilding', 'False')
-        db.set('isoMinimal', 'False')
-        db.set('idle', "True")
+                pkgobj.version = version
+                if db.exists('iso:one:arch') and 'x86_64' in pkgobj.name:
+                    continue
+                build_iso(pkg_obj=pkgobj)
+        status.iso_building = False
+        status.iso_minimal = False
+        status.current_status = ''
+        status.idle = True
         return True
 
     elif first and not status.iso_flag:
+        if os.path.exists(REPO_DIR):
+            remove(REPO_DIR)
+        try:
+            subprocess.check_call(
+                ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
+                cwd='/opt')
+            subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+
         status.current_status = 'Building docker image.'
         image = docker_utils.maybe_build_base_devel()
         if not image:
@@ -323,7 +326,7 @@ def update_main_repo(rev_result=None, bld_obj=None):
             return True
 
 
-def publish_build_ouput(container=None, bld_obj=None, upd_repo=False):
+def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False):
     if not container or not bld_obj:
         logger.error('Unable to publish build output. (Container is None)')
         return
@@ -348,14 +351,14 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False):
             db.publish('build-output', line)
             db.set('build_log_last_line', line)
 
-    if upd_repo:
+    failed = bld_obj.failed if bld_obj.completed != bld_obj.failed and not bld_obj.completed else False
+    if upd_repo or failed:
         db.publish('build-output', 'ENDOFLOG')
 
     log = bld_obj.log()
 
     existing = True
-    logger.debug(log)
-    if not log or len(log) < 1:
+    if len(log) < 1 and (not failed or not is_iso):
         existing = False
 
     for line in content:
@@ -386,6 +389,51 @@ def get_latest_translations():
                 shutil.copy(f, dest_dir)
         except Exception as err:
             logger.error(err)
+
+
+def process_and_save_build_metadata(pkg_obj=None):
+    if not pkg_obj:
+        raise AttributeError
+
+    status.current_status = 'Building %s' % pkg_obj.name
+    logger.info('Building %s' % pkg_obj.name)
+    bld_obj = build_obj.get_build_object(pkg_obj=pkg_obj)
+    bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+    status.building_num = bld_obj.bnum
+    status.building_start = bld_obj.start_str
+    build_id = bld_obj.bnum
+    tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg_obj.name)
+    Timeline(msg=tlmsg, tl_type=3)
+    pbuilds = pkg_obj.builds()
+    pbuilds.append(build_id)
+    run_docker_clean(pkg_obj.name)
+
+    return bld_obj
+
+
+def fetch_and_compile_updater_translations():
+    """ Get and compile translations for Cnchi updater script. """
+
+    trans_dir = "/opt/antergos-iso-translations/"
+    trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
+    dest_dir = '/srv/antergos.info/repo/iso/testing/trans'
+    if not os.path.exists(dest_dir):
+        os.mkdir(dest_dir)
+    try:
+        subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi_updaterpot', '--minimum-perc=50'],
+                              cwd=trans_dir)
+        for r, d, f in os.walk(trans_files_dir):
+            for tfile in f:
+                logger.info('tfile is %s' % tfile)
+                logger.info('tfile cut is %s' % tfile[:-2])
+                mofile = tfile[:-2] + 'mo'
+                logger.info('mofile is %s' % mofile)
+                subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans_files_dir)
+                os.rename(os.path.join(trans_files_dir, mofile), os.path.join(dest_dir, mofile))
+    except subprocess.CalledProcessError as err:
+        logger.error(err.output)
+    except Exception as err:
+        logger.error(err)
 
 
 def build_pkgs(last=False, pkg_info=None):
@@ -425,19 +473,11 @@ def build_pkgs(last=False, pkg_info=None):
         pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
             pkgbuild_dir = pkg_info.build_path
-            status.current_status = 'Building %s with makepkg' % pkg
-            bld_obj = build_obj.get_build_object(pkg_obj=pkg_info)
-            bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-            status.building_num = bld_obj.bnum
-            status.building_start = bld_obj.start_str
-            build_id = bld_obj.bnum
-            tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg)
-            Timeline(msg=tlmsg, tl_type=3)
-            pbuilds = pkg_info.builds()
-            pbuilds.append(build_id)
             pkg_deps = pkg_info.depends() or []
-            pkg_deps_str = ' '.join(pkg_deps)
-            run_docker_clean(pkg)
+            pkg_deps_str = ' '.join(pkg_deps) if pkg_deps else ''
+
+            bld_obj = process_and_save_build_metadata()
+            build_id = bld_obj.bnum
 
             if pkg_info is not None and pkg_info.autosum == "True":
                 build_env = ['_AUTOSUMS=True']
@@ -479,8 +519,8 @@ def build_pkgs(last=False, pkg_info=None):
                     bld_obj.completed = False
                     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                 else:
-                    logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                     bld_obj.failed = False
+                    logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                     bld_obj.completed = True
             except Exception as err:
                 logger.error('Start container failed. Error Msg: %s' % err)
@@ -497,7 +537,8 @@ def build_pkgs(last=False, pkg_info=None):
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (build_id, build_id, pkg)
                 Timeline(msg=tlmsg, tl_type=4)
                 completed = status.completed()
-                completed.rpush(build_id)
+                completed.rpush(bld_obj.bnum)
+                bld_obj.review_status = 'pending'
             else:
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
                 Timeline(msg=tlmsg, tl_type=5)
@@ -514,172 +555,108 @@ def build_pkgs(last=False, pkg_info=None):
     return False
 
 
-def build_iso():
-    iso_arch = ['x86_64', 'i686']
+def build_iso(pkg_obj=None):
     in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
     if in_dir_last is None:
         in_dir_last = "0"
     db.set('pkg_count_iso', in_dir_last)
-    is_minimal = db.get('isoMinimal')
-    if is_minimal == 'True':
-        iso_name = 'antergos-iso-minimal-'
+
+    failed = False
+
+    bld_obj = process_and_save_build_metadata()
+    build_id = bld_obj.bnum
+
+    status.queue().remove(pkg_obj.name)
+    flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
+    minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
+    if 'i686' in pkg_obj.name:
+        if not os.path.exists(flag):
+            open(flag, 'a').close()
     else:
-        iso_name = 'antergos-iso-'
-    for arch in iso_arch:
-        if db.exists('iso:one:arch') and arch == 'x86_64':
-            continue
-        pkgobj = package.get_pkg_object(iso_name + arch)
-        failed = False
-        db.incr('build_number')
-        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        build_id = db.get('build_number')
-        pkgobj.save_to_db('builds', build_id, 'list')
-        this_log = 'build_log:%s' % build_id
-        db.set('%s:start' % this_log, dt)
-        db.set('building_num', build_id)
-        db.hset('now_building', 'build_id', build_id)
-        db.hset('now_building', 'key', this_log)
-        db.hset('now_building', 'pkg', pkgobj.name)
-        db.set(this_log, True)
-        db.set('building_start', dt)
-        logger.info('Building %s' % pkgobj.name)
-        db.set('building', 'Building: %s' % pkgobj.name)
-        db.lrem('queue', 0, pkgobj.name)
-        db.set('%s:pkg' % this_log, pkgobj.name)
-        db.set('%s:version' % this_log, pkgobj.version)
+        if os.path.exists(flag):
+            os.remove(flag)
+    if status.is_minimal:
+        out_dir = '/out'
+        if not os.path.exists(minimal):
+            open(minimal, 'a').close()
+    else:
+        out_dir = '/out'
+        if os.path.exists(minimal):
+            os.remove(minimal)
 
-        flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
-        minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
-        if arch is 'i686':
-            if not os.path.exists(flag):
-                open(flag, 'a').close()
+    # Initiate communication with docker daemon
+    hconfig = create_host_config(privileged=True, cap_add=['ALL'],
+                                 binds={
+                                     '/opt/archlinux-mkarchiso':
+                                         {
+                                             'bind': '/start',
+                                             'ro': False
+                                         },
+                                     '/run/dbus':
+                                         {
+                                             'bind': '/var/run/dbus',
+                                             'ro': False
+                                         },
+                                     '/srv/antergos.info/repo/iso/testing':
+                                         {
+                                             'bind': out_dir,
+                                             'ro': False
+                                         }},
+                                 restart_policy={
+                                     "MaximumRetryCount": 2,
+                                     "Name": "on-failure"})
+    iso_container = {}
+    try:
+        iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh', tty=True,
+                                             name=pkg_obj.name, host_config=hconfig, cpuset='0-3')
+        status.container = iso_container.get('Id')
+        if iso_container.get('Warnings') and iso_container.get('Warnings') != '':
+            logger.error(iso_container.get('Warnings'))
+    except Exception as err:
+        logger.error('Create container failed. Error Msg: %s' % err)
+        bld_obj.failed = True
+
+    bld_obj.container = iso_container.get('Id')
+    status.container = bld_obj.container
+
+    try:
+        doc.start(iso_container.get('Id'))
+        cont = bld_obj.container
+        stream_process = Process(target=publish_build_ouput, kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True))
+        stream_process.start()
+        result = doc.wait(cont)
+        stream_process.join()
+        if result != 0:
+            bld_obj.failed = True
+            bld_obj.completed = False
+            logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg_obj.name, result))
         else:
-            if os.path.exists(flag):
-                os.remove(flag)
-        if is_minimal == "True":
-            out_dir = '/out'
-            if not os.path.exists(minimal):
-                open(minimal, 'a').close()
-        else:
-            out_dir = '/out'
-            if os.path.exists(minimal):
-                os.remove(minimal)
-        # Get and compile translations for updater script
-        # TODO: Move this into its own method.
-        trans_dir = "/opt/antergos-iso-translations/"
-        trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
-        dest_dir = '/srv/antergos.info/repo/iso/testing/trans'
-        if not os.path.exists(dest_dir):
-            os.mkdir(dest_dir)
-        try:
-            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi_updaterpot', '--minimum-perc=50'],
-                                  cwd=trans_dir)
-            for r, d, f in os.walk(trans_files_dir):
-                for tfile in f:
-                    logger.info('tfile is %s' % tfile)
-                    logger.info('tfile cut is %s' % tfile[:-2])
-                    mofile = tfile[:-2] + 'mo'
-                    logger.info('mofile is %s' % mofile)
-                    subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans_files_dir)
-                    os.rename(os.path.join(trans_files_dir, mofile), os.path.join(dest_dir, mofile))
-        except subprocess.CalledProcessError as err:
-            logger.error(err.output)
-        except Exception as err:
-            logger.error(err)
+            bld_obj.failed = False
+            logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg_obj.name, result))
+            bld_obj.completed = True
+    except Exception as err:
+        logger.error('Start container failed. Error Msg: %s' % err)
+        bld_obj.failed = True
 
-        nm = iso_name + arch
-        # Initiate communication with docker daemon
-        run_docker_clean(nm)
-        hconfig = create_host_config(privileged=True, cap_add=['ALL'],
-                                     binds={
-                                         '/opt/archlinux-mkarchiso':
-                                             {
-                                                 'bind': '/start',
-                                                 'ro': False
-                                             },
-                                         '/run/dbus':
-                                             {
-                                                 'bind': '/var/run/dbus',
-                                                 'ro': False
-                                             },
-                                         '/srv/antergos.info/repo/iso/testing':
-                                             {
-                                                 'bind': out_dir,
-                                                 'ro': False
-                                             }},
-                                     restart_policy={
-                                         "MaximumRetryCount": 2,
-                                         "Name": "on-failure"})
-        try:
-            iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh', tty=True,
-                                                 name=nm, host_config=hconfig, cpuset='0-3')
-            db.set('container', iso_container.get('Id'))
-        except Exception as err:
-            logger.error("Cant connect to Docker daemon. Error msg: %s", err)
-            failed = True
-            break
+    in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+    last_count = int(db.get('pkg_count_iso'))
+    if in_dir > last_count:
+        bld_obj.completed = True
+        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (build_id, build_id, pkg_obj.name)
+        Timeline(msg=tlmsg, tl_type=4)
+        completed = status.completed()
+        completed.rpush(bld_obj.bnum)
+    else:
+        bld_obj.failed = True
+        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg_obj.name)
+        Timeline(msg=tlmsg, tl_type=5)
+        failed = status.failed()
+        failed.rpush(build_id)
+    remove('/opt/archlinux-mkarchiso/antergos-iso')
+    run_docker_clean(pkg_obj.name)
+    bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
-        try:
-            doc.start(iso_container, privileged=True, cap_add=['ALL'], binds={
-                '/opt/archlinux-mkarchiso':
-                    {
-                        'bind': '/start',
-                        'ro': False
-                    },
-                '/run/dbus':
-                    {
-                        'bind': '/var/run/dbus',
-                        'ro': False
-                    },
-                '/srv/antergos.info/repo/iso/testing':
-                    {
-                        'bind': out_dir,
-                        'ro': False
-                    },
-            })
-
-            cont = db.get('container')
-            stream_process = Process(target=publish_build_ouput, args=(cont, this_log))
-            stream_process.start()
-            result = doc.wait(cont)
-            result2 = None
-            if result is not 0:
-                doc.restart(cont)
-                stream_process2 = Process(target=publish_build_ouput, args=(cont, this_log))
-                stream_process2.start()
-                result2 = doc.wait(cont)
-                if result2 is not 0:
-                    # failed = True
-                    # db.set('build_failed', "True")
-                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-            if result is 0 or (result2 and result2 is 0):
-                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (nm, result))
-                db.set('build_failed', "False")
-
-        except Exception as err:
-            logger.error("Cant start container. Error msg: %s", err)
-            break
-
-        db.publish('build-output', 'ENDOFLOG')
-        db.set('%s:end' % this_log, datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"))
-
-        in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
-        last_count = int(db.get('pkg_count_iso'))
-        if in_dir > last_count:
-            db.incr('pkg_count_iso', (in_dir - last_count))
-            db.rpush('completed', build_id)
-            db.set('%s:result' % this_log, 'completed')
-            # db.set('%s:review_stat' % this_log, '1')
-        else:
-            logger.error('%s not found after container exit.' % iso_name + arch)
-            failed = True
-            db.set('%s:result' % this_log, 'failed')
-            db.rpush('failed', build_id)
-        remove('/opt/archlinux-mkarchiso/antergos-iso')
-        doc.remove_container(cont, v=True)
-        # log_string = db.hget('%s:content' % this_log, 'content')
-        # if log_string and log_string != '':
-        # pretty = highlight(log_string, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-        # prestyles="background:#272822;color:#fff;",
-        # encoding='utf-8'))
-        # db.hset('%s:content' % this_log, 'content', pretty.decode('utf-8'))
+    if not bld_obj.failed:
+        db.set('antbs:misc:cache_buster:flag', True)
+        return True
+    return False
