@@ -42,6 +42,7 @@ import package
 from rq import get_current_job
 from utils.server_status import status, Timeline
 import build_obj
+import utils.sign_pkgs as sign_pkgs
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -478,7 +479,7 @@ def build_pkgs(last=False, pkg_info=None):
             pkg_deps = pkg_info.depends() or []
             pkg_deps_str = ' '.join(pkg_deps) if pkg_deps else ''
 
-            bld_obj = process_and_save_build_metadata()
+            bld_obj = process_and_save_build_metadata(pkg_obj=pkg_info)
             build_id = bld_obj.bnum
 
             if pkg_info is not None and pkg_info.autosum == "True":
@@ -503,7 +504,6 @@ def build_pkgs(last=False, pkg_info=None):
             except Exception as err:
                 logger.error('Create container failed. Error Msg: %s' % err)
                 bld_obj.failed = True
-                bld_obj.completed = False
                 continue
 
             bld_obj.container = container.get('Id')
@@ -518,10 +518,8 @@ def build_pkgs(last=False, pkg_info=None):
                 stream_process.join()
                 if result != 0:
                     bld_obj.failed = True
-                    bld_obj.completed = False
                     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                 else:
-                    bld_obj.failed = False
                     logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                     bld_obj.completed = True
             except Exception as err:
@@ -532,8 +530,10 @@ def build_pkgs(last=False, pkg_info=None):
 
             repo_updated = False
             if not bld_obj.failed:
-                db.publish('build-output', 'Updating staging repo database..')
-                repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
+                signed = sign_pkgs.sign_packages(bld_obj.pkgname)
+                if signed:
+                    db.publish('build-output', 'Updating staging repo database..')
+                    repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
 
             if repo_updated:
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (build_id, build_id, pkg)
@@ -565,7 +565,7 @@ def build_iso(pkg_obj=None):
 
     failed = False
 
-    bld_obj = process_and_save_build_metadata()
+    bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
     status.queue().remove(pkg_obj.name)
