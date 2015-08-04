@@ -175,18 +175,12 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
 
 with Connection(db):
     queue = Queue('build_queue')
-    w = Worker([queue], exc_handler=handle_worker_exception)
+    #w = Worker([queue], exc_handler=handle_worker_exception)
     repo_queue = Queue('repo_queue')
-    repo_w = Worker([repo_queue], exc_handler=handle_worker_exception)
+    #repo_w = Worker([repo_queue], exc_handler=handle_worker_exception)
+    #w.work()
+    #repo_w.work()
 
-
-# def stream_template(template_name, **context):
-# app.update_template_context(context)
-# t = app.jinja_env.get_template(template_name)
-# rv = t.stream(context)
-#     # rv.enable_buffering(5)
-#     rv.disable_buffering()
-#     return rv
 
 def url_for_other_page(page):
     args = request.view_args.copy()
@@ -403,7 +397,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(builder.update_main_repo,
-                                        kwargs=dict(rev_result=result, bld_obj=bld_obj), timeout=9600)
+                                        kwargs=dict(rev_result=result, bld_obj=bld_obj, is_review=True), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:

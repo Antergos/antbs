@@ -269,7 +269,7 @@ def handle_hook(first=False, last=False):
         logger.info('All builds completed.')
 
 
-def update_main_repo(rev_result=None, bld_obj=None):
+def update_main_repo(rev_result=None, bld_obj=None, is_review=False):
     if rev_result:
         repo = 'antergos'
         repodir = 'main'
@@ -300,11 +300,13 @@ def update_main_repo(rev_result=None, bld_obj=None):
                                              host_config=hconfig)
             db.set('update_repo_container', container.get('Id'))
             doc.start(container.get('Id'))
-            stream_process = Process(target=publish_build_ouput,
-                                     kwargs=dict(container=container.get('Id'), bld_obj=bld_obj, upd_repo=True))
-            stream_process.start()
+            if not is_review:
+                stream_process = Process(target=publish_build_ouput,
+                                         kwargs=dict(container=container.get('Id'), bld_obj=bld_obj, upd_repo=True))
+                stream_process.start()
             result = doc.wait(container.get('Id'))
-            stream_process.join()
+            if not is_review:
+                stream_process.join()
             if result != 0:
                 logger.err('update repo failed. exit status is: %s', result)
             db.set('antbs:misc:cache_buster:flag', True)
