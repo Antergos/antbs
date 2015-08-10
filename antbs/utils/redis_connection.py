@@ -181,6 +181,9 @@ class RedisList(RedisField):
         cp = list(db.lrange(self.id_key, 0, -1))
         return cp.reverse()
 
+    def remove(self, val):
+        db.lrem(self.id_key, 0, val)
+
 
 class RedisZSet(RedisField):
     """ A sorted set where all items are stored in Redis. """

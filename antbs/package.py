@@ -47,7 +47,7 @@ class PackageMeta(RedisObject):
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
-            redis_string_bool=['push_version', 'autosum', 'saved_commit'],
+            redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
             redis_zset=['depends', 'groups', 'makedepends'])
@@ -71,7 +71,7 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self or not self.pkg_id and (os.path.exists(os.path.join(REPO_DIR, name) or 'antergos-iso' in name)):
+        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
                     setattr(self, key, '')
@@ -88,6 +88,10 @@ class Package(PackageMeta):
             self.pkg_id = next_id
             all_pkgs = status.all_packages()
             all_pkgs.add(self.name)
+            if '-x86_64' in self.name or '-i686' in self.name:
+                self.is_iso = True
+            else:
+                self.is_iso = False
 
     def get_from_pkgbuild(self, var=None):
         if var is None:
@@ -115,10 +119,16 @@ class Package(PackageMeta):
         else:
             cmd = 'source ' + path + '; echo ${' + var + '}'
 
-        if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name):
+        if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
             giturl = re.search('(?<=git\\+).+(?="|\')', parse)
             if giturl:
                 giturl = giturl.group(0)
+            else:
+                giturl = re.search('(?<="|\')git:.+(?="|\')', parse)
+                if giturl:
+                    giturl = giturl.group(0)
+                else:
+                    giturl = ''
             gitnm = self.name
             if self.name == 'pamac-dev':
                 gitnm = 'pamac'
@@ -226,7 +236,7 @@ class Package(PackageMeta):
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver is not None:
                 dep = has_ver.group(0)
-                if dep in status.all_packages and dep in queue:
+                if dep in status.all_packages() and dep in queue:
                     depends.append(dep)
 
                 self.depends().add(dep)
@@ -235,7 +245,7 @@ class Package(PackageMeta):
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
             if has_ver is not None:
                 mkdep = has_ver.group(0)
-                if mkdep in status.all_packages and mkdep in queue:
+                if mkdep in status.all_packages() and mkdep in queue:
                     depends.append(mkdep)
 
                 self.makedepends().add(mkdep)

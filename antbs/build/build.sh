@@ -107,7 +107,7 @@ function run_update_repo() {
 
 	for arc in i686 x86_64; do
 		cd "/${repo_dir}/${arc}"
-		repo-add -R -f "${repo}.db.tar.gz" ./*.xz
+		repo-add -R -n -f "${repo}.db.tar.gz" ./*.xz
 	done && touch "/result/${PKGNAME}" && return 0;
 
 	return 1
@@ -276,7 +276,7 @@ if [[ "${_UPDREPO}" != "True" ]]; then
 
 	print2log 'SYNCING REPO DATABASES'
 	#pacman-key --init && pacman-key --populate archlinux antergos
-	yaourt -Scc --noconfirm --noprogressbar --color never 2>&1
+	#yaourt -Scc --noconfirm --noprogressbar --color never 2>&1
 	pacman -Syy wget --noconfirm --noprogressbar --color never 2>&1
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64

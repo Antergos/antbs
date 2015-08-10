@@ -45,8 +45,8 @@
     <div id="" class="block">
         <div class="header dark">
 
-            <h3 class="hfloat">{% if idle != "True" %}<i class="fa fa-cog fa-spin" style="font-size:26px;"></i>{% else %}<i class="fa fa-cog"></i>{% endif %} Live Build Output</h3>
-            {%- if idle != "True" %}
+            <h3 class="hfloat">{% if not idle %}<i class="fa fa-cog fa-spin" style="font-size:26px;"></i>{% else %}<i class="fa fa-cog"></i>{% endif %} Live Build Output</h3>
+            {%- if not idle %}
                 <h5 class="hfloat"><strong>Docker Container ID:</strong> {{ container }}</h5>
                 {% else %}
                 <h5 class="hfloat">&nbsp;</h5>

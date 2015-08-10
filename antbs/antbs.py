@@ -53,13 +53,13 @@ import webhook
 import utils.slack_bot as slack_bot
 import build_obj
 
-if not status.github_token:
-    status.github_token = os.environ.get('GITHUB_TOKEN')
-    status.gitlab_token = os.environ.get('GITLAB_TOKEN')
-    status.docker_user = os.environ.get('DOCKER_USER')
-    status.docker_password = os.environ.get('DOCKER_PASSWORD')
-    status.gpg_key = os.environ.get('ANTBS_GPG_KEY')
-    status.gpg_password = os.environ.get('ANTBS_GPG_PASS')
+status.github_token = os.environ.get('GITHUB_TOKEN')
+status.gitlab_token = os.environ.get('GITLAB_TOKEN')
+status.docker_user = os.environ.get('DOCKER_USER')
+status.docker_password = os.environ.get('DOCKER_PASSWORD')
+status.gpg_key = os.environ.get('ANTBS_GPG_KEY')
+status.gpg_password = os.environ.get('ANTBS_GPG_PASS')
+
 import repo_monitor as repo_mon
 
 gevent.monkey.patch_all()
@@ -108,9 +108,7 @@ def copy(src, dst):
     else:
         try:
             shutil.copy(src, dst)
-        except shutil.SameFileError:
-            pass
-        except shutil.Error:
+        except Exception:
             pass
 
 
@@ -381,9 +379,9 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg_obj.pkgname))
         pkg_files = pkg_files_64 + pkg_files_32
 
-        if pkg_files:
-            logger.info('Moving %s from staging to main repo.', pkg_obj.pkgname)
+        if pkg_files or True:
             for f in pkg_files_64:
+                logger.debug('f in pkg_files_64 fired!')
                 if result == 'passed':
                     copy(f, MAIN_64)
                     copy(f, '/tmp')
@@ -396,8 +394,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 elif result == 'failed':
                     os.remove(f)
             if result and result != 'skip':
-                repo_queue.enqueue_call(builder.update_main_repo,
-                                        kwargs=dict(rev_result=result, bld_obj=bld_obj, is_review=True), timeout=9600)
+                repo_queue.enqueue_call(builder.update_main_repo, (result, None, True, bld_obj.pkgname), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -551,7 +548,7 @@ def hooked():
 def maybe_check_for_remote_commits():
     check = repo_mon.maybe_check_for_new_items()
     if not check:
-        repo_mon.check_for_new_items()
+        repo_queue.enqueue_call(repo_mon.check_for_new_items)
 
 
 @app.route('/scheduled')
@@ -723,11 +720,11 @@ def build_pkg_now():
                 flash('Unable to build %s because it is in "pending review" status.' % pkgname, category='error')
             else:
                 args = (True, True)
-                if 'antergos-iso' in pkgname:
+                if '-x86_64' in pkgname or '-i686' in pkgname:
                     if not status.iso_building:
                         status.iso_flag = True
                         args = (True, True)
-                        if 'openbox' in pkgname:
+                        if 'minimal' in pkgname:
                             status.iso_minimal = True
                     else:
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
