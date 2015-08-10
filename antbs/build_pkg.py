@@ -151,7 +151,7 @@ def process_package_queue(the_queue=None):
             elif pkg == 'cnchi':
                 shutil.copytree('/var/tmp/antergos-packages/cnchi', '/opt/antergos-packages/cnchi/cnchi')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
-            get_latest_translations(pkg_obj=pkg_obj)
+            fetch_and_compile_translations(translations_for="cnchi", pkg_obj=pkg_obj)
 
         if depends and len(the_queue) > 1:
             all_deps.append(depends)
@@ -337,7 +337,7 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         end = line[25:]
         if end not in nodup:
             nodup.add(end)
-            #line = re.sub(r'(?<=[\w\d])(( \')|(\' )(?=[\w\d]+))|(\'\n)', ' ', line)
+            # line = re.sub(r'(?<=[\w\d])(( \')|(\' )(?=[\w\d]+))|(\'\n)', ' ', line)
             line = line.replace("'", '')
             line = line.replace('"', '')
             line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
@@ -368,23 +368,6 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         bld_obj.log_str = pretty
 
 
-def get_latest_translations(pkg_obj=None):
-    # Get translations for Cnchi
-    trans_dir = "/opt/cnchi-translations/"
-    trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi")
-    dest_dir = '/opt/antergos-packages/' + pkg_obj.name + '/cnchi/po'
-    if not os.path.exists(dest_dir):
-        logger.error('cnchi po directory not found.')
-    else:
-        try:
-            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi', '--minimum-perc=50'],
-                                  cwd=trans_dir)
-            for f in os.listdir(trans_files_dir):
-                shutil.copy(f, dest_dir)
-        except Exception as err:
-            logger.error(err)
-
-
 def process_and_save_build_metadata(pkg_obj=None):
     if not pkg_obj:
         raise AttributeError
@@ -406,29 +389,54 @@ def process_and_save_build_metadata(pkg_obj=None):
     return bld_obj
 
 
-def fetch_and_compile_updater_translations():
-    """ Get and compile translations for Cnchi updater script. """
+def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
+    """ Get and compile translations from Transifex. """
 
-    trans_dir = "/opt/antergos-iso-translations/"
-    trans_files_dir = os.path.join(trans_dir, "translations/antergos.cnchi_updaterpot")
-    dest_dir = '/srv/antergos.info/repo/iso/testing/trans'
-    if not os.path.exists(dest_dir):
-        os.mkdir(dest_dir)
-    try:
-        subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.cnchi_updaterpot', '--minimum-perc=50'],
-                              cwd=trans_dir)
-        for r, d, f in os.walk(trans_files_dir):
-            for tfile in f:
-                logger.info('tfile is %s' % tfile)
-                logger.info('tfile cut is %s' % tfile[:-2])
-                mofile = tfile[:-2] + 'mo'
-                logger.info('mofile is %s' % mofile)
-                subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans_files_dir)
-                os.rename(os.path.join(trans_files_dir, mofile), os.path.join(dest_dir, mofile))
-    except subprocess.CalledProcessError as err:
-        logger.error(err.output)
-    except Exception as err:
-        logger.error(err)
+    trans = {
+        "cnchi": {
+            'trans_dir': "/opt/cnchi-translations/",
+            'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
+            'dest_dir': '/opt/antergos-packages/' + pkg_obj.name + '/cnchi/po'
+        },
+        "cnchi_updater": {
+            'trans_dir': "/opt/antergos-iso-translations/",
+            'trans_files_dir': "/opt/antergos-iso-translations/translations/antergos.cnchi_updaterpot",
+            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
+        },
+        "gfxboot": {
+            'trans_dir': "/opt/cnchi-translations/",
+            'trans_files_dir': '/opt/cnchi-translations/translations/antergos.gfxboot',
+            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/gfxboot'
+        }
+    }
+
+    for trans_for in translations_for:
+
+        if not os.path.exists(trans[trans_for]['dest_dir']):
+            os.mkdir(trans[trans_for]['dest_dir'])
+        try:
+            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.gfxboot', '--minimum-perc=50'],
+                                  cwd=trans[trans_for]['trans_dir'])
+            for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
+                for tfile in f:
+                    if 'cnchi' == trans_for:
+                        shutil.copy(tfile, trans[trans_for]['dest_dir'])
+                    elif 'cnchi_updater' == trans_for:
+                        mofile = tfile[:-2] + 'mo'
+                        subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans[trans_for]['trans_files_dir'])
+                        os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
+                                  os.path.join(trans[trans_for]['dest_dir'], mofile))
+                    elif 'gfxboot' == trans_for:
+                        trfile = tfile[:-2] + 'tr'
+                        subprocess.check_call(['po2txt_helper', tfile, trfile],
+                                              cwd=trans[trans_for]['trans_files_dir'])
+                        os.rename(os.path.join(trans[trans_for]['trans_files_dir'], trfile),
+                                  os.path.join(trans[trans_for]['dest_dir'], trfile))
+
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
+        except Exception as err:
+            logger.error(err)
 
 
 def build_pkgs(last=False, pkg_info=None):
@@ -528,7 +536,8 @@ def build_pkgs(last=False, pkg_info=None):
                     repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj, )
 
             if repo_updated:
-                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (build_id, build_id, pkg)
+                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
+                build_id, build_id, pkg)
                 Timeline(msg=tlmsg, tl_type=4)
                 completed = status.completed()
                 completed.rpush(bld_obj.bnum)
@@ -562,7 +571,7 @@ def build_iso(pkg_obj=None):
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
-    fetch_and_compile_updater_translations()
+    fetch_and_compile_translations(translations_for=["gfxboot", "cnchi_updater"])
 
     flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
     minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
@@ -641,7 +650,8 @@ def build_iso(pkg_obj=None):
     last_count = int(db.get('pkg_count_iso'))
     if in_dir > last_count:
         bld_obj.completed = True
-        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (build_id, build_id, pkg_obj.name)
+        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
+        build_id, build_id, pkg_obj.name)
         Timeline(msg=tlmsg, tl_type=4)
         completed = status.completed()
         completed.rpush(bld_obj.bnum)
