@@ -134,7 +134,7 @@ def process_package_queue(the_queue=None):
         if not version:
             continue
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
-        status.current_status = 'Updating pkgver in databse for %s to %s' % (pkg_obj.name, version)
+        status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
         depends = pkg_obj.get_deps()
 
         if not pkg_obj.build_path or pkg_obj.build_path == '':
@@ -147,11 +147,11 @@ def process_package_queue(the_queue=None):
                     break
         if 'cnchi' in pkg:
             if pkg == 'cnchi-dev':
-                shutil.copytree('/var/tmp/antergos-packages/cnchi-dev', '/opt/antergos-packages/cnchi-dev/cnchi-dev')
+                shutil.copytree('/var/tmp/antergos-packages/cnchi-dev/cnchi-dev', '/opt/antergos-packages/cnchi-dev')
             elif pkg == 'cnchi':
-                shutil.copytree('/var/tmp/antergos-packages/cnchi', '/opt/antergos-packages/cnchi/cnchi')
+                shutil.copytree('/var/tmp/antergos-packages/cnchi/cnchi', '/opt/antergos-packages/cnchi')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
-            fetch_and_compile_translations(translations_for="cnchi", pkg_obj=pkg_obj)
+            fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
 
         if depends and len(the_queue) > 1:
             all_deps.append(depends)
@@ -164,6 +164,7 @@ def handle_hook(first=False, last=False):
     packages = status.queue()
 
     if first:
+        status.current_status = 'Building docker image.'
         if not status.iso_flag:
             if os.path.exists(REPO_DIR):
                 remove(REPO_DIR)
@@ -180,8 +181,6 @@ def handle_hook(first=False, last=False):
         else:
             status.iso_flag = False
             image = docker_utils.maybe_build_mkarchiso()
-
-        status.current_status = 'Building docker image.'
 
         if not image:
             return False
@@ -392,11 +391,16 @@ def process_and_save_build_metadata(pkg_obj=None):
 def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
     """ Get and compile translations from Transifex. """
 
+    if pkg_obj is None:
+        name = ''
+    else:
+        name = pkg_obj.name
+
     trans = {
         "cnchi": {
             'trans_dir': "/opt/cnchi-translations/",
             'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
-            'dest_dir': '/opt/antergos-packages/' + pkg_obj.name + '/cnchi/po'
+            'dest_dir': '/opt/antergos-packages/' + name + '/cnchi/po'
         },
         "cnchi_updater": {
             'trans_dir': "/opt/antergos-iso-translations/",
@@ -404,19 +408,22 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
             'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
         },
         "gfxboot": {
-            'trans_dir': "/opt/cnchi-translations/",
-            'trans_files_dir': '/opt/cnchi-translations/translations/antergos.gfxboot',
+            'trans_dir': "/opt/antergos-iso-translations/",
+            'trans_files_dir': '/opt/antergos-iso-translations/translations/antergos.antergos-gfxboot',
             'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/gfxboot'
         }
     }
 
+    pulled = False
     for trans_for in translations_for:
 
         if not os.path.exists(trans[trans_for]['dest_dir']):
             os.mkdir(trans[trans_for]['dest_dir'])
         try:
-            subprocess.check_call(['tx', 'pull', '-a', '-r', 'antergos.gfxboot', '--minimum-perc=50'],
-                                  cwd=trans[trans_for]['trans_dir'])
+            if not pulled:
+                subprocess.check_call(['tx', 'pull', '-a', '--minimum-perc=50'],
+                                      cwd=trans[trans_for]['trans_dir'])
+                pulled = True
             for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
                 for tfile in f:
                     if 'cnchi' == trans_for:
@@ -427,7 +434,7 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
                         os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
                                   os.path.join(trans[trans_for]['dest_dir'], mofile))
                     elif 'gfxboot' == trans_for:
-                        trfile = tfile[:-2] + 'tr'
+                        trfile = tfile[:-2] + 'tr' if '.pot' not in tfile else 'en.tr'
                         subprocess.check_call(['po2txt_helper', tfile, trfile],
                                               cwd=trans[trans_for]['trans_files_dir'])
                         os.rename(os.path.join(trans[trans_for]['trans_files_dir'], trfile),

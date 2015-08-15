@@ -218,13 +218,20 @@ function build_32bit_pkg() {
 	done
 
 	cp /etc/sudoers.d/10-builder /32build/root/etc/sudoers.d/
-	chmod 600 /32build/root/etc/sudoers
-	chmod 600 /32build/root/etc/sudoers.d/10-builder
-	chmod -R 600 /usr/lib/sudo
 	sed -i '1s/^/CARCH="i686"\n/' /32build/root/pkg/PKGBUILD
-	find /32build/root -maxdepth 1 -exec chmod a+rw {} \;
-	find /32build/root/pkg -exec chmod a+rw {} \;
+	chmod a+rw /32build/root
+	chmod a+rw /32build/root/pkg
+	#find /32build/root -maxdepth 1 -exec chmod a+rw {} \;
+	#find /32build/root/pkg -exec chmod a+rw {} \;
+	chmod 644 /32build/root/etc/sudoers
+	chmod -R 644 /32build/root/etc/sudoers.d
+	chmod 755 /32build/root/etc/sudoers.d
+	chmod 700 /32build/root/usr/lib/sudo
+	chmod 600 /32build/root/usr/lib/sudo/*.so
+	cp -R /etc/pacman.d /32build/root/etc
+	cd /32build/root && wget http://repo.antergos.info/antergos/i686/antergos-keyring-20150806-1-any.pkg.tar.xz
 	arch-chroot /32build/root pacman -Scc --noconfirm --noprogressbar --color never && pacman -Syy
+	arch-chroot /32build/root pacman -U --noconfirm --noprogressbar --color never /antergos-keyring-20150806-1-any.pkg.tar.xz
 
 	print2log 'UPDATING 32BIT SOURCE CHECKSUMS'
 	check_pkg_sums 32bit
