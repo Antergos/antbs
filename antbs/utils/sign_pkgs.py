@@ -3,24 +3,32 @@
 #
 # sign_pkgs.py
 #
-# Copyright 2014 Antergos
+# Copyright © 2014-2015 Antergos
+#
 # The code in this module was originally written by Xyne (Arch Linux TU)
 # and was modified to suit the needs of this application.
 #
-# This program is free software; you can redistribute it and/or modify
+# This file is part of The Antergos Build Server, (AntBS).
+#
+# AntBS is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
-# the Free Software Foundation; either version 2 of the License, or
+# the Free Software Foundation; either version 3 of the License, or
 # (at your option) any later version.
 #
-# This program is distributed in the hope that it will be useful,
+# AntBS is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# The following additional terms are in effect as per Section 7 of the license:
+#
+# The preservation of all legal notices and author attributions in
+# the material or in the Appropriate Legal Notices displayed
+# by works containing it is required.
+#
 # You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+# along with AntBS; If not, see <http://www.gnu.org/licenses/>.
+
 
 """ Sign packages with gpg """
 
