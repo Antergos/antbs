@@ -73,10 +73,21 @@ class BuildObject(RedisObject):
 
     @staticmethod
     def datetime_to_string(dt):
+        """
+
+        :param dt:
+        :return:
+        """
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
 
 def get_build_object(pkg_obj=None, bnum=None):
+    """
+
+    :param pkg_obj:
+    :param bnum:
+    :return: :raise AttributeError:
+    """
     if not pkg_obj and not bnum:
         logger.debug('bnum or pkg_obj is required to get build object.')
         raise AttributeError

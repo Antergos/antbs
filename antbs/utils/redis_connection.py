@@ -65,7 +65,10 @@ class RedisField(object):
 
     @staticmethod
     def decode_value(obj_type, value):
-        """ Decode a value if it is non-None, otherwise, decode with no arguments. """
+        """ Decode a value if it is non-None, otherwise, decode with no arguments.
+        :param obj_type:
+        :param value:
+        """
 
         if value is None:
             return obj_type()
@@ -74,7 +77,9 @@ class RedisField(object):
 
     @staticmethod
     def encode_value(value):
-        """ Encode a value using json.dumps, with default = str. """
+        """ Encode a value using json.dumps, with default = str.
+        :param value:
+        """
 
         return str(value)
 
@@ -98,9 +103,18 @@ class RedisList(RedisField):
 
     @classmethod
     def as_child(cls, parent, tag, item_type):
-        """ Alternative callable constructor that instead defines this as a child object """
+        """ Alternative callable constructor that instead defines this as a child object
+        :param parent:
+        :param tag:
+        :param item_type:
+        """
 
         def helper(_=None):
+            """
+
+            :param _:
+            :return:
+            """
             return cls(parent.namespace + tag, item_type)
 
         return helper
@@ -162,26 +176,47 @@ class RedisList(RedisField):
         return RedisField.decode_value(self.item_type, db.rpop(self.id_key))
 
     def lpush(self, val):
-        """ Add an item to the left (low) end of the list. """
+        """ Add an item to the left (low) end of the list.
+        :param val:
+        """
 
         db.lpush(self.id_key, RedisField.encode_value(val))
 
     def rpush(self, val):
-        """ Add an item to the right (high) end of the list."""
+        """ Add an item to the right (high) end of the list.
+        :param val:
+        """
 
         db.rpush(self.id_key, RedisField.encode_value(val))
 
     def append(self, val):
+        """
+
+        :param val:
+        """
         self.rpush(val)
 
     def delete(self):
+        """
+
+
+        """
         db.delete(self.id_key)
 
     def reverse(self):
+        """
+
+
+        :return:
+        """
         cp = list(db.lrange(self.id_key, 0, -1))
         return cp.reverse()
 
     def remove(self, val):
+        """
+
+        :param val:
+        """
         db.lrem(self.id_key, 0, val)
 
 
@@ -204,9 +239,18 @@ class RedisZSet(RedisField):
 
     @classmethod
     def as_child(cls, parent, tag, item_type):
-        """ Alternative callable constructor that instead defines this as a child object """
+        """ Alternative callable constructor that instead defines this as a child object
+        :param parent:
+        :param tag:
+        :param item_type:
+        """
 
         def helper(_=None):
+            """
+
+            :param _:
+            :return:
+            """
             return cls(parent.namespace + tag, item_type)
 
         return helper
@@ -223,22 +267,31 @@ class RedisZSet(RedisField):
             yield RedisField.decode_value(self.item_type, el)
 
     def add(self, val):
-        """ Add member to set if it doesn't exist. """
+        """ Add member to set if it doesn't exist.
+        :param val:
+        """
 
         db.zadd(self.id_key, 1, RedisField.encode_value(val))
 
     def remove(self, val):
-        """ Remove a member from the set. """
+        """ Remove a member from the set.
+        :param val:
+        """
 
         db.zrem(self.id_key, RedisField.encode_value(val))
 
     def ismember(self, val):
-        """ Check if value is a member of set """
+        """ Check if value is a member of set
+        :param val:
+        """
 
         return db.zrank(self.id_key, RedisField.encode_value(val))
 
 
 class RedisObject(object):
+    """
+
+    """
     database = db
 
     def __init__(self):
@@ -308,6 +361,11 @@ class RedisObject(object):
 
     @staticmethod
     def bool_string_helper(value):
+        """
+
+        :param value:
+        :return:
+        """
         if isinstance(value, str):
             return True if 'True' == value else False
         elif isinstance(value, bool):

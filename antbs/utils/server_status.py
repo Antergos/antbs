@@ -29,6 +29,12 @@ import os
 
 
 class Singleton(RedisObject):
+    """
+
+    :param args:
+    :param kwargs:
+    """
+
     def __init__(self, *args, **kwargs):
         super(Singleton, self).__init__()
         globals()[self.__class__.__name__] = self
@@ -38,6 +44,12 @@ class Singleton(RedisObject):
 
 
 class ServerStatus(Singleton):
+
+    """
+
+    :param args:
+    :param kwargs:
+    """
 
     def __init__(self, *args, **kwargs):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
@@ -75,6 +87,14 @@ class ServerStatus(Singleton):
 
 
 class Timeline(RedisObject):
+    """
+
+    :param msg:
+    :param tl_type:
+    :param event_id:
+    :raise AttributeError:
+    """
+
     def __init__(self, msg=None, tl_type=None, event_id=None):
         if (not msg or not tl_type) and not event_id:
             raise AttributeError
@@ -105,10 +125,20 @@ class Timeline(RedisObject):
 
     @staticmethod
     def dt_date_to_string(dt):
+        """
+
+        :param dt:
+        :return:
+        """
         return dt.strftime("%b %d")
 
     @staticmethod
     def dt_time_to_string(dt):
+        """
+
+        :param dt:
+        :return:
+        """
         return dt.strftime("%I:%M%p")
 
 

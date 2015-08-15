@@ -54,6 +54,11 @@ logger = logconf.logger
 
 
 def remove(src):
+    """
+
+    :param src:
+    :return:
+    """
     if src != str(src):
         return True
     if os.path.isdir(src):
@@ -73,6 +78,11 @@ def remove(src):
 
 
 def run_docker_clean(pkg=None):
+    """
+
+    :param pkg:
+    :return:
+    """
     try:
         doc.remove_container(pkg, v=True)
     except Exception:
@@ -81,6 +91,12 @@ def run_docker_clean(pkg=None):
 
 
 def truncate_middle(s, n):
+    """
+
+    :param s:
+    :param n:
+    :return:
+    """
     if len(s) <= n:
         # string is already short-enough
         return s
@@ -95,6 +111,7 @@ def check_deps(source):
     # # TODO: This still needs to be improved.
     """perform topological sort on elements.
 
+    :param source:
     :arg source: list of ``(name, [list of dependancies])`` pairs
     :returns: list of names, with dependancies listed first
     """
@@ -123,6 +140,11 @@ def check_deps(source):
 
 
 def process_package_queue(the_queue=None):
+    """
+
+    :param the_queue:
+    :return: :raise ValueError:
+    """
     if the_queue is None:
         raise ValueError('the_queue cannot be None')
     all_deps = []
@@ -160,6 +182,12 @@ def process_package_queue(the_queue=None):
 
 
 def handle_hook(first=False, last=False):
+    """
+
+    :param first:
+    :param last:
+    :return:
+    """
     status.idle = False
     packages = status.queue()
 
@@ -256,6 +284,14 @@ def handle_hook(first=False, last=False):
 
 
 def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname=None):
+    """
+
+    :param rev_result:
+    :param bld_obj:
+    :param is_review:
+    :param rev_pkgname:
+    :return:
+    """
     logger.debug('update_main_repo fired! %s', rev_result)
     if rev_result:
         repo = 'antergos'
@@ -320,6 +356,14 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
 
 
 def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False):
+    """
+
+    :param container:
+    :param bld_obj:
+    :param upd_repo:
+    :param is_iso:
+    :return:
+    """
     if not container or not bld_obj:
         logger.error('Unable to publish build output. (Container is None)')
         return
@@ -368,6 +412,11 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
 
 
 def process_and_save_build_metadata(pkg_obj=None):
+    """
+
+    :param pkg_obj:
+    :return: :raise AttributeError:
+    """
     if not pkg_obj:
         raise AttributeError
 
@@ -389,7 +438,10 @@ def process_and_save_build_metadata(pkg_obj=None):
 
 
 def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
-    """ Get and compile translations from Transifex. """
+    """ Get and compile translations from Transifex.
+    :param translations_for:
+    :param pkg_obj:
+    """
 
     if pkg_obj is None:
         name = ''
@@ -430,7 +482,8 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
                         shutil.copy(tfile, trans[trans_for]['dest_dir'])
                     elif 'cnchi_updater' == trans_for:
                         mofile = tfile[:-2] + 'mo'
-                        subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile], cwd=trans[trans_for]['trans_files_dir'])
+                        subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile],
+                                              cwd=trans[trans_for]['trans_files_dir'])
                         os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
                                   os.path.join(trans[trans_for]['dest_dir'], mofile))
                     elif 'gfxboot' == trans_for:
@@ -447,6 +500,12 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
 
 
 def build_pkgs(last=False, pkg_info=None):
+    """
+
+    :param last:
+    :param pkg_info:
+    :return:
+    """
     if pkg_info is None:
         return False
     # Create our tmp directories
@@ -544,7 +603,7 @@ def build_pkgs(last=False, pkg_info=None):
 
             if repo_updated:
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
-                build_id, build_id, pkg)
+                    build_id, build_id, pkg)
                 Timeline(msg=tlmsg, tl_type=4)
                 completed = status.completed()
                 completed.rpush(bld_obj.bnum)
@@ -568,6 +627,11 @@ def build_pkgs(last=False, pkg_info=None):
 
 
 def build_iso(pkg_obj=None):
+    """
+
+    :param pkg_obj:
+    :return:
+    """
     status.iso_building = True
 
     in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
@@ -658,7 +722,7 @@ def build_iso(pkg_obj=None):
     if in_dir > last_count:
         bld_obj.completed = True
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
-        build_id, build_id, pkg_obj.name)
+            build_id, build_id, pkg_obj.name)
         Timeline(msg=tlmsg, tl_type=4)
         completed = status.completed()
         completed.rpush(bld_obj.bnum)

@@ -49,6 +49,11 @@ with Connection(db):
 
 
 def rm_file_or_dir(src):
+    """
+
+    :param src:
+    :return:
+    """
     if os.path.isdir(src):
         try:
             shutil.rmtree(src)
@@ -66,6 +71,11 @@ def rm_file_or_dir(src):
 
 
 class Webhook(object):
+    """
+
+    :param request:
+    """
+
     def __init__(self, request=None):
         self.can_process = False
         self.is_monitor = False
@@ -114,6 +124,11 @@ class Webhook(object):
 
     def is_from_authorized_sender(self):
         # Determine if the request sender is authorized to send us webhooks.
+        """
+
+
+        :return:
+        """
         if self.is_monitor is True:
             return True
         manual = int(self.request.args.get('phab', '0'))
@@ -153,6 +168,11 @@ class Webhook(object):
 
     def process_manual(self):
 
+        """
+
+
+        :return:
+        """
         try:
             key = db.lrange('payloads:index', -1, -1)
             logger.info(key)
@@ -168,6 +188,10 @@ class Webhook(object):
         self.repo = 'antergos-packages'
 
     def process_github(self):
+        """
+
+
+        """
         if not self.is_manual:
             self.payload = json.loads(self.request.data)
             # Save payload in the database temporarily in case we need it later.
@@ -208,7 +232,7 @@ class Webhook(object):
             self.changes.append(['cnchi-dev'])
             self.repo = 'antergos-packages'
             self.is_cnchi = True
-        #     idle = db.get('idle')
+        # idle = db.get('idle')
         #     working = db.exists('creating-cnchi-archive-from-dev')
         #     check = 'cnchi-dev' != self.building or idle == "True"
         #     if not working and 'cnchi-dev' not in self.the_queue and check:
@@ -238,6 +262,10 @@ class Webhook(object):
 
     def process_changes(self):
 
+        """
+
+
+        """
         if self.repo == "antergos-packages":
             logger.info("Build hook triggered. Updating build queue.")
             has_pkgs = False
@@ -298,7 +326,7 @@ class Webhook(object):
                         the_pkgs_str = ''.join(p_ul)
                         tl_event = Timeline(
                             msg='Webhook triggered by <strong>%s.</strong> Packages added to the build queue: %s' % (
-                            source, the_pkgs_str), tl_type=tltype)
+                                source, the_pkgs_str), tl_type=tltype)
                         p_obj = package.Package(p)
                         events = p_obj.tl_events()
                         events.append(tl_event.event_id)
@@ -308,6 +336,10 @@ class Webhook(object):
                 self.result = json.dumps({'msg': 'OK!'})
 
     def process_cnchi(self):
+        """
+
+
+        """
         a_b_test = db.get('CNCHI_A_B_TEST')
 
         if a_b_test == 'A':

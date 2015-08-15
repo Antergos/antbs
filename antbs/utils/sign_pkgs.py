@@ -40,6 +40,11 @@ gpg_key = status.gpg_key
 
 
 def remove(src):
+    """
+
+    :param src:
+    :return:
+    """
     if src != str(src):
         return True
     if os.path.isdir(src):
@@ -65,6 +70,9 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
     If no passphrase is given then the user is prompted for one.
 
     The passphrase is returned to avoid further prompts.
+    :param paths:
+    :param uid:
+    :param passphrase:
     """
     for path in paths:
         db.publish('build-output', 'Creating detached signature for %s' % path)
@@ -107,6 +115,11 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
 
 
 def sign_packages(pkgname=None):
+    """
+
+    :param pkgname:
+    :return:
+    """
     if pkgname:
         db.publish('build-output', 'Signing package..')
         pkgs2sign = glob.glob(

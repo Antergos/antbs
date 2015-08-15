@@ -34,10 +34,19 @@ GITHUB_TOKEN = status.github_token
 
 
 def maybe_check_for_new_items():
+    """
+
+
+    :return:
+    """
     return db.exists('FEED_CHECKED')
 
 
 def check_for_new_items():
+    """
+
+
+    """
     db.set('FEED_CHECKED', 'True')
     db.expire('FEED_CHECKED', 900)
     new_items = []
@@ -76,6 +85,11 @@ def check_for_new_items():
 
 
 def add_to_build_queue(pkgs=None):
+    """
+
+    :param pkgs:
+    :return:
+    """
     if pkgs is None:
         return False
     req = dict(method='POST', args={})

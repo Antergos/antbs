@@ -38,6 +38,11 @@ MAX_QUESTIONS = 5
 
 
 def get_response_string(q):
+    """
+
+    :param q:
+    :return:
+    """
     q_data = q.json
 
     check = ' :white_check_mark:' if q.json['is_answered'] else ''
@@ -46,6 +51,12 @@ def get_response_string(q):
 
 
 def overflow(command=None, text=None):
+    """
+
+    :param command:
+    :param text:
+    :return:
+    """
     if command is None or text is None:
         return False
 

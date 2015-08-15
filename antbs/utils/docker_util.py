@@ -39,7 +39,7 @@ doc_pass = status.docker_password
 SRC_DIR = os.path.dirname(__file__) or '.'
 DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
 BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
-#logger.debug([('SRC_DIR', SRC_DIR), ('DOC_DIR', DOC_DIR), ('BUILD_DIR', BUILD_DIR)])
+# logger.debug([('SRC_DIR', SRC_DIR), ('DOC_DIR', DOC_DIR), ('BUILD_DIR', BUILD_DIR)])
 
 
 # Initiate communication with build daemon
@@ -51,6 +51,13 @@ except Exception as err:
 
 
 def create_pkgs_host_config(cache, pkgbuild_dir, result):
+    """
+
+    :param cache:
+    :param pkgbuild_dir:
+    :param result:
+    :return:
+    """
     pkgs_hconfig = create_host_config(
         binds={
             cache:
@@ -108,6 +115,11 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
 
 
 def create_repo_update_host_config():
+    """
+
+
+    :return:
+    """
     repos_hconfig = create_host_config(
         binds={
             BUILD_DIR:
@@ -141,6 +153,11 @@ def create_repo_update_host_config():
 
 
 def maybe_build_base_devel():
+    """
+
+
+    :return:
+    """
     if db.exists('antbs:docker-images:base-devel:built-today'):
         return True
 
@@ -169,6 +186,11 @@ def maybe_build_base_devel():
 
 
 def maybe_build_mkarchiso():
+    """
+
+
+    :return:
+    """
     if db.exists('antbs:docker-images:mkarchiso:built-today'):
         return True
 
@@ -183,6 +205,11 @@ def maybe_build_mkarchiso():
 
 
 def build_makepkg():
+    """
+
+
+    :return:
+    """
     dockerfile = os.path.join(DOC_DIR, 'makepkg')
     try:
         build_it = [line for line in
@@ -198,6 +225,11 @@ def build_makepkg():
 
 
 def build_mkarchiso():
+    """
+
+
+    :return:
+    """
     dockerfile = '/opt/archlinux-mkarchiso'
     try:
         build_it = [line for line in
@@ -214,6 +246,11 @@ def build_mkarchiso():
 
 
 def push_to_hub(repo=None):
+    """
+
+    :param repo:
+    :return:
+    """
     if repo is None:
         return
     try:

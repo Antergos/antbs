@@ -102,6 +102,11 @@ logger = logconf.logger
 
 
 def copy(src, dst):
+    """
+
+    :param src:
+    :param dst:
+    """
     if os.path.islink(src):
         linkto = os.readlink(src)
         os.symlink(linkto, dst)
@@ -113,6 +118,11 @@ def copy(src, dst):
 
 
 def remove(src):
+    """
+
+    :param src:
+    :return:
+    """
     if os.path.isdir(src):
         try:
             shutil.rmtree(src)
@@ -131,6 +141,14 @@ def remove(src):
 
 def handle_worker_exception(job, exc_type, exc_value, traceback):
     # TODO: This needs some thought on how to recover instead of bailing on entire build queue
+    """
+
+    :param job:
+    :param exc_type:
+    :param exc_value:
+    :param traceback:
+    :return:
+    """
     doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
     if job['origin'] == 'build_queue':
         container = db.get('container')
@@ -173,14 +191,19 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
 
 with Connection(db):
     queue = Queue('build_queue')
-    #w = Worker([queue], exc_handler=handle_worker_exception)
+    # w = Worker([queue], exc_handler=handle_worker_exception)
     repo_queue = Queue('repo_queue')
-    #repo_w = Worker([repo_queue], exc_handler=handle_worker_exception)
-    #w.work()
-    #repo_w.work()
+    # repo_w = Worker([repo_queue], exc_handler=handle_worker_exception)
+    # w.work()
+    # repo_w.work()
 
 
 def url_for_other_page(page):
+    """
+
+    :param page:
+    :return:
+    """
     args = request.view_args.copy()
     args['page'] = page
     return url_for(request.endpoint, **args)
@@ -190,6 +213,10 @@ app.jinja_env.globals['url_for_other_page'] = url_for_other_page
 
 
 def get_live_build_ouput():
+    """
+
+
+    """
     psub = db.pubsub()
     psub.subscribe('build-output')
     first_run = True
@@ -210,6 +237,14 @@ def get_live_build_ouput():
 
 
 def get_paginated(item_list, per_page, page, timeline):
+    """
+
+    :param item_list:
+    :param per_page:
+    :param page:
+    :param timeline:
+    :return:
+    """
     if len(item_list) < 1:
         return [], []
     page -= 1
@@ -223,6 +258,12 @@ def get_paginated(item_list, per_page, page, timeline):
 
 
 def match_pkg_name_build_log(bnum=None, match=None):
+    """
+
+    :param bnum:
+    :param match:
+    :return:
+    """
     if not bnum or not match:
         return False
     pname = build_obj.get_build_object(bnum=bnum)
@@ -234,6 +275,11 @@ def match_pkg_name_build_log(bnum=None, match=None):
 
 
 def cache_buster():
+    """
+
+
+    :return:
+    """
     if db.exists('antbs:misc:cache_buster:flag'):
         db.delete('antbs:misc:cache_buster:flag')
         return True
@@ -245,11 +291,24 @@ def cache_buster():
 
 @app.context_processor
 def inject_idle_status():
+    """
+
+
+    :return:
+    """
     return dict(idle=status.idle)
 
 
 @cache.cached(timeout=900, key_prefix='build_info', unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
+    """
+
+    :param page:
+    :param build_status:
+    :param logged_in:
+    :param search:
+    :return:
+    """
     if page is None or build_status is None:
         abort(500)
 
@@ -295,6 +354,12 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
 
 
 def get_repo_info(repo=None, logged_in=False):
+    """
+
+    :param repo:
+    :param logged_in:
+    :return:
+    """
     if repo is None:
         abort(500)
     rinfo_key = 'cache:repo_info:%s' % repo
@@ -348,11 +413,23 @@ def get_repo_info(repo=None, logged_in=False):
 
 
 def redirect_url(default='homepage'):
+    """
+
+    :param default:
+    :return:
+    """
     return request.args.get('next') or request.referrer or url_for(default)
 
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
     # TODO: This is garbage. Needs rewrite.
+    """
+
+    :param bnum:
+    :param dev:
+    :param result:
+    :return:
+    """
     if any(i is None for i in (bnum, dev, result)):
         abort(500)
     errmsg = dict(error=True, msg=None)
@@ -411,6 +488,11 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
 
 
 def get_timeline(tlpage=None):
+    """
+
+    :param tlpage:
+    :return:
+    """
     event_ids = status.all_tl_events()
     timeline = []
     if not tlpage:
@@ -428,11 +510,21 @@ def get_timeline(tlpage=None):
 
 @app.errorhandler(404)
 def page_not_found(e):
+    """
+
+    :param e:
+    :return:
+    """
     return render_template('404.html'), 404
 
 
 @app.errorhandler(500)
 def internal_error(e):
+    """
+
+    :param e:
+    :return:
+    """
     if e is not None:
         logger.error(e)
     return render_template('500.html'), 500
@@ -440,6 +532,11 @@ def internal_error(e):
 
 @app.errorhandler(400)
 def flask_error(e):
+    """
+
+    :param e:
+    :return:
+    """
     if e is not None:
         logger.error(e)
     return render_template('500.html'), 400
@@ -456,6 +553,11 @@ def flask_error(e):
 @app.route("/")
 @cache.cached(timeout=900, unless=cache_buster)
 def homepage(tlpage=None):
+    """
+
+    :param tlpage:
+    :return:
+    """
     if tlpage is None:
         tlpage = 1
     check_stats = ['queue', 'completed', 'failed']
@@ -507,6 +609,11 @@ def homepage(tlpage=None):
 
 @app.route("/building")
 def build():
+    """
+
+
+    :return:
+    """
     now_building = status.now_building
     ver = ''
     bnum = ''
@@ -529,6 +636,11 @@ def build():
 
 @app.route('/get_log')
 def get_log():
+    """
+
+
+    :return:
+    """
     if status.idle:
         abort(404)
 
@@ -537,6 +649,11 @@ def get_log():
 
 @app.route('/hook', methods=['POST', 'GET'])
 def hooked():
+    """
+
+
+    :return:
+    """
     hook = webhook.Webhook(request)
     if hook.result is int:
         abort(hook.result)
@@ -546,6 +663,10 @@ def hooked():
 
 @app.before_request
 def maybe_check_for_remote_commits():
+    """
+
+
+    """
     check = repo_mon.maybe_check_for_new_items()
     if not check:
         repo_queue.enqueue_call(repo_mon.check_for_new_items)
@@ -553,6 +674,11 @@ def maybe_check_for_remote_commits():
 
 @app.route('/scheduled')
 def scheduled():
+    """
+
+
+    :return:
+    """
     try:
         queued = status.queue()
     except Exception:
@@ -579,6 +705,12 @@ def scheduled():
 @app.route('/completed/search/<name>/<int:page>')
 @app.route('/completed')
 def completed(page=None, name=None):
+    """
+
+    :param page:
+    :param name:
+    :return:
+    """
     build_status = 'completed'
     is_logged_in = user.is_authenticated()
     if page is None and name is None:
@@ -596,6 +728,11 @@ def completed(page=None, name=None):
 @app.route('/failed/<int:page>')
 @app.route('/failed')
 def failed(page=None):
+    """
+
+    :param page:
+    :return:
+    """
     build_status = 'failed'
     if page is None:
         page = 1
@@ -611,6 +748,11 @@ def failed(page=None):
 
 @app.route('/build/<int:num>')
 def build_info(num):
+    """
+
+    :param num:
+    :return:
+    """
     if not num:
         abort(404)
     try:
@@ -637,6 +779,11 @@ def build_info(num):
 @app.route('/browse/<goto>')
 @app.route('/browse')
 def repo_browser(goto=None):
+    """
+
+    :param goto:
+    :return:
+    """
     building = status.now_building
     release = False
     testing = False
@@ -658,6 +805,11 @@ def repo_browser(goto=None):
 @app.route('/pkg_review', methods=['POST', 'GET'])
 @groups_required(['admin'])
 def dev_pkg_check(page=None):
+    """
+
+    :param page:
+    :return:
+    """
     build_status = 'completed'
     set_rev_error = False
     set_rev_error_msg = None
@@ -690,6 +842,11 @@ def dev_pkg_check(page=None):
 @app.route('/build_pkg_now', methods=['POST', 'GET'])
 @groups_required(['admin'])
 def build_pkg_now():
+    """
+
+
+    :return:
+    """
     if request.method == 'POST':
         pkgname = request.form['pkgname']
         dev = request.form['dev']
@@ -744,6 +901,11 @@ def build_pkg_now():
 
 @app.route('/get_status', methods=['GET'])
 def get_status():
+    """
+
+
+    :return:
+    """
     building = status.current_status
     if status.idle:
         message = dict(msg='Idle')
@@ -755,11 +917,21 @@ def get_status():
 
 @app.route('/issues', methods=['GET'])
 def show_issues():
+    """
+
+
+    :return:
+    """
     return render_template('issues.html')
 
 
 @app.route('/pkg/<pkgname>', methods=['GET'])
 def get_and_show_pkg_profile(pkgname=None):
+    """
+
+    :param pkgname:
+    :return:
+    """
     if pkgname is None:
         abort(404)
     check = status.all_packages()
@@ -794,6 +966,11 @@ def get_and_show_pkg_profile(pkgname=None):
 
 @app.route('/repo_packages/<repo>')
 def repo_packages(repo=None):
+    """
+
+    :param repo:
+    :return:
+    """
     if repo is None or repo not in ['antergos', 'antergos-staging']:
         abort(404)
     is_logged_in = user.is_authenticated()
@@ -807,6 +984,11 @@ def repo_packages(repo=None):
 @app.route('/slack/todo', methods=['post'])
 @app.route('/slack/tableflip', methods=['post'])
 def overflow():
+    """
+
+
+    :return:
+    """
     token = request.values.get('token')
     if not token or '' == token:
         abort(404)
