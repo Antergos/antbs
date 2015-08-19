@@ -71,7 +71,7 @@ def remove(src):
         return True
 
 
-def batch_sign(paths, uid=gpg_key, passphrase=password):
+def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
     """
     Batch sign several files with the key matching the given UID.
 
@@ -82,6 +82,9 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
     :param uid:
     :param passphrase:
     """
+    if not isinstance(paths, list):
+        logger.error('paths must be a list')
+        return False
     for path in paths:
         db.publish('build-output', 'Creating detached signature for %s' % path)
         logger.info('[SIGN PKG] Creating detached signature for %s' % path)
@@ -114,6 +117,7 @@ def batch_sign(paths, uid=gpg_key, passphrase=password):
         if len(err) > 0:
             db.publish('build-output', 'Signing FAILED for %s. Error output: %s' % (path, err))
             logger.error('[SIGN PKG] Signing FAILED for %s. Error output: %s' % (path, err))
+            paths = [p for p in paths if not os.path.isdir(p) and not is_iso]
             for p in paths:
                 remove(p)
                 remove(p + '.sig')

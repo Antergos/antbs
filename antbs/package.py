@@ -182,6 +182,7 @@ class Package(PackageMeta):
             if self.name == 'pamac-dev':
                 gitnm = 'pamac'
             elif self.name == 'cnchi-dev':
+                gitnm = 'cnchi'
                 giturl = 'http://github.com/lots0logs/cnchi-dev.git'
             elif self.name == 'cnchi':
                 giturl = 'http://github.com/antergos/cnchi.git'
@@ -190,8 +191,6 @@ class Package(PackageMeta):
                 shutil.rmtree(os.path.join(dirpath, gitnm), ignore_errors=True)
             try:
                 subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=dirpath)
-                if 'cnchi' in self.name:
-                    subprocess.check_output(['tar', '-cf', self.name + '.tar', self.name], cwd=dirpath)
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
 

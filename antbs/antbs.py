@@ -29,8 +29,9 @@
 
 """Main AntBS (Antergos Build Server) Module"""
 
-import newrelic.agent
 import requests
+
+import newrelic.agent
 
 settings = newrelic.agent.global_settings()
 settings.app_name = 'AntBS'
@@ -41,8 +42,8 @@ import re
 import os
 import glob
 import shutil
-from datetime import datetime, timedelta, time
-from rq import Queue, Connection, Worker
+from datetime import datetime, timedelta
+from rq import Queue, Connection
 from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
 import docker
@@ -59,6 +60,7 @@ import package
 import webhook
 import utils.slack_bot as slack_bot
 import build_obj
+import iso
 
 status.github_token = os.environ.get('GITHUB_TOKEN')
 status.gitlab_token = os.environ.get('GITLAB_TOKEN')
@@ -306,7 +308,7 @@ def inject_idle_status():
     return dict(idle=status.idle)
 
 
-@cache.cached(timeout=900, key_prefix='build_info', unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
 
@@ -360,6 +362,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     return pkg_list, int(all_pages), rev_pending
 
 
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_repo_info(repo=None, logged_in=False):
     """
 
@@ -369,52 +372,32 @@ def get_repo_info(repo=None, logged_in=False):
     """
     if repo is None:
         abort(500)
-    rinfo_key = 'cache:repo_info:%s' % repo
-    repo_info_cache = db.exists(rinfo_key)
     pkg_list = {}
     p, a, rev_pending = get_build_info(1, repo, logged_in)
 
-    # logger.info('@@-antbs.py-@@ 293 | GET_REPO_INFO - FIRED')
-    if not repo_info_cache:
-        logger.info('@@-antbs.py-@@ 295 | GET_REPO_INFO - CACHE CHECK FAILED. WE ARE NOT USING CACHED INFO')
-        all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
+    logger.info('@@-antbs.py-@@ 295 | GET_REPO_INFO - CACHE CHECK FAILED. WE ARE NOT USING CACHED INFO')
+    all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
 
-        if all_packages is not None:
-            for item in all_packages:
-                # logger.info(item)
-                item = item.split('/')[-1]
-                item = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', item)
+    if all_packages is not None:
+        for item in all_packages:
+            # logger.info(item)
+            item = item.split('/')[-1]
+            item = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', item)
 
-                item = item.group(0) or ''
-                if not item or item == '':
-                    continue
-                logger.info(item)
-                pkg = package.Package(item)
-                builds = pkg.builds
-                try:
-                    bnum = builds[0]
-                except Exception:
-                    bnum = ''
-                review_stat = db.get('build_log:%s:review_stat' % bnum) or 'n/a'
-                review_stat = db.get('review_stat:%s:string' % review_stat) or 'n/a'
-                review_dev = db.get('build_log:%s:review_dev' % bnum) or 'n/a'
-                review_date = db.get('build_log:%s:review_date' % bnum) or 'n/a'
-                all_info = dict(bnum=bnum, name=pkg.name, version=pkg.version, review_dev=review_dev,
-                                review_stat=review_stat, review_date=review_date, pkgid=pkg.pkgid)
-
-                db.hmset('%s:%s' % (rinfo_key, pkg.pkgid), all_info)
-                db.expire('%s:%s' % (rinfo_key, pkg.pkgid), 901)
-                db.rpush(rinfo_key, pkg.pkgid)
-                db.expire(rinfo_key, 900)
-                pkg_list[pkg.pkgid] = all_info
-
-    else:
-        logger.info('@@-antbs.py-@@ 318 | GET_REPO_INFO - CACHE CHECK PASSED. WE ARE USING CACHED INFO')
-        rindex = db.lrange(rinfo_key, 0, -1)
-        for i in rindex:
-            h = db.hgetall('%s:%s' % (rinfo_key, i))
-            pkg_list[i] = h
-            # logger.info('@@-antbs.py-@@ 320 | GET_REPO_INFO - pkg_list hash is %s' % str(pkg_list))
+            item = item.group(0) or ''
+            if not item or item == '':
+                continue
+            logger.info(item)
+            pkg = package.Package(item)
+            builds = pkg.builds()
+            try:
+                bnum = builds[0]
+            except Exception:
+                bnum = ''
+            bld_obj = build_obj.BuildObject(bnum=bnum)
+            all_info = dict(bnum=bnum, name=pkg.name, version=pkg.version_str, review_dev=bld_obj.review_dev,
+                            review_stat=bld_obj.review_stat, review_date=bld_obj.review_date, pkgid=pkg.pkgid)
+            pkg_list[pkg.pkgid] = all_info
 
     return pkg_list, rev_pending
 
@@ -558,7 +541,7 @@ def flask_error(e):
 
 @app.route("/timeline/<int:tlpage>")
 @app.route("/")
-@cache.cached(timeout=900, unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def homepage(tlpage=None):
     """
 
@@ -692,8 +675,7 @@ def scheduled():
         queued = None
     building = status.now_building
     the_queue = []
-    logger.debug(queued)
-    if queued:
+    if queued and len(queued) > 0:
         for pak in queued:
             try:
                 pkg_obj = package.Package(name=pak)
@@ -914,10 +896,32 @@ def get_status():
     :return:
     """
     building = status.current_status
-    if status.idle:
-        message = dict(msg='Idle')
+    iso_release = bool(request.args.get('do_iso_release', False)) and user.is_authenticated()
+    reset_queue = bool(request.args.get('reset_build_queue', False)) and user.is_authenticated()
+
+    if iso_release:
+        queue.enqueue_call(iso.iso_release_job)
+        message = dict(msg='Ok')
+
+    elif reset_queue:
+        if queue.count > 0:
+            queue.empty()
+        if repo_queue.count > 0:
+            repo_queue.empty()
+        items = len(status.queue())
+        if items > 0:
+            for item in range(items):
+                popped = status.queue().rpop()
+                logger.debug(popped)
+        status.idle = True
+        status.current_status = 'Idle.'
+        message = dict(msg='Ok')
+
     else:
-        message = dict(msg=building)
+        if status.idle:
+            message = dict(msg='Idle')
+        else:
+            message = dict(msg=building)
 
     return json.dumps(message)
 
@@ -946,23 +950,6 @@ def get_and_show_pkg_profile(pkgname=None):
     if not check:
         abort(404)
 
-    # all_pkgs = db.scan_iter('pkg:*:name', 100)
-    #
-    # for pkg in all_pkgs:
-    #     try:
-    #         pkgobj = package.Package(db.get(pkg))
-    #         #key = 'pkg:' + db.get(pkg) + ':'
-    #         completed = db.lrange('completed', 0, -1)
-    #         failed = db.lrange('failed', 0, -1)
-    #         success = len([x for x in pkgobj.builds if x in completed])
-    #         failure = len([x for x in pkgobj.builds if x in failed])
-    #         total = len(pkgobj.builds)
-    #         success = 100 * success/total
-    #         failure = 100 * failure/total
-    #         pkgobj.save_to_db('success_rate', success)
-    #         pkgobj.save_to_db('failure_rate', failure)
-    #     except Exception as err:
-    #         logger.error(err)
     pkgobj = package.Package(name=pkgname)
     if '' == pkgobj.description:
         desc = pkgobj.get_from_pkgbuild('pkgdesc')
@@ -1017,4 +1004,4 @@ def overflow():
 
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=8020, debug=True, use_reloader=False)
+    app.run(host='127.0.0.1', port=8020, debug=False, use_reloader=False)

@@ -9,7 +9,7 @@
 #
 #  AntBS is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation; either version 2 of the License, or
+#  the Free Software Foundation; either version 3 of the License, or
 #  (at your option) any later version.
 #
 #  AntBS is distributed in the hope that it will be useful,
@@ -69,8 +69,8 @@ function setup_environment() {
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
 		export PACKAGER="Antergos Build Server <dev@antergos.com>"
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
-		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = http://repo.antergos.info/$repo/$arch\n%' /etc/pacman.conf
-		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = http://repo.antergos.info/$repo/$arch\n|g' /etc/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
+		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = file:///$repo/$arch\n|g' /etc/pacman.conf
 
 	else
 
@@ -111,7 +111,7 @@ function run_update_repo() {
 
 	for arc in i686 x86_64; do
 		cd "/${repo_dir}/${arc}"
-		repo-add -R -n -f "${repo}.db.tar.gz" ./*.xz
+		repo-add -R -f "${repo}.db.tar.gz" ./${PKGNAME}**.xz
 	done && touch "/result/${PKGNAME}" && return 0;
 
 	return 1

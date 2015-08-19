@@ -17,10 +17,14 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# The following additional terms are in effect as per Section 7 of the license:
+#
+# The preservation of all legal notices and author attributions in
+# the material or in the Appropriate Legal Notices displayed
+# by works containing it is required.
+#
 # You should have received a copy of the GNU General Public License
-# along with AntBS; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+# along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 """ Docker Utilities """
 
@@ -79,7 +83,7 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
                 },
             '/srv/antergos.info/repo/antergos':
                 {
-                    'bind': '/main',
+                    'bind': '/antergos',
                     'ro': False
                 },
             pkgbuild_dir:
@@ -176,8 +180,11 @@ def maybe_build_base_devel():
         logger(err2)
 
     if build_it:
-        # Image was built successfully. Push it to docker hub.
-        push_to_hub('antergos/archlinux-base-devel')
+        try:
+            # Image was built successfully. Push it to docker hub.
+            push_to_hub('antergos/archlinux-base-devel')
+        except Exception:
+            pass
         mpkg = build_makepkg()
         if not mpkg:
             return False

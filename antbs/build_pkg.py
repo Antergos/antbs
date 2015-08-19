@@ -176,11 +176,12 @@ def process_package_queue(the_queue=None):
                     break
         if 'cnchi' in pkg:
             if pkg == 'cnchi-dev':
-                shutil.copytree('/var/tmp/antergos-packages/cnchi-dev/cnchi-dev', '/opt/antergos-packages/cnchi-dev')
+                shutil.move('/var/tmp/antergos-packages/cnchi-dev/cnchi', '/opt/antergos-packages/cnchi-dev/')
             elif pkg == 'cnchi':
-                shutil.copytree('/var/tmp/antergos-packages/cnchi/cnchi', '/opt/antergos-packages/cnchi')
+                shutil.move('/var/tmp/antergos-packages/cnchi/cnchi', '/opt/antergos-packages/cnchi/')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
+            subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd='/opt/antergos-packages/%s' % pkg)
 
         if depends and len(the_queue) > 1:
             all_deps.append(depends)
@@ -385,7 +386,7 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
             continue
         line = line.rstrip()
         end = line[25:]
-        if end not in nodup:
+        if end not in nodup or (end in nodup and 'UTF-8' in end):
             nodup.add(end)
             # line = re.sub(r'(?<=[\w\d])(( \')|(\' )(?=[\w\d]+))|(\'\n)', ' ', line)
             line = line.replace("'", '')
@@ -486,6 +487,7 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
             for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
                 for tfile in f:
                     if 'cnchi' == trans_for:
+                        tfile = os.path.join(r, tfile)
                         shutil.copy(tfile, trans[trans_for]['dest_dir'])
                     elif 'cnchi_updater' == trans_for:
                         mofile = tfile[:-2] + 'mo'
@@ -649,7 +651,7 @@ def build_iso(pkg_obj=None):
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
-    fetch_and_compile_translations(translations_for=["gfxboot", "cnchi_updater"])
+    fetch_and_compile_translations(translations_for=["cnchi_updater"])
 
     flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
     minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
@@ -661,7 +663,7 @@ def build_iso(pkg_obj=None):
         if os.path.exists(flag):
             os.remove(flag)
 
-    if status.iso_minimal:
+    if 'minimal' in pkg_obj.name:
         out_dir = '/out'
         if not os.path.exists(minimal):
             open(minimal, 'a').close()
