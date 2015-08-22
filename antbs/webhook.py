@@ -51,7 +51,7 @@ from utils.server_status import status, Timeline
 logger = logconf.logger
 
 with Connection(db):
-    queue = Queue('build_queue')
+    queue = Queue('hook_queue')
     w = Worker([queue])
 
 
@@ -103,7 +103,7 @@ class Webhook(object):
             self.is_gitlab = False
             self.changes = []
             self.phab_payload = False
-            self.the_queue = status.queue()
+            self.the_queue = status.hook_queue()
             self.repo = 'antergos-packages'
             self.payload = None
             self.full_name = None
@@ -181,7 +181,7 @@ class Webhook(object):
         :return:
         """
         try:
-            key = db.lrange('payloads:index', -1, -1)
+            key = db.lrange('antbs:github:payloads:index', -2, -2)
             logger.info(key)
             logger.info(key[0])
             self.payload = db.hgetall(key[0])
@@ -319,9 +319,6 @@ class Webhook(object):
                             p_li = '<strong>%s</strong>' % p
                         p_ul.append(p_li)
                     if p == last_pkg:
-                        last = True
-                    queue.enqueue_call(builder.handle_hook, args=(first, last), timeout=84600)
-                    if last:
                         if self.is_gitlab:
                             source = 'Gitlab'
                             tltype = 2
@@ -338,6 +335,8 @@ class Webhook(object):
                         events = p_obj.tl_events()
                         events.append(tl_event.event_id)
                     first = False
+
+                queue.enqueue_call(builder.handle_hook, timeout=84600)
 
             if not self.result:
                 self.result = json.dumps({'msg': 'OK!'})

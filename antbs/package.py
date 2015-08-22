@@ -67,6 +67,9 @@ class PackageMeta(RedisObject):
         self.namespace = 'antbs:pkg:%s:' % name
         self.name = name
 
+    def is_deepin_pkg(self):
+        return os.path.exists(os.path.join(REPO_DIR, 'deepin_desktop', self.name))
+
 
 class Package(PackageMeta):
     """
@@ -111,7 +114,7 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
+        if not self or not self.pkg_id and (os.path.exists(os.path.join(REPO_DIR, name)) or self.is_deepin_pkg()):
             # Package is not in the database, so it must be new. Let's initialize it.
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
@@ -148,17 +151,22 @@ class Package(PackageMeta):
             return ''
         self.maybe_update_pkgbuild_repo()
         path = None
-        paths = [os.path.join('/var/tmp/antergos-packages/', self.name),
-                 os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.name),
-                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.name)]
+        paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
+                 os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.pkgname),
+                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
         for p in paths:
+            logger.debug(p)
             if os.path.exists(p):
-                path = os.path.join(p, 'PKGBUILD')
-                if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in()) == 0:
-                    self.allowed_in().append('main')
-                break
+                ppath = os.path.join(p, 'PKGBUILD')
+                logger.debug(ppath)
+                if os.path.exists(ppath):
+                    path = ppath
+                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in()) == 0:
+                        self.allowed_in().append('main')
+                    break
         else:
-            logger.error('get_from_pkgbuild cant determine pkgbuild path')
+            logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
+            return ''
 
         parse = open(path).read()
         dirpath = os.path.dirname(path)
@@ -214,17 +222,20 @@ class Package(PackageMeta):
 
 
         """
-        try:
-            if not os.path.exists('/var/tmp/antergos-packages'):
-                subprocess.check_call(
-                    ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
-                    cwd='/var/tmp')
-            else:
-                subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
-                                      cwd='/var/tmp/antergos-packages')
-                subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
+        if not db.exists('PKGBUILD_REPO_UPDATED'):
+            try:
+                if not os.path.exists('/var/tmp/antergos-packages'):
+                    subprocess.check_call(
+                        ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
+                        cwd='/var/tmp')
+                else:
+                    subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
+                                          cwd='/var/tmp/antergos-packages')
+                    subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
+                db.setex('PKGBUILD_REPO_UPDATED', 500, True)
+            except subprocess.CalledProcessError as err:
+                logger.error(err)
+                raise Exception
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         """
@@ -272,6 +283,10 @@ class Package(PackageMeta):
             if new_val != old_val:
                 changed.append((key, new_val))
                 setattr(self, key, new_val)
+
+        if 'cnchi-dev' == self.name:
+            if self.pkgver[-1] != '0':
+                return False
 
         if not changed:
             return self.version_str

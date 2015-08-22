@@ -68,7 +68,8 @@ class ServerStatus(Singleton):
                                             'docker_password', 'gpg_key', 'gpg_password'],
                               redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
                               redis_string_int=['building_num'],
-                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events'],
+                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
+                                          'hook_queue'],
                               redis_zset=['all_packages'])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]

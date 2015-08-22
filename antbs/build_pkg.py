@@ -46,7 +46,7 @@ import re
 import time
 from multiprocessing import Process
 import package
-from rq import get_current_job
+from rq import Connection, Queue, get_current_job
 from utils.server_status import status, Timeline
 import build_obj
 import utils.sign_pkgs as sign_pkgs
@@ -58,6 +58,11 @@ REPO_DIR = "/opt/antergos-packages"
 doc = docker_utils.doc
 create_host_config = docker_utils.create_host_config
 logger = logconf.logger
+
+with Connection(db):
+    build_queue = Queue('build_queue')
+    repo_queue = Queue('repo_queue')
+    hook_queue = Queue('hook_queue')
 
 
 def remove(src):
@@ -161,7 +166,8 @@ def process_package_queue(the_queue=None):
         pkg_obj = package.get_pkg_object(name=pkg)
         version = pkg_obj.get_version()
         if not version:
-            continue
+            status.queue().remove(pkg_obj.name)
+            logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
         depends = pkg_obj.get_deps()
@@ -180,65 +186,94 @@ def process_package_queue(the_queue=None):
             elif pkg == 'cnchi':
                 shutil.move('/var/tmp/antergos-packages/cnchi/cnchi', '/opt/antergos-packages/cnchi/')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
+            cnchi_dir = '/opt/antergos-packages/%s' % pkg
             fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
+            remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd='/opt/antergos-packages/%s' % pkg)
 
         if depends and len(the_queue) > 1:
             all_deps.append(depends)
+        elif len(the_queue) == 1:
+            all_deps.append(1)
 
     return all_deps
 
 
-def handle_hook(first=False, last=False):
+def handle_hook():
     """
 
     :param first:
     :param last:
     :return:
     """
+    saved_status = False
+    if not status.idle:
+        saved_status = status.current_status
+    else:
+        status.idle = False
+
+    package_queue = status.queue()
+    hook_q = status.hook_queue()
+
+    status.current_status = 'Building docker image.'
+    if not status.iso_flag:
+        if os.path.exists(REPO_DIR):
+            remove(REPO_DIR)
+        try:
+            subprocess.check_call(
+                ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
+                cwd='/opt')
+            subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+
+        image = docker_utils.maybe_build_base_devel()
+
+    else:
+        status.iso_flag = False
+        image = docker_utils.maybe_build_mkarchiso()
+
+    if not image:
+        return False
+
+    logger.info('Checking database for packages.')
+    status.current_status = 'Checking database for queued packages'
+
+    all_deps = process_package_queue(hook_q)
+
+    logger.info('All queued packages are in the database, checking deps to determine build order.')
+    status.current_status = 'Determining build order by sorting package depends'
+
+    if len(all_deps) > 1:
+        topsort = check_deps(all_deps)
+        for p in topsort:
+            hook_q.remove(p)
+            if p not in package_queue:
+                package_queue.append(p)
+                build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+
+    elif len(all_deps) == 1:
+        p = hook_q.lpop()
+        package_queue.append(p)
+        build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+    else:
+        return False
+
+    logger.info('Check deps complete. Starting build_pkgs')
+    status.current_status = 'Check deps complete. Starting build container.'
+
+    if saved_status and status.idle:
+        status.current_status = saved_status
+
+
+def build_pkg_handler():
+    """
+
+
+    :return:
+    """
     status.idle = False
     packages = status.queue()
-
-    if first:
-        status.current_status = 'Building docker image.'
-        if not status.iso_flag:
-            if os.path.exists(REPO_DIR):
-                remove(REPO_DIR)
-            try:
-                subprocess.check_call(
-                    ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
-                    cwd='/opt')
-                subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
-            except subprocess.CalledProcessError as err:
-                logger.error(err)
-
-            image = docker_utils.maybe_build_base_devel()
-
-        else:
-            status.iso_flag = False
-            image = docker_utils.maybe_build_mkarchiso()
-
-        if not image:
-            return False
-
-        logger.info('Checking database for packages.')
-        status.current_status = 'Checking database for queued packages'
-
-        all_deps = process_package_queue(packages)
-
-        logger.info('All queued packages are in the database, checking deps to determine build order.')
-        status.current_status = 'Determining build order by sorting package depends'
-        if len(all_deps) > 1:
-            topsort = check_deps(all_deps)
-            check = []
-            packages.delete()
-            for p in topsort:
-                # TODO: What if there is already a group of packages in queue prior to the current group?
-                packages.append(p)
-
-        logger.info('Check deps complete. Starting build_pkgs')
-        status.current_status = 'Check deps complete. Starting build container.'
-
     if len(packages) > 0:
         pack = status.queue().lpop()
         if pack and pack is not None and pack != '':
@@ -247,8 +282,6 @@ def handle_hook(first=False, last=False):
             return False
 
         rqjob = get_current_job(db)
-        rqjob.meta['is_first'] = first
-        rqjob.meta['is_last'] = last
         rqjob.meta['package'] = pkgobj.name
         rqjob.save()
 
@@ -258,7 +291,7 @@ def handle_hook(first=False, last=False):
             status.iso_building = True
             built = build_iso(pkgobj)
         else:
-            built = build_pkgs(last, pkgobj)
+            built = build_pkgs(pkgobj)
         # TODO: Move this into its own method
         if built:
             completed = status.completed()
@@ -279,7 +312,7 @@ def handle_hook(first=False, last=False):
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
 
-    if last:
+    if len(packages) == 0:
         remove('/opt/antergos-packages')
         status.idle = True
         status.building = 'Idle'
@@ -508,7 +541,7 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
             logger.error(err)
 
 
-def build_pkgs(last=False, pkg_info=None):
+def build_pkgs(pkg_info=None):
     """
 
     :param last:
@@ -569,7 +602,7 @@ def build_pkgs(last=False, pkg_info=None):
             try:
                 container = doc.create_container("antergos/makepkg",
                                                  command="/makepkg/build.sh " + pkg_deps_str,
-                                                 volumes=['/var/cache/pacman', '/makepkg', '/repo',
+                                                 volumes=['/var/cache/pacman', '/makepkg', '/antergos',
                                                           '/pkg', '/root/.gnupg', '/staging',
                                                           '/32bit', '/32build', '/result'],
                                                  environment=build_env, cpuset='0-3', name=pkg,
@@ -590,13 +623,13 @@ def build_pkgs(last=False, pkg_info=None):
                 stream_process = Process(target=publish_build_ouput, kwargs=dict(container=cont, bld_obj=bld_obj))
                 stream_process.start()
                 result = doc.wait(cont)
-                stream_process.join()
                 if result != 0:
                     bld_obj.failed = True
                     logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                 else:
                     logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
                     bld_obj.completed = True
+                stream_process.join()
             except Exception as err:
                 logger.error('Start container failed. Error Msg: %s' % err)
                 bld_obj.failed = True

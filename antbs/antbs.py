@@ -200,11 +200,8 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
 
 with Connection(db):
     queue = Queue('build_queue')
-    # w = Worker([queue], exc_handler=handle_worker_exception)
     repo_queue = Queue('repo_queue')
-    # repo_w = Worker([repo_queue], exc_handler=handle_worker_exception)
-    # w.work()
-    # repo_w.work()
+    hook_queue = Queue('hook_queue')
 
 
 def url_for_other_page(page):
@@ -278,7 +275,7 @@ def match_pkg_name_build_log(bnum=None, match=None):
     pname = build_obj.get_build_object(bnum=bnum)
     logger.info(bnum)
     if pname:
-        return match in pname
+        return match in pname.pkgname
     else:
         return False
 
@@ -876,9 +873,9 @@ def build_pkg_now():
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                         return redirect(redirect_url())
 
-                q = status.queue()
+                q = status.hook_queue()
                 q.rpush(pkgname)
-                queue.enqueue_call(builder.handle_hook, args=args, timeout=84600)
+                hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 tl_event(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname),
                     tl_type='0')

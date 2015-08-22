@@ -47,15 +47,14 @@ function setup_environment() {
 
 	update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
 	update_success='STAGING REPO UPDATE COMPLETE'
-	mkdir /var/cache/pacman/success
+	mkdir /var/cache/pacman/success || true
 	export HOME=/root
 
 	if [[ -f /pkg/PKGBUILD ]]; then
 
 		source /pkg/PKGBUILD && export PKGNAME="${pkgname}"
 		chmod -R a+rw /pkg
-		cd /pkg && git pull
-		pacman -S wget --noconfirm
+		cd /pkg
 
 	elif [[ "${_UPDREPO}" != "True" ]]; then
 
@@ -71,6 +70,7 @@ function setup_environment() {
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
 		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
 		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = file:///$repo/$arch\n|g' /etc/pacman.conf
+		pacman -Syy
 
 	else
 
@@ -78,7 +78,7 @@ function setup_environment() {
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /etc/makepkg.conf
 		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
 		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
-		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = http://repo.antergos.info/$repo/$arch\n%' /etc/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
 		#sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
 
 	fi
@@ -166,7 +166,7 @@ function check_pkg_sums() {
 		if [[ ${1} = '' ]]; then
 			sudo -u antbs /usr/bin/updpkgsums 2>&1 && return 0
 		else
-			arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; sudo -u antbs /usr/bin/updpkgsums" 2>&1 && return 0;
+			arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; chmod -R a+rw /pkg; sudo -u antbs /usr/bin/updpkgsums" 2>&1 && return 0;
 		fi
 	else
 		return 0
@@ -176,46 +176,33 @@ function check_pkg_sums() {
 
 }
 
-function build_32bit_pkg() {
+function setup_32bit_env() {
 
-	print2log 'BUILDING i686 PACKAGE';
 	chmod -R 777 /32build
 	chmod -R a+rw /staging/i686
 	cp /usr/share/devtools/makepkg-i686.conf /32bit/makepkg.conf
 	cp /etc/pacman.conf /32bit
+	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
+	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
+	mkdir /run/shm || true
 
 	if [[ ${_ALEXPKG} = False ]]; then
 
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /32bit/makepkg.conf
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /32bit/makepkg.conf
 		cd /32bit
-
-		if ! grep -Rl 'antergos-staging'; then
-
-			sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = http://repo.antergos.info/$repo/$arch\n%' /32bit/pacman.conf
-		fi
-
-		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = http://repo.antergos.info/$repo/$arch\n|g' /32bit/pacman.conf
-
 	else
-
 		sed -i '/\[antergos/,+1 d' /32bit/pacman.conf
-		sed -i '/\[antergos-staging/,+1 d' /32bit/pacman.conf
 		cd /32bit
-		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = http://repo.antergos.info/$repo/$arch\n%' /32bit/pacman.conf
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /32bit/makepkg.conf
-
 	fi
 
-	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
-	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
-	mkdir /run/shm || true
-	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget #reflector
+	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo
 	mkdir /32build/root/pkg
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
 
-	for conf in /32bit/pacman.conf /etc/sudoers /etc/passwd /etc/group; do
+	for conf in /32bit/pacman.conf /32bit/makepkg.conf /etc/sudoers /etc/passwd /etc/group; do
 
 		cp "${conf}" /32build/root/etc/
 
@@ -225,21 +212,25 @@ function build_32bit_pkg() {
 	sed -i '1s/^/CARCH="i686"\n/' /32build/root/pkg/PKGBUILD
 	chmod a+rw /32build/root
 	chmod a+rw /32build/root/pkg
-	#find /32build/root -maxdepth 1 -exec chmod a+rw {} \;
-	#find /32build/root/pkg -exec chmod a+rw {} \;
 	chmod 644 /32build/root/etc/sudoers
 	chmod -R 644 /32build/root/etc/sudoers.d
 	chmod 755 /32build/root/etc/sudoers.d
 	chmod 700 /32build/root/usr/lib/sudo
 	chmod 600 /32build/root/usr/lib/sudo/*.so
-	cp -R /etc/pacman.d /32build/root/etc
-	cd /32build/root && wget http://repo.antergos.info/antergos/i686/antergos-keyring-20150806-1-any.pkg.tar.xz
-	arch-chroot /32build/root pacman -Scc --noconfirm --noprogressbar --color never && pacman -Syy
-	arch-chroot /32build/root pacman -U --noconfirm --noprogressbar --color never /antergos-keyring-20150806-1-any.pkg.tar.xz
+	sed -i 's|file:\/\/\/\$repo/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
+	sed -i 's|file:\/\/\/staging/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
+	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 
+}
+
+
+function build_32bit_pkg() {
+
+	print2log 'CREATING 32-BIT BUILD ENVIRONMENT';
+	setup_32bit_env
 	print2log 'UPDATING 32BIT SOURCE CHECKSUMS'
 	check_pkg_sums 32bit
-	cd /makepkg;
+	cd /32bit
 
 	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; sudo -u antbs /usr/bin/makepkg -smfL --noconfirm --noprogressbar --needed" 2>&1 && \
       cp /32build/root/pkg/*-i686.pkg.* /staging/i686 && return 0; } || return 1
@@ -250,7 +241,6 @@ function build_32bit_pkg() {
 function try_build() {
 
 	print2log 'TRYING BUILD';
-	cd /makepkg
 	chmod -R a+rw /pkg
 	chmod 777 /pkg
 	if [[ "$1" = "i686" ]]; then
@@ -286,9 +276,6 @@ setup_environment
 if [[ "${_UPDREPO}" != "True" ]]; then
 
 	print2log 'SYNCING REPO DATABASES'
-	#pacman-key --init && pacman-key --populate archlinux antergos
-	#yaourt -Scc --noconfirm --noprogressbar --color never 2>&1
-	pacman -Syy wget --noconfirm --noprogressbar --color never 2>&1
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64
 
