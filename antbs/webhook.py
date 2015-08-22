@@ -343,14 +343,12 @@ class Webhook(object):
 
     def process_cnchi(self):
         """
+        Generate installation ID then store it along with the clients ip in result variable.
 
-
+        :return: None
         """
-        a_b_test = db.get('CNCHI_A_B_TEST')
 
-        if a_b_test == 'A':
-            db.set('CNCHI_A_B_TEST', 'B')
-        elif a_b_test == 'B':
-            db.set('CNCHI_A_B_TEST', 'A')
+        install_id = db.incr('cnchi:install_id:next')
+        client_ip = self.request.remote_addr
 
-        self.result = json.dumps({'msg': a_b_test})
+        self.result = json.dumps({'id': install_id, 'ip': client_ip})

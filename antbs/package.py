@@ -31,6 +31,7 @@ import sys
 
 from github3 import login
 import shutil
+import time
 
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
@@ -81,18 +82,18 @@ class Package(PackageMeta):
 
     Attributes:
         (str)
-            name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc,
-            version_str: The package's version including pkgrel for displaying on the frontend.,
-            short_name: Optional name to use on frontend instead of the pkgname.,
-            path: Absolute path to the package's directory (subdir of antergos-packages directory),
-            pbpath: Absolute path to the package's PKGBUILD file.,
-            build_path: Absolute path to the the package's build directory.,
-            success_rate: The package's rate of successful builds.,
+            name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc: self explanatory (see `man PKGBUILD`)
+            version_str: The package's version including pkgrel for displaying on the frontend.
+            short_name: Optional name to use on frontend instead of the pkgname.
+            path: Absolute path to the package's directory (subdir of antergos-packages directory)
+            pbpath: Absolute path to the package's PKGBUILD file.
+            build_path: Absolute path to the the package's build directory.
+            success_rate: The package's rate of successful builds.
             failure_rate: The package's rate of build failures.
         
         (bool)
-            push_version: Should we automatically update the version and push to Github (for pkgrel bumps)?,
-            autosum: Does the package's PKGBUILD download checksums when makepkg is called?,
+            push_version: Should we automatically update the version and push to Github (for pkgrel bumps)?
+            autosum: Does the package's PKGBUILD download checksums when makepkg is called?
             saved_commit: When making changes to be pushed to github, do we have a saved commit not yet pushed?
             is_iso: Is this a dummy package for building an install iso image?
 
@@ -100,8 +101,8 @@ class Package(PackageMeta):
             pkg_id: ID assigned to the package when it is added to our database for the first time.
 
         (list)
-            allowed_in: The repos that the package is allowed to be in.,
-            builds: The IDs of all builds (coompleted & failed) for the package.,
+            allowed_in: The repos that the package is allowed to be in.
+            builds: The IDs of all builds (coompleted & failed) for the package.
             tl_events: The IDs of all timeline events that include this package.
 
         (set)
@@ -222,20 +223,22 @@ class Package(PackageMeta):
 
 
         """
-        if not db.exists('PKGBUILD_REPO_UPDATED'):
+        if not db.exists('PKGBUILD_REPO_UPDATED') and not db.exists('PKGBUILD_REPO_LOCK'):
+            db.set('PKGBUILD_REPO_LOCK', True)
             try:
-                if not os.path.exists('/var/tmp/antergos-packages'):
-                    subprocess.check_call(
-                        ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
-                        cwd='/var/tmp')
-                else:
-                    subprocess.check_call(['git', 'reset', '--hard', 'origin/master'],
-                                          cwd='/var/tmp/antergos-packages')
-                    subprocess.check_call(['git', 'pull'], cwd='/var/tmp/antergos-packages')
-                db.setex('PKGBUILD_REPO_UPDATED', 500, True)
+                if os.path.exists('/var/tmp/antergos-packages'):
+                    shutil.rmtree('/var/tmp/antergos-packages')
+                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
+                db.setex('PKGBUILD_REPO_UPDATED', 350, True)
             except subprocess.CalledProcessError as err:
                 logger.error(err)
-                raise Exception
+                db.delete('PKGBUILD_REPO_UPDATED')
+
+            db.delete('PKGBUILD_REPO_LOCK')
+
+        elif not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
+            while db.exists('PKGBUILD_REPO_LOCK'):
+                time.sleep(3)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         """

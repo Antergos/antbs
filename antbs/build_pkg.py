@@ -312,6 +312,7 @@ def build_pkg_handler():
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
 
+    packages = status.queue()
     if len(packages) == 0:
         remove('/opt/antergos-packages')
         status.idle = True
