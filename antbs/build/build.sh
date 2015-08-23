@@ -233,7 +233,7 @@ function build_32bit_pkg() {
 	check_pkg_sums 32bit
 	cd /32bit
 
-	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; sudo -u antbs /usr/bin/makepkg -smfL --noconfirm --noprogressbar --needed" 2>&1 && \
+	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -smfL --noconfirm --noprogressbar --needed" 2>&1 && \
       cp /32build/root/pkg/*-i686.pkg.* /staging/i686 && return 0; } || return 1
 
 }

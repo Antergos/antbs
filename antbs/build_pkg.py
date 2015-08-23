@@ -219,7 +219,7 @@ def handle_hook():
     package_queue = status.queue
     hook_q = status.hook_queue
 
-    status.current_status = 'Building docker image.'
+    status.current_status = 'Build hook was triggered. Checking docker images.'
     if not status.iso_flag:
         if os.path.exists(REPO_DIR):
             remove(REPO_DIR)
@@ -240,13 +240,13 @@ def handle_hook():
     if not image:
         return False
 
-    logger.info('Checking database for packages.')
-    status.current_status = 'Checking database for queued packages'
+    logger.info('Processing packages.')
+    status.current_status = 'Processing packages.'
 
     all_deps = process_package_queue(hook_q)
 
     logger.info('All queued packages are in the database, checking deps to determine build order.')
-    status.current_status = 'Determining build order by sorting package depends'
+    status.current_status = 'Determining build order based on package dependencies.'
 
     if len(all_deps) > 1:
         topsort = check_deps(all_deps)
@@ -481,7 +481,7 @@ def process_and_save_build_metadata(pkg_obj=None):
     build_id = bld_obj.bnum
     tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg_obj.name)
     Timeline(msg=tlmsg, tl_type=3)
-    pbuilds = pkg_obj.builds()
+    pbuilds = pkg_obj.builds
     pbuilds.append(build_id)
     run_docker_clean(pkg_obj.name)
 
@@ -594,7 +594,7 @@ def build_pkgs(pkg_info=None):
         pkg = pkg_info.name
         if pkg and pkg is not None and pkg != '':
             pkgbuild_dir = pkg_info.build_path
-            pkg_deps = pkg_info.depends() or []
+            pkg_deps = pkg_info.depends or []
             pkg_deps_str = ' '.join(pkg_deps) if pkg_deps else ''
 
             bld_obj = process_and_save_build_metadata(pkg_obj=pkg_info)

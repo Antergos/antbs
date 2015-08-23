@@ -218,11 +218,12 @@ def url_for_other_page(page):
 app.jinja_env.globals['url_for_other_page'] = url_for_other_page
 
 
-def get_live_build_ouput():
+def get_live_build_output():
     """
 
 
     """
+
     psub = db.pubsub()
     psub.subscribe('build-output')
     first_run = True
@@ -240,6 +241,26 @@ def get_live_build_ouput():
         gevent.sleep(.05)
 
     psub.close()
+
+
+def get_live_status_updates():
+    """
+
+    :return:
+    """
+
+    last_event = None
+    while True:
+        idle = status.idle
+        building = status.current_status
+        if idle and 'Idle' != last_event:
+            last_event = 'Idle'
+            yield 'data: %s\n\n' % 'Idle'
+        elif not idle and building != last_event:
+            last_event = building
+            yield 'data: %s\n\n' % building
+
+        gevent.sleep(1)
 
 
 def get_paginated(item_list, per_page, page, timeline):
@@ -328,7 +349,6 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
 
     try:
         all_builds = getattr(status, build_status)
-        all_builds = all_builds()
     except Exception as err:
         logger.error('GET_BUILD_INFO - %s', err)
         abort(500)
@@ -385,13 +405,13 @@ def get_repo_info(repo=None, logged_in=False):
             if not item or item == '':
                 continue
             logger.info(item)
-            pkg = package.Package(item)
-            builds = pkg.builds()
+            pkg = package.get_pkg_object(item)
+            builds = pkg.builds
             try:
                 bnum = builds[0]
             except Exception:
                 bnum = ''
-            bld_obj = build_obj.BuildObject(bnum=bnum)
+            bld_obj = build_obj.get_build_object(bnum=bnum)
             all_info = dict(bnum=bnum, name=pkg.name, version=pkg.version_str, review_dev=bld_obj.review_dev,
                             review_stat=bld_obj.review_stat, review_date=bld_obj.review_date, pkgid=pkg.pkgid)
             pkg_list[pkg.pkgid] = all_info
@@ -554,7 +574,6 @@ def homepage(tlpage=None):
     stats = {}
     for stat in check_stats:
         builds = getattr(status, stat)
-        builds = builds()
         res = len(builds)
         if stat != "queue":
             builds = [x for x in builds if x is not None]
@@ -631,7 +650,7 @@ def get_log():
     if status.idle:
         abort(404)
 
-    return Response(get_live_build_ouput(), direct_passthrough=True, mimetype='text/event-stream')
+    return Response(get_live_build_output(), direct_passthrough=True, mimetype='text/event-stream')
 
 
 @app.route('/hook', methods=['POST', 'GET'])
@@ -914,13 +933,10 @@ def get_status():
         status.current_status = 'Idle.'
         message = dict(msg='Ok')
 
-    else:
-        if status.idle:
-            message = dict(msg='Idle')
-        else:
-            message = dict(msg=building)
+        return json.dumps(message)
 
-    return json.dumps(message)
+    else:
+        return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
 
 
 @app.route('/issues', methods=['GET'])

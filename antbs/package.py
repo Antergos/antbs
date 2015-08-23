@@ -162,8 +162,8 @@ class Package(PackageMeta):
                 logger.debug(ppath)
                 if os.path.exists(ppath):
                     path = ppath
-                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in()) == 0:
-                        self.allowed_in().append('main')
+                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
+                        self.allowed_in.append('main')
                     break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
@@ -329,9 +329,9 @@ class Package(PackageMeta):
             if dep in status.all_packages and dep in queue:
                 depends.append(dep)
                 if dep in deps:
-                    self.depends().add(dep)
+                    self.depends.add(dep)
                 elif dep in mkdeps:
-                    self.makedepends().add(dep)
+                    self.makedepends.add(dep)
 
         res = (self.name, depends)
 

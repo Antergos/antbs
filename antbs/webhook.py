@@ -332,7 +332,7 @@ class Webhook(object):
                             msg='Webhook triggered by <strong>%s.</strong> Packages added to the build queue: %s' % (
                                 source, the_pkgs_str), tl_type=tltype)
                         p_obj = package.Package(p)
-                        events = p_obj.tl_events()
+                        events = p_obj.tl_events
                         events.append(tl_event.event_id)
                     first = False
 

@@ -168,6 +168,7 @@ def maybe_build_base_devel():
         return True
 
     # No image was built in the past 24 hours, let's build one.
+    status.current_status = 'Docker images are stale. Building new images.'
     build_script = os.path.join(DOC_DIR, 'base-devel.sh')
     build_it = False
     try:

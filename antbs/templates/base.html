@@ -744,31 +744,28 @@
 
                         jQuery('#main pre').addClass('pre-scrollable');
                         jQuery('.not-idle').show();
-                        function getStatus() {
-                            $.getJSON('/get_status', function (data) {
+                        sse = new EventSource('/get_status');
+                        sse.onmessage = function (message) {
                                 var current = jQuery('#status_bar_pre').text();
-                                if (data['msg'] !== current) {
+                                if (message.data !== current) {
                                     jQuery('.idle').addClass('not-idle').removeClass('idle');
                                     jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
                                     jQuery('.fa-spinner').addClass('fa-spin');
                                     jQuery('#status_bar').show();
-                                    jQuery('#status_bar_pre').text(data['msg']);
+                                    jQuery('#status_bar_pre').text(message.data);
                                     current = jQuery('#status_bar_pre').text();
                                 }
-                                if (data['msg'] == 'Idle' || current == 'Idle') {
+                                if (message.data == 'Idle' || current == 'Idle') {
 
                                     jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
                                     jQuery('.fa-spin').removeClass('fa-spin');
                                     jQuery('#status_bar').hide();
 
                                 }
-                            })
+                            }
 
-                        }
+                        });
 
-                        getStatus();
-                        setInterval(getStatus, 10000);
-                    });
                     jQuery(window).load(function () {
                                 jQuery('[data-toggle="tooltip"]').tooltip();
 

@@ -380,8 +380,6 @@ class RedisObject(object):
             db.hset(key, attrib, str(value))
 
         elif attrib in self.key_lists['redis_list'] or attrib in self.key_lists['redis_zset']:
-            if not callable(value):
-                raise ValueError(type(value))
             super(RedisObject, self).__setattr__(attrib, value)
 
     @staticmethod
