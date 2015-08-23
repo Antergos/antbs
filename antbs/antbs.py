@@ -227,6 +227,7 @@ def get_live_build_output():
     psub = db.pubsub()
     psub.subscribe('build-output')
     first_run = True
+    keep_alive = 0
     while True:
         message = psub.get_message()
         if message:
@@ -236,8 +237,12 @@ def get_live_build_output():
             elif message['data'] == '1' or message['data'] == 1:
                 message['data'] = '...'
 
-            yield 'data: %s\n\n' % message['data']
+            yield 'event: build_output\ndata: %s\n\n' % message['data']
+        elif keep_alive > 600:
+            keep_alive = 0
+            yield ':'
 
+        keep_alive += 1
         gevent.sleep(.05)
 
     psub.close()
@@ -250,6 +255,7 @@ def get_live_status_updates():
     """
 
     last_event = None
+    keep_alive = 0
     while True:
         idle = status.idle
         building = status.current_status
@@ -259,7 +265,11 @@ def get_live_status_updates():
         elif not idle and building != last_event:
             last_event = building
             yield 'data: %s\n\n' % building
+        elif keep_alive > 30:
+            keep_alive = 0
+            yield ':'
 
+        keep_alive += 1
         gevent.sleep(1)
 
 
@@ -445,7 +455,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         bld_obj = build_obj.get_build_object(bnum=bnum)
         pkg_obj = package.Package(name=bld_obj.pkgname)
         if pkg_obj:
-            allowed = pkg_obj.allowed_in()
+            allowed = pkg_obj.allowed_in
             if 'main' not in allowed and result == 'passed':
                 msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
                 errmsg.update(error=True, msg=msg)

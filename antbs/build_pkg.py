@@ -293,11 +293,11 @@ def build_pkg_handler():
 
         if pkgobj.is_iso is True or pkgobj.is_iso == 'True':
             status.iso_building = True
-            built = build_iso(pkgobj)
+            build_result = build_iso(pkgobj)
         else:
-            built = build_pkgs(pkgobj)
+            build_result = build_pkgs(pkgobj)
         # TODO: Move this into its own method
-        if built:
+        if build_result is not None:
             completed = status.completed
             failed = status.failed
             blds = pkgobj.builds
@@ -315,6 +315,9 @@ def build_pkg_handler():
                     failure = 0
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
+
+        if build_result is True:
+            run_docker_clean(pkgobj.pkgname)
 
     packages = status.queue
     if len(packages) == 0:
