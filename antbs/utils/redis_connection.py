@@ -338,17 +338,19 @@ class RedisObject(object):
     __bool__ = __nonzero__
 
     def __getattribute__(self, attrib):
-        key = self.prefix
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__getattribute__(attrib)
 
-        elif attrib in self.key_lists['redis_string']:
+        key = self.prefix
+
+        if attrib in self.key_lists['redis_string']:
             return db.hget(key, attrib) if db.hexists(key, attrib) else ''
 
         elif attrib in self.key_lists['redis_string_bool']:
-            return bool(db.hget(key, attrib)) if db.hexists(key, attrib) else False
+            val = db.hget(key, attrib) if db.hexists(key, attrib) else 'False'
+            return self.bool_string_helper(val)
 
         elif attrib in self.key_lists['redis_string_int']:
             return int(db.hget(key, attrib)) if db.hexists(key, attrib) else 0
@@ -360,19 +362,24 @@ class RedisObject(object):
             return RedisZSet.as_child(self, attrib, str)
 
     def __setattr__(self, attrib, value, score=None):
-        key = self.prefix
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', self.key_lists['redis_list'],
-                     self.key_lists['redis_zset'], 'prefix']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
 
         if attrib in pass_list or attrib not in self.all_keys:
             super(RedisObject, self).__setattr__(attrib, value)
+            return
 
-        elif attrib in self.key_lists['redis_string']:
+        key = self.prefix
+
+        if attrib in self.key_lists['redis_list'] or attrib in self.key_lists['redis_zset']:
+            super(RedisObject, self).__setattr__(attrib, value)
+            return
+
+        if attrib in self.key_lists['redis_string']:
             db.hset(key, attrib, value)
 
         elif attrib in self.key_lists['redis_string_bool']:
-            if value in ['True', 'False']:
-                db.hset(key, attrib, value)
+            if value in [True, False]:
+                db.hset(key, attrib, self.bool_string_helper(value))
             else:
                 raise ValueError
 
