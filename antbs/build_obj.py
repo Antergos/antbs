@@ -58,6 +58,7 @@ class BuildObject(RedisObject):
         if not bnum:
             next_bnum = db.incr('antbs:misc:bnum:next')
             self.namespace = 'antbs:build:%s:' % next_bnum
+            self.prefix = self.namespace[:-1]
             for key in self.all_keys:
                 if key in self.key_lists['redis_string']:
                     value = getattr(pkg_obj, key, '')
@@ -77,6 +78,7 @@ class BuildObject(RedisObject):
             self.completed = False
         else:
             self.namespace = 'antbs:build:%s:' % bnum
+            self.prefix = self.namespace[:-1]
 
     @staticmethod
     def datetime_to_string(dt):

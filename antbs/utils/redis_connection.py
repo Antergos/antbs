@@ -321,6 +321,7 @@ class RedisObject(object):
 
     def __init__(self):
         self.namespace = 'antbs:'
+        self.prefix = self.namespace[:-1]
         self.key_lists = dict(
             redis_string=[],
             redis_string_bool=[],
@@ -332,22 +333,22 @@ class RedisObject(object):
     def __nonzero__(self):
         """ Test if an object currently exists in database. """
 
-        return db.exists(self.namespace[:-1])
+        return db.exists(self.prefix)
 
     __bool__ = __nonzero__
 
     def __getattribute__(self, attrib):
-        if attrib in ['key_lists', 'all_keys', 'namespace', 'database'] or attrib not in self.all_keys:
+        key = self.prefix
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
+
+        if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__getattribute__(attrib)
 
-        key = self.namespace[:-1]
-
-        if attrib in self.key_lists['redis_string']:
+        elif attrib in self.key_lists['redis_string']:
             return db.hget(key, attrib) if db.hexists(key, attrib) else ''
 
         elif attrib in self.key_lists['redis_string_bool']:
-            val = db.hget(key, attrib) if db.hexists(key, attrib) else False
-            return self.bool_string_helper(val)
+            return bool(db.hget(key, attrib)) if db.hexists(key, attrib) else False
 
         elif attrib in self.key_lists['redis_string_int']:
             return int(db.hget(key, attrib)) if db.hexists(key, attrib) else 0
@@ -359,28 +360,27 @@ class RedisObject(object):
             return RedisZSet.as_child(self, attrib, str)
 
     def __setattr__(self, attrib, value, score=None):
-        if attrib in ['key_lists', 'all_keys', 'namespace', 'database'] or attrib not in self.all_keys:
+        key = self.prefix
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', self.key_lists['redis_list'],
+                     self.key_lists['redis_zset'], 'prefix']
+
+        if attrib in pass_list or attrib not in self.all_keys:
             super(RedisObject, self).__setattr__(attrib, value)
-            return
 
-        key = self.namespace[:-1]
-
-        if attrib in self.key_lists['redis_string']:
+        elif attrib in self.key_lists['redis_string']:
             db.hset(key, attrib, value)
 
         elif attrib in self.key_lists['redis_string_bool']:
-            if isinstance(value, bool):
-                value = self.bool_string_helper(value)
-            if isinstance(value, str) and value in ['True', 'False']:
+            if value in ['True', 'False']:
                 db.hset(key, attrib, value)
             else:
                 raise ValueError
 
         elif attrib in self.key_lists['redis_string_int']:
-            db.hset(key, attrib, str(value))
+            db.hset(key, attrib, value)
 
-        elif attrib in self.key_lists['redis_list'] or attrib in self.key_lists['redis_zset']:
-            super(RedisObject, self).__setattr__(attrib, value)
+        else:
+            raise ValueError
 
     @staticmethod
     def bool_string_helper(value):

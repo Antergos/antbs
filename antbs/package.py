@@ -66,6 +66,7 @@ class PackageMeta(RedisObject):
             raise AttributeError
 
         self.namespace = 'antbs:pkg:%s:' % name
+        self.prefix = self.namespace[:-1]
         self.name = name
 
     def is_deepin_pkg(self):
@@ -281,15 +282,14 @@ class Package(PackageMeta):
         """
         changed = []
         for key in ['pkgver', 'pkgrel', 'epoch']:
-            old_val = getattr(self, key)
-            new_val = self.get_from_pkgbuild(key)
+            old_val = str(getattr(self, key))
+            new_val = str(self.get_from_pkgbuild(key))
             if new_val != old_val:
                 changed.append((key, new_val))
                 setattr(self, key, new_val)
 
-        if 'cnchi-dev' == self.name:
-            if self.pkgver[-1] != '0':
-                return False
+        if 'cnchi-dev' == self.name and self.pkgver[-1] != '0':
+            return False
 
         if not changed:
             return self.version_str
@@ -299,7 +299,7 @@ class Package(PackageMeta):
             version = self.epoch + ':' + version
 
         version = version + '-' + self.pkgrel
-        if version and version != '' and version is not None:
+        if version and version != '' and version is not None and version != '-':
             self.version_str = version
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:

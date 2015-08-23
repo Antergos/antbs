@@ -62,6 +62,7 @@ class ServerStatus(Singleton):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
 
         self.namespace = 'antbs:status:'
+        self.prefix = self.namespace[:-1]
 
         self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
                                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
@@ -120,6 +121,7 @@ class Timeline(RedisObject):
         if not event_id:
             next_id = db.incr('antbs:misc:event_id:next')
             self.namespace = 'antbs:timeline:%s:' % next_id
+            self.prefix = self.namespace[:-1]
             self.event_id = next_id
             all_events = status.all_tl_events
             all_events.append(self.event_id)
@@ -130,6 +132,7 @@ class Timeline(RedisObject):
             self.date_str = self.dt_time_to_string(dt)
         else:
             self.namespace = 'antbs:timeline:%s:' % event_id
+            self.prefix = self.namespace[:-1]
 
     @staticmethod
     def dt_date_to_string(dt):
