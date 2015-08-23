@@ -68,6 +68,7 @@ function setup_environment() {
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
 		export PACKAGER="Antergos Build Server <dev@antergos.com>"
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
+		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
 		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
 		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = file:///$repo/$arch\n|g' /etc/pacman.conf
 		pacman -Syy

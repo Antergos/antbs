@@ -951,6 +951,7 @@ def get_and_show_pkg_profile(pkgname=None):
     if '' == pkgobj.description:
         desc = pkgobj.get_from_pkgbuild('pkgdesc')
         pkgobj.description = desc
+        pkgobj.pkgdesc = desc
 
     return render_template('package.html', pkg=pkgobj)
 

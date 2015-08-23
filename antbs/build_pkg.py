@@ -181,15 +181,19 @@ def process_package_queue(the_queue=None):
                     pkg_obj.build_path = p
                     break
         if 'cnchi' in pkg:
-            if pkg == 'cnchi-dev':
-                shutil.move('/var/tmp/antergos-packages/cnchi-dev/cnchi', '/opt/antergos-packages/cnchi-dev/')
-            elif pkg == 'cnchi':
-                shutil.move('/var/tmp/antergos-packages/cnchi/cnchi', '/opt/antergos-packages/cnchi/')
+            src = os.path.join('/var/tmp/antergos-packages/', pkg, 'cnchi')
+            dest = os.path.join('/opt/antergos-packages/', pkg)
+            shutil.move(src, dest)
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             cnchi_dir = '/opt/antergos-packages/%s' % pkg
             fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd='/opt/antergos-packages/%s' % pkg)
+        elif 'numix-icon-theme-square' in pkg:
+            src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg)
+            dest = os.path.join('/opt/antergos-packages/', pkg)
+            shutil.move(src, dest)
+            subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
         if depends and len(the_queue) > 1:
             all_deps.append(depends)
@@ -432,7 +436,12 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
             db.publish('build-output', line)
             db.set('build_log_last_line', line)
 
-    failed = bld_obj.failed if bld_obj.completed != bld_obj.failed and not bld_obj.completed else False
+    result_ready = bld_obj.completed != bld_obj.failed
+    if not result_ready:
+        while not result_ready:
+            result_ready = bld_obj.completed != bld_obj.failed
+            time.sleep(3)
+    failed = bld_obj.failed
     if upd_repo or failed:
         db.publish('build-output', 'ENDOFLOG')
 

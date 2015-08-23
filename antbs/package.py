@@ -317,25 +317,21 @@ class Package(PackageMeta):
         deps = self.get_from_pkgbuild('depends').split()
         logger.info('deps are %s', deps)
         mkdeps = self.get_from_pkgbuild('makedepends').split()
-        queue = status.queue
+        build_queue = status.queue()
+        hook_queue = status.hook_queue()
+        queue = build_queue + hook_queue
 
-        for dep in deps:
+        all_deps = deps + mkdeps
+        for dep in all_deps:
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
-            if has_ver is not None:
+            if has_ver and has_ver is not None:
                 dep = has_ver.group(0)
-                if dep in status.all_packages() and dep in queue:
-                    depends.append(dep)
-
-                self.depends().add(dep)
-
-        for mkdep in mkdeps:
-            has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', mkdep)
-            if has_ver is not None:
-                mkdep = has_ver.group(0)
-                if mkdep in status.all_packages() and mkdep in queue:
-                    depends.append(mkdep)
-
-                self.makedepends().add(mkdep)
+            if dep in status.all_packages() and dep in queue:
+                depends.append(dep)
+                if dep in deps:
+                    self.depends().add(dep)
+                elif dep in mkdeps:
+                    self.makedepends().add(dep)
 
         res = (self.name, depends)
 
