@@ -121,7 +121,7 @@ class Timeline(RedisObject):
             next_id = db.incr('antbs:misc:event_id:next')
             self.namespace = 'antbs:timeline:%s:' % next_id
             self.event_id = next_id
-            all_events = status.all_tl_events()
+            all_events = status.all_tl_events
             all_events.append(self.event_id)
             self.tl_type = tl_type
             self.message = msg

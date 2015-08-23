@@ -86,7 +86,7 @@ class RedisField(object):
         return str(value)
 
 
-class RedisList(RedisField):
+class RedisList(RedisField, list):
     """ An equivalent to list where all items are stored in Redis. """
 
     def __init__(self, id_key=None, item_type=str, items=None):
@@ -119,7 +119,7 @@ class RedisList(RedisField):
             """
             return cls(parent.namespace + tag, item_type)
 
-        return helper
+        return helper()
 
     def __str__(self):
         """ Return this object as a string """
@@ -166,6 +166,17 @@ class RedisList(RedisField):
 
         for el in db.lrange(self.id_key, 0, -1):
             yield RedisField.decode_value(self.item_type, el)
+
+    def __contains__(self, item):
+        """
+        Check if item is in this list.
+
+        :param (str) item: Item to check.
+        :return: (bool) True if item is in list else False
+
+        """
+        items = db.lrange(self.id_key, 0, -1)
+        return item in items
 
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
@@ -222,7 +233,7 @@ class RedisList(RedisField):
         db.lrem(self.id_key, 0, val)
 
 
-class RedisZSet(RedisField):
+class RedisZSet(RedisField, set):
     """ A sorted set where all items are stored in Redis. """
 
     def __init__(self, id_key=None, item_type=str, items=None):
@@ -255,7 +266,7 @@ class RedisZSet(RedisField):
             """
             return cls(parent.namespace + tag, item_type)
 
-        return helper
+        return helper()
 
     def __len__(self):
         """ Return the size of the set. """
@@ -267,6 +278,17 @@ class RedisZSet(RedisField):
 
         for el in db.zrange(self.id_key, 0, -1):
             yield RedisField.decode_value(self.item_type, el)
+
+    def __contains__(self, item):
+        """
+        Check if item is in the set.
+
+        :param (str) item: Item to check.
+        :return: (bool) True if item is in set else False
+
+        """
+        members = db.zrange(self.id_key, 0, -1)
+        return item in members
 
     def add(self, val):
         """ Add member to set if it doesn't exist.
@@ -287,7 +309,8 @@ class RedisZSet(RedisField):
         :param val:
         """
 
-        return db.zrank(self.id_key, RedisField.encode_value(val))
+        rank = db.zrank(self.id_key, RedisField.encode_value(val))
+        return True if rank else False
 
 
 class RedisObject(object):

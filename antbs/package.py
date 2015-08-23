@@ -131,7 +131,7 @@ class Package(PackageMeta):
             self.pkgname = name
             next_id = db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
-            all_pkgs = status.all_packages()
+            all_pkgs = status.all_packages
             all_pkgs.add(self.name)
 
             if '-x86_64' in self.name or '-i686' in self.name:
@@ -175,7 +175,7 @@ class Package(PackageMeta):
         if var in ['source', 'depends', 'makedepends', 'arch']:
             cmd = 'source ' + path + '; echo ${' + var + '[*]}'
         else:
-            cmd = 'source ' + path + '; echo ${' + var + '}'
+            cmd = 'source ' + path + '; srcdir=$CWD; echo ${' + var + '}'
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
             giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -317,8 +317,8 @@ class Package(PackageMeta):
         deps = self.get_from_pkgbuild('depends').split()
         logger.info('deps are %s', deps)
         mkdeps = self.get_from_pkgbuild('makedepends').split()
-        build_queue = status.queue()
-        hook_queue = status.hook_queue()
+        build_queue = status.queue
+        hook_queue = status.hook_queue
         queue = build_queue + hook_queue
 
         all_deps = deps + mkdeps
@@ -326,7 +326,7 @@ class Package(PackageMeta):
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver and has_ver is not None:
                 dep = has_ver.group(0)
-            if dep in status.all_packages() and dep in queue:
+            if dep in status.all_packages and dep in queue:
                 depends.append(dep)
                 if dep in deps:
                     self.depends().add(dep)

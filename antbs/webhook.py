@@ -103,7 +103,7 @@ class Webhook(object):
             self.is_gitlab = False
             self.changes = []
             self.phab_payload = False
-            self.the_queue = status.hook_queue()
+            self.the_queue = status.hook_queue
             self.repo = 'antergos-packages'
             self.payload = None
             self.full_name = None
@@ -112,7 +112,7 @@ class Webhook(object):
             self.result = None
             self.building = status.now_building
             self.result = None
-            self.allpkgs = status.all_packages()
+            self.allpkgs = status.all_packages
             self.is_authorized = self.is_from_authorized_sender()
 
             if self.is_authorized:

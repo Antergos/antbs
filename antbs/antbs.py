@@ -165,7 +165,7 @@ def handle_worker_exception(job, exc_type, exc_value, traceback):
         container = db.get('repo_container')
     else:
         container = ''
-    queue = status.queue()
+    queue = status.queue
     now_building = status.now_building
     try:
         doc.kill(container)
@@ -480,7 +480,7 @@ def get_timeline(tlpage=None):
     :param tlpage:
     :return:
     """
-    event_ids = status.all_tl_events()
+    event_ids = status.all_tl_events
     timeline = []
     if not tlpage:
         tlpage = 1
@@ -667,7 +667,7 @@ def scheduled():
     :return:
     """
     try:
-        queued = status.queue()
+        queued = status.queue
     except Exception:
         queued = None
     building = status.now_building
@@ -838,7 +838,7 @@ def build_pkg_now():
         dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        pexists = status.all_packages()
+        pexists = status.all_packages
         pexists = pexists.ismember(pkgname)
         if not pexists:
             try:
@@ -873,7 +873,7 @@ def build_pkg_now():
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                         return redirect(redirect_url())
 
-                q = status.hook_queue()
+                q = status.hook_queue
                 q.rpush(pkgname)
                 hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 tl_event(
@@ -905,10 +905,10 @@ def get_status():
             queue.empty()
         if repo_queue.count > 0:
             repo_queue.empty()
-        items = len(status.queue())
+        items = len(status.queue)
         if items > 0:
             for item in range(items):
-                popped = status.queue().rpop()
+                popped = status.queue.rpop()
                 logger.debug(popped)
         status.idle = True
         status.current_status = 'Idle.'
@@ -942,7 +942,7 @@ def get_and_show_pkg_profile(pkgname=None):
     """
     if pkgname is None:
         abort(404)
-    check = status.all_packages()
+    check = status.all_packages
     check = check.ismember(pkgname)
     if not check:
         abort(404)

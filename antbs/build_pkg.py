@@ -166,7 +166,7 @@ def process_package_queue(the_queue=None):
         pkg_obj = package.get_pkg_object(name=pkg)
         version = pkg_obj.get_version()
         if not version:
-            status.queue().remove(pkg_obj.name)
+            status.queue.remove(pkg_obj.name)
             logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
@@ -216,8 +216,8 @@ def handle_hook():
     else:
         status.idle = False
 
-    package_queue = status.queue()
-    hook_q = status.hook_queue()
+    package_queue = status.queue
+    hook_q = status.hook_queue
 
     status.current_status = 'Building docker image.'
     if not status.iso_flag:
@@ -277,9 +277,9 @@ def build_pkg_handler():
     :return:
     """
     status.idle = False
-    packages = status.queue()
+    packages = status.queue
     if len(packages) > 0:
-        pack = status.queue().lpop()
+        pack = status.queue.lpop()
         if pack and pack is not None and pack != '':
             pkgobj = package.get_pkg_object(name=pack)
         else:
@@ -298,9 +298,9 @@ def build_pkg_handler():
             built = build_pkgs(pkgobj)
         # TODO: Move this into its own method
         if built:
-            completed = status.completed()
-            failed = status.failed()
-            blds = pkgobj.builds()
+            completed = status.completed
+            failed = status.failed
+            blds = pkgobj.builds
             total = len(blds)
             if total > 0:
                 success = len([x for x in blds if x in completed])
@@ -316,7 +316,7 @@ def build_pkg_handler():
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
 
-    packages = status.queue()
+    packages = status.queue
     if len(packages) == 0:
         remove('/opt/antergos-packages')
         status.idle = True
@@ -582,7 +582,7 @@ def build_pkgs(pkg_info=None):
                     pname = pname.group(0)
                     pfile = os.path.join(pcache, pfile)
                     dtime = time.time()
-                    if os.stat(pfile).st_mtime < (dtime - (7 * 86400)) or status.all_packages().ismember(pname):
+                    if os.stat(pfile).st_mtime < (dtime - (7 * 86400)) or status.all_packages.ismember(pname):
                         remove(pfile)
         else:
             os.mkdir(d, 0o777)
@@ -657,7 +657,7 @@ def build_pkgs(pkg_info=None):
                 tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
                     build_id, build_id, pkg)
                 Timeline(msg=tlmsg, tl_type=4)
-                completed = status.completed()
+                completed = status.completed
                 completed.rpush(bld_obj.bnum)
                 bld_obj.review_status = 'pending'
             else:
@@ -666,7 +666,7 @@ def build_pkgs(pkg_info=None):
                 bld_obj.failed = True
                 bld_obj.completed = False
 
-                failed = status.failed()
+                failed = status.failed
                 failed.rpush(build_id)
 
             bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -776,14 +776,14 @@ def build_iso(pkg_obj=None):
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
             build_id, build_id, pkg_obj.name)
         Timeline(msg=tlmsg, tl_type=4)
-        completed = status.completed()
+        completed = status.completed
         completed.rpush(bld_obj.bnum)
     else:
         bld_obj.failed = True
         bld_obj.completed = False
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg_obj.name)
         Timeline(msg=tlmsg, tl_type=5)
-        failed = status.failed()
+        failed = status.failed
         failed.rpush(build_id)
     remove('/opt/archlinux-mkarchiso/antergos-iso')
     run_docker_clean(pkg_obj.name)
