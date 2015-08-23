@@ -221,15 +221,17 @@ def handle_hook():
 
     status.current_status = 'Build hook was triggered. Checking docker images.'
     if not status.iso_flag:
-        if os.path.exists(REPO_DIR):
-            remove(REPO_DIR)
         try:
             subprocess.check_call(
                 ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
                 cwd='/opt')
             subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
-        except subprocess.CalledProcessError as err:
-            logger.error(err)
+        except subprocess.CalledProcessError:
+            try:
+                subprocess.check_call(['git', 'reset', '--hard', 'origin/master'], cwd='/opt/antergos-packages')
+                subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
+            except subprocess.CalledProcessError as err:
+                logger.error(err)
 
         image = docker_utils.maybe_build_base_devel()
 
@@ -266,7 +268,7 @@ def handle_hook():
     logger.info('Check deps complete. Starting build_pkgs')
     status.current_status = 'Check deps complete. Starting build container.'
 
-    if saved_status and status.idle:
+    if saved_status and not status.idle:
         status.current_status = saved_status
 
 
@@ -319,8 +321,7 @@ def build_pkg_handler():
         if build_result is True:
             run_docker_clean(pkgobj.pkgname)
 
-    packages = status.queue
-    if len(packages) == 0:
+    if not status.queue and not status.hook_queue:
         remove('/opt/antergos-packages')
         status.idle = True
         status.building = 'Idle'
@@ -569,7 +570,7 @@ def build_pkgs(pkg_info=None):
     for d in [result, cache, '/var/tmp/32build', '/var/tmp/32bit']:
         if os.path.exists(d) and 'pkg_cache' not in d:
             shutil.rmtree(d)
-            os.mkdir(d, 0o777)
+            os.makedirs(d, 0o777)
         elif os.path.exists(d) and 'pkg_cache' in d:
             logger.info('@@-build_pkg.py-@@ 476 | Cleaning package cache....')
             status.current_status = 'Cleaning package cache.'
@@ -588,7 +589,7 @@ def build_pkgs(pkg_info=None):
                     if os.stat(pfile).st_mtime < (dtime - (7 * 86400)) or status.all_packages.ismember(pname):
                         remove(pfile)
         else:
-            os.mkdir(d, 0o777)
+            os.makedirs(d, 0o777)
 
     pkglist1 = ['1']
     in_dir_last = len([name for name in os.listdir(result)])

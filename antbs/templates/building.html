@@ -92,10 +92,10 @@
                     editor.setHighlightActiveLine(false);
                     editor.clearSelection();
                     var doc = editor.getSession().getDocument();
-                    sse = new EventSource('/get_log');
+                    var sse = new EventSource('/get_log');
                     var endOfLog = false,
                             lastMsg = '';
-                    sse.onmessage = function (message) {
+                    sse.addEventListener("build_output", function (message) {
                         if (false === endOfLog) {
                             if (message.data.indexOf('ENDOFLOG') >= 0) {
                                 console.log('ENDOFLOG');
@@ -119,7 +119,7 @@
                             pos = doc.getLength();
                             doc.insert({row: pos, column: -1}, '\n' + message.data);
                         }
-                    }
+                    });
                 });
     </script>
     {#    <script src="/static/js/prism.js"></script>#}

@@ -744,8 +744,8 @@
 
                         jQuery('#main pre').addClass('pre-scrollable');
                         jQuery('.not-idle').show();
-                        sse = new EventSource('/get_status');
-                        sse.onmessage = function (message) {
+                        var sse = new EventSource('/get_status');
+                        sse.addEventListener("status", function (message) {
                                 var current = jQuery('#status_bar_pre').text();
                                 if (message.data !== current) {
                                     jQuery('.idle').addClass('not-idle').removeClass('idle');
@@ -762,7 +762,7 @@
                                     jQuery('#status_bar').hide();
 
                                 }
-                            }
+                            });
 
                         });
 

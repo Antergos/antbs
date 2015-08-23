@@ -261,10 +261,10 @@ def get_live_status_updates():
         building = status.current_status
         if idle and 'Idle' != last_event:
             last_event = 'Idle'
-            yield 'data: %s\n\n' % 'Idle'
+            yield 'event: status\ndata: %s\n\n' % 'Idle'
         elif not idle and building != last_event:
             last_event = building
-            yield 'data: %s\n\n' % building
+            yield 'event: status\ndata: %s\n\n' % building
         elif keep_alive > 30:
             keep_alive = 0
             yield ':'
