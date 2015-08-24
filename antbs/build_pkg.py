@@ -449,7 +449,7 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
     if upd_repo or failed:
         db.publish('build-output', 'ENDOFLOG')
 
-    log = bld_obj.log()
+    log = bld_obj.log
 
     existing = True
     if len(log) < 1 and not failed and not is_iso:
