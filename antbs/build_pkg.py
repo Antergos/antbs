@@ -183,6 +183,7 @@ def process_package_queue(the_queue=None):
         if 'cnchi' in pkg:
             src = os.path.join('/var/tmp/antergos-packages/', pkg, 'cnchi')
             dest = os.path.join('/opt/antergos-packages/', pkg)
+            remove(dest)
             shutil.move(src, dest)
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             cnchi_dir = '/opt/antergos-packages/%s' % pkg

@@ -35,9 +35,13 @@ from utils.server_status import status
 import webhook
 from github3 import login
 from gitlab import Gitlab
+import json
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
+ITEMS_HASH = db.hgetall('antbs:monitor:list') or False
+logger.debug(type(ITEMS_HASH))
+MONITOR_ITEMS = ITEMS_HASH if ITEMS_HASH else None
 
 
 def maybe_check_for_new_items():
@@ -56,39 +60,28 @@ def check_for_new_items():
     """
     db.set('FEED_CHECKED', 'True')
     db.expire('FEED_CHECKED', 900)
-    new_items = []
-    gh = login(token=GITHUB_TOKEN)
-    last_id = db.get('ANTBS_GITHUB_LAST_EVENT') or ''
-    repo = gh.repository('numixproject', "numix-icon-theme")
-    commits = repo.commits()
-    latest = None
-    try:
-        commit = commits.next()
-        latest = commit.sha
-    except StopIteration:
-        pass
+    build_pkgs = []
+    for service, project_list in MONITOR_ITEMS.iteritems():
+        logger.debug((service, project_list))
+        projects = project_list.split(',')
+        logger.debug(projects)
+        for project in projects:
+            if not project or project == '':
+                continue
+            res = None
+            if 'github' == service:
+                project = project.split('/')
+                logger.debug(project)
+                res = check_github_repo(project=project[0], repo=project[1])
+            elif 'gitlab' == service:
+                logger.debug(project)
+                res = check_gitlab_repo(project_id=project)
 
-    if latest != last_id:
-        db.set('ANTBS_GITHUB_LAST_EVENT', latest)
-        new_items.append(['numix-icon-theme'])
+            if res:
+                build_pkgs = build_pkgs + res
 
-    gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
-    gl.auth()
-    nxsq = gl.Project(id='61284')
-    last_updated = db.get('ANTBS_GITLAB_LAST_UPDATED')
-    events = nxsq.Event()
-
-    for event in events:
-        if event.action_name == 'pushed to':
-            if event.created_at != last_updated:
-                db.set('ANTBS_GITLAB_LAST_UPDATED', event.created_at)
-                new_items.append(['numix-icon-theme-square'])
-                new_items.append(['numix-icon-theme-square-kde'])
-
-            break
-
-    if len(new_items) > 0:
-        add_to_build_queue(new_items)
+    if len(build_pkgs) > 0:
+        add_to_build_queue(build_pkgs)
 
 
 def add_to_build_queue(pkgs=None):
@@ -108,3 +101,58 @@ def add_to_build_queue(pkgs=None):
     wh.changes = pkgs
 
     wh.process_changes()
+
+
+def check_github_repo(project=None, repo=None):
+    """
+
+    :param project:
+    :param repo:
+    :return:
+    """
+    new_items = []
+    gh = login(token=GITHUB_TOKEN)
+    key = 'antbs:monitor:github:%s:%s' % (project, repo)
+    last_id = db.get(key) or ''
+    gh_repo = gh.repository(project, repo)
+    commits = gh_repo.commits()
+    latest = None
+    try:
+        commit = commits.next()
+        latest = commit.sha
+    except StopIteration:
+        pass
+
+    if latest != last_id:
+        if 'pamac' == repo:
+            repo = 'pamac-dev'
+        db.set(key, latest)
+        new_items.append([repo])
+
+    return new_items
+
+
+def check_gitlab_repo(project_id=None):
+    """
+
+    :param project_id:
+    :return:
+    """
+    new_items = []
+    gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
+    gl.auth()
+    nxsq = gl.Project(id=project_id)
+    key = 'antbs:monitor:gitlab:%s' % project_id
+    last_updated = db.get(key)
+    events = nxsq.Event()
+
+    for event in events:
+        if event.action_name == 'pushed to':
+            if event.created_at != last_updated:
+                db.set(key, event.created_at)
+                new_items.append(['numix-icon-theme-square'])
+                new_items.append(['numix-icon-theme-square-kde'])
+
+            break
+
+    return new_items

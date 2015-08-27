@@ -198,7 +198,7 @@ function setup_32bit_env() {
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /32bit/makepkg.conf
 	fi
 
-	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo
+	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo git
 	mkdir /32build/root/pkg
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
