@@ -151,22 +151,46 @@ def check_deps(source):
         logger.error(err)
 
 
-def process_package_queue(the_queue=None):
+def process_package_queue():
     """
 
     :param the_queue:
     :return: :raise ValueError:
     """
-    if the_queue is None:
+    hook_queue = status.hook_queue
+    logger.info(hook_queue)
+    if hook_queue is None:
         raise ValueError('the_queue cannot be None')
     all_deps = []
-    for pkg in the_queue:
+
+    if not db.exists('BUILD_REPO_UPDATED'):
+        if db.setnx('BUILD_REPO_LOCK', True):
+            db.expire('BUILD_REPO_LOCK', 300)
+            try:
+                subprocess.check_call(
+                    ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
+                    cwd='/opt')
+                subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
+            except subprocess.CalledProcessError:
+                try:
+                    subprocess.check_call(['git', 'reset', '--soft', 'origin/master'], cwd='/opt/antergos-packages')
+                    subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
+                    db.setex('BUILD_REPO_UPDATED', 350, True)
+                except subprocess.CalledProcessError as err:
+                    logger.error(err)
+            db.delete('BUILD_REPO_LOCK')
+        else:
+            while not db.exists('BUILD_REPO_UPDATED') and db.exists('BUILD_REPO_LOCK'):
+                time.sleep(2)
+
+    for pkg in hook_queue:
+        logger.info(pkg)
         if pkg == '':
             continue
         pkg_obj = package.get_pkg_object(name=pkg)
         version = pkg_obj.get_version()
         if not version:
-            status.queue.remove(pkg_obj.name)
+            status.hook_queue.remove(pkg_obj.name)
             logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
@@ -181,11 +205,13 @@ def process_package_queue(the_queue=None):
                     pkg_obj.build_path = p
                     break
         if 'cnchi' in pkg:
+            logger.info('cnchi package detected.')
             src = os.path.join('/var/tmp/antergos-packages/', pkg, 'cnchi')
             dest = os.path.join('/opt/antergos-packages/', pkg)
-            remove(dest)
+            remove(os.path.join(dest, 'cnchi'))
             shutil.move(src, dest)
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
+            logger.info(status.current_status)
             cnchi_dir = '/opt/antergos-packages/%s' % pkg
             fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
@@ -196,9 +222,9 @@ def process_package_queue(the_queue=None):
             shutil.move(src, dest)
             subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
-        if depends and len(the_queue) > 1:
+        if depends and len(hook_queue) > 1:
             all_deps.append(depends)
-        elif len(the_queue) == 1:
+        elif len(hook_queue) == 1:
             all_deps.append(1)
 
     return all_deps
@@ -222,20 +248,7 @@ def handle_hook():
 
     status.current_status = 'Build hook was triggered. Checking docker images.'
     if not status.iso_flag:
-        try:
-            subprocess.check_call(
-                ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
-                cwd='/opt')
-            subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
-        except subprocess.CalledProcessError:
-            try:
-                subprocess.check_call(['git', 'reset', '--hard', 'origin/master'], cwd='/opt/antergos-packages')
-                subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
-            except subprocess.CalledProcessError as err:
-                logger.error(err)
-
         image = docker_utils.maybe_build_base_devel()
-
     else:
         status.iso_flag = False
         image = docker_utils.maybe_build_mkarchiso()
@@ -246,13 +259,15 @@ def handle_hook():
     logger.info('Processing packages.')
     status.current_status = 'Processing packages.'
 
-    all_deps = process_package_queue(hook_q)
+    all_deps = process_package_queue()
 
     logger.info('All queued packages are in the database, checking deps to determine build order.')
     status.current_status = 'Determining build order based on package dependencies.'
 
     if len(all_deps) > 1:
         topsort = check_deps(all_deps)
+        logger.info('Check deps complete. Starting build_pkgs')
+        status.current_status = 'Check deps complete. Starting build container.'
         for p in topsort:
             hook_q.remove(p)
             if p not in package_queue:
@@ -261,13 +276,11 @@ def handle_hook():
 
     elif len(all_deps) == 1:
         p = hook_q.lpop()
-        package_queue.append(p)
-        build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+        if p not in package_queue:
+            package_queue.append(p)
+            build_queue.enqueue_call(build_pkg_handler, timeout=84600)
     else:
         return False
-
-    logger.info('Check deps complete. Starting build_pkgs')
-    status.current_status = 'Check deps complete. Starting build container.'
 
     if saved_status and not status.idle:
         status.current_status = saved_status
@@ -299,6 +312,7 @@ def build_pkg_handler():
             build_result = build_iso(pkgobj)
         else:
             build_result = build_pkgs(pkgobj)
+
         # TODO: Move this into its own method
         if build_result is not None:
             completed = status.completed

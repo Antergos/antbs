@@ -212,9 +212,9 @@ class Package(PackageMeta):
 
         if len(out) > 0:
             out = out.strip()
-            logger.info('@@-package.py-@@ | proc.out is %s' % out)
+            logger.info('proc.out is %s' % out)
         if len(err) > 0:
-            logger.error('@@-package.py-@@ | proc.err is %s', err)
+            logger.error('proc.err is %s', err)
 
         return out
 
@@ -224,22 +224,24 @@ class Package(PackageMeta):
 
 
         """
-        if not db.exists('PKGBUILD_REPO_UPDATED') and not db.exists('PKGBUILD_REPO_LOCK'):
-            db.set('PKGBUILD_REPO_LOCK', True)
-            try:
-                if os.path.exists('/var/tmp/antergos-packages'):
-                    shutil.rmtree('/var/tmp/antergos-packages')
-                subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
-                db.setex('PKGBUILD_REPO_UPDATED', 350, True)
-            except subprocess.CalledProcessError as err:
-                logger.error(err)
-                db.delete('PKGBUILD_REPO_UPDATED')
+        if not db.exists('PKGBUILD_REPO_UPDATED'):
+            if db.setnx('PKGBUILD_REPO_LOCK', True):
+                db.expire('PKGBUILD_REPO_LOCK', 300)
+                try:
+                    if os.path.exists('/var/tmp/antergos-packages'):
+                        shutil.rmtree('/var/tmp/antergos-packages')
+                    subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
+                    db.setex('PKGBUILD_REPO_UPDATED', 350, True)
+                except subprocess.CalledProcessError as err:
+                    logger.error(err)
+                    db.delete('PKGBUILD_REPO_UPDATED')
 
-            db.delete('PKGBUILD_REPO_LOCK')
-
-        elif not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
-            while db.exists('PKGBUILD_REPO_LOCK'):
-                time.sleep(3)
+                db.delete('PKGBUILD_REPO_LOCK')
+                return
+            else:
+                while not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
+                    time.sleep(2)
+                return
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         """

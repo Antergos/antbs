@@ -37,8 +37,6 @@ from redis_connection import db
 stmpath = logging.getLogger('stormpath.http')
 stmpath.setLevel(logging.ERROR)
 
-logger = logging.getLogger()
-
 logging.config.dictConfig({
     'version': 1,
     'disable_existing_loggers': True,
@@ -62,7 +60,7 @@ logging.config.dictConfig({
             'formatter': 'file'
         },
         'file': {
-            'level': 'INFO',
+            'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
             'maxBytes': 5000000,
@@ -94,4 +92,6 @@ logging.config.dictConfig({
         }
     }
 })
+
+logger = logging.getLogger()
 
