@@ -451,10 +451,14 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         abort(500)
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
+    if result in ['0', '1', '2', '3', '4']:
+        msg = 'Please clear your browser cache, refresh the page, and try again.'
+        errmsg.update(error=True, msg=msg)
+        return errmsg
     try:
         bld_obj = build_obj.get_build_object(bnum=bnum)
         pkg_obj = package.Package(name=bld_obj.pkgname)
-        if pkg_obj:
+        if pkg_obj and build_obj:
             allowed = pkg_obj.allowed_in
             if 'main' not in allowed and result == 'passed':
                 msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
@@ -891,13 +895,13 @@ def build_pkg_now():
             if pending:
                 flash('Unable to build %s because it is in "pending review" status.' % pkgname, category='error')
             else:
-                args = (True, True)
                 if '-x86_64' in pkgname or '-i686' in pkgname:
                     if not status.iso_building:
                         status.iso_flag = True
-                        args = (True, True)
                         if 'minimal' in pkgname:
                             status.iso_minimal = True
+                        else:
+                            status.iso_minimal = False
                     else:
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                         return redirect(redirect_url())

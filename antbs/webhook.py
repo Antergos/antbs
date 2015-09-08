@@ -141,20 +141,24 @@ class Webhook(object):
         manual = int(self.request.args.get('phab', '0'))
         gitlab = self.request.headers.get('X-Gitlab-Event') or ''
         cnchi = self.request.args.get('cnchi', False)
+        cnchi_version = self.request.headers.get('X-Cnchi-Installer', False)
         if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
             self.is_manual = True
-        elif cnchi and cnchi == db.get('CNCHI_TOKEN'):
-            self.is_cnchi = True
-        elif cnchi and cnchi != db.get('CNCHI_TOKEN'):
-            logger.error('CNCHI_A_B_TEST: ' + cnchi)
+        elif cnchi and cnchi == db.get('CNCHI_TOKEN_NEW') and cnchi_version:
+            self.is_cnchi = cnchi_version
         elif '' != gitlab and 'Push Hook' == gitlab:
             self.is_gitlab = True
             self.repo = 'antergos-packages'
             self.full_name = 'Antergos/antergos-packages'
             self.changes = [['numix-icon-theme-square', 'numix-icon-theme-square-kde']]
         else:
-            # Store the IP address blocks that github uses for hook requests.
-            hook_blocks = requests.get('https://api.github.com/meta').json()['hooks']
+            if not db.exists('GITHUB_HOOK_IP_BLOCKS'):
+                # Store the IP address blocks that github uses for hook requests.
+                hook_blocks = requests.get('https://api.github.com/meta').text
+                db.setex('GITHUB_HOOK_IP_BLOCKS', 42300, hook_blocks)
+                hook_blocks = json.loads(hook_blocks)['hooks']
+            else:
+                hook_blocks = json.loads(db.get('GITHUB_HOOK_IP_BLOCKS'))['hooks']
             for block in hook_blocks:
                 ip = ipaddress.ip_address(u'%s' % self.request.remote_addr)
                 if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
@@ -350,5 +354,15 @@ class Webhook(object):
 
         install_id = db.incr('cnchi:install_id:next')
         client_ip = self.request.remote_addr
+        user_hash_key = 'cnchi:user:%s' % client_ip
+        install_hash_key = 'cnchi:install:%s' % install_id
+        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+        db.hsetnx(user_hash_key, 'ip', client_ip)
+        db.hsetnx(user_hash_key, install_id, dt + ' | ' + str(self.is_cnchi))
+        install_hash = {'id': install_id,
+                        'ip': client_ip,
+                        'date': dt,
+                        'cnchi_version': self.is_cnchi}
+        db.hmset(install_hash_key, install_hash)
 
         self.result = json.dumps({'id': install_id, 'ip': client_ip})

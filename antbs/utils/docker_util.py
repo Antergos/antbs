@@ -76,7 +76,7 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
                     'bind': '/makepkg',
                     'ro': False
                 },
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging':
+            '/srv/antergos.info/repo/antergos-staging':
                 {
                     'bind': '/staging',
                     'ro': False
@@ -138,7 +138,7 @@ def create_repo_update_host_config():
                     'bind': '/main',
                     'ro': False
                 },
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/':
+            '/srv/antergos.info/repo/antergos-staging':
                 {
                     'bind': '/staging',
                     'ro': False
@@ -173,7 +173,6 @@ def maybe_build_base_devel():
     build_it = False
     try:
         build_it = subprocess.check_output([build_script])
-        shutil.rmtree('/opt/antergos-packages')
     except subprocess.CalledProcessError as err:
         logger.error('@@-docker_util.py-@@ | Image build script failed with error: %s', err.output)
         return False
@@ -189,7 +188,7 @@ def maybe_build_base_devel():
         mpkg = build_makepkg()
         if not mpkg:
             return False
-        db.psetex('antbs:docker-images:base-devel:built-today', 304800000, 'True')
+        db.setex('antbs:docker-images:base-devel:built-today', 84600, 'True')
         return True
     else:
         return False
@@ -204,12 +203,15 @@ def maybe_build_mkarchiso():
     if db.exists('antbs:docker-images:mkarchiso:built-today'):
         return True
 
+    # No image was built in the past 24 hours, let's build one.
+    status.current_status = 'Docker images are stale. Building new images.'
+
     archiso = build_mkarchiso()
 
     if not archiso or archiso is None:
         return False
 
-    db.psetex('antbs:docker-images:mkarchiso:built-today', 304800000, 'True')
+    db.setex('antbs:docker-images:mkarchiso:built-today', 84600, 'True')
 
     return True
 
@@ -241,11 +243,11 @@ def build_mkarchiso():
     :return:
     """
     dockerfile = '/opt/archlinux-mkarchiso'
+    shutil.rmtree(os.path.join(dockerfile, 'antergos-iso'), ignore_errors=True)
     try:
         build_it = [line for line in
                     doc.build(dockerfile, tag='antergos/mkarchiso', quiet=False, nocache=True,
-                              rm=True,
-                              stream=True, forcerm=True)]
+                              rm=True, stream=True, forcerm=True)]
         if build_it:
             push_to_hub('antergos/mkarchiso')
     except Exception as err:

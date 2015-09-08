@@ -222,6 +222,7 @@ def process_package_queue():
             shutil.move(src, dest)
             subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
+        logger.info('DEPENDS IS: %s' % depends)
         if depends and len(hook_queue) > 1:
             all_deps.append(depends)
         elif len(hook_queue) == 1:
@@ -238,7 +239,7 @@ def handle_hook():
     :return:
     """
     saved_status = False
-    if not status.idle:
+    if not status.idle and 'Idle' not in status.current_status:
         saved_status = status.current_status
     else:
         status.idle = False
@@ -254,6 +255,11 @@ def handle_hook():
         image = docker_utils.maybe_build_mkarchiso()
 
     if not image:
+        if not saved_status:
+            status.idle = True
+            status.current_status = 'Idle'
+        else:
+            status.current_status = saved_status
         return False
 
     logger.info('Processing packages.')
@@ -401,12 +407,12 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
                 stream_process.join()
             if result != 0:
                 logger.error('update repo failed. exit status is: %s', result)
+            else:
+                doc.remove_container(container, v=True)
             db.set('antbs:misc:cache_buster:flag', True)
         except Exception as err:
             result = 1
             logger.error('Start container failed. Error Msg: %s' % err)
-
-        doc.remove_container(container, v=True)
 
         if not status.idle:
             if building_saved:
@@ -804,11 +810,12 @@ def build_iso(pkg_obj=None):
         Timeline(msg=tlmsg, tl_type=5)
         failed = status.failed
         failed.rpush(build_id)
-    remove('/opt/archlinux-mkarchiso/antergos-iso')
-    run_docker_clean(pkg_obj.name)
+
     bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
     if not bld_obj.failed:
+        remove('/opt/archlinux-mkarchiso/antergos-iso')
+        run_docker_clean(pkg_obj.name)
         db.set('antbs:misc:cache_buster:flag', True)
         return True
     return False

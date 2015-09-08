@@ -12,16 +12,16 @@
 				<h3>Completed Builds</h3>
 			</div>
 			<div class="content">
-                {% if not completed or completed == "0" %}
+				{% if not completed or completed == "0" %}
 					None
-                {% else %}
+				{% else %}
 					<div class="col-md-3 pull-right">
 						<div class="form-group">
 							<div class="input-group">
 								<input id="search_input" type="text" class="form-control">
                                             <span class="input-group-btn">
                                             <button id="search_btn" class="btn btn-primary" type="button">Search!
-                                            </button>
+											</button>
                                             </span>
 							</div>
 
@@ -43,8 +43,8 @@
 						<tbody class="no-border-y">
 
 
-                        {% for pkg, info in completed|dictsort() %}
-                            {% if user.is_authenticated() %}
+						{% for pkg, info in completed|dictsort() %}
+							{% if user.is_authenticated() %}
 								<tr>
 									<td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
 									<td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>
@@ -55,7 +55,7 @@
 										<div class="btn-group">
 											<button class="btn btn-default btn-xs" type="button">Set Result</button>
 											<button data-toggle="dropdown"
-											        class="btn btn-xs btn-primary dropdown-toggle" type="button">
+													class="btn btn-xs btn-primary dropdown-toggle" type="button">
 												<span class="caret"></span>
 												<span class="sr-only">Toggle Dropdown</span></button>
 											<ul role="menu" class="dropdown-menu set_result">
@@ -68,34 +68,36 @@
 													Fail</a>
 												</li>
 												<li style="font-style: italic;"><a href="#" id="skip"
-												                                   bnum="{{ info['bnum'] }}"><i
+																				   bnum="{{ info['bnum'] }}"><i
 													class="fa fa-eye-slash" style="color:#777777;"></i>
 													Skip</a>
 												</li>
 											</ul>
 										</div>
 										<span class="passed" style="display: none"><i class="fa fa-check"
-										                                              style="color:green;"></i> Passed</span>
+																					  style="color:green;"></i> Passed</span>
 										<span class="failed" style="display: none"><i
 											class="fa fa-exclamation-circle"
 											style="color:red;"></i> Failed</span>
-                                    {% elif info['review_stat'] == 'passed' %}
+									{% elif info['review_stat'] == 'passed' %}
 										<i class="fa fa-check" style="color:green;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+										{{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
 										<i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                        {{ info['review_stat'] }}
-                                    {% endif %}</td>
+										{{ info['review_stat'] }} {% elif info['review_stat'] == 'skip' %}
+										<i class="fa fa-eye-slash" style="color:#999999;"></i>
+										<span style="color:#999999;"><em>skipped</em></span>
+									{% endif %}</td>
 									<td>
-                                        {% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
+										{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
 											<i class="fa fa-user"></i>
-                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+											{{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
 									<td>
-                                        {% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
+										{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
 											<i class="fa fa-calendar"></i>
-                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+											{{ info['review_date'] }}{% else %}n/a{% endif %}</td>
 								</tr>
 
-                            {% else %}
+							{% else %}
 								<tr>
 									<td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
 									<td>{{ info['name'] }}</td>
@@ -103,51 +105,53 @@
 									<td>{{ info['start'] }}</td>
 									<td>{{ info['end'] }}</td>
 									<td>{% if info['review_stat'] == 'pending' %}
-										<i class="fafa-clock-o" style="color:yellow;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
+										<i class="fa fa-clock-o" style="color:yellow;"></i>
+										{{ info['review_stat'] }}{% elif info['review_stat'] == 'passed' %}
 										<i class="fa fa-check" style="color:green;"></i>
-                                        {{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
+										{{ info['review_stat'] }}{% elif info['review_stat'] == 'failed' %}
 										<i class="fa fa-exclamation-circle" style="color:red;"></i>
-                                        {{ info['review_stat'] }}{% endif %}</td>
+										{{ info['review_stat'] }}{% elif info['review_stat'] == 'skip' %}
+										<i class="fa fa-eye-slash" style="color:#999999;"></i>
+										<span style="color:#999999;"><em>skipped</em></span>{% endif %}</td>
 									<td>
-                                        {% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
+										{% if info['review_dev'] != '' and info['review_dev'] is not none and info['review_dev'] != 'None' %}
 											<i class="fa fa-user"></i>
-                                            {{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
+											{{ info['review_dev'] }}{% else %}n/a{% endif %}</td>
 									<td>
-                                        {% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
+										{% if info['review_date'] != '' and info['review_date'] is not none and info['review_date'] != 'None' %}
 											<i class="fa fa-calendar"></i>
-                                            {{ info['review_date'] }}{% else %}n/a{% endif %}</td>
+											{{ info['review_date'] }}{% else %}n/a{% endif %}</td>
 								</tr>
-                            {% endif %}
-                        {% endfor %}
+							{% endif %}
+						{% endfor %}
 
 
 						</tbody>
 					</table>
-                    {% macro render_pagination(pagination) %}
+					{% macro render_pagination(pagination) %}
 						<ul class="pagination custom">
-                            {% if pagination.has_prev %}
+							{% if pagination.has_prev %}
 								<li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
-                            {% endif %}
-                            {%- for page in pagination.iter_pages() %}
-                                {% if page %}
+							{% endif %}
+							{%- for page in pagination.iter_pages() %}
+								{% if page %}
 
-                                    {% if page != pagination.page %}
+									{% if page != pagination.page %}
 										<li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
-                                    {% else %}
+									{% else %}
 										<li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
-                                    {% endif %}
-                                {% else %}
+									{% endif %}
+								{% else %}
 									<li><span class=ellipsis>…</span></li>
-                                {% endif %}
-                            {%- endfor %}
-                            {% if pagination.has_next %}
+								{% endif %}
+							{%- endfor %}
+							{% if pagination.has_next %}
 								<li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
-                            {% endif %}
+							{% endif %}
 						</ul>
-                    {% endmacro %}
-                    {{ render_pagination(pagination) }}
-                {% endif %}
+					{% endmacro %}
+					{{ render_pagination(pagination) }}
+				{% endif %}
 			</div>
 
 		</div>
@@ -155,7 +159,7 @@
 
 {%- endblock bottomcontent %}
 {% block scripts %}
-    {{ super() }}
+	{{ super() }}
 	<script type="text/javascript">
 		jQuery('#search_btn').on('click', function () {
 			var search = jQuery('#search_input').val();
