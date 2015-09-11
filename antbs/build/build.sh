@@ -315,7 +315,7 @@ if [[ $? = 0 ]]; then
 
 	if [[ ${repo_dir} = "main" ]] && [[ "${RESULT}" = "passed" ]]; then
 
-		{ run_update_repo "${repo}" && print2log "${update_success}"; } ||
+		{ run_update_repo "${repo}" && run_remove_pkg && print2log "${update_success}"; } ||
 
 		{ print2log "${update_error}" && exit 1; }
 

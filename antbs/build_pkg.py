@@ -222,7 +222,6 @@ def process_package_queue():
             shutil.move(src, dest)
             subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
-        logger.info('DEPENDS IS: %s' % depends)
         if depends and len(hook_queue) > 1:
             all_deps.append(depends)
         elif len(hook_queue) == 1:
@@ -535,10 +534,10 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
             'trans_files_dir': "/opt/antergos-iso-translations/translations/antergos.cnchi_updaterpot",
             'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
         },
-        "gfxboot": {
+        "antergos-gfxboot": {
             'trans_dir': "/opt/antergos-iso-translations/",
             'trans_files_dir': '/opt/antergos-iso-translations/translations/antergos.antergos-gfxboot',
-            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/gfxboot'
+            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/antergos-gfxboot'
         }
     }
 
@@ -554,7 +553,7 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
                 pulled = True
             for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
                 for tfile in f:
-                    if 'cnchi' == trans_for:
+                    if 'cnchi' == trans_for or 'antergos-gfxboot' == trans_for:
                         tfile = os.path.join(r, tfile)
                         shutil.copy(tfile, trans[trans_for]['dest_dir'])
                     elif 'cnchi_updater' == trans_for:
@@ -563,12 +562,6 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
                                               cwd=trans[trans_for]['trans_files_dir'])
                         os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
                                   os.path.join(trans[trans_for]['dest_dir'], mofile))
-                    elif 'gfxboot' == trans_for:
-                        trfile = tfile[:-2] + 'tr' if '.pot' not in tfile else 'en.tr'
-                        subprocess.check_call(['po2txt_helper', tfile, trfile],
-                                              cwd=trans[trans_for]['trans_files_dir'])
-                        os.rename(os.path.join(trans[trans_for]['trans_files_dir'], trfile),
-                                  os.path.join(trans[trans_for]['dest_dir'], trfile))
 
         except subprocess.CalledProcessError as err:
             logger.error(err.output)
@@ -719,7 +712,7 @@ def build_iso(pkg_obj=None):
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
-    fetch_and_compile_translations(translations_for=["cnchi_updater"])
+    fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])
 
     flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
     minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
@@ -781,7 +774,6 @@ def build_iso(pkg_obj=None):
         stream_process = Process(target=publish_build_ouput, kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True))
         stream_process.start()
         result = doc.wait(cont)
-        stream_process.join()
         if result != 0:
             bld_obj.failed = True
             logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg_obj.name, result))
@@ -794,6 +786,7 @@ def build_iso(pkg_obj=None):
         bld_obj.failed = True
         return False
 
+    stream_process.join()
     in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
     last_count = int(db.get('pkg_count_iso'))
     if in_dir > last_count:
