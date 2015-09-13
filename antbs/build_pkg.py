@@ -191,7 +191,11 @@ def process_package_queue():
         version = pkg_obj.get_version()
         if not version:
             status.hook_queue.remove(pkg_obj.name)
-            logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
+            if 'cnchi-dev' != pkg:
+                logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
+            else:
+                continue
+
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
         depends = pkg_obj.get_deps()
@@ -284,8 +288,6 @@ def handle_hook():
         if p not in package_queue:
             package_queue.append(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
-    else:
-        return False
 
     if saved_status and not status.idle:
         status.current_status = saved_status
