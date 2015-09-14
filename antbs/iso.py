@@ -131,6 +131,24 @@ class ISOUtility(object):
         sign.batch_sign([self.file_path], is_iso=True)
 
 
+class WordPressBridge(object):
+    def __init__(self):
+        self.post_id_map = {
+            'antergos-x86_64': '1252',
+            'antergos-i686': '1257',
+            'antergos-minimal-x86_64': '1562',
+            'antergos-minimal-i686': '1564'
+        }
+        logger.info('WordPressBridge Object Initialized')
+
+    def add_new_iso_to_wordpress(self, iso=None):
+        if iso is None:
+            logger.error('iso cant be None')
+            return
+        parent_id = self.post_id_map[iso.pkgname]
+        title = ''
+
+
 def iso_release_job():
     try:
         status.idle = False
