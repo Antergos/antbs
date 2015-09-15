@@ -62,6 +62,7 @@ class ISOUtility(object):
                           pkg_obj.pkgname.rsplit('-', 1)[-1] + '.iso')
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
+        self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.md5', self.file_path + '.torrent']
 
     def prep_release(self):
         status.current_status = 'ISO Release: Step 1/4 - Generating checksum for %s' % self.file_name
@@ -101,8 +102,8 @@ class ISOUtility(object):
     def do_release(self):
         status.current_status = 'ISO Release: Step 4/4 - Moving %s to release directory.' % self.file_name
         logger.debug(status.current_status)
-        for f in [self.file_path, self.file_path + '.sig', self.file_path + '.md5', self.file_path + '.torrent']:
-            shutil.copy2(f, RELEASE_DIR)
+        for f in self.files:
+            shutil.move(f, RELEASE_DIR)
 
     @staticmethod
     def checksum_md5(filename):
@@ -149,30 +150,39 @@ class WordPressBridge(object):
         title = ''
 
 
+def clean_up_after_release(version):
+    status.current_status = 'ISO Release: Cleaning up old files.'
+    logger.debug(status.current_status)
+    all_files = os.listdir(RELEASE_DIR)
+    moved = []
+    for f in all_files:
+        if version not in f:
+            moved.append(f)
+            shutil.move(f, '/opt/old-iso-images')
+
+    all_old_files = os.listdir('/opt/old-iso-images')
+    for f in all_old_files:
+        if f not in moved:
+            os.remove(f)
+
+
 def iso_release_job():
-    try:
-        status.idle = False
-        iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
-        version = None
-        for name in iso_names:
+    status.idle = False
+    iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
+    version = None
+    for name in iso_names:
+        try:
             pkg_obj = package.Package(name=name)
             iso = ISOUtility(pkg_obj=pkg_obj)
-            version = pkg_obj.pkgver
+            if version is None:
+                version = pkg_obj.pkgver
             iso.prep_release()
             iso.do_release()
+        except Exception as err:
+            logger.error(err)
 
-        if version and isinstance(version, str):
-            files = os.listdir(RELEASE_DIR)
-            for f in files:
-                if version not in f:
-                    shutil.move(f, '/opt/old-iso-images')
-            files = os.listdir(TESTING_DIR)
-            for f in files:
-                if not os.path.isdir(f) and version in f:
-                    shutil.move(f, '/tmp')
-
-    except Exception as err:
-        logger.error(err)
+    if version:
+        clean_up_after_release(version)
 
     status.idle = True
 

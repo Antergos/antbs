@@ -932,6 +932,7 @@ def get_status():
     if iso_release:
         queue.enqueue_call(iso.iso_release_job)
         message = dict(msg='Ok')
+        return json.dumps(message)
 
     elif reset_queue:
         if queue.count > 0:
