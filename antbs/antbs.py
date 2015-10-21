@@ -889,7 +889,7 @@ def build_pkg_now():
             p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
             # logger.info(rev_pending)
             pending = False
-            for bnum in rev_pending.keys():
+            for bnum in rev_pending:
                 bld_obj = build_obj.get_build_object(bnum=bnum)
                 if pkgname == bld_obj.pkgname:
                     pending = True
