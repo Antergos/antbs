@@ -336,7 +336,7 @@ def inject_idle_status():
     return dict(idle=status.idle)
 
 
-@cache.memoize(timeout=900, key_prefix='%s/get_build_info', unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
 
@@ -389,7 +389,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     return pkg_list, int(all_pages), rev_pending
 
 
-@cache.memoize(timeout=900, key_prefix='%s/get_repo_info', unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_repo_info(repo=None, logged_in=False):
     """
 
