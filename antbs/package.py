@@ -48,7 +48,7 @@ class PackageMeta(RedisObject):
 
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name=None, *args, **kwargs):
         super(PackageMeta, self).__init__()
 
         self.key_lists = dict(
@@ -61,16 +61,12 @@ class PackageMeta(RedisObject):
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        name = kwargs.get('name')
         if not name:
             raise AttributeError
 
         self.namespace = 'antbs:pkg:%s:' % name
         self.prefix = self.namespace[:-1]
         self.name = name
-
-    def is_deepin_pkg(self):
-        return os.path.exists(os.path.join(REPO_DIR, 'deepin_desktop', self.name))
 
 
 class Package(PackageMeta):
@@ -112,11 +108,11 @@ class Package(PackageMeta):
     """
 
     def __init__(self, name):
-        super(Package, self).__init__(self, name=name)
+        super(Package, self).__init__(name=name)
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self or not self.pkg_id and (os.path.exists(os.path.join(REPO_DIR, name)) or self.is_deepin_pkg()):
+        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
             # Package is not in the database, so it must be new. Let's initialize it.
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
@@ -152,23 +148,24 @@ class Package(PackageMeta):
             logger.error('get_from_pkgbuild var is none')
             return ''
         self.maybe_update_pkgbuild_repo()
-        path = None
-        paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
-                 os.path.join('/var/tmp/antergos-packages/deepin_desktop', self.pkgname),
-                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
-        for p in paths:
-            logger.debug(p)
-            if os.path.exists(p):
-                ppath = os.path.join(p, 'PKGBUILD')
-                logger.debug(ppath)
-                if os.path.exists(ppath):
-                    path = ppath
-                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
-                        self.allowed_in.append('main')
-                    break
+        if not self.pbpath or self.pbpath == '':
+            path = None
+            paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
+                     os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
+            for p in paths:
+                if os.path.exists(p):
+                    ppath = os.path.join(p, 'PKGBUILD')
+                    if os.path.exists(ppath):
+                        path = ppath
+                        self.pbpath = path
+                        if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
+                            self.allowed_in.append('main')
+                        break
+            else:
+                logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
+                return ''
         else:
-            logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
-            return ''
+            path = self.pbpath
 
         parse = open(path).read()
         dirpath = os.path.dirname(path)
@@ -197,12 +194,16 @@ class Package(PackageMeta):
             elif self.name == 'cnchi':
                 giturl = 'http://github.com/antergos/cnchi.git'
 
+            os.putenv('srcdir', dirpath)
+
             if os.path.exists(os.path.join(dirpath, gitnm)):
                 shutil.rmtree(os.path.join(dirpath, gitnm), ignore_errors=True)
             try:
                 subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=dirpath)
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
+
+            os.unsetenv('srcdir')
 
             cmd = 'source ' + path + '; ' + var
 
@@ -226,10 +227,11 @@ class Package(PackageMeta):
         """
         if not db.exists('PKGBUILD_REPO_UPDATED'):
             if db.setnx('PKGBUILD_REPO_LOCK', True):
-                db.expire('PKGBUILD_REPO_LOCK', 300)
+                db.expire('PKGBUILD_REPO_LOCK', 150)
+
+                if os.path.exists('/var/tmp/antergos-packages'):
+                    shutil.rmtree('/var/tmp/antergos-packages')
                 try:
-                    if os.path.exists('/var/tmp/antergos-packages'):
-                        shutil.rmtree('/var/tmp/antergos-packages')
                     subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
                     db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
@@ -250,17 +252,20 @@ class Package(PackageMeta):
         :param old_val:
         :param new_val:
         :return:
+
         """
-        if self.push_version != "True" or old_val == new_val:
+        if not self.push_version or old_val == new_val:
             return
-        gh = login(token=self.gh_user)
+        gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
         tf = repo.file_contents(self.name + '/PKGBUILD')
         content = tf.decoded
         search_str = '%s=%s' % (var, old_val)
+        if 'pkgver=None' in content:
+            search_str = '%s=%s' % (var, 'None')
         replace_str = '%s=%s' % (var, new_val)
         content = content.replace(search_str, replace_str)
-        ppath = os.path.join('/opt/antergos-packages/', self.name, '/PKGBUILD')
+        ppath = os.path.join('/var/tmp/antergos-packages/', self.name, '/PKGBUILD')
         with open(ppath, 'w') as pbuild:
             pbuild.write(content)
         pbuild.close()
@@ -270,7 +275,7 @@ class Package(PackageMeta):
             try:
                 logger.info('@@-package.py-@@ | commit hash is %s', commit['commit'].sha)
             except AttributeError:
-                pass
+                logger.error('commit failed. commit=%s | content=%s', (commit, content))
             return True
         else:
             logger.error('@@-package.py-@@ | commit failed')
@@ -282,19 +287,24 @@ class Package(PackageMeta):
 
         :return:
         """
-        changed = []
-        for key in ['pkgver', 'pkgrel', 'epoch']:
-            old_val = str(getattr(self, key))
-            new_val = str(self.get_from_pkgbuild(key))
-            if new_val != old_val:
-                changed.append((key, new_val))
-                setattr(self, key, new_val)
+        if self.name not in ['scudcloud']:
+            changed = []
+            for key in ['pkgver', 'pkgrel', 'epoch']:
+                old_val = str(getattr(self, key))
+                new_val = str(self.get_from_pkgbuild(key))
+                if new_val != old_val:
+                    changed.append((key, new_val))
+                    setattr(self, key, new_val)
 
-        if 'cnchi-dev' == self.name and self.pkgver[-1] != '0':
-            return False
+            if 'cnchi-dev' == self.name and self.pkgver[-1] != '0' and self.pkgver[-1] != '5':
+                return False
 
-        if not changed:
-            return self.version_str
+            if not changed:
+                return self.version_str
+        else:
+            old_val = self.pkgver
+            self.pkgver = db.get('ANTBS_SCUDCLOUD_RELEASE_TAG')
+            self.update_and_push_github('pkgver', old_val, self.pkgver)
 
         version = self.pkgver
         if self.epoch and self.epoch != '' and self.epoch is not None:

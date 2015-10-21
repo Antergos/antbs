@@ -119,8 +119,15 @@ class Webhook(object):
                 # Process Webhook
                 if self.is_manual:
                     self.process_manual()
-                if self.is_cnchi:
-                    self.process_cnchi()
+
+                if self.is_cnchi and not self.request.args.get('result', False):
+                    self.process_cnchi_start()
+                elif self.is_cnchi and self.request.args.get('result', False):
+                    install_id = self.request.args.get('install_id', None)
+                    result = self.request.args.get('result', None)
+                    if install_id and result:
+                        self.process_cnchi_end(install_id, result)
+
                 if self.is_github:
                     self.process_github()
                 if len(self.changes) > 0:
@@ -345,24 +352,45 @@ class Webhook(object):
             if not self.result:
                 self.result = json.dumps({'msg': 'OK!'})
 
-    def process_cnchi(self):
+    def process_cnchi_start(self):
         """
         Generate installation ID then store it along with the clients ip in result variable.
 
         :return: None
         """
 
-        install_id = db.incr('cnchi:install_id:next')
+        install_id = str(db.incr('cnchi:install_id:next'))
         client_ip = self.request.remote_addr
         user_hash_key = 'cnchi:user:%s' % client_ip
         install_hash_key = 'cnchi:install:%s' % install_id
         dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         db.hsetnx(user_hash_key, 'ip', client_ip)
-        db.hsetnx(user_hash_key, install_id, dt + ' | ' + str(self.is_cnchi))
+        db.hsetnx(user_hash_key, install_id + ':start', dt)
+        db.hsetnx(user_hash_key, install_id + ':cnchi', str(self.is_cnchi))
         install_hash = {'id': install_id,
                         'ip': client_ip,
-                        'date': dt,
-                        'cnchi_version': self.is_cnchi}
+                        'start': dt,
+                        'cnchi_version': self.is_cnchi,
+                        'successful': "False"}
         db.hmset(install_hash_key, install_hash)
 
         self.result = json.dumps({'id': install_id, 'ip': client_ip})
+
+    def process_cnchi_end(self, install_id, result):
+        """
+            Record install result (success/failure).
+
+            :return: None
+        """
+        install_hash_key = 'cnchi:install:%s' % install_id
+        client_ip = self.request.remote_addr
+        user_hash_key = 'cnchi:user:%s' % client_ip
+        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+        db.hsetnx(user_hash_key, str(install_id) + ':end', dt)
+        db.hsetnx(user_hash_key, str(install_id) + ':successful', result)
+        db.hset(install_hash_key, 'successful', result)
+        db.hset(install_hash_key, 'end', dt)
+
+        self.result = json.dumps({'msg': 'Ok!'})
+
+

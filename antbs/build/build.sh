@@ -47,7 +47,6 @@ function setup_environment() {
 
 	update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
 	update_success='STAGING REPO UPDATE COMPLETE'
-	mkdir /var/cache/pacman/success || true
 	export HOME=/root
 
 	if [[ -f /pkg/PKGBUILD ]]; then
@@ -56,7 +55,7 @@ function setup_environment() {
 		chmod -R a+rw /pkg
 		cd /pkg
 
-	elif [[ "${_UPDREPO}" != "True" ]]; then
+	elif [[ "True" != "${_UPDREPO}" ]]; then
 
 		print2log 'ERROR WHILE SETTING UP ENVIRONMENT (BUILD FAILED)'
 		exit 1;
@@ -87,7 +86,8 @@ function setup_environment() {
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
 	sed -i '/CFLAGS=/c\CFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
 	sed -i '/CXXFLAGS=/c\CXXFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
-	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j3"' /etc/makepkg.conf
+	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j6"' /etc/makepkg.conf
+	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
 	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
 	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
 
@@ -128,8 +128,7 @@ function run_remove_pkg() {
 
 	for arc in i686 x86_64; do
 		cd "/${repo_dir}/${arc}"
-		repo-remove "${repo}.db.tar.gz" "${PKGNAME}"
-		rm "/${repo_dir}/${arc}/${PKGNAME}"***
+		repo-remove "${repo}.db.tar.gz" "${PKGNAME}" && rm "${PKGNAME}"***
 	done && return 0
 
 	return 1
@@ -182,6 +181,8 @@ function setup_32bit_env() {
 	chmod -R 777 /32build
 	chmod -R a+rw /staging/i686
 	cp /usr/share/devtools/makepkg-i686.conf /32bit/makepkg.conf
+	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j6"' /32bit/makepkg.conf
+	echo 'BUILDDIR=/var/tmp' >> /32bit/makepkg.conf
 	cp /etc/pacman.conf /32bit
 	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
 	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
@@ -197,8 +198,10 @@ function setup_32bit_env() {
 		cd /32bit
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /32bit/makepkg.conf
 	fi
+	pacman -Syyu --noconfirm reflector
+	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 
-	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo git
+	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo git reflector
 	mkdir /32build/root/pkg
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
@@ -221,6 +224,7 @@ function setup_32bit_env() {
 	sed -i 's|file:\/\/\/\$repo/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
 	sed -i 's|file:\/\/\/staging/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
 	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
+	arch-chroot /32build/root reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 
 }
 
@@ -274,9 +278,11 @@ function try_build() {
 print2log 'SETTING UP ENVIRONMENT'
 setup_environment
 
-if [[ "${_UPDREPO}" != "True" ]]; then
+if [[ "True" != "${_UPDREPO}" ]]; then
 
 	print2log 'SYNCING REPO DATABASES'
+	#pacman -Syyu --noconfirm reflector
+	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64
 

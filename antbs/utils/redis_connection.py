@@ -320,6 +320,7 @@ class RedisObject(object):
     database = db
 
     def __init__(self):
+        super(RedisObject, self).__init__()
         self.namespace = 'antbs:'
         self.prefix = self.namespace[:-1]
         self.key_lists = dict(
@@ -336,6 +337,21 @@ class RedisObject(object):
         return db.exists(self.prefix)
 
     __bool__ = __nonzero__
+
+    def __eq__(self, other):
+        """ Tests if two redis objects are equal (they have the same id/key). """
+
+        return self.prefix == other.prefix
+
+    def __str__(self):
+        """ Return this object's id/key as a string for testing purposes. """
+
+        return self.prefix
+
+    def delete(self):
+        """ Delete this object from redis. """
+
+        db.delete(self.prefix)
 
     def __getattribute__(self, attrib):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']

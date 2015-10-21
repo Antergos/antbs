@@ -34,7 +34,7 @@ import shutil
 import subprocess
 from utils.logging_config import logger
 from utils.server_status import status
-#import gnupg
+import re
 import package
 import utils.sign_pkgs as sign
 
@@ -63,6 +63,15 @@ class ISOUtility(object):
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
         self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.md5', self.file_path + '.torrent']
+
+    @staticmethod
+    def get_version():
+        iso = [x for x in os.listdir(TESTING_DIR) if x.endswith('.iso')]
+        match = re.match('\d{4}(\.\d{1,2}){2}', iso[0])
+        if match:
+            logger.info(match)
+            return match.group(0)
+        raise ValueError
 
     def prep_release(self):
         status.current_status = 'ISO Release: Step 1/4 - Generating checksum for %s' % self.file_name
@@ -172,14 +181,17 @@ def iso_release_job():
     version = None
     for name in iso_names:
         try:
-            pkg_obj = package.Package(name=name)
+            pkg_obj = package.get_pkg_object(name=name)
             iso = ISOUtility(pkg_obj=pkg_obj)
             if version is None:
-                version = pkg_obj.pkgver
+                version = iso.version
+
             iso.prep_release()
             iso.do_release()
         except Exception as err:
             logger.error(err)
+            status.idle = True
+            return
 
     if version:
         clean_up_after_release(version)

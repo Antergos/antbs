@@ -129,7 +129,7 @@ class Timeline(RedisObject):
             self.message = msg
             dt = datetime.datetime.now()
             self.date_str = self.dt_date_to_string(dt)
-            self.date_str = self.dt_time_to_string(dt)
+            self.time_str = self.dt_time_to_string(dt)
         else:
             self.namespace = 'antbs:timeline:%s:' % event_id
             self.prefix = self.namespace[:-1]

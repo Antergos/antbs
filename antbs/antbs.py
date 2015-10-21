@@ -402,7 +402,6 @@ def get_repo_info(repo=None, logged_in=False):
     pkg_list = {}
     p, a, rev_pending = get_build_info(1, repo, logged_in)
 
-    logger.info('@@-antbs.py-@@ 295 | GET_REPO_INFO - CACHE CHECK FAILED. WE ARE NOT USING CACHED INFO')
     all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
 
     if all_packages is not None:
@@ -419,12 +418,11 @@ def get_repo_info(repo=None, logged_in=False):
             builds = pkg.builds
             try:
                 bnum = builds[0]
+                bld_obj = build_obj.get_build_object(bnum=bnum)
             except Exception:
-                bnum = ''
-            bld_obj = build_obj.get_build_object(bnum=bnum)
-            all_info = dict(bnum=bnum, name=pkg.name, version=pkg.version_str, review_dev=bld_obj.review_dev,
-                            review_stat=bld_obj.review_stat, review_date=bld_obj.review_date, pkgid=pkg.pkgid)
-            pkg_list[pkg.pkgid] = all_info
+                bld_obj = None
+            all_info = dict(bld_obj=bld_obj, pkg_obj=pkg)
+            pkg_list[pkg.pkg_id] = all_info
 
     return pkg_list, rev_pending
 
@@ -483,13 +481,13 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 if result == 'passed':
                     copy(f, MAIN_64)
                     copy(f, '/tmp')
-                elif result == 'failed':
+                if result != 'skip':
                     os.remove(f)
             for f in pkg_files_32:
                 if result == 'passed':
                     copy(f, MAIN_32)
                     copy(f, '/tmp')
-                elif result == 'failed':
+                if result != 'skip':
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(builder.update_main_repo, (result, None, True, bld_obj.pkgname), timeout=9600)
@@ -609,19 +607,22 @@ def homepage(tlpage=None):
             stats[stat] = res
 
     main_repo = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
-    staging_repo = glob.glob('/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/*.pkg.tar.xz')
+    staging_repo = glob.glob('/srv/antergos.info/repo/antergos-staging/x86_64/*.pkg.tar.xz')
 
     for repo in [main_repo, staging_repo]:
-        filtered = []
-        for file_path in repo:
-            new_fp = os.path.basename(file_path)
-            if 'dummy-package' not in new_fp:
-                filtered.append(new_fp)
-        if '-staging' not in repo[0]:
-            repo_name = 'repo_main'
+        if repo:
+            filtered = []
+            for file_path in repo:
+                new_fp = os.path.basename(file_path)
+                if 'dummy-package' not in new_fp:
+                    filtered.append(new_fp)
+            if '-staging' not in repo[0]:
+                repo_name = 'repo_main'
+            else:
+                repo_name = 'repo_staging'
+            stats[repo_name] = len(set(filtered))
         else:
-            repo_name = 'repo_staging'
-        stats[repo_name] = len(set(filtered))
+            stats['repo_staging'] = 0
 
     return render_template("overview.html", stats=stats, user=user, building=building,
                            this_page=this_page, all_pages=all_pages, page=tlpage, rev_pending=[])

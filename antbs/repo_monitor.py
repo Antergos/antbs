@@ -62,19 +62,15 @@ def check_for_new_items():
     db.expire('FEED_CHECKED', 900)
     build_pkgs = []
     for service, project_list in MONITOR_ITEMS.iteritems():
-        logger.debug((service, project_list))
         projects = project_list.split(',')
-        logger.debug(projects)
         for project in projects:
             if not project or project == '':
                 continue
             res = None
             if 'github' == service:
                 project = project.split('/')
-                logger.debug(project)
                 res = check_github_repo(project=project[0], repo=project[1])
             elif 'gitlab' == service:
-                logger.debug(project)
                 res = check_gitlab_repo(project_id=project)
 
             if res:
@@ -116,12 +112,21 @@ def check_github_repo(project=None, repo=None):
     last_id = db.get(key) or ''
     gh_repo = gh.repository(project, repo)
     commits = gh_repo.commits()
+    releases = [r for r in gh_repo.releases()]
     latest = None
-    try:
-        commit = commits.next()
-        latest = commit.sha
-    except StopIteration:
-        pass
+    if repo not in ['scudcloud']:
+        try:
+            commit = commits.next()
+            latest = commit.sha
+        except StopIteration:
+            pass
+    else:
+        try:
+            release = releases[0]
+            latest = release.name
+            db.set('ANTBS_SCUDCLOUD_RELEASE_TAG', latest.replace('v', ''))
+        except Exception as err:
+            logger.error(err)
 
     if latest != last_id:
         if 'pamac' == repo:

@@ -33,7 +33,6 @@ import os
 import shutil
 
 import docker
-from docker.utils import create_host_config
 
 from logging_config import logger
 from redis_connection import db
@@ -64,7 +63,7 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
     :param result:
     :return:
     """
-    pkgs_hconfig = create_host_config(
+    pkgs_hconfig = doc.create_host_config(
         binds={
             cache:
                 {
@@ -115,7 +114,7 @@ def create_pkgs_host_config(cache, pkgbuild_dir, result):
         restart_policy={
             "MaximumRetryCount": 2,
             "Name": "on-failure"
-        }, privileged=True, cap_add=['ALL'])
+        }, privileged=True, cap_add=['ALL'], mem_limit='2G', memswap_limit='-1')
 
     return pkgs_hconfig
 
@@ -126,7 +125,7 @@ def create_repo_update_host_config():
 
     :return:
     """
-    repos_hconfig = create_host_config(
+    repos_hconfig = doc.create_host_config(
         binds={
             BUILD_DIR:
                 {
@@ -153,7 +152,7 @@ def create_repo_update_host_config():
                     'bind': '/result',
                     'ro': False
                 }
-        }, privileged=True, cap_add=['ALL'])
+        }, privileged=True, cap_add=['ALL'], mem_limit='2G', memswap_limit='-1')
 
     return repos_hconfig
 

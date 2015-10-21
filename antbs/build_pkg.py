@@ -56,7 +56,6 @@ BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
 doc = docker_utils.doc
-create_host_config = docker_utils.create_host_config
 logger = logconf.logger
 
 with Connection(db):
@@ -175,7 +174,7 @@ def process_package_queue():
                 try:
                     subprocess.check_call(['git', 'reset', '--soft', 'origin/master'], cwd='/opt/antergos-packages')
                     subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
-                    db.setex('BUILD_REPO_UPDATED', 350, True)
+                    db.setex('BUILD_REPO_UPDATED', 120, True)
                 except subprocess.CalledProcessError as err:
                     logger.error(err)
             db.delete('BUILD_REPO_LOCK')
@@ -288,6 +287,10 @@ def handle_hook():
         if p not in package_queue:
             package_queue.append(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+    else:
+        if not saved_status:
+            status.current_status = 'Idle'
+            status.idle = True
 
     if saved_status and not status.idle:
         status.current_status = saved_status
@@ -515,9 +518,12 @@ def process_and_save_build_metadata(pkg_obj=None):
 
 
 def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
-    """ Get and compile translations from Transifex.
-    :param translations_for:
-    :param pkg_obj:
+    """
+    Get and compile translations from Transifex.
+
+    :param (list) translations_for:
+    :param (Package) pkg_obj:
+
     """
 
     if pkg_obj is None:
@@ -620,7 +626,7 @@ def build_pkgs(pkg_info=None):
             bld_obj = process_and_save_build_metadata(pkg_obj=pkg_info)
             build_id = bld_obj.bnum
 
-            if pkg_info is not None and pkg_info.autosum == "True":
+            if pkg_info.autosum == "True":
                 build_env = ['_AUTOSUMS=True']
             else:
                 build_env = ['_AUTOSUMS=False']
@@ -706,11 +712,6 @@ def build_iso(pkg_obj=None):
     """
     status.iso_building = True
 
-    in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
-    if in_dir_last is None:
-        in_dir_last = "0"
-    db.set('pkg_count_iso', in_dir_last)
-
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
@@ -735,27 +736,32 @@ def build_iso(pkg_obj=None):
         if os.path.exists(minimal):
             os.remove(minimal)
 
+    in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+    db.set('pkg_count_iso', in_dir_last)
+
     # Create docker host config dict
-    hconfig = create_host_config(privileged=True, cap_add=['ALL'],
-                                 binds={
-                                     '/opt/archlinux-mkarchiso':
-                                         {
-                                             'bind': '/start',
-                                             'ro': False
-                                         },
-                                     '/run/dbus':
-                                         {
-                                             'bind': '/var/run/dbus',
-                                             'ro': False
-                                         },
-                                     '/srv/antergos.info/repo/iso/testing':
-                                         {
-                                             'bind': out_dir,
-                                             'ro': False
-                                         }},
-                                 restart_policy={
-                                     "MaximumRetryCount": 2,
-                                     "Name": "on-failure"})
+    hconfig = doc.create_host_config(privileged=True, cap_add=['ALL'],
+                                     binds={
+                                         '/opt/archlinux-mkarchiso':
+                                             {
+                                                 'bind': '/start',
+                                                 'ro': False
+                                             },
+                                         '/run/dbus':
+                                             {
+                                                 'bind': '/var/run/dbus',
+                                                 'ro': False
+                                             },
+                                         '/srv/antergos.info/repo/iso/testing':
+                                             {
+                                                 'bind': out_dir,
+                                                 'ro': False
+                                             }},
+                                     restart_policy={
+                                         "MaximumRetryCount": 2,
+                                         "Name": "on-failure"},
+                                     mem_limit='2G',
+                                     memswap_limit='-1')
     iso_container = {}
     try:
         iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
@@ -769,6 +775,7 @@ def build_iso(pkg_obj=None):
 
     bld_obj.container = iso_container.get('Id')
     status.container = bld_obj.container
+    open('/opt/archlinux-mkarchiso/first-run', 'a').close()
 
     try:
         doc.start(bld_obj.container)
@@ -776,10 +783,16 @@ def build_iso(pkg_obj=None):
         stream_process = Process(target=publish_build_ouput, kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True))
         stream_process.start()
         result = doc.wait(cont)
+        inspect = doc.inspect_container(cont)
         if result != 0:
+            if inspect['State'].get('Restarting', False) or inspect.get('RestartCount', 0) != 2:
+                while inspect['State'].get('Restarting', False) or inspect.get('RestartCount', 0) != 2:
+                    time.sleep(5)
+                    inspect = doc.inspect_container(cont)
+
+        if inspect['State'].get('ExitCode', 1) == 1:
             bld_obj.failed = True
             logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg_obj.name, result))
-            return False
         else:
             bld_obj.completed = True
             logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg_obj.name, result))
