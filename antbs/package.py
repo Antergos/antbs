@@ -146,34 +146,18 @@ class Package(PackageMeta):
         """
         if var is None:
             logger.error('get_from_pkgbuild var is none')
-            return ''
+            raise ValueError
         self.maybe_update_pkgbuild_repo()
-        if not self.pbpath or self.pbpath == '':
-            path = None
-            paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
-                     os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
-            for p in paths:
-                if os.path.exists(p):
-                    ppath = os.path.join(p, 'PKGBUILD')
-                    if os.path.exists(ppath):
-                        path = ppath
-                        self.pbpath = path
-                        if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
-                            self.allowed_in.append('main')
-                        break
-            else:
-                logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
-                return ''
-        else:
-            path = self.pbpath
+        if not self.pbpath:
+            self.determine_pbpath()
 
-        parse = open(path).read()
-        dirpath = os.path.dirname(path)
+        parse = open(self.pbpath).read()
+        dirpath = os.path.dirname(self.pbpath)
 
         if var in ['source', 'depends', 'makedepends', 'arch']:
-            cmd = 'source ' + path + '; echo ${' + var + '[*]}'
+            cmd = 'source ' + self.pbpath + '; echo ${' + var + '[*]}'
         else:
-            cmd = 'source ' + path + '; srcdir=$CWD; echo ${' + var + '}'
+            cmd = 'source ' + self.pbpath + '; srcdir=$CWD; echo ${' + var + '}'
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
             giturl = re.search('(?<=git\\+).+(?="|\')', parse)
@@ -205,7 +189,7 @@ class Package(PackageMeta):
 
             os.unsetenv('srcdir')
 
-            cmd = 'source ' + path + '; ' + var
+            cmd = 'source ' + self.pbpath + '; ' + var
 
         proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -213,11 +197,27 @@ class Package(PackageMeta):
 
         if len(out) > 0:
             out = out.strip()
-            logger.info('proc.out is %s' % out)
+            # logger.info('proc.out is %s' % out)
         if len(err) > 0:
             logger.error('proc.err is %s', err)
 
         return out
+
+    def determine_pbpath(self):
+        path = None
+        paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
+                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
+        for p in paths:
+            if os.path.exists(p):
+                ppath = os.path.join(p, 'PKGBUILD')
+                if os.path.exists(ppath):
+                    self.pbpath = ppath
+                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
+                        self.allowed_in.append('main')
+                    break
+        else:
+            logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
+            raise ValueError
 
     @staticmethod
     def maybe_update_pkgbuild_repo():

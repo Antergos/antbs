@@ -336,7 +336,7 @@ def inject_idle_status():
     return dict(idle=status.idle)
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+@cache.memoize(timeout=900, key_prefix='%s/get_build_info', unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
 
@@ -389,7 +389,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     return pkg_list, int(all_pages), rev_pending
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+@cache.memoize(timeout=900, key_prefix='%s/get_repo_info', unless=cache_buster)
 def get_repo_info(repo=None, logged_in=False):
     """
 
@@ -506,6 +506,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     return errmsg
 
 
+@cache.memoize(timeout=900, key_prefix='%s/get_timeline', unless=cache_buster)
 def get_timeline(tlpage=None):
     """
 
@@ -733,10 +734,9 @@ def completed(page=None, name=None):
     """
     build_status = 'completed'
     is_logged_in = user.is_authenticated()
-    if page is None and name is None:
+    if (page is None and name is None) or (name is not None and page is None):
         page = 1
-    if name is not None and page is None:
-        page = 1
+
     building = status.now_building
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)

@@ -1,11 +1,9 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# build_pkg.py
+# webhook.py
 #
 # Copyright © 2013-2015 Antergos
-#
-# This file is part of AntBS
 #
 # This file is part of The Antergos Build Server, (AntBS).
 #
@@ -93,8 +91,8 @@ class Webhook(object):
             self.request = False
             self.is_monitor = True
         if self.request is None or db is None or queue is None:
-            logger.error('@@-webhook.py-@@ 40 | Cant process new webhook because request or db is None.')
-        elif self.request or self.is_monitor is True:
+            logger.error('Cant process new webhook because request or db is None.')
+        elif self.request or self.is_monitor:
             self.can_process = True
             self.request = request
             self.is_manual = False
@@ -113,6 +111,7 @@ class Webhook(object):
             self.building = status.now_building
             self.result = None
             self.allpkgs = status.all_packages
+
             self.is_authorized = self.is_from_authorized_sender()
 
             if self.is_authorized:
@@ -167,7 +166,7 @@ class Webhook(object):
             else:
                 hook_blocks = json.loads(db.get('GITHUB_HOOK_IP_BLOCKS'))['hooks']
             for block in hook_blocks:
-                ip = ipaddress.ip_address(u'%s' % self.request.remote_addr)
+                ip = ipaddress.ip_address('%s' % self.request.remote_addr)
                 if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
                     # the remote_addr is within the network range of github
                     self.is_github = True
@@ -345,6 +344,7 @@ class Webhook(object):
                         p_obj = package.Package(p)
                         events = p_obj.tl_events
                         events.append(tl_event.event_id)
+                        del [p_obj, events]
                     first = False
 
                 queue.enqueue_call(builder.handle_hook, timeout=84600)
