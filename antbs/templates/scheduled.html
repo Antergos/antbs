@@ -25,12 +25,10 @@
                             </thead>
                             <tbody class="no-border-y">
                                 {% for p in queue %}
-
-                                    {% set pkg, version = p %}
                                         <tr>
                                             <td>{{ loop.index }}</td>
-                                            <td>{{ pkg }}</td>
-                                            <td>{{ version }}</td>
+                                            <td>{{ p.pkgname }}</td>
+                                            <td>{{ p.version_str }}</td>
                                         </tr>
                                 {% endfor %}
 

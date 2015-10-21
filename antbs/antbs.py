@@ -339,12 +339,15 @@ def inject_idle_status():
 @cache.memoize(timeout=900, unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
+    Get paginated list of build objects.
 
-    :param page:
-    :param build_status:
-    :param logged_in:
-    :param search:
-    :return:
+    :param (int) page: Page number.
+    :param (str) build_status: Only include builds of this status (completed, failed, etc).
+    :param (bool) logged_in: Was the request made by a logged-in user?
+    :param (str) search: Filter list to include builds where "search" string is found in pkgname.
+
+    :return (list) pkglist, (int) all_pages, (list) rev_pending:
+
     """
     if page is None or build_status is None:
         abort(500)
@@ -352,8 +355,8 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     if 'antergos' in build_status:
         build_status = 'completed'
 
-    pkg_list = {}
-    rev_pending = {}
+    pkg_list = []
+    rev_pending = []
     all_builds = None
     all_pages = 0
 
@@ -378,13 +381,15 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
                     logger.error('Unable to ge build object - %s' % err)
                     continue
 
-                all_info = dict(bnum=bld_obj.bnum, name=bld_obj.pkgname, version=bld_obj.version_str,
-                                start=bld_obj.start_str, end=bld_obj.end_str, review_stat=bld_obj.review_status,
-                                review_dev=bld_obj.review_dev, review_date=bld_obj.review_date)
-                pkg_list[bnum] = all_info
+                # all_info = dict(bnum=bld_obj.bnum, name=bld_obj.pkgname, version=bld_obj.version_str,
+                #                 start=bld_obj.start_str, end=bld_obj.end_str, review_stat=bld_obj.review_status,
+                #                 review_dev=bld_obj.review_dev, review_date=bld_obj.review_date)
+                # pkg_list[bnum] = all_info
+
+                pkg_list.append(bld_obj)
 
                 if logged_in and bld_obj.review_status == "pending":
-                    rev_pending[bnum] = all_info
+                    rev_pending.append(bld_obj)
 
     return pkg_list, int(all_pages), rev_pending
 
@@ -506,7 +511,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     return errmsg
 
 
-@cache.memoize(timeout=900, key_prefix='%s/get_timeline', unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_timeline(tlpage=None):
     """
 
@@ -711,10 +716,7 @@ def scheduled():
         for pak in queued:
             try:
                 pkg_obj = package.Package(name=pak)
-                name = pkg_obj.name
-                version = pkg_obj.version_str
-                all_info = (name, version)
-                the_queue.append(all_info)
+                the_queue.append(pkg_obj)
             except ValueError as err:
                 logger.error(err)
 

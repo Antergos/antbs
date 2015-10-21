@@ -518,11 +518,11 @@
 															<div class="nano-content content">
 																<ul>
 
-																	{% for pkg, info in rev_pending.items() %}
+																	{% for build in rev_pending|sort(attribute='bnum') %}
 																		<li><a href="/pkg_review"><i
-																			class="fa fa-archive"></i><b>{{ info['name'] }}</b>
-																			{{ info['version'] }} <span
-																				class="date">{{ info['end'] }}</span></a>
+																			class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
+																			{{ build.version_str }} <span
+																				class="date">{{ build.end_str }}</span></a>
 																		</li>
 
 																	{% endfor %}

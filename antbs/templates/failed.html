@@ -29,14 +29,14 @@
 
 
 
-                    {% for pkg, info in failed|dictsort() %}
+                    {% for build in failed|sort(attribute='bnum') %}
                         <tr>
-                            <td><a href="/build/{{ info['bnum'] }}">{{ info['bnum'] }}</a></td>
-                            {% if user.is_authenticated() %}<td><a href="/pkg/{{ info['name'] }}">{{ info['name'] }}</a></td>{% else %}
-                            <td>{{ info['name'] }}</td>{% endif %}
-                            <td>{{ info['version'] }}</td>
-                            <td>{{ info['start'] }}</td>
-                            <td>{{ info['end'] }}</td>
+                            <td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>
+                            {% if user.is_authenticated() %}<td><a href="/pkg/{{ build.pkgname }}">{{ build.pkgname }}</a></td>{% else %}
+                            <td>{{ build.pkgname }}</td>{% endif %}
+                            <td>{{ build.version_str }}</td>
+                            <td>{{ build.start_str }}</td>
+                            <td>{{ build.end_str }}</td>
                         </tr>
 
                     {% endfor %}

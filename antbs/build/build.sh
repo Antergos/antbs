@@ -128,7 +128,7 @@ function run_remove_pkg() {
 
 	for arc in i686 x86_64; do
 		cd "/${repo_dir}/${arc}"
-		repo-remove "${repo}.db.tar.gz" "${PKGNAME}" && rm "${PKGNAME}"***
+		repo-remove "${repo}.db.tar.gz" "${PKGNAME}"
 	done && return 0
 
 	return 1
