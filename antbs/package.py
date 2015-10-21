@@ -273,12 +273,12 @@ class Package(PackageMeta):
             '[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
         if commit and commit['commit'] is not None:
             try:
-                logger.info('@@-package.py-@@ | commit hash is %s', commit['commit'].sha)
+                logger.info('commit hash is %s', commit['commit'].sha)
             except AttributeError:
-                logger.error('commit failed. commit=%s | content=%s', (commit, content))
+                logger.error('commit failed. commit=%s | content=%s', commit, content)
             return True
         else:
-            logger.error('@@-package.py-@@ | commit failed')
+            logger.error('commit failed')
             return False
 
     def get_version(self):
