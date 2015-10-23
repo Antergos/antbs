@@ -523,10 +523,7 @@ def get_timeline(tlpage=None):
     if not tlpage:
         tlpage = 1
     for event_id in event_ids:
-        ev_obj = tl_event(event_id=event_id)
-        allinfo = dict(event_id=ev_obj.event_id, date=ev_obj.date_str, msg=ev_obj.message, time=ev_obj.time_str,
-                       tltype=ev_obj.tl_type)
-        event = {event_id: allinfo}
+        event = tl_event(event_id=event_id)
         timeline.append(event)
     this_page, all_pages = get_paginated(timeline, 6, tlpage, True)
 
@@ -587,7 +584,7 @@ def homepage(tlpage=None):
         tlpage = 1
     check_stats = ['queue', 'completed', 'failed']
     building = status.current_status
-    this_page, all_pages = get_timeline(tlpage)
+    tl_events, all_pages = get_timeline(tlpage)
 
     stats = {}
     for stat in check_stats:
@@ -631,7 +628,7 @@ def homepage(tlpage=None):
             stats['repo_staging'] = 0
 
     return render_template("overview.html", stats=stats, user=user, building=building,
-                           this_page=this_page, all_pages=all_pages, page=tlpage, rev_pending=[])
+                           tl_events=tl_events, all_pages=all_pages, page=tlpage, rev_pending=[])
 
 
 @app.route("/building")
@@ -931,6 +928,10 @@ def get_status():
     building = status.current_status
     iso_release = bool(request.args.get('do_iso_release', False)) and user.is_authenticated()
     reset_queue = bool(request.args.get('reset_build_queue', False)) and user.is_authenticated()
+    rerun_transaction = int(request.args.get('rerun_transaction', False))
+
+    if not any([iso_release, reset_queue, rerun_transaction]):
+        return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
 
     if iso_release:
         queue.enqueue_call(iso.iso_release_job)
@@ -953,8 +954,13 @@ def get_status():
 
         return json.dumps(message)
 
-    else:
-        return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
+    elif rerun_transaction and user.is_authenticated():
+        event = tl_event(event_id=rerun_transaction)
+        pkgs = event.packages
+        if pkgs:
+            for pkg in pkgs:
+                status.queue.append(pkg)
+            hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
 
 
 @app.route('/issues', methods=['GET'])

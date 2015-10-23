@@ -630,7 +630,7 @@ def build_pkgs(pkg_info=None):
                 build_env = ['_AUTOSUMS=True']
             else:
                 build_env = ['_AUTOSUMS=False']
-            if '/cinnamon/' in pkg_info.path:
+            if '/cinnamon/' in pkg_info.pbpath:
                 build_env.append('_ALEXPKG=True')
             else:
                 build_env.append('_ALEXPKG=False')

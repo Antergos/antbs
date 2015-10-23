@@ -113,7 +113,7 @@ class Timeline(RedisObject):
         self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
                               redis_string_int=['event_id', 'tl_type'],
                               redis_string_bool=[],
-                              redis_list=[],
+                              redis_list=['packages'],
                               redis_zset=[])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]

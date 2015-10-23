@@ -344,9 +344,13 @@ class RedisObject(object):
         return self.prefix == other.prefix
 
     def __str__(self):
-        """ Return this object's id/key as a string for testing purposes. """
+        """ Return this object as a string for testing purposes. """
 
-        return self.prefix
+        as_string = {}
+        for key in self.all_keys:
+            value = getattr(self, key)
+            as_string[key] = value
+        return str(as_string)
 
     def delete(self):
         """ Delete this object from redis. """

@@ -135,6 +135,8 @@ class Package(PackageMeta):
                 self.is_iso = True
             else:
                 self.is_iso = False
+        if not self.pkgname:
+            self.pkgname = self.name
 
     def get_from_pkgbuild(self, var=None):
         """
@@ -206,11 +208,13 @@ class Package(PackageMeta):
     def determine_pbpath(self):
         path = None
         paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
-                 os.path.join('/var/tmp/antergos-packages/cinnamon', self.pkgname)]
+                 os.path.join('/var/tmp/antergos-packages/cinnamon/', self.pkgname)]
         for p in paths:
+            logger.info(p)
             if os.path.exists(p):
                 ppath = os.path.join(p, 'PKGBUILD')
-                if os.path.exists(ppath):
+                logger.info(ppath)
+                if os.path.exists(ppath) and not ('cinnamon' == self.pkgname and paths[0] == p):
                     self.pbpath = ppath
                     if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
                         self.allowed_in.append('main')

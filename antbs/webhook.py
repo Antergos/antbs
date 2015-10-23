@@ -166,7 +166,7 @@ class Webhook(object):
             else:
                 hook_blocks = json.loads(db.get('GITHUB_HOOK_IP_BLOCKS'))['hooks']
             for block in hook_blocks:
-                ip = ipaddress.ip_address('%s' % self.request.remote_addr)
+                ip = ipaddress.ip_address(u'%s' % self.request.remote_addr)
                 if ipaddress.ip_address(ip) in ipaddress.ip_network(block):
                     # the remote_addr is within the network range of github
                     self.is_github = True
@@ -191,7 +191,7 @@ class Webhook(object):
         :return:
         """
         try:
-            key = db.lrange('antbs:github:payloads:index', -2, -2)
+            key = db.lrange('antbs:github:payloads:index', -1, -1)
             logger.info(key)
             logger.info(key[0])
             self.payload = db.hgetall(key[0])
