@@ -96,12 +96,12 @@ class Webhook(object):
             self.can_process = True
             self.request = request
             self.is_manual = False
+            self.manual_transaction_index = None
             self.is_numix = False
             self.is_github = False
             self.is_gitlab = False
             self.changes = []
             self.phab_payload = False
-            self.the_queue = status.hook_queue
             self.repo = 'antergos-packages'
             self.payload = None
             self.full_name = None
@@ -110,7 +110,6 @@ class Webhook(object):
             self.result = None
             self.building = status.now_building
             self.result = None
-            self.allpkgs = status.all_packages
 
             self.is_authorized = self.is_from_authorized_sender()
 
@@ -150,6 +149,7 @@ class Webhook(object):
         cnchi_version = self.request.headers.get('X-Cnchi-Installer', False)
         if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
             self.is_manual = True
+            self.manual_transaction_index = int(manual)
         elif cnchi and cnchi == db.get('CNCHI_TOKEN_NEW') and cnchi_version:
             self.is_cnchi = cnchi_version
         elif '' != gitlab and 'Push Hook' == gitlab:
@@ -190,8 +190,9 @@ class Webhook(object):
 
         :return:
         """
+        index = self.manual_transaction_index
         try:
-            key = db.lrange('antbs:github:payloads:index', -1, -1)
+            key = db.lrange('antbs:github:payloads:index', -index, -index)
             logger.info(key)
             logger.info(key[0])
             self.payload = db.hgetall(key[0])
@@ -291,7 +292,7 @@ class Webhook(object):
 
             for changed in self.changes:
                 # logger.info(changed)
-                if changed is not None and changed != [] and changed != '':
+                if len(changed) > 0:
                     for item in changed:
                         # logger.info(item)
                         if self.is_gitlab or self.is_numix or self.is_cnchi:
@@ -303,11 +304,11 @@ class Webhook(object):
                             else:
                                 pak = None
 
-                        logger.info(pak)
-                        if pak is not None and pak != '' and pak != [] and pak != 'antergos-iso':
+                        # logger.info(pak)
+                        if pak and pak != 'antergos-iso':
                             logger.info('Adding %s to the build queue' % pak)
                             no_dups.append(pak)
-                            self.allpkgs.add(pak)
+                            status.all_packages.add(pak)
                             has_pkgs = True
 
             if has_pkgs:
@@ -315,19 +316,19 @@ class Webhook(object):
                 first = True
                 last = False
                 last_pkg = the_pkgs[-1]
-                p_ul = []
+                html = []
                 if len(the_pkgs) > 1:
-                    p_ul.append('<ul class="hook-pkg-list">')
+                    html.append('<ul class="hook-pkg-list">')
                 for p in the_pkgs:
-                    if p in self.the_queue:
+                    if p and p in status.hook_queue:
                         continue
-                    if p not in self.the_queue and p is not None and p != '' and p != []:
-                        self.the_queue.rpush(p)
+                    if p and p not in status.hook_queue:
+                        status.hook_queue.rpush(p)
                         if len(the_pkgs) > 1:
-                            p_li = '<li>%s</li>' % p
+                            item = '<li>%s</li>' % p
                         else:
-                            p_li = '<strong>%s</strong>' % p
-                        p_ul.append(p_li)
+                            item = '<strong>%s</strong>' % p
+                        html.append(item)
                     if p == last_pkg:
                         if self.is_gitlab:
                             source = 'Gitlab'
@@ -336,11 +337,11 @@ class Webhook(object):
                             source = 'Github'
                             tltype = 1
                         if len(the_pkgs) > 1:
-                            p_ul.append('</ul>')
-                        the_pkgs_str = ''.join(p_ul)
+                            html.append('</ul>')
+                        the_pkgs_str = ''.join(html)
                         tl_event = Timeline(
                             msg='Webhook triggered by <strong>%s.</strong> Packages added to the build queue: %s' % (
-                                source, the_pkgs_str), tl_type=tltype)
+                                source, the_pkgs_str), tl_type=tltype, packages=the_pkgs)
                         p_obj = package.Package(p)
                         events = p_obj.tl_events
                         events.append(tl_event.event_id)

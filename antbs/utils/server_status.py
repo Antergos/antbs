@@ -104,7 +104,7 @@ class Timeline(RedisObject):
     :raise AttributeError:
     """
 
-    def __init__(self, msg=None, tl_type=None, event_id=None):
+    def __init__(self, msg=None, tl_type=None, event_id=None, packages=None):
         if (not msg or not tl_type) and not event_id:
             raise AttributeError
 
@@ -130,6 +130,10 @@ class Timeline(RedisObject):
             dt = datetime.datetime.now()
             self.date_str = self.dt_date_to_string(dt)
             self.time_str = self.dt_time_to_string(dt)
+            if packages:
+                packages = [p for p in packages if p]
+                for p in packages:
+                    self.packages.append(p)
         else:
             self.namespace = 'antbs:timeline:%s:' % event_id
             self.prefix = self.namespace[:-1]
