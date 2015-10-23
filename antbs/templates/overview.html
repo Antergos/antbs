@@ -64,26 +64,28 @@
 {% endblock topcontent %}
 {% block bottomcontent %}
 	{% if tl_events %}
-		<div class="col-md-6">
+		<div class="col-md-4" style="width: 36%;">
 			<div class="block-transparent tlwrap">
 				<div class="header">
 					<h4>Timeline</h4>
 				</div>
 				<ul class="timeline">
-					{% for event in tl_events %}
+					{%- for event in tl_events %}
 						<li id="{{ event|attr('event_id') }}">
 							<i class="{% if event|attr('tl_type') == 1 %}fa fa-github{% elif event|attr('tl_type') == 2 %}fa phab{% elif event|attr('tl_type') == 3 %}fa fa-rocket{% elif event|attr('tl_type') == 4 %}fa fa-check{% elif event|attr('tl_type') == 5 %}fa fa-times{% else %}fa fa-comment{% endif %}"></i>
 							<span class="date">{{ event|attr('date_str') }}</span>
 
-							<div class="content">
-								<p>{{ event|attr('message')|safe() }}</p>
-								{% if user.is_authenticated() and event|attr('packages')|count() > 0 %}
-									<a href="#" class="rerun-transaction" data-tlevent="{{ event|attr('event_id') }}"><i class="fa fa-repeat"></i></a>
-								{% endif %}
+							<div class="content" style="padding-bottom:3px;">
+								{{ event|attr('message')|safe() }}
+							<p style="margin-top:10px;padding-bottom: 0px;">
 								<small>{{ event|attr('time_str') }}</small>
+								{% if user.is_authenticated() and event|attr('packages')|count() > 0 %}
+									<a href="#" class="rerun-transaction" data-tlevent="{{ event|attr('event_id') }}"><i class="fa fa-repeat" style="margin-left:5px;color:#F4275C;" data-toggle="tooltip" title="Rerun This Transaction"></i></a>
+								{% endif %}
+							</p>
 							</div>
 						</li>
-					{% endfor %}
+					{% endfor -%}
 				</ul>
 				{% if all_pages > 1 %}
 					<ul class="pagination">
@@ -115,20 +117,25 @@
 					});
 				}
 			});
+			$('.tlwrap [data-toggle]').tooltip();
 		}
-		$(document).ready(tlhandler());
+		$(document).ready(tlhandler);
 		{% if user.is_authenticated() %}
-			jQuery('.rerun_transaction').click(function () {
-				var $icon = $(this).find('i'),
-					url = '/get_status?rerun_transaction=' + $(this).attr('data-tlevent');
-				$icon.addClass('fa-spin');
-				$.getJSON(url, function (data) {
-					console.log(data);
-					setTimeout(function ($the_icon) {
-						$the_icon.removeClass('fa-spin');
-					}, 2000, $icon);
+			function rerun_trans_handler() {
+				jQuery('.tlwrap').on('click', '.rerun-transaction', function (e) {
+					e.preventDefault();
+					var $icon = $(this).find('i'),
+						url = '/api/ajax?rerun_transaction=' + $(this).attr('data-tlevent');
+					$icon.addClass('fa-spin');
+					$.getJSON(url, function (data) {
+						console.log(data);
+						setTimeout(function ($the_icon) {
+							$the_icon.removeClass('fa-spin');
+						}, 2000, $icon);
+					});
 				});
-			});
+			}
+			$(document).ready(rerun_trans_handler);
 		{% endif %}
 	</script>
 {% endblock scripts %}

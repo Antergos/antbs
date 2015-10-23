@@ -40,7 +40,7 @@ import json
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
 ITEMS_HASH = db.hgetall('antbs:monitor:list') or False
-logger.debug(type(ITEMS_HASH))
+# logger.debug(type(ITEMS_HASH))
 MONITOR_ITEMS = ITEMS_HASH if ITEMS_HASH else None
 
 

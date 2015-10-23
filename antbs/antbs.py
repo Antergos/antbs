@@ -43,7 +43,7 @@ import os
 import glob
 import shutil
 from datetime import datetime, timedelta
-from rq import Queue, Connection
+from rq import Queue, Connection, Worker
 from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
 import docker
@@ -202,6 +202,9 @@ with Connection(db):
     queue = Queue('build_queue')
     repo_queue = Queue('repo_queue')
     hook_queue = Queue('hook_queue')
+    w1 = Worker([queue])
+    w2 = Worker([repo_queue])
+    w3 = Worker([hook_queue])
 
 
 def url_for_other_page(page):
@@ -919,6 +922,7 @@ def build_pkg_now():
 
 
 @app.route('/get_status', methods=['GET'])
+@app.route('/api/ajax', methods=['GET'])
 def get_status():
     """
 
@@ -928,14 +932,15 @@ def get_status():
     building = status.current_status
     iso_release = bool(request.args.get('do_iso_release', False)) and user.is_authenticated()
     reset_queue = bool(request.args.get('reset_build_queue', False)) and user.is_authenticated()
-    rerun_transaction = int(request.args.get('rerun_transaction', False))
+    rerun_transaction = int(request.args.get('rerun_transaction', 0))
 
-    if not any([iso_release, reset_queue, rerun_transaction]):
+    if not all([iso_release, reset_queue]) and rerun_transaction == 0:
         return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
+
+    message = dict(msg='Ok')
 
     if iso_release:
         queue.enqueue_call(iso.iso_release_job)
-        message = dict(msg='Ok')
         return json.dumps(message)
 
     elif reset_queue:
@@ -950,8 +955,6 @@ def get_status():
                 logger.debug(popped)
         status.idle = True
         status.current_status = 'Idle.'
-        message = dict(msg='Ok')
-
         return json.dumps(message)
 
     elif rerun_transaction and user.is_authenticated():
@@ -959,8 +962,10 @@ def get_status():
         pkgs = event.packages
         if pkgs:
             for pkg in pkgs:
-                status.queue.append(pkg)
+                if pkg not in status.hook_queue:
+                    status.hook_queue.rpush(pkg)
             hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
+        return json.dumps(message)
 
 
 @app.route('/issues', methods=['GET'])

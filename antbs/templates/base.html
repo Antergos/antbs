@@ -674,14 +674,14 @@
 					jQuery(document).ready(function () {
 
 						jQuery('#do_iso_release_confirm').click(function () {
-							$.getJSON('/get_status?do_iso_release=True', function (data) {
+							$.getJSON('/api/ajax?do_iso_release=True', function (data) {
 								console.log(data);
 							});
 						});
 						jQuery('#reset_build_queue').click(function () {
 							var $icon = $(this).find('i');
 							$icon.addClass('fa-spin');
-							$.getJSON('/get_status?reset_build_queue=True', function (data) {
+							$.getJSON('/api/ajax?reset_build_queue=True', function (data) {
 								console.log(data);
 								setTimeout(function ($the_icon) {
 									$the_icon.removeClass('fa-spin');

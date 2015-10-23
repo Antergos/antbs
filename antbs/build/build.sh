@@ -70,7 +70,6 @@ function setup_environment() {
 		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
 		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
 		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = file:///$repo/$arch\n|g' /etc/pacman.conf
-		pacman -Syy
 
 	else
 
@@ -82,6 +81,8 @@ function setup_environment() {
 		#sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
 
 	fi
+
+	pacman -Syy
 
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
 	sed -i '/CFLAGS=/c\CFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
@@ -195,11 +196,10 @@ function setup_32bit_env() {
 		cd /32bit
 	else
 		sed -i '/\[antergos/,+1 d' /32bit/pacman.conf
-		cd /32bit
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /32bit/makepkg.conf
+		sed -i '/\[antergos-staging/,+1 d' /32bit/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /32bit/pacman.conf
 	fi
-	pacman -Syyu --noconfirm reflector
-	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 
 	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf /32build/root base-devel wget sudo git reflector
 	mkdir /32build/root/pkg

@@ -156,9 +156,8 @@ def process_package_queue():
     :param the_queue:
     :return: :raise ValueError:
     """
-    hook_queue = status.hook_queue
-    logger.info(hook_queue)
-    if hook_queue is None:
+
+    if status.hook_queue is None:
         raise ValueError('the_queue cannot be None')
     all_deps = []
 
@@ -182,9 +181,9 @@ def process_package_queue():
             while not db.exists('BUILD_REPO_UPDATED') and db.exists('BUILD_REPO_LOCK'):
                 time.sleep(2)
 
-    for pkg in hook_queue:
-        logger.info(pkg)
-        if pkg == '':
+    for pkg in status.hook_queue:
+        # logger.info(pkg)
+        if not pkg:
             continue
         pkg_obj = package.get_pkg_object(name=pkg)
         version = pkg_obj.get_version()
@@ -225,9 +224,9 @@ def process_package_queue():
             shutil.move(src, dest)
             subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
-        if depends and len(hook_queue) > 1:
+        if depends and len(status.hook_queue) > 1:
             all_deps.append(depends)
-        elif len(hook_queue) == 1:
+        elif len(status.hook_queue) == 1:
             all_deps.append(1)
 
     return all_deps
@@ -245,9 +244,6 @@ def handle_hook():
         saved_status = status.current_status
     else:
         status.idle = False
-
-    package_queue = status.queue
-    hook_q = status.hook_queue
 
     status.current_status = 'Build hook was triggered. Checking docker images.'
     if not status.iso_flag:
@@ -277,15 +273,15 @@ def handle_hook():
         logger.info('Check deps complete. Starting build_pkgs')
         status.current_status = 'Check deps complete. Starting build container.'
         for p in topsort:
-            hook_q.remove(p)
-            if p not in package_queue:
-                package_queue.append(p)
+            status.hook_queue.remove(p)
+            if p not in status.queue:
+                status.queue.rpush(p)
                 build_queue.enqueue_call(build_pkg_handler, timeout=84600)
 
     elif len(all_deps) == 1:
-        p = hook_q.lpop()
-        if p not in package_queue:
-            package_queue.append(p)
+        p = status.hook_queue.lpop()
+        if p not in status.queue:
+            status.queue.rpush(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
     else:
         if not saved_status:
