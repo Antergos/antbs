@@ -142,8 +142,8 @@ def check_deps(source):
                     emitted.append(name)  # <-- not required, but helps preserve original ordering
                     next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
             if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
-                logger.error("cyclic or missing dependancy detected: %r" % (next_pending,))
-                pass
+                logger.error("cyclic or missing dependancy detected: %r", next_pending)
+                raise ValueError
             pending = next_pending
             emitted = next_emitted
     except ValueError as err:
@@ -224,10 +224,8 @@ def process_package_queue():
             shutil.move(src, dest)
             subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
-        if depends and len(status.hook_queue) > 1:
+        if depends:
             all_deps.append(depends)
-        elif len(status.hook_queue) == 1:
-            all_deps.append(1)
 
     return all_deps
 
@@ -268,7 +266,7 @@ def handle_hook():
     logger.info('All queued packages are in the database, checking deps to determine build order.')
     status.current_status = 'Determining build order based on package dependencies.'
 
-    if len(all_deps) > 1:
+    if all_deps:
         topsort = check_deps(all_deps)
         logger.info('Check deps complete. Starting build_pkgs')
         status.current_status = 'Check deps complete. Starting build container.'
@@ -278,15 +276,11 @@ def handle_hook():
                 status.queue.rpush(p)
                 build_queue.enqueue_call(build_pkg_handler, timeout=84600)
 
-    elif len(all_deps) == 1:
+    else:
         p = status.hook_queue.lpop()
         if p not in status.queue:
             status.queue.rpush(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
-    else:
-        if not saved_status:
-            status.current_status = 'Idle'
-            status.idle = True
 
     if saved_status and not status.idle:
         status.current_status = saved_status

@@ -95,7 +95,7 @@ class RedisList(RedisField, list):
         item_type: The constructor to use when reading items from redis.
         values: Default values to store during construction. """
 
-        RedisField.__init__(self, id_key)
+        super(RedisList, self).__init__(id_key=id_key)
 
         self.item_type = item_type
 
@@ -209,13 +209,6 @@ class RedisList(RedisField, list):
         """
         self.rpush(val)
 
-    def delete(self):
-        """
-
-
-        """
-        db.delete(self.id_key)
-
     def reverse(self):
         """
 
@@ -242,7 +235,7 @@ class RedisZSet(RedisField, set):
         item_type: The constructor to use when reading items from redis.
         values: Default values to store during construction. """
 
-        RedisField.__init__(self, id_key)
+        super(RedisZSet, self).__init__(id_key=id_key)
 
         self.item_type = item_type
 
@@ -331,12 +324,15 @@ class RedisObject(object):
             redis_zset=[])
         self.all_keys = []
 
+    def __bool__(self):
+        """ Test if an object currently exists. """
+
+        return db.exists(self.prefix)
+
     def __nonzero__(self):
         """ Test if an object currently exists in database. """
 
         return db.exists(self.prefix)
-
-    __bool__ = __nonzero__
 
     def __eq__(self, other):
         """ Tests if two redis objects are equal (they have the same id/key). """
@@ -385,14 +381,12 @@ class RedisObject(object):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
 
         if attrib in pass_list or attrib not in self.all_keys:
-            super(RedisObject, self).__setattr__(attrib, value)
-            return
+            return super(RedisObject, self).__setattr__(attrib, value)
 
         key = self.prefix
 
         if attrib in self.key_lists['redis_list'] or attrib in self.key_lists['redis_zset']:
-            super(RedisObject, self).__setattr__(attrib, value)
-            return
+            return super(RedisObject, self).__setattr__(attrib, value)
 
         if attrib in self.key_lists['redis_string']:
             db.hset(key, attrib, value)

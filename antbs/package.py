@@ -162,8 +162,10 @@ class Package(PackageMeta):
             cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
-            if '' == self.git_url or '' == self.git_name:
+            if 'http' not in self.git_url or '' == self.git_name:
+                logger.info('1. self.git_url is: %s', self.git_url)
                 self.determine_git_repo_info()
+                logger.info('3. self.git_url is: %s', self.git_url)
 
             cmd = self.prepare_package_source(dirpath=dirpath)
 
@@ -191,27 +193,27 @@ class Package(PackageMeta):
         if os.path.exists(os.path.join(dirpath, self.git_name)):
             shutil.rmtree(os.path.join(dirpath, self.git_name), ignore_errors=True)
         try:
-            subprocess.check_output(['git', 'clone', self.git_url, self.git_name], cwd=dirpath)
+            res = subprocess.check_output(['/usr/bin/git', 'clone', self.git_url, self.git_name], cwd=dirpath)
+            logger.info(res)
         except subprocess.CalledProcessError as err:
-            logger.error(err.output)
+            logger.error(err)
 
         cmd = 'cd ' + dirpath + '; source ./PKGBUILD; pkgver'
         return cmd
 
     def determine_git_repo_info(self):
-        if '' == self.git_url:
+        if not self.git_url:
             source = self.get_from_pkgbuild('source')
-            url_match = re.search('(?<=git\\+).+(?=["\'])', source)
+            logger.info(source)
+            url_match = re.search(r"((https*)|(git:\/\/)).+(?=\"|')", source)
             if url_match:
+                logger.info('url_match is: %s', url_match)
                 self.git_url = url_match.group(0)
             else:
-                url_match = re.search('git:.+(?=["\'])', source)
-                if url_match:
-                    self.git_url = url_match.group(0)
-                else:
-                    self.git_url = ''
+                self.git_url = ''
 
-        if '' == self.git_name:
+        logger.info('2. self.git_url is: %s', self.git_url)
+        if not self.git_name:
             self.git_name = self.name
             if self.name == 'pamac-dev':
                 self.git_name = 'pamac'
@@ -369,7 +371,7 @@ class Package(PackageMeta):
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver and has_ver is not None:
                 dep = has_ver.group(0)
-            if dep in status.all_packages and dep in queue:
+            if dep in status.all_packages or dep in queue:
                 depends.append(dep)
                 if dep in deps:
                     self.depends.add(dep)
