@@ -306,14 +306,17 @@ class Package(PackageMeta):
 
 
         :return:
+
         """
+        changed = {}
+        old_vals = {}
         if self.name not in ['scudcloud']:
-            changed = []
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 old_val = str(getattr(self, key))
+                old_vals[key] = old_val
                 new_val = str(self.get_from_pkgbuild(key))
                 if new_val != old_val:
-                    changed.append((key, new_val))
+                    changed[key] = new_val
                     setattr(self, key, new_val)
 
             if 'cnchi-dev' == self.name and self.pkgver[-1] != '0' and self.pkgver[-1] != '5':
@@ -323,15 +326,23 @@ class Package(PackageMeta):
                 return self.version_str
         else:
             old_val = self.pkgver
-            self.pkgver = db.get('ANTBS_SCUDCLOUD_RELEASE_TAG')
+            changed['pkgver'] = db.get('ANTBS_SCUDCLOUD_RELEASE_TAG')
+            self.pkgver = changed['pkgver']
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
-        version = self.pkgver
-        if self.epoch and self.epoch != '' and self.epoch is not None:
+        version = changed['pkgver']
+
+        if changed.get('epoch', False):
+            version = changed['epoch'] + ':' + version
+        elif self.epoch:
             version = self.epoch + ':' + version
 
-        version = version + '-' + self.pkgrel
-        if version and version != '' and version is not None and version != '-':
+        if changed.get('pkgrel', False):
+            version = version + '-' + changed['pkgrel']
+        else:
+            version = version + '-' + self.pkgrel
+
+        if version and version != '-':
             self.version_str = version
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
