@@ -131,6 +131,10 @@ def check_github_repo(project=None, repo=None):
     if latest != last_id:
         if 'pamac' == repo:
             repo = 'pamac-dev'
+        elif 'paper-gtk-theme' == repo:
+            repo = 'gtk-theme-paper'
+        elif repo in ['arc-theme', 'Arc-theme']:
+            repo = 'gtk-theme-arc'
         db.set(key, latest)
         new_items.append([repo])
 

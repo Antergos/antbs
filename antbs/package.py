@@ -53,7 +53,7 @@ class PackageMeta(RedisObject):
 
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
-                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate'],
+                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
@@ -112,7 +112,7 @@ class Package(PackageMeta):
 
         self.maybe_update_pkgbuild_repo()
 
-        if not self or not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name)):
+        if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name))):
             # Package is not in the database, so it must be new. Let's initialize it.
             for key in self.all_keys:
                 if key in self.key_lists['redis_string'] and key != 'name':
@@ -162,34 +162,36 @@ class Package(PackageMeta):
             cmd = 'source ' + self.pbpath + '; srcdir=$CWD; echo ${' + var + '}'
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
-            giturl = re.search('(?<=git\\+).+(?="|\')', parse)
-            if giturl:
-                giturl = giturl.group(0)
-            else:
-                giturl = re.search('(?<="|\')git:.+(?="|\')', parse)
-                if giturl:
-                    giturl = giturl.group(0)
+            if '' == self.git_url:
+                source = self.get_from_pkgbuild('source')
+                logger.info('source is: %s', source)
+                url_match = re.search('(?<=git\\+).+(?=["\'])', source)
+                if url_match:
+                    self.git_url = url_match.group(0)
                 else:
-                    giturl = ''
+                    url_match = re.search('git:.+(?=["\'])', source)
+                    if url_match:
+                        self.git_url = url_match.group(0)
+
+            logger.info('giturl is: %s', self.giturl)
+
             gitnm = self.name
             if self.name == 'pamac-dev':
                 gitnm = 'pamac'
             elif self.name == 'cnchi-dev':
                 gitnm = 'cnchi'
-                giturl = 'http://github.com/lots0logs/cnchi-dev.git'
+                self.git_url = 'http://github.com/lots0logs/cnchi-dev.git'
             elif self.name == 'cnchi':
-                giturl = 'http://github.com/antergos/cnchi.git'
+                self.git_url = 'http://github.com/antergos/cnchi.git'
 
             os.putenv('srcdir', dirpath)
 
             if os.path.exists(os.path.join(dirpath, gitnm)):
                 shutil.rmtree(os.path.join(dirpath, gitnm), ignore_errors=True)
             try:
-                subprocess.check_output(['git', 'clone', giturl, gitnm], cwd=dirpath)
+                subprocess.check_output(['git', 'clone', self.git_url, gitnm], cwd=dirpath)
             except subprocess.CalledProcessError as err:
                 logger.error(err.output)
-
-            os.unsetenv('srcdir')
 
             cmd = 'source ' + self.pbpath + '; ' + var
 
@@ -202,6 +204,8 @@ class Package(PackageMeta):
             # logger.info('proc.out is %s' % out)
         if len(err) > 0:
             logger.error('proc.err is %s', err)
+
+        os.unsetenv('srcdir')
 
         return out
 
@@ -229,7 +233,7 @@ class Package(PackageMeta):
 
 
         """
-        if not db.exists('PKGBUILD_REPO_UPDATED'):
+        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
             if db.setnx('PKGBUILD_REPO_LOCK', True):
                 db.expire('PKGBUILD_REPO_LOCK', 150)
 
