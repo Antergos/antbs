@@ -54,7 +54,7 @@ sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	pacman -S --noconfirm base-devel git gcc arch-install-scripts reflector lzo2
 	reflector -l 30 -f 15 --save /etc/pacman.d/mirrorlist
 	pacman -Rcc --noconfirm reflector python
-        pacman -Sc --noconfirm
+	pacman -Scc --noconfirm
 	# Install stuff
 	echo "en_US.UTF-8 UTF-8" > /etc/locale.gen
 	locale-gen

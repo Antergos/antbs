@@ -934,7 +934,7 @@ def get_status():
     reset_queue = bool(request.args.get('reset_build_queue', False)) and user.is_authenticated()
     rerun_transaction = int(request.args.get('rerun_transaction', 0))
 
-    if not all([iso_release, reset_queue]) and rerun_transaction == 0:
+    if not iso_release and not reset_queue and rerun_transaction == 0:
         return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
 
     message = dict(msg='Ok')

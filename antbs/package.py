@@ -53,7 +53,7 @@ class PackageMeta(RedisObject):
 
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
-                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url'],
+                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
@@ -157,43 +157,15 @@ class Package(PackageMeta):
         dirpath = os.path.dirname(self.pbpath)
 
         if var in ['source', 'depends', 'makedepends', 'arch']:
-            cmd = 'source ' + self.pbpath + '; echo ${' + var + '[*]}'
+            cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '[*]}'
         else:
-            cmd = 'source ' + self.pbpath + '; srcdir=$CWD; echo ${' + var + '}'
+            cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
-            if '' == self.git_url:
-                source = self.get_from_pkgbuild('source')
-                logger.info('source is: %s', source)
-                url_match = re.search('(?<=git\\+).+(?=["\'])', source)
-                if url_match:
-                    self.git_url = url_match.group(0)
-                else:
-                    url_match = re.search('git:.+(?=["\'])', source)
-                    if url_match:
-                        self.git_url = url_match.group(0)
+            if '' == self.git_url or '' == self.git_name:
+                self.determine_git_repo_info()
 
-            logger.info('giturl is: %s', self.giturl)
-
-            gitnm = self.name
-            if self.name == 'pamac-dev':
-                gitnm = 'pamac'
-            elif self.name == 'cnchi-dev':
-                gitnm = 'cnchi'
-                self.git_url = 'http://github.com/lots0logs/cnchi-dev.git'
-            elif self.name == 'cnchi':
-                self.git_url = 'http://github.com/antergos/cnchi.git'
-
-            os.putenv('srcdir', dirpath)
-
-            if os.path.exists(os.path.join(dirpath, gitnm)):
-                shutil.rmtree(os.path.join(dirpath, gitnm), ignore_errors=True)
-            try:
-                subprocess.check_output(['git', 'clone', self.git_url, gitnm], cwd=dirpath)
-            except subprocess.CalledProcessError as err:
-                logger.error(err.output)
-
-            cmd = 'source ' + self.pbpath + '; ' + var
+            cmd = self.prepare_package_source(dirpath=dirpath)
 
         proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -208,6 +180,46 @@ class Package(PackageMeta):
         os.unsetenv('srcdir')
 
         return out
+
+    def prepare_package_source(self, dirpath=None):
+        if not dirpath:
+            logger.error('dirpath cannot be None')
+            raise ValueError
+
+        os.putenv('srcdir', dirpath)
+
+        if os.path.exists(os.path.join(dirpath, self.git_name)):
+            shutil.rmtree(os.path.join(dirpath, self.git_name), ignore_errors=True)
+        try:
+            subprocess.check_output(['git', 'clone', self.git_url, self.git_name], cwd=dirpath)
+        except subprocess.CalledProcessError as err:
+            logger.error(err.output)
+
+        cmd = 'cd ' + dirpath + '; source ./PKGBUILD; pkgver'
+        return cmd
+
+    def determine_git_repo_info(self):
+        if '' == self.git_url:
+            source = self.get_from_pkgbuild('source')
+            url_match = re.search('(?<=git\\+).+(?=["\'])', source)
+            if url_match:
+                self.git_url = url_match.group(0)
+            else:
+                url_match = re.search('git:.+(?=["\'])', source)
+                if url_match:
+                    self.git_url = url_match.group(0)
+                else:
+                    self.git_url = ''
+
+        if '' == self.git_name:
+            self.git_name = self.name
+            if self.name == 'pamac-dev':
+                self.git_name = 'pamac'
+            elif self.name == 'cnchi-dev':
+                self.git_name = 'cnchi'
+                self.git_url = 'http://github.com/lots0logs/cnchi-dev.git'
+            elif self.name == 'cnchi':
+                self.git_url = 'http://github.com/antergos/cnchi.git'
 
     def determine_pbpath(self):
         path = None
