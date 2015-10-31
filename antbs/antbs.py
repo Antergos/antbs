@@ -658,7 +658,7 @@ def build():
             ver = bld_obj.version_str
 
     return render_template("building.html", building=now_building, container=container, bnum=bnum,
-                           start=start, ver=ver)
+                           start=start, ver=ver, idle=status.idle)
 
 
 @app.route('/get_log')

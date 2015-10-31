@@ -74,9 +74,13 @@ def check_for_new_items():
                 res = check_gitlab_repo(project_id=project)
 
             if res:
-                build_pkgs = build_pkgs + res
+                build_pkgs.append([res])
 
+    build_pkgs = [p for p in build_pkgs if p]
     if len(build_pkgs) > 0:
+        if 'numix-icon-theme-square' in build_pkgs:
+            build_pkgs.append(['numix-icon-theme-square-kde'])
+
         add_to_build_queue(build_pkgs)
 
 
@@ -111,32 +115,34 @@ def check_github_repo(project=None, repo=None):
     key = 'antbs:monitor:github:%s:%s' % (project, repo)
     last_id = db.get(key) or ''
     gh_repo = gh.repository(project, repo)
-    commits = gh_repo.commits()
-    releases = [r for r in gh_repo.releases()]
     latest = None
-    if repo not in ['scudcloud']:
+
+    if repo not in ['scudcloud', 'yaourt', 'package-query']:
+        commits = gh_repo.commits()
         try:
             commit = commits.next()
             latest = commit.sha
         except StopIteration:
             pass
     else:
+        releases = [r for r in gh_repo.releases()]
         try:
             release = releases[0]
             latest = release.name
-            db.set('ANTBS_SCUDCLOUD_RELEASE_TAG', latest.replace('v', ''))
+            latest = latest.replace('v', '')
         except Exception as err:
             logger.error(err)
 
     if latest != last_id:
+        db.set(key, latest)
         if 'pamac' == repo:
             repo = 'pamac-dev'
         elif 'paper-gtk-theme' == repo:
             repo = 'gtk-theme-paper'
         elif repo in ['arc-theme', 'Arc-theme']:
             repo = 'gtk-theme-arc'
-        db.set(key, latest)
-        new_items.append([repo])
+
+        new_items = repo
 
     return new_items
 
@@ -159,8 +165,7 @@ def check_gitlab_repo(project_id=None):
         if event.action_name == 'pushed to':
             if event.created_at != last_updated:
                 db.set(key, event.created_at)
-                new_items.append(['numix-icon-theme-square'])
-                new_items.append(['numix-icon-theme-square-kde'])
+                new_items = ['numix-icon-theme-square']
 
             break
 

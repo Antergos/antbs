@@ -62,6 +62,11 @@ function setup_environment() {
 
 	fi
 
+	if [[ ${_GET_PKGVER_ONLY} = True ]]; then
+		touch "/result/$(pkgver)"
+		exit 0
+	fi
+
 	if [[ ${_ALEXPKG} = False ]]; then
 
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf

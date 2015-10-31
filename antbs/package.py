@@ -36,6 +36,8 @@ import time
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
 from utils.server_status import status
+from utils.docker_util import DockerUtils
+
 
 REPO_DIR = "/var/tmp/antergos-packages"
 
@@ -53,7 +55,8 @@ class PackageMeta(RedisObject):
 
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
-                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name'],
+                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
+                          'gh_repo', 'gh_project'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
@@ -135,6 +138,9 @@ class Package(PackageMeta):
                 self.is_iso = True
             else:
                 self.is_iso = False
+
+            self.determine_pbpath()
+
         if not self.pkgname:
             self.pkgname = self.name
 
@@ -163,11 +169,11 @@ class Package(PackageMeta):
 
         if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
             if 'http' not in self.git_url or '' == self.git_name:
-                logger.info('1. self.git_url is: %s', self.git_url)
                 self.determine_git_repo_info()
-                logger.info('3. self.git_url is: %s', self.git_url)
 
-            cmd = self.prepare_package_source(dirpath=dirpath)
+            self.prepare_package_source(dirpath=dirpath)
+            pkgver = DockerUtils().get_pkgver_inside_container(self)
+            return pkgver
 
         proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -198,14 +204,11 @@ class Package(PackageMeta):
         except subprocess.CalledProcessError as err:
             logger.error(err)
 
-        cmd = 'cd ' + dirpath + '; source ./PKGBUILD; pkgver'
-        return cmd
-
     def determine_git_repo_info(self):
         if not self.git_url:
             source = self.get_from_pkgbuild('source')
             logger.info(source)
-            url_match = re.search(r"((https*)|(git:\/\/)).+(?=\"|')", source)
+            url_match = re.search("((https*)|(git:)).+", source)
             if url_match:
                 logger.info('url_match is: %s', url_match)
                 self.git_url = url_match.group(0)
@@ -227,6 +230,7 @@ class Package(PackageMeta):
         path = None
         paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
                  os.path.join('/var/tmp/antergos-packages/cinnamon/', self.pkgname)]
+        self.maybe_update_pkgbuild_repo()
         for p in paths:
             logger.info(p)
             if os.path.exists(p):
@@ -261,11 +265,9 @@ class Package(PackageMeta):
                     db.delete('PKGBUILD_REPO_UPDATED')
 
                 db.delete('PKGBUILD_REPO_LOCK')
-                return
             else:
                 while not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
                     time.sleep(2)
-                return
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         """
@@ -312,7 +314,7 @@ class Package(PackageMeta):
         """
         changed = {}
         old_vals = {}
-        if self.name not in ['scudcloud']:
+        if self.name not in ['scudcloud', 'yaourt', 'package-query']:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 old_val = str(getattr(self, key))
                 old_vals[key] = old_val
@@ -328,7 +330,8 @@ class Package(PackageMeta):
                 return self.version_str
         else:
             old_val = self.pkgver
-            changed['pkgver'] = db.get('ANTBS_SCUDCLOUD_RELEASE_TAG')
+            key = 'antbs:monitor:github:%s:%s' % (self.gh_project, self.gh_repo)
+            changed['pkgver'] = db.get(key)
             self.pkgver = changed['pkgver']
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
@@ -371,7 +374,7 @@ class Package(PackageMeta):
             has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
             if has_ver and has_ver is not None:
                 dep = has_ver.group(0)
-            if dep in status.all_packages or dep in queue:
+            if dep in status.all_packages and dep in queue:
                 depends.append(dep)
                 if dep in deps:
                     self.depends.add(dep)

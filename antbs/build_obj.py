@@ -64,10 +64,7 @@ class BuildObject(RedisObject):
             self.prefix = self.namespace[:-1]
             for key in self.all_keys:
                 if key in self.key_lists['redis_string']:
-                    if 'pkgver' == key:
-                        value = pkg_obj.get_version()
-                    else:
-                        value = getattr(pkg_obj, key, '')
+                    value = getattr(pkg_obj, key, '')
                     setattr(self, key, value)
                 elif key in self.key_lists['redis_string_bool']:
                     value = getattr(pkg_obj, key, False)

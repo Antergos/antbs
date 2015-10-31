@@ -55,7 +55,7 @@ SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
-doc = docker_utils.doc
+doc = docker_utils.DockerUtils().doc
 logger = logconf.logger
 
 with Connection(db):
@@ -377,7 +377,7 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
         pkgenv = ["_PKGNAME=%s" % pkgname, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo,
                   "_REPO_DIR=%s" % repodir]
         building_saved = False
-        if not status.idle:
+        if not status.idle and status.current_status != 'Updating repo database.':
             building_saved = status.current_status
         else:
             status.idle = False
