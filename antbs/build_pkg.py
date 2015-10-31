@@ -245,10 +245,10 @@ def handle_hook():
 
     status.current_status = 'Build hook was triggered. Checking docker images.'
     if not status.iso_flag:
-        image = docker_utils.maybe_build_base_devel()
+        image = docker_utils.DockerUtils().maybe_build_base_devel()
     else:
         status.iso_flag = False
-        image = docker_utils.maybe_build_mkarchiso()
+        image = docker_utils.DockerUtils().maybe_build_mkarchiso()
 
     if not image:
         if not saved_status:
@@ -384,7 +384,7 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
         status.current_status = 'Updating repo database.'
         container = None
         run_docker_clean("update_repo")
-        hconfig = docker_utils.create_repo_update_host_config()
+        hconfig = docker_utils.DockerUtils().create_repo_update_host_config()
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=pkgenv,
@@ -624,7 +624,7 @@ def build_pkgs(pkg_info=None):
                 build_env.append('_ALEXPKG=True')
             else:
                 build_env.append('_ALEXPKG=False')
-            hconfig = docker_utils.create_pkgs_host_config(cache, pkgbuild_dir, result)
+            hconfig = docker_utils.DockerUtils().create_pkgs_host_config(cache, pkgbuild_dir, result)
             try:
                 container = doc.create_container("antergos/makepkg",
                                                  command="/makepkg/build.sh " + pkg_deps_str,
