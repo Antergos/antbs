@@ -368,7 +368,7 @@ class Package(PackageMeta):
 
         all_deps = deps + mkdeps
         for dep in all_deps:
-            has_ver = re.search('^[\d\w]+(?=\=|\>|\<)', dep)
+            has_ver = re.search('^[\d\w-]+(?=\=|\>|\<)', dep)
             if has_ver:
                 dep = has_ver.group(0)
             if dep in status.all_packages and (dep in status.queue or dep in status.hook_queue):

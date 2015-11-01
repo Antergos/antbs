@@ -55,8 +55,9 @@ class DockerUtils(object):
     def __init__(self):
         self.cache_dir = '/var/cache/pacman'
         self.result_dir = '/tmp/pkgver_result'
-        if not os.path.exists(self.result_dir):
-            os.mkdir(self.result_dir)
+        if os.path.exists(self.result_dir):
+            shutil.rmtree(self.result_dir, ignore_errors=True)
+        os.mkdir(self.result_dir)
 
     def create_pkgs_host_config(self, cache, pkgbuild_dir, result):
         """
@@ -278,7 +279,7 @@ class DockerUtils(object):
         dirpath = os.path.dirname(pkg_obj.pbpath)
         hconfig = self.create_pkgs_host_config(self.cache_dir, dirpath, self.result_dir)
         hconfig.pop('restart_policy', None)
-        build_env = ['_ALEXPKG=False', '_GET_PKGVER_ONLY=True']
+        build_env = ['_ALEXPKG=False', '_GET_PKGVER_ONLY=True', 'srcdir=/pkg']
         try:
             container = self.doc.create_container("antergos/makepkg",
                                                   command="/makepkg/build.sh ",
@@ -287,7 +288,7 @@ class DockerUtils(object):
                                                            '/staging', '/32bit', '/32build',
                                                            '/result'],
                                                   environment=build_env, cpuset='0-3',
-                                                  name=pkg_obj.pkgname, host_config=hconfig)
+                                                  name=pkg_obj.pkgname + '-pkgver', host_config=hconfig)
             if container.get('Warnings') and container.get('Warnings') != '':
                 logger.error(container.get('Warnings'))
         except Exception as err:
