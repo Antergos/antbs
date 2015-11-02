@@ -51,18 +51,20 @@ class DockerUtils(object):
         # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
     except Exception as err:
         logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+        raise RuntimeError
 
     def __init__(self):
-        self.cache_dir = '/var/cache/pacman'
-        self.cache_i686 = '/var/cache/pacman_i686'
+        self.cache_dir = '/var/tmp/pkg_cache'
+        self.cache_i686 = '/var/tmp/pkg_cache_i686'
         self.result_dir = '/tmp/pkgver_result'
         if os.path.exists(self.result_dir):
             shutil.rmtree(self.result_dir, ignore_errors=True)
         os.mkdir(self.result_dir)
 
-    def create_pkgs_host_config(self, cache, pkgbuild_dir, result, cache_i686):
+    def create_pkgs_host_config(self, pkgbuild_dir, result):
         """
 
+        :param cache_i686:
         :param cache:
         :param pkgbuild_dir:
         :param result:
@@ -70,12 +72,12 @@ class DockerUtils(object):
         """
         pkgs_hconfig = self.doc.create_host_config(
             binds={
-                cache:
+                self.cache_dir:
                     {
                         'bind': '/var/cache/pacman',
                         'ro': False
                     },
-                cache_i686:
+                self.cache_i686:
                     {
                         'bind': '/var/cache/pacman_i686',
                         'ro': False
@@ -283,7 +285,7 @@ class DockerUtils(object):
 
     def get_pkgver_inside_container(self, pkg_obj):
         dirpath = os.path.dirname(pkg_obj.pbpath)
-        hconfig = self.create_pkgs_host_config(self.cache_dir, dirpath, self.result_dir, self.cache_i686)
+        hconfig = self.create_pkgs_host_config(dirpath, self.result_dir)
         hconfig.pop('restart_policy', None)
         build_env = ['_ALEXPKG=False', '_GET_PKGVER_ONLY=True', 'srcdir=/pkg']
         try:
@@ -294,7 +296,8 @@ class DockerUtils(object):
                                                            '/staging', '/32bit', '/32build',
                                                            '/result'],
                                                   environment=build_env, cpuset='0-3',
-                                                  name=pkg_obj.pkgname + '-pkgver', host_config=hconfig)
+                                                  name=pkg_obj.pkgname + '-pkgver',
+                                                  host_config=hconfig)
             if container.get('Warnings') and container.get('Warnings') != '':
                 logger.error(container.get('Warnings'))
         except Exception as err:

@@ -642,14 +642,13 @@ def build_package(pkg_obj=None):
     else:
         build_env.append('_ALEXPKG=False')
 
-    hconfig = docker_utils.DockerUtils().create_pkgs_host_config(cache, pkg_obj.build_path,
-                                                                 result, cache_i686)
+    hconfig = docker_utils.DockerUtils().create_pkgs_host_config(pkg_obj.build_path, result)
     try:
         container = doc.create_container("antergos/makepkg",
                                          command="/makepkg/build.sh " + pkg_deps_str,
                                          volumes=['/var/cache/pacman', '/makepkg', '/antergos',
-                                                  '/pkg', '/root/.gnupg', '/staging',
-                                                  '/32bit', '/32build', '/result'],
+                                                  '/pkg', '/root/.gnupg', '/staging', '/32bit',
+                                                  '/32build', '/result', '/var/cache/pacman_i686'],
                                          environment=build_env, cpuset='0-3', name=pkg_obj.name,
                                          host_config=hconfig)
         if container.get('Warnings') and container.get('Warnings') != '':
