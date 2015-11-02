@@ -335,7 +335,7 @@ class Package(PackageMeta):
             self.pkgver = changed['pkgver']
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
-        version = changed['pkgver']
+        version = changed.get('pkgver', self.pkgver)
 
         if changed.get('epoch', False):
             version = changed['epoch'] + ':' + version

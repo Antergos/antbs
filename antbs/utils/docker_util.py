@@ -59,7 +59,7 @@ class DockerUtils(object):
             shutil.rmtree(self.result_dir, ignore_errors=True)
         os.mkdir(self.result_dir)
 
-    def create_pkgs_host_config(self, cache, pkgbuild_dir, result):
+    def create_pkgs_host_config(self, cache, pkgbuild_dir, result, cache_i686):
         """
 
         :param cache:
@@ -72,6 +72,11 @@ class DockerUtils(object):
                 cache:
                     {
                         'bind': '/var/cache/pacman',
+                        'ro': False
+                    },
+                cache_i686:
+                    {
+                        'bind': '/var/cache/pacman_i686',
                         'ro': False
                     },
                 BUILD_DIR:

@@ -39,6 +39,7 @@ import subprocess
 import utils.logging_config as logconf
 import datetime
 import shutil
+import glob
 from pygments import highlight
 from pygments.lexers import BashLexer
 from pygments.formatters import HtmlFormatter
@@ -153,8 +154,8 @@ def check_deps(source):
 def process_package_queue():
     """
 
-    :param the_queue:
     :return: :raise ValueError:
+
     """
 
     if status.hook_queue is None:
@@ -233,9 +234,6 @@ def process_package_queue():
 def handle_hook():
     """
 
-    :param first:
-    :param last:
-    :return:
     """
     saved_status = False
     if not status.idle and 'Idle' not in status.current_status:
@@ -268,7 +266,7 @@ def handle_hook():
 
     if all_deps:
         topsort = check_deps(all_deps)
-        logger.info('Check deps complete. Starting build_pkgs')
+        logger.info('Check deps complete. Starting build_package')
         status.current_status = 'Check deps complete. Starting build container.'
         for p in topsort:
             status.hook_queue.remove(p)
@@ -311,7 +309,7 @@ def build_pkg_handler():
             status.iso_building = True
             build_result = build_iso(pkgobj)
         else:
-            build_result = build_pkgs(pkgobj)
+            build_result = build_package(pkgobj)
 
         # TODO: Move this into its own method
         if build_result is not None:
@@ -567,130 +565,151 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
             logger.error(err)
 
 
-def build_pkgs(pkg_info=None):
-    """
-
-    :param last:
-    :param pkg_info:
-    :return:
-    """
-    if pkg_info is None:
-        return False
-    # Create our tmp directories
+def prepare_temp_and_cache_dirs():
+    # Create our tmp directories and clean up pacman package caches
     result = '/tmp/result'
     cache = '/var/tmp/pkg_cache'
-    for d in [result, cache, '/var/tmp/32build', '/var/tmp/32bit']:
+    cache_i686 = '/var/tmp/pkg_cache_i686'
+    for d in [result, cache, cache_i686, '/var/tmp/32build', '/var/tmp/32bit']:
         if os.path.exists(d) and 'pkg_cache' not in d:
+            # This is a temp directory that we don't want to persist across builds.
             shutil.rmtree(d)
             os.makedirs(d, 0o777)
         elif os.path.exists(d) and 'pkg_cache' in d:
-            logger.info('@@-build_pkg.py-@@ 476 | Cleaning package cache....')
-            status.current_status = 'Cleaning package cache.'
+            # This is a pacman package cache directory. Let's clean it up.
+            logger.info('Cleaning package cache...')
+            status.current_status = 'Cleaning package cache...'
             for pcache in os.listdir(d):
                 pcache = os.path.join(d, pcache)
                 if not os.path.isdir(pcache):
-                    logger.error('@@-build_pkg.py-@@ 479 | pcache is not a directory')
+                    logger.error('pcache is not a directory')
                     continue
+                already_checked = []
                 for pfile in os.listdir(pcache):
+                    # Get the package name using regex.
                     pname = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', pfile)
                     if not pname or pname == '':
                         continue
                     pname = pname.group(0)
-                    pfile = os.path.join(pcache, pfile)
-                    dtime = time.time()
-                    if os.stat(pfile).st_mtime < (dtime - (7 * 86400)) or status.all_packages.ismember(pname):
-                        remove(pfile)
+                    # Use globbing to check for multiple versions of the package.
+                    all_versions = glob.glob('%s/%s**.xz' % (pcache, pname))
+                    if pname in already_checked:
+                        # We've already handled all versions of this package.
+                        continue
+                    elif len(all_versions) <= 1:
+                        # There is only one version of the package in this cache dir, keep it.
+                        already_checked.append(pname)
+                        continue
+                    elif pname not in already_checked and len(all_versions) > 1:
+                        # There are multiple versions of the package. Determine the latest.
+                        newest = max(glob.iglob('%s/%s**.xz' % (pcache, pname)),
+                                     key=os.path.getctime)
+                        pfile = os.path.join(pcache, pfile)
+                        for package_file in all_versions:
+                            if package_file != newest or status.all_packages.ismember(pname):
+                                # This file is not the newest. Remove it.
+                                remove(pfile)
         else:
             os.makedirs(d, 0o777)
 
-    pkglist1 = ['1']
+        return result, cache, cache_i686
+
+
+def build_package(pkg_obj=None):
+    """
+
+    :param pkg_obj:
+    :return:
+
+    """
+    if pkg_obj is None:
+        return False
+    result, cache, cache_i686 = prepare_temp_and_cache_dirs()
+
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)
-    for i in range(len(pkglist1)):
-        pkg = pkg_info.name
-        if pkg and pkg is not None and pkg != '':
-            pkgbuild_dir = pkg_info.build_path
-            pkg_deps = pkg_info.depends or []
-            pkg_deps_str = ' '.join(pkg_deps) if pkg_deps else ''
+    pkg_deps_str = ' '.join(pkg_obj.depends) if pkg_obj.depends else ''
 
-            bld_obj = process_and_save_build_metadata(pkg_obj=pkg_info)
-            build_id = bld_obj.bnum
+    bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
+    build_id = bld_obj.bnum
 
-            if pkg_info.autosum == "True":
-                build_env = ['_AUTOSUMS=True']
-            else:
-                build_env = ['_AUTOSUMS=False']
-            if '/cinnamon/' in pkg_info.pbpath:
-                build_env.append('_ALEXPKG=True')
-            else:
-                build_env.append('_ALEXPKG=False')
-            hconfig = docker_utils.DockerUtils().create_pkgs_host_config(cache, pkgbuild_dir, result)
-            try:
-                container = doc.create_container("antergos/makepkg",
-                                                 command="/makepkg/build.sh " + pkg_deps_str,
-                                                 volumes=['/var/cache/pacman', '/makepkg', '/antergos',
-                                                          '/pkg', '/root/.gnupg', '/staging',
-                                                          '/32bit', '/32build', '/result'],
-                                                 environment=build_env, cpuset='0-3', name=pkg,
-                                                 host_config=hconfig)
-                if container.get('Warnings') and container.get('Warnings') != '':
-                    logger.error(container.get('Warnings'))
-            except Exception as err:
-                logger.error('Create container failed. Error Msg: %s' % err)
-                bld_obj.failed = True
-                continue
+    if pkg_obj.autosum == "True":
+        build_env = ['_AUTOSUMS=True']
+    else:
+        build_env = ['_AUTOSUMS=False']
+    if '/cinnamon/' in pkg_obj.pbpath:
+        build_env.append('_ALEXPKG=True')
+    else:
+        build_env.append('_ALEXPKG=False')
 
-            bld_obj.container = container.get('Id')
-            status.container = bld_obj.container
+    hconfig = docker_utils.DockerUtils().create_pkgs_host_config(cache, pkg_obj.build_path,
+                                                                 result, cache_i686)
+    try:
+        container = doc.create_container("antergos/makepkg",
+                                         command="/makepkg/build.sh " + pkg_deps_str,
+                                         volumes=['/var/cache/pacman', '/makepkg', '/antergos',
+                                                  '/pkg', '/root/.gnupg', '/staging',
+                                                  '/32bit', '/32build', '/result'],
+                                         environment=build_env, cpuset='0-3', name=pkg_obj.name,
+                                         host_config=hconfig)
+        if container.get('Warnings') and container.get('Warnings') != '':
+            logger.error(container.get('Warnings'))
+    except Exception as err:
+        logger.error('Create container failed. Error Msg: %s' % err)
+        bld_obj.failed = True
+        return False
 
-            try:
-                doc.start(container.get('Id'))
-                cont = bld_obj.container
-                stream_process = Process(target=publish_build_ouput, kwargs=dict(container=cont, bld_obj=bld_obj))
-                stream_process.start()
-                result = doc.wait(cont)
-                if result != 0:
-                    bld_obj.failed = True
-                    logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
-                else:
-                    logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s' % (pkg, result))
-                    bld_obj.completed = True
-                stream_process.join()
-            except Exception as err:
-                logger.error('Start container failed. Error Msg: %s' % err)
-                bld_obj.failed = True
-                bld_obj.completed = False
-                continue
+    bld_obj.container = container.get('Id')
+    status.container = bld_obj.container
 
-            repo_updated = False
-            if bld_obj.completed:
-                signed = sign_pkgs.sign_packages(bld_obj.pkgname)
-                if signed:
-                    db.publish('build-output', 'Updating staging repo database..')
-                    repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj, )
+    try:
+        doc.start(container.get('Id'))
+        cont = bld_obj.container
+        stream_process = Process(target=publish_build_ouput,
+                                 kwargs=dict(container=cont, bld_obj=bld_obj))
+        stream_process.start()
+        result = doc.wait(cont)
+        if result != 0:
+            bld_obj.failed = True
+            logger.error('Container %s exited. Return code was %s' % (pkg_obj.name, result))
+        else:
+            logger.info('Container %s exited. Return code was %s' % (pkg_obj.name, result))
+            bld_obj.completed = True
+        stream_process.join()
+    except Exception as err:
+        logger.error('Start container failed. Error Msg: %s' % err)
+        bld_obj.failed = True
+        return False
 
-            if repo_updated:
-                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
-                    build_id, build_id, pkg)
-                Timeline(msg=tlmsg, tl_type=4)
-                completed = status.completed
-                completed.rpush(bld_obj.bnum)
-                bld_obj.review_status = 'pending'
-            else:
-                tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg)
-                Timeline(msg=tlmsg, tl_type=5)
-                bld_obj.failed = True
-                bld_obj.completed = False
+    repo_updated = False
+    if bld_obj.completed:
+        signed = sign_pkgs.sign_packages(bld_obj.pkgname)
+        if signed:
+            db.publish('build-output', 'Updating staging repo database..')
+            repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
 
-                failed = status.failed
-                failed.rpush(build_id)
+    if repo_updated:
+        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
+            bld_obj.bnum, bld_obj.bnum, pkg_obj.name
+        )
+        Timeline(msg=tlmsg, tl_type=4)
+        completed = status.completed
+        completed.rpush(bld_obj.bnum)
+        bld_obj.review_status = 'pending'
+    else:
+        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (
+            bld_obj.bnum, bld_obj.bnum, pkg_obj.name)
+        Timeline(msg=tlmsg, tl_type=5)
+        bld_obj.failed = True
 
-            bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+    bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
-            if not bld_obj.failed:
-                db.set('antbs:misc:cache_buster:flag', True)
-                return True
+    if not bld_obj.failed:
+        db.set('antbs:misc:cache_buster:flag', True)
+        return True
 
+    failed = status.failed
+    failed.rpush(build_id)
     return False
 
 
