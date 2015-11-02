@@ -54,6 +54,7 @@ class DockerUtils(object):
 
     def __init__(self):
         self.cache_dir = '/var/cache/pacman'
+        self.cache_i686 = '/var/cache/pacman_i686'
         self.result_dir = '/tmp/pkgver_result'
         if os.path.exists(self.result_dir):
             shutil.rmtree(self.result_dir, ignore_errors=True)
@@ -282,7 +283,7 @@ class DockerUtils(object):
 
     def get_pkgver_inside_container(self, pkg_obj):
         dirpath = os.path.dirname(pkg_obj.pbpath)
-        hconfig = self.create_pkgs_host_config(self.cache_dir, dirpath, self.result_dir)
+        hconfig = self.create_pkgs_host_config(self.cache_dir, dirpath, self.result_dir, self.cache_i686)
         hconfig.pop('restart_policy', None)
         build_env = ['_ALEXPKG=False', '_GET_PKGVER_ONLY=True', 'srcdir=/pkg']
         try:
