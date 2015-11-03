@@ -61,7 +61,7 @@ class DockerUtils(object):
             shutil.rmtree(self.result_dir, ignore_errors=True)
         os.mkdir(self.result_dir)
 
-    def create_pkgs_host_config(self, pkgbuild_dir, result):
+    def create_pkgs_host_config(self, pkgbuild_dir, result=None):
         """
 
         :param cache_i686:
@@ -70,63 +70,54 @@ class DockerUtils(object):
         :param result:
         :return:
         """
-        pkgs_hconfig = self.doc.create_host_config(
-            binds={
-                self.cache_dir:
-                    {
-                        'bind': '/var/cache/pacman',
-                        'ro': False
-                    },
-                self.cache_i686:
-                    {
-                        'bind': '/var/cache/pacman_i686',
-                        'ro': False
-                    },
-                BUILD_DIR:
-                    {
-                        'bind': '/makepkg',
-                        'ro': False
-                    },
-                '/srv/antergos.info/repo/antergos-staging':
-                    {
-                        'bind': '/staging',
-                        'ro': False
-                    },
-                '/srv/antergos.info/repo/antergos':
-                    {
-                        'bind': '/antergos',
-                        'ro': False
-                    },
-                pkgbuild_dir:
-                    {
-                        'bind': '/pkg',
-                        'ro': False
-                    },
-                '/root/.gnupg':
-                    {
-                        'bind': '/root/.gnupg',
-                        'ro': False
-                    },
-                '/var/tmp/32bit':
-                    {
-                        'bind': '/32bit',
-                        'ro': False
-                    },
-                '/var/tmp/32build':
-                    {
-                        'bind': '/32build',
-                        'ro': False
-                    },
-                result:
-                    {
-                        'bind': '/result',
-                        'ro': False
-                    }
-            },
-            restart_policy={
-                "MaximumRetryCount": 2,
-                "Name": "on-failure"
-            }, privileged=True, cap_add=['ALL'], mem_limit='2G', memswap_limit='-1')
+        binds = {
+            self.cache_dir:
+                {
+                    'bind': '/var/cache/pacman',
+                    'ro': False
+                },
+            self.cache_i686:
+                {
+                    'bind': '/var/cache/pacman_i686',
+                    'ro': False
+                },
+            BUILD_DIR:
+                {
+                    'bind': '/makepkg',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/antergos-staging':
+                {
+                    'bind': '/staging',
+                    'ro': False
+                },
+            '/srv/antergos.info/repo/antergos':
+                {
+                    'bind': '/antergos',
+                    'ro': False
+                },
+            pkgbuild_dir:
+                {
+                    'bind': '/pkg',
+                    'ro': False
+                },
+            '/root/.gnupg':
+                {
+                    'bind': '/root/.gnupg',
+                    'ro': False
+                },
+        }
+        if 'pkgver' not in result:
+            binds['/var/tmp/32bit'] = {'bind': '/32bit', 'ro': False}
+            binds['/var/tmp/32build'] = {'bind': '/32build', 'ro': False}
+
+        binds[result] = {'bind': '/result', 'ro': False}
+
+        pkgs_hconfig = self.doc.create_host_config(binds=binds,
+                                                   restart_policy={"MaximumRetryCount": 2,
+                                                                   "Name": "on-failure"},
+                                                   privileged=True, cap_add=['ALL'],
+                                                   mem_limit='2G', memswap_limit='-1')
 
         return pkgs_hconfig
 

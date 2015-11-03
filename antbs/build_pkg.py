@@ -372,8 +372,8 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
         else:
             pkgname = bld_obj.pkgname
         command = "/makepkg/build.sh"
-        pkgenv = ["_PKGNAME=%s" % pkgname, "_RESULT=%s" % rev_result, "_UPDREPO=True", "_REPO=%s" % repo,
-                  "_REPO_DIR=%s" % repodir]
+        pkgenv = ["_PKGNAME=%s" % pkgname, "_RESULT=%s" % rev_result, "_UPDREPO=True",
+                  "_REPO=%s" % repo, "_REPO_DIR=%s" % repodir]
         building_saved = False
         if not status.idle and status.current_status != 'Updating repo database.':
             building_saved = status.current_status
@@ -386,13 +386,16 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=pkgenv,
-                                             volumes=['/makepkg', '/root/.gnupg', '/main', '/result', '/staging'],
+                                             volumes=['/makepkg', '/root/.gnupg', '/main',
+                                                      '/result', '/staging'],
                                              host_config=hconfig)
             db.set('update_repo_container', container.get('Id'))
             doc.start(container.get('Id'))
             if not is_review:
                 stream_process = Process(target=publish_build_ouput,
-                                         kwargs=dict(container=container.get('Id'), bld_obj=bld_obj, upd_repo=True))
+                                         kwargs=dict(container=container.get('Id'),
+                                                     bld_obj=bld_obj,
+                                                     upd_repo=True))
                 stream_process.start()
             result = doc.wait(container.get('Id'))
             if not is_review:
@@ -473,9 +476,12 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
 
     if existing:
         log_content = '\n '.join(log)
-        pretty = highlight(log_content, BashLexer(), HtmlFormatter(style='monokai', linenos='inline',
-                                                                   prestyles="background:#272822;color:#fff;",
-                                                                   encoding='utf-8'))
+        pretty = highlight(log_content,
+                           BashLexer(),
+                           HtmlFormatter(style='monokai',
+                                         linenos='inline',
+                                         prestyles="background:#272822;color:#fff;",
+                                         encoding='utf-8'))
         bld_obj.log_str = pretty
 
 
@@ -496,7 +502,9 @@ def process_and_save_build_metadata(pkg_obj=None):
     status.building_num = bld_obj.bnum
     status.building_start = bld_obj.start_str
     build_id = bld_obj.bnum
-    tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id, build_id, pkg_obj.name)
+    tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id,
+                                                                                   build_id,
+                                                                                   pkg_obj.name)
     Timeline(msg=tlmsg, tl_type=3)
     pbuilds = pkg_obj.builds
     pbuilds.append(build_id)
@@ -567,15 +575,19 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
 
 def prepare_temp_and_cache_dirs():
     # Create our tmp directories and clean up pacman package caches
+    logger.info('Preparing temp directories and cleaning package cache')
     result = '/tmp/result'
     cache = '/var/tmp/pkg_cache'
     cache_i686 = '/var/tmp/pkg_cache_i686'
     for d in [result, cache, cache_i686, '/var/tmp/32build', '/var/tmp/32bit']:
+        logger.info('TOPLEVEL: DIR is %s' % d)
         if os.path.exists(d) and 'pkg_cache' not in d:
+            logger.info('DIR EXISTS and is not a pkg cache.')
             # This is a temp directory that we don't want to persist across builds.
-            shutil.rmtree(d)
-            os.makedirs(d, 0o777)
+            remove(d)
+            os.mkdir(d, 0o777)
         elif os.path.exists(d) and 'pkg_cache' in d:
+            logger.info('DIR EXISTS and is a pkg_cache')
             # This is a pacman package cache directory. Let's clean it up.
             logger.info('Cleaning package cache...')
             status.current_status = 'Cleaning package cache...'
@@ -610,9 +622,9 @@ def prepare_temp_and_cache_dirs():
                                 # This file is not the newest. Remove it.
                                 remove(pfile)
         else:
-            os.makedirs(d, 0o777)
+            os.mkdir(d, 0o777)
 
-        return result, cache, cache_i686
+    return result, cache, cache_i686
 
 
 def build_package(pkg_obj=None):
