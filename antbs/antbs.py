@@ -533,6 +533,25 @@ def get_timeline(tlpage=None):
     return this_page, all_pages
 
 
+@cache.memoize(timeout=1800, unless=cache_buster)
+def get_build_history_chart_data(pkg_obj=None):
+    if pkg_obj is None:
+        return {}
+    chart_data = dict()
+    for build in pkg_obj.builds:
+        bld_obj = build_obj.get_build_object(bnum=build)
+        if not bld_obj.end_str:
+            continue
+        dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
+        key = str(dt.year) + str(dt.month) + str(dt.day)
+        if not chart_data.get(key, False):
+            chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1)
+        else:
+            chart_data[key]['builds'] += 1
+
+    return chart_data
+
+
 @app.errorhandler(404)
 def page_not_found(e):
     """
@@ -565,13 +584,6 @@ def flask_error(e):
     if e is not None:
         logger.error(e)
     return render_template('500.html'), 400
-
-
-# @app.errorhandler(Exception)
-# def unhandled_exception(e):
-#    if e is not None:
-#        logger.debug(e)
-#    return render_template('500.html'), 500
 
 
 @app.route("/timeline/<int:tlpage>")
@@ -987,8 +999,7 @@ def get_and_show_pkg_profile(pkgname=None):
     """
     if pkgname is None:
         abort(404)
-    check = status.all_packages
-    check = check.ismember(pkgname)
+    check = status.all_packages.ismember(pkgname)
     if not check:
         abort(404)
 
@@ -998,7 +1009,10 @@ def get_and_show_pkg_profile(pkgname=None):
         pkgobj.description = desc
         pkgobj.pkgdesc = desc
 
-    return render_template('package.html', pkg=pkgobj)
+    build_history = get_build_history_chart_data(pkgobj)
+    logger.info(build_history)
+
+    return render_template('package.html', pkg=pkgobj, build_history=build_history)
 
 
 @app.route('/repo_packages/<repo>')

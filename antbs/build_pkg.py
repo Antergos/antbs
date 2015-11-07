@@ -580,14 +580,11 @@ def prepare_temp_and_cache_dirs():
     cache = '/var/tmp/pkg_cache'
     cache_i686 = '/var/tmp/pkg_cache_i686'
     for d in [result, cache, cache_i686, '/var/tmp/32build', '/var/tmp/32bit']:
-        logger.info('TOPLEVEL: DIR is %s' % d)
         if os.path.exists(d) and 'pkg_cache' not in d:
-            logger.info('DIR EXISTS and is not a pkg cache.')
             # This is a temp directory that we don't want to persist across builds.
             remove(d)
             os.mkdir(d, 0o777)
         elif os.path.exists(d) and 'pkg_cache' in d:
-            logger.info('DIR EXISTS and is a pkg_cache')
             # This is a pacman package cache directory. Let's clean it up.
             logger.info('Cleaning package cache...')
             status.current_status = 'Cleaning package cache...'

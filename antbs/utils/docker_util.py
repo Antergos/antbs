@@ -284,8 +284,7 @@ class DockerUtils(object):
                                                   command="/makepkg/build.sh ",
                                                   volumes=['/var/cache/pacman', '/makepkg',
                                                            '/antergos', '/pkg', '/root/.gnupg',
-                                                           '/staging', '/32bit', '/32build',
-                                                           '/result'],
+                                                           '/staging', '/result'],
                                                   environment=build_env, cpuset='0-3',
                                                   name=pkg_obj.pkgname + '-pkgver',
                                                   host_config=hconfig)

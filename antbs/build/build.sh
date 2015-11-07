@@ -210,7 +210,7 @@ function setup_32bit_env() {
 		rm -rf /32build/root
 	fi
 
-	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf -c /var/tmp/pkg_cache_i686 /32build/root base-devel wget sudo git reflector
+	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf -c /var/cache/pacman_i686/pkg /32build/root base-devel wget sudo git reflector
 	mkdir /32build/root/pkg
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
@@ -232,6 +232,7 @@ function setup_32bit_env() {
 	chmod 600 /32build/root/usr/lib/sudo/*.so
 	sed -i 's|file:\/\/\/\$repo/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
 	sed -i 's|file:\/\/\/staging/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
+	mount -o bind /var/cache/pacman_i686 /32build/root/var/cache/pacman
 	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 	arch-chroot /32build/root reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 

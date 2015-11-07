@@ -5,49 +5,118 @@
 
 {% block bottomcontent -%}
 
-<div class="col-sm-12">
-    <div class="block-flat profile-info">
-        <div class="row">
-            <div class="col-sm-1">
-                <div class="avatar">
-                    <img src="http://antergos.info/apps/{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
-                </div>
-            </div>
-            <div class="col-sm-4">
-                <div class="personal">
-                    <h1 class="name">{{ pkg.name }}</h1>
+	<div class="col-sm-12">
+		<div class="block-flat profile-info">
+			<div class="row">
+				<div class="col-sm-1">
+					<div class="avatar">
+						<img src="http://antergos.info/apps/
+							{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
+					</div>
+				</div>
+				<div class="col-sm-3">
+					<div class="personal">
+						<h1 class="name">{{ pkg.name }}</h1>
 
-                    <p class="description">{{ pkg.desc }}This is a WIP, only logged-in users can see it.<p>
-                </div>
-            </div>
-            <div class="col-sm-2" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
-                <h3 style="margin-bottom: 20px;">Total Builds</h3>
-                {{ pkg.builds|length() }}
-            </div>
-            <div class="col-sm-5">
-                <h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
-                              <div class="progress">
-                                <div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate }}% Completed</div>
-                                  <div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate }}% Failed</div>
-                              </div>
-            </div>
-        </div>
-    </div>
-</div>
+						<p class="description">{{ pkg.pkgdesc }}<p>
+					</div>
+				</div>
+				<div class="col-sm-2" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
+					<h3 style="margin-bottom: 20px;">Total Builds</h3>
+					{{ pkg.builds|length() }}
+				</div>
+				<div class="col-sm-6">
+					<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
+
+					<div class="progress">
+						<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate }}% Completed</div>
+						<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate }}% Failed</div>
+					</div>
+					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>
+				</div>
+			</div>
+		</div>
+	</div>
 {% endblock bottomcontent %}
 {% block scripts %}
-{{ super() }}
-    {#<script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>
-<script>
-    if ($('.epie-chart').length) {
-    $('.epie-chart').easyPieChart({
-            lineWidth: 8,
-            animate: 600,
-            size: 150,
-            onStep: function(val){//Update current value while animation
-              $("span", this.$el).html(parseInt(val) + "%");
-            }
-            });
-    }
-</script>#}
+	{{ super() }}
+	{#    <script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>#}
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript">
+		google.load("visualization", "1.1", {packages: ["calendar"]});
+		google.setOnLoadCallback(drawChart);
+
+		function drawChart() {
+			var wwidth = $(window).width(),
+				the_width = (wwidth > 1366) ? 761 : (wwidth > 1024) ? 485 : (wwidth > 767) ? 340 : 240;
+			var dataTable = new google.visualization.DataTable();
+			dataTable.addColumn({type: 'date', id: 'Date'});
+			dataTable.addColumn({type: 'number', id: 'Won/Loss'});
+			dataTable.addRows([
+				{% if build_history %}
+					{% for dt in build_history.itervalues() %}
+						[new Date({{ dt.year }}, {{ dt.month }}, {{ dt.day }}), {{ dt.builds }}]{% if not loop.last %},{% endif %}
+					{% endfor %}
+				{% endif %}
+
+			]);
+
+			var chart = new google.visualization.Calendar(document.getElementById('build_history'));
+
+			var options = {
+				title: "Build Frequency",
+				height: 200,
+				width: the_width,
+				calendar: {cellSize: 12}
+			};
+
+			chart.draw(dataTable, options);
+		}
+	</script>
+	<script>
+		{#var plot_builds = $.plot($("#build_stats"), [{
+			data: pageviews,
+			label: "Version History"
+		}
+		], {
+			series: {
+				bars: {
+					show: true,
+					barWidth: 0.6,
+					lineWidth: 0,
+					fill: true,
+					hoverable: true,
+					fillColor: {
+						colors: [{
+							opacity: 1
+						}, {
+							opacity: 1
+						}
+						]
+					}
+				},
+				shadowSize: 2
+			},
+			legend: {
+				show: false
+			},
+			grid: {
+				labelMargin: 10,
+				axisMargin: 500,
+				hoverable: true,
+				clickable: true,
+				tickColor: "rgba(0,0,0,0.15)",
+				borderWidth: 0
+			},
+			colors: ["#FD6A5E", "#FFFFFF", "#52e136"],
+			xaxis: {
+				ticks: 11,
+				tickDecimals: 0
+			},
+			yaxis: {
+				ticks: 6,
+				tickDecimals: 0
+			}
+		});#}
+	</script>
 {% endblock scripts %}
