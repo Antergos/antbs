@@ -64,7 +64,7 @@
 {% endblock topcontent %}
 {% block bottomcontent %}
 	{% if tl_events %}
-		<div class="col-md-4" style="width: 45%;">
+		<div class="col-md-4" style="width: 45%; margin-top: 30px;">
 			<div class="block-transparent tlwrap">
 				<div class="header">
 					<h4>Timeline</h4>
@@ -102,9 +102,82 @@
 			</div>
 		</div>
 	{% endif %}
+	<div class="col-md-6" style="margin-top: 47px;">
+	<div class="col-md-11 pull-right">
+		<div class="block-flat dark-box">
+			<div class="header">
+				<div class="actions">
+					<a class="minimize" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
+					<a class="refresh" href="#"><i class="fa"></i></a>
+					<a class="close-down" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
+				</div>
+			<h3>Build Activity</h3>
+				</div>
+			<div class="content build_heat">
+
+			</div>
+		</div>
+	</div>
+	</div>
 {% endblock bottomcontent %}
 {% block scripts %}
 	{{ super() }}
+	{% if build_history %}
+	<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
+	<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
+	<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>
+	<style>
+		.graph-label {
+			font-size: 15px;
+			color: #CACACA;
+		}
+	</style>
+	<script>
+		$(window).load(function () {
+			var history = $.parseJSON('{{ timestamps|tojson }}');
+			var cal = new CalHeatMap(),
+				today = new Date(),
+				day = new Date(),
+				last_year = day.setMonth(today.getMonth() - 6);
+			cal.init({
+				itemSelector: ".build_heat",
+				domain: "month",
+				subDomain: "x_day",
+				dataType: "json",
+				data: history,
+				start: new Date(last_year),
+				minDate: new Date(last_year),
+				maxDate: today,
+				cellSize: 15,
+				legendCellSize: 15,
+				cellRadius: 1,
+				cellPadding: 3,
+				legendCellPadding: 3,
+				legendHorizontalPosition: "center",
+				range: 4,
+				domainMargin: 10,
+				domainGutter: 15,
+				animationDuration: 800,
+				domainDynamicDimension: false,
+				previousSelector: "#build_history-Previous",
+				nextSelector: "#build_history-Next",
+				considerMissingDataAsZero: false,
+				label: {
+					position: "bottom",
+					align: "center",
+					height: 22
+				},
+				itemName: ["build", "builds"],
+				tooltip: true,
+				legend: [1, 3, 6, 12, 24],
+				//legendColors: {min: "#F9F1F4", max: "#F42D6B", empty: "#FEFEFE"},
+				legendColors: {min: "#FBE2EA", max: "#F42D6B", empty: "#383A41"},
+				domainLabelFormat: "%b"
+			});
+			cal.jumpTo(new Date());
+		});
+		</script>
+	{% endif %}
 	<script type="text/javascript">
 		function tlhandler() {
 			$('.pagination').on('click', 'a', function (e) {

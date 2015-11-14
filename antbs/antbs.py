@@ -536,20 +536,39 @@ def get_timeline(tlpage=None):
 @cache.memoize(timeout=1800, unless=cache_buster)
 def get_build_history_chart_data(pkg_obj=None):
     if pkg_obj is None:
-        return {}
-    chart_data = dict()
-    for build in pkg_obj.builds:
-        bld_obj = build_obj.get_build_object(bnum=build)
-        if not bld_obj.end_str:
-            continue
-        dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
-        key = str(dt.year) + str(dt.month) + str(dt.day)
-        if not chart_data.get(key, False):
-            chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1)
-        else:
-            chart_data[key]['builds'] += 1
+        builds = status.completed + status.failed
+        chart_data = db.get('antbs:misc:charts:home:heatmap') or False
+    else:
+        builds = pkg_obj.builds
+        chart_data = False
 
-    return chart_data
+    timestamps = {}
+
+    if not chart_data or '{}' == chart_data:
+        chart_data = dict()
+        builds = [bld for bld in builds if bld]
+        for build in builds:
+            bld_obj = build_obj.get_build_object(bnum=build)
+            if not bld_obj.end_str:
+                continue
+            dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
+            key = dt.strftime("%s")
+            # key = str(dt.year) + str(dt.month) + str(dt.day)
+            if not chart_data.get(key, False):
+                chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
+                                       timestamp=key)
+            else:
+                chart_data[key]['builds'] += 1
+
+        if pkg_obj is None:
+            db.setex('antbs:misc:charts:home:heatmap', 10800, json.dumps(chart_data))
+    else:
+        chart_data = json.loads(chart_data)
+
+    for key in chart_data.keys():
+        timestamps[key] = chart_data[key]['builds']
+
+    return chart_data, timestamps
 
 
 @app.errorhandler(404)
@@ -588,7 +607,7 @@ def flask_error(e):
 
 @app.route("/timeline/<int:tlpage>")
 @app.route("/")
-@cache.memoize(timeout=900, unless=cache_buster)
+@cache.memoize(timeout=1800, unless=cache_buster)
 def homepage(tlpage=None):
     """
 
@@ -600,6 +619,7 @@ def homepage(tlpage=None):
     check_stats = ['queue', 'completed', 'failed']
     building = status.current_status
     tl_events, all_pages = get_timeline(tlpage)
+    build_history, timestamps = get_build_history_chart_data()
 
     stats = {}
     for stat in check_stats:
@@ -643,7 +663,8 @@ def homepage(tlpage=None):
             stats['repo_staging'] = 0
 
     return render_template("overview.html", stats=stats, user=user, building=building,
-                           tl_events=tl_events, all_pages=all_pages, page=tlpage, rev_pending=[])
+                           tl_events=tl_events, all_pages=all_pages, page=tlpage, rev_pending=[],
+                           build_history=build_history, timestamps=timestamps)
 
 
 @app.route("/building")
@@ -1009,10 +1030,10 @@ def get_and_show_pkg_profile(pkgname=None):
         pkgobj.description = desc
         pkgobj.pkgdesc = desc
 
-    build_history = get_build_history_chart_data(pkgobj)
-    logger.info(build_history)
+    build_history, timestamps = get_build_history_chart_data(pkgobj)
 
-    return render_template('package.html', pkg=pkgobj, build_history=build_history)
+    return render_template('package.html', pkg=pkgobj, build_history=build_history,
+                           timestamps=timestamps)
 
 
 @app.route('/repo_packages/<repo>')

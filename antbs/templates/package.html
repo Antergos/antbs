@@ -11,6 +11,7 @@
 				<div class="col-sm-1">
 					<div class="avatar">
 						<img src="http://antergos.info/apps/
+
 							{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
 					</div>
 				</div>
@@ -41,7 +42,63 @@
 {% block scripts %}
 	{{ super() }}
 	{#    <script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>#}
-	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
+	<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
+	<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>
+	<style>
+		.graph-label {
+			font-size: 14px;
+		}
+	</style>
+	<script>
+	$(window).load(function() {
+		{% if build_history %}
+			var history = $.parseJSON('{{ timestamps|tojson }}');
+			var cal = new CalHeatMap(),
+				today = new Date(),
+				day = new Date(),
+				last_year = day.setYear(today.getMonth() - 5);
+			cal.init({
+				itemSelector: "#build_history",
+				domain: "month",
+				subDomain: "x_day",
+				dataType: "json",
+				data: history,
+				start: new Date(last_year),
+				minDate: new Date(last_year),
+				maxDate: today,
+				cellSize: 13,
+				legendCellSize: 13,
+				cellRadius: 2,
+				cellPadding: 5,
+				legendCellPadding: 5,
+				legendHorizontalPosition: "center",
+				range: 5,
+				domainMargin: 8,
+				animationDuration: 800,
+				domainDynamicDimension: false,
+				previousSelector: "#build_history-Previous",
+				nextSelector: "#build_history-Next",
+				considerMissingDataAsZero: true,
+				label: {
+					position: "bottom",
+					align: "center",
+					height: 22
+				},
+				itemName: ["build", "builds"],
+				tooltip: true,
+				legend: [1, 3, 5, 10],
+				legendColors: { min: "#EFEDED", max: "#F42D6B", empty: "#EFEDED"},
+				domainLabelFormat: "%b"
+			});
+			cal.jumpTo(new Date());
+		{% endif %}
+	});
+	</script>
+
+
+
+	{#<script type="text/javascript" src="https://www.google.com/jsapi"></script>
 	<script type="text/javascript">
 		google.load("visualization", "1.1", {packages: ["calendar"]});
 		google.setOnLoadCallback(drawChart);
@@ -72,7 +129,7 @@
 
 			chart.draw(dataTable, options);
 		}
-	</script>
+	</script>#}
 	<script>
 		{#var plot_builds = $.plot($("#build_stats"), [{
 			data: pageviews,

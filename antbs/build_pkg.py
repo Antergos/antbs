@@ -218,12 +218,12 @@ def process_package_queue():
             cnchi_dir = '/opt/antergos-packages/%s' % pkg
             fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
-            subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd='/opt/antergos-packages/%s' % pkg)
+            subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'],
+                                    cwd='/opt/antergos-packages/%s' % pkg)
         elif 'numix-icon-theme-square' in pkg:
-            src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg)
+            src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
             dest = os.path.join('/opt/antergos-packages/', pkg)
             shutil.move(src, dest)
-            subprocess.check_output(['tar', '-cf', pkg + '.tar', pkg], cwd='/opt/antergos-packages/%s' % pkg)
 
         if depends:
             all_deps.append(depends)
@@ -642,7 +642,7 @@ def build_package(pkg_obj=None):
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
 
-    if pkg_obj.autosum == "True":
+    if pkg_obj.autosum:
         build_env = ['_AUTOSUMS=True']
     else:
         build_env = ['_AUTOSUMS=False']

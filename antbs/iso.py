@@ -190,8 +190,6 @@ def iso_release_job():
             iso.do_release()
         except Exception as err:
             logger.error(err)
-            status.idle = True
-            return
 
     if version:
         clean_up_after_release(version)

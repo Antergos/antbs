@@ -27,9 +27,9 @@
 import subprocess
 import os
 import re
-import sys
 
 from github3 import login
+from gitlab import Gitlab
 import shutil
 import time
 
@@ -40,6 +40,7 @@ from utils.docker_util import DockerUtils
 
 
 REPO_DIR = "/var/tmp/antergos-packages"
+GITLAB_TOKEN = status.gitlab_token
 
 
 class PackageMeta(RedisObject):
@@ -136,8 +137,9 @@ class Package(PackageMeta):
 
             if '-x86_64' in self.name or '-i686' in self.name:
                 self.is_iso = True
-            else:
-                self.is_iso = False
+
+            if 'pycharm' in self.name:
+                self.autosum = True
 
             self.determine_pbpath()
 
@@ -167,13 +169,18 @@ class Package(PackageMeta):
         else:
             cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
 
-        if var == "pkgver" and ('git+' in parse or 'cnchi' in self.name or 'git://' in parse):
-            if 'http' not in self.git_url or '' == self.git_name:
-                self.determine_git_repo_info()
+        if var == "pkgver":
+            exclude = ['numix-icon-theme-kde', 'numix-icon-theme', 'plymouth']
+            git_source = 'git+' in parse or 'git://' in parse
+            if (git_source and self.name not in exclude) or 'cnchi' in self.name:
+                if 'http' not in self.git_url or '' == self.git_name:
+                    self.determine_git_repo_info()
+                self.prepare_package_source(dirpath=dirpath)
+                pkgver = DockerUtils().get_pkgver_inside_container(self)
+                return pkgver
 
-            self.prepare_package_source(dirpath=dirpath)
-            pkgver = DockerUtils().get_pkgver_inside_container(self)
-            return pkgver
+            if 'numix-icon-theme' in self.name:
+                self.prepare_package_source(dirpath=dirpath)
 
         proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -193,6 +200,16 @@ class Package(PackageMeta):
         if not dirpath:
             logger.error('dirpath cannot be None')
             raise ValueError
+
+        if 'numix-icon-theme-square' in self.name:
+            zpath = os.path.join(os.path.dirname(self.pbpath), self.name + '.zip')
+            gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
+            gl.auth()
+            nxsq = gl.Project(id='61284')
+            source = nxsq.archive()
+            with open(zpath, 'wb') as fd:
+                fd.write(source)
+            return
 
         os.putenv('srcdir', dirpath)
 

@@ -178,6 +178,16 @@ class RedisList(RedisField, list):
         items = db.lrange(self.id_key, 0, -1)
         return item in items
 
+    def __add__(self, other_list):
+        """
+        Combine elements from this list (self) and other_list into a new list.
+
+        :param (list) other_list:
+        :return (list): new_list
+
+        """
+        return [x for x in self.__iter__()] + [x for x in other_list.__iter__()]
+
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
 

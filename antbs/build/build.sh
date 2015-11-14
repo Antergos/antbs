@@ -67,7 +67,7 @@ function setup_environment() {
 		exit 0
 	fi
 
-	if [[ ${_ALEXPKG} = False ]]; then
+	if [[ "${_ALEXPKG}" = "False" ]]; then
 
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
 		export PACKAGER="Antergos Build Server <dev@antergos.com>"
@@ -86,8 +86,6 @@ function setup_environment() {
 		#sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
 
 	fi
-
-	pacman -Syy
 
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
 	sed -i '/CFLAGS=/c\CFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
@@ -168,7 +166,7 @@ function copy_any() {
 
 function check_pkg_sums() {
 
-	if [[ ${_AUTOSUMS} != "True" ]]; then
+	if [[ ${_AUTOSUMS} = "False" ]]; then
 		if [[ ${1} = '' ]]; then
 			sudo -u antbs /usr/bin/updpkgsums 2>&1 && return 0
 		else
@@ -291,8 +289,8 @@ setup_environment
 if [[ "True" != "${_UPDREPO}" ]]; then
 
 	print2log 'SYNCING REPO DATABASES'
-	#pacman -Syyu --noconfirm reflector
 	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
+	pacman -Syyu --noconfirm
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64
 
