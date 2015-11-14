@@ -178,21 +178,28 @@ def clean_up_after_release(version):
 def iso_release_job():
     status.idle = False
     iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
-    version = None
+    version = mirror_url = db = None
     for name in iso_names:
         try:
             pkg_obj = package.get_pkg_object(name=name)
             iso = ISOUtility(pkg_obj=pkg_obj)
             if version is None:
                 version = iso.version
+            if mirror_url is None:
+                mirror_url = iso.mirror_url
+            if db is None:
+                db = pkg_obj.db
 
             iso.prep_release()
             iso.do_release()
         except Exception as err:
             logger.error(err)
 
-    if version:
-        clean_up_after_release(version)
+    if version and db and mirror_url:
+        # We will use the repo monitor class to check propagation of the new files
+        # before deleting the old files.
+        db.set('antbs:misc:iso-release:check_url', mirror_url)
+        db.set('antbs:misc:iso-release:version', version)
 
     status.idle = True
 
