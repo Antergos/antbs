@@ -32,6 +32,10 @@ import hashlib
 import os
 import shutil
 import subprocess
+
+import requests
+from requests_toolbelt.adapters.source import SourceAddressAdapter
+
 from utils.logging_config import logger
 from utils.server_status import status
 import re
@@ -63,6 +67,7 @@ class ISOUtility(object):
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
         self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.md5', self.file_path + '.torrent']
+        self.md5 = None
 
     @staticmethod
     def get_version():
@@ -129,6 +134,7 @@ class ISOUtility(object):
 
         md5_path = self.file_path + '.md5'
         md5_sum = self.checksum_md5(self.file_path)
+        self.md5 = md5_sum
 
         with open(md5_path, 'w') as check_sum:
             check_sum.write(md5_sum)
@@ -142,21 +148,50 @@ class ISOUtility(object):
 
 
 class WordPressBridge(object):
-    def __init__(self):
+    def __init__(self, auth):
         self.post_id_map = {
             'antergos-x86_64': '1252',
             'antergos-i686': '1257',
             'antergos-minimal-x86_64': '1562',
             'antergos-minimal-i686': '1564'
         }
+        self.auth = auth
         logger.info('WordPressBridge Object Initialized')
+        self.success = False
 
-    def add_new_iso_to_wordpress(self, iso=None):
-        if iso is None:
+    def add_new_iso_version(self, iso_pkg_obj=None):
+        if iso_pkg_obj is None:
             logger.error('iso cant be None')
             return
-        parent_id = self.post_id_map[iso.pkgname]
-        title = ''
+        else:
+            iso = iso_pkg_obj
+
+        pid = self.post_id_map[iso.pkgname]
+        domain = 'antergos'
+        query = 'json=get_nonce&controller=' + domain + '&method=handle_request'
+        post_url = 'https://' + domain + '.com/?' + query
+        session = requests.Session()
+        session.mount('http://', SourceAddressAdapter(('173.230.141.187', 0)))
+        session.mount('https://', SourceAddressAdapter(('173.230.141.187', 0)))
+        session.auth = self.auth
+        try:
+            req = session.get(post_url)
+            req.raise_for_status()
+            logger.info(req.text)
+            req = req.json()
+
+            if req.get('nonce', False):
+                nonce = req.get('nonce')
+                query = 'json=' + domain + '.handle_request&nonce='
+                post_url = 'https://' + domain + '.com/?' + query + nonce
+                req = session.post(post_url, data=dict(pid=pid, url=iso.iso_url,
+                                                       md5=iso.iso_md5, version=iso.pkgver))
+                req.raise_for_status()
+                logger.info(req.text)
+                self.success = True
+        except Exception as err:
+            self.success = False
+            logger.error(err)
 
 
 def clean_up_after_release(version):
@@ -178,28 +213,32 @@ def clean_up_after_release(version):
 def iso_release_job():
     status.idle = False
     iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
-    version = mirror_url = db = None
+    version = db = None
     for name in iso_names:
         try:
             pkg_obj = package.get_pkg_object(name=name)
             iso = ISOUtility(pkg_obj=pkg_obj)
-            if version is None:
-                version = iso.version
-            if mirror_url is None:
-                mirror_url = iso.mirror_url
-            if db is None:
-                db = pkg_obj.db
 
             iso.prep_release()
             iso.do_release()
+
+            pkg_obj.iso_url = iso.mirror_url
+            pkg_obj.iso_md5 = iso.md5
+
+            if version is None:
+                version = iso.version
+            if db is None:
+                db = pkg_obj.database
+
+            status.iso_pkgs.add(pkg_obj.name)
+
         except Exception as err:
             logger.error(err)
 
-    if version and db and mirror_url:
+    if version and db:
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
-        db.set('antbs:misc:iso-release:check_url', mirror_url)
-        db.set('antbs:misc:iso-release:version', version)
+        db.set('antbs:misc:iso-release:do_check', True)
 
     status.idle = True
 

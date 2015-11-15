@@ -36,7 +36,6 @@ import time
 from utils.logging_config import logger
 from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
 from utils.server_status import status
-from utils.docker_util import DockerUtils
 
 
 REPO_DIR = "/var/tmp/antergos-packages"
@@ -57,7 +56,7 @@ class PackageMeta(RedisObject):
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
-                          'gh_repo', 'gh_project'],
+                          'gh_repo', 'gh_project', 'iso_md5', 'iso_url'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
@@ -176,6 +175,7 @@ class Package(PackageMeta):
                 if 'http' not in self.git_url or '' == self.git_name:
                     self.determine_git_repo_info()
                 self.prepare_package_source(dirpath=dirpath)
+                from utils.docker_util import DockerUtils
                 pkgver = DockerUtils().get_pkgver_inside_container(self)
                 return pkgver
 

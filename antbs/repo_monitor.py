@@ -36,6 +36,9 @@ import webhook
 from github3 import login
 from gitlab import Gitlab
 import json
+import requests
+import package
+from iso import WordPressBridge
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
@@ -58,8 +61,7 @@ def check_for_new_items():
 
 
     """
-    db.set('FEED_CHECKED', 'True')
-    db.expire('FEED_CHECKED', 900)
+    db.setex('FEED_CHECKED', 900, 'True')
     build_pkgs = []
     for service, project_list in MONITOR_ITEMS.iteritems():
         projects = project_list.split(',')
@@ -78,10 +80,39 @@ def check_for_new_items():
 
     build_pkgs = [p for p in build_pkgs if p]
     if len(build_pkgs) > 0:
-        if 'numix-icon-theme-square' in build_pkgs:
-            build_pkgs.append(['numix-icon-theme-square-kde'])
-
         add_to_build_queue(build_pkgs)
+
+    if db.exists('antbs:misc:iso-release:do_check'):
+        check_mirror_for_iso()
+
+
+def check_mirror_for_iso():
+    synced = []
+    for iso_pkg in status.iso_pkgs:
+        iso = package.get_pkg_object(name=iso_pkg)
+        req = requests.head(iso.iso_url, allow_redirects=True)
+
+        try:
+            req.raise_for_status()
+            synced.append(iso)
+        except Exception as err:
+            logger.info(err)
+
+    if len(synced) == 4:
+        success = add_iso_versions_to_wordpress(synced)
+        if success:
+            db.delete('antbs:misc:iso-release:do_check')
+
+
+def add_iso_versions_to_wordpress(iso_pkgs):
+    bridge = WordPressBridge(auth=(status.docker_user, status.wp_password))
+    success = True
+    for iso_pkg in iso_pkgs:
+        bridge.add_new_iso_version(iso_pkg)
+        if not bridge.success:
+            success = False
+
+    return success
 
 
 def add_to_build_queue(pkgs=None):

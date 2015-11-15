@@ -66,12 +66,12 @@ class ServerStatus(Singleton):
 
         self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
                                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                                            'docker_password', 'gpg_key', 'gpg_password'],
+                                            'docker_password', 'gpg_key', 'gpg_password', 'wp_password'],
                               redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
                               redis_string_int=['building_num'],
                               redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
                                           'hook_queue'],
-                              redis_zset=['all_packages'])
+                              redis_zset=['all_packages', 'iso_pkgs'])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 

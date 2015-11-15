@@ -45,13 +45,7 @@ BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
 
 
 class DockerUtils(object):
-    # Initiate communication with build daemon
-    try:
-        doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
-        # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
-    except Exception as err:
-        logger.error("Cant connect to Docker daemon. Error msg: %s", err)
-        raise RuntimeError
+    doc = None
 
     def __init__(self):
         self.cache_dir = '/var/tmp/pkg_cache'
@@ -60,6 +54,15 @@ class DockerUtils(object):
         if os.path.exists(self.result_dir):
             shutil.rmtree(self.result_dir, ignore_errors=True)
         os.mkdir(self.result_dir)
+
+        if self.doc is None:
+            # Initiate communication with build daemon
+            try:
+                self.doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
+                # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
+            except Exception as err:
+                logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+                raise RuntimeError
 
     def create_pkgs_host_config(self, pkgbuild_dir, result=None):
         """

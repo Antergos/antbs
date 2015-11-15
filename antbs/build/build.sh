@@ -62,7 +62,7 @@ function setup_environment() {
 
 	fi
 
-	if [[ ${_GET_PKGVER_ONLY} = True ]]; then
+	if [[ ${_GET_PKGVER_ONLY} = "True" ]]; then
 		touch "/result/$(pkgver)"
 		exit 0
 	fi
@@ -94,6 +94,9 @@ function setup_environment() {
 	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
 	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
 	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
+
+	git config --global user.name "Antergos Build Server"
+	git config --global user.email "admin@antergos.org"
 
 }
 
