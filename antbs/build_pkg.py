@@ -220,7 +220,7 @@ def process_package_queue():
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'],
                                     cwd='/opt/antergos-packages/%s' % pkg)
-        elif 'numix-icon-theme-square' in pkg:
+        elif 'numix-icon-theme-square' == pkg:
             src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
             dest = os.path.join('/opt/antergos-packages/', pkg)
             shutil.move(src, dest)

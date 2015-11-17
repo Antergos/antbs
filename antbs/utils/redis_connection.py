@@ -25,6 +25,7 @@
 """ Database module """
 
 import redis
+import json
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock')
 
@@ -90,10 +91,14 @@ class RedisList(RedisField, list):
     """ An equivalent to list where all items are stored in Redis. """
 
     def __init__(self, id_key=None, item_type=str, items=None):
-        """ Create a new RedisList
+        """
+        Create a new RedisList
+
         id_key: use this as the redis key.
         item_type: The constructor to use when reading items from redis.
-        values: Default values to store during construction. """
+        values: Default values to store during construction.
+
+        """
 
         super(RedisList, self).__init__(id_key=id_key)
 
@@ -105,10 +110,13 @@ class RedisList(RedisField, list):
 
     @classmethod
     def as_child(cls, parent, tag, item_type):
-        """ Alternative callable constructor that instead defines this as a child object
+        """
+        Alternative callable constructor that instead defines this as a child object
+
         :param parent:
         :param tag:
         :param item_type:
+
         """
 
         def helper(_=None):
@@ -121,15 +129,23 @@ class RedisList(RedisField, list):
 
         return helper()
 
+    def __jsonable__(self):
+        """
+        Return object converted to a type that is supported by json module.
+
+        :return (str):
+
+        """
+        return list(self.__iter__())
+
     def __str__(self):
         """ Return this object as a string """
 
         return str([x for x in self.__iter__()])
 
     def __repr__(self):
-        """ Return this object as a string """
-
-        return str([x for x in self.__iter__()])
+        """ Return this object as a string. """
+        return self.__str__()
 
     def __getitem__(self, index):
         """ Load an item by index where index is either an int or a slice. """
@@ -271,6 +287,15 @@ class RedisZSet(RedisField, set):
 
         return helper()
 
+    def __jsonable__(self):
+        """
+        Return object converted to a type that is supported by json module.
+
+        :return (str):
+
+        """
+        return list(self.__iter__())
+
     def __len__(self):
         """ Return the size of the set. """
 
@@ -281,6 +306,15 @@ class RedisZSet(RedisField, set):
 
         for el in db.zrange(self.id_key, 0, -1):
             yield RedisField.decode_value(self.item_type, el)
+
+    def __str__(self):
+        """ Return this object as a string """
+
+        return str([x for x in self.__iter__()])
+
+    def __repr__(self):
+        """ Return this object as a string. """
+        return self.__str__()
 
     def __contains__(self, item):
         """
@@ -350,13 +384,49 @@ class RedisObject(object):
         return self.prefix == other.prefix
 
     def __str__(self):
-        """ Return this object as a string for testing purposes. """
+        """ Return this object as a friendly (human readable) string. """
 
-        as_string = {}
+        as_string = dict()
         for key in self.all_keys:
             value = getattr(self, key)
-            as_string[key] = value
+            as_string[key] = value if isinstance(value, str) else value.__str__()
+
         return str(as_string)
+
+    def __jsonable__(self):
+        """
+        Return object converted to a type that is supported by json module.
+
+        :return (str):
+
+        """
+        as_string = dict()
+        for key in self.all_keys:
+            value = getattr(self, key)
+            if 'log_str' == key or 'log' == key:
+                pass
+            elif isinstance(value, (str, dict)):
+                as_string[key] = value
+            elif isinstance(value, (bool, int)):
+                as_string[key] = str(value)
+            else:
+                as_string[key] = value.__jsonable__()
+
+        return as_string
+
+    def json(self):
+        """
+        Return this object as a json serialized string.
+
+        :return (str):
+
+        """
+
+        return json.dumps(self.__jsonable__())
+
+    def __repr__(self):
+        """ Return this object as a string. """
+        return self.__str__()
 
     def delete(self):
         """ Delete this object from redis. """
@@ -364,7 +434,7 @@ class RedisObject(object):
         db.delete(self.prefix)
 
     def __getattribute__(self, attrib):
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__getattribute__(attrib)
@@ -388,7 +458,7 @@ class RedisObject(object):
             return RedisZSet.as_child(self, attrib, str)
 
     def __setattr__(self, attrib, value, score=None):
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__setattr__(attrib, value)

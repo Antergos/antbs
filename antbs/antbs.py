@@ -30,7 +30,6 @@
 """Main AntBS (Antergos Build Server) Module"""
 
 import requests
-
 import newrelic.agent
 
 settings = newrelic.agent.global_settings()
@@ -53,7 +52,7 @@ import gevent
 import gevent.monkey
 import utils.pagination
 import build_pkg as builder
-from utils.redis_connection import db
+from utils.redis_connection import db, RedisObject
 from utils.server_status import status as status, Timeline as tl_event
 import utils.logging_config as logconf
 import package
@@ -81,7 +80,6 @@ STAGING_32 = os.path.join(STAGING_REPO, 'i686')
 MAIN_64 = os.path.join(MAIN_REPO, 'x86_64')
 MAIN_32 = os.path.join(MAIN_REPO, 'i686')
 
-
 # Create the variable `app` which is an instance of the Flask class
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('STORMPATH_SESSION_KEY')
@@ -103,7 +101,8 @@ app.jinja_options['trim_blocks'] = True
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
 
-cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3, 'CACHE_KEY_PREFIX': 'antbs:cache:',
+cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
+                           'CACHE_KEY_PREFIX': 'antbs:cache:',
                            'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
 cache.init_app(app)
 
@@ -371,7 +370,8 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
 
     if all_builds:
         if search is not None:
-            search_all_builds = [x for x in all_builds if x is not None and match_pkg_name_build_log(x, search)]
+            search_all_builds = [x for x in all_builds if
+                                 x is not None and match_pkg_name_build_log(x, search)]
             logger.info('search_all_builds is %s', search_all_builds)
             all_builds = search_all_builds
 
@@ -383,11 +383,6 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
                 except Exception as err:
                     logger.error('Unable to ge build object - %s' % err)
                     continue
-
-                # all_info = dict(bnum=bld_obj.bnum, name=bld_obj.pkgname, version=bld_obj.version_str,
-                #                 start=bld_obj.start_str, end=bld_obj.end_str, review_stat=bld_obj.review_status,
-                #                 review_dev=bld_obj.review_dev, review_date=bld_obj.review_date)
-                # pkg_list[bnum] = all_info
 
                 pkg_list.append(bld_obj)
 
@@ -407,32 +402,36 @@ def get_repo_info(repo=None, logged_in=False):
     """
     if repo is None:
         abort(500)
-    pkg_list = {}
-    p, a, rev_pending = get_build_info(1, repo, logged_in)
+    container = dict(pkgs=[])
+
+    if logged_in:
+        p, a, rev_pending = get_build_info(1, repo, logged_in)
+    else:
+        rev_pending = []
 
     all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
 
-    if all_packages is not None:
-        for item in all_packages:
-            # logger.info(item)
-            item = item.split('/')[-1]
-            item = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', item)
-
-            item = item.group(0) or ''
-            if not item or item == '':
+    if all_packages:
+        for pkg in all_packages:
+            pkg = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', os.path.basename(pkg))
+            if pkg:
+                pkg = pkg.group(0)
+            else:
                 continue
-            logger.info(item)
-            pkg = package.get_pkg_object(item)
-            builds = pkg.builds
+            pkg_obj = package.get_pkg_object(pkg)
+            builds = pkg_obj.builds
+            bld_obj = dict(review_status='', review_dev='', review_date='')
             try:
                 bnum = builds[0]
-                bld_obj = build_obj.get_build_object(bnum=bnum)
+                if bnum:
+                    bld_obj = build_obj.get_build_object(bnum=bnum)
             except Exception:
-                bld_obj = None
-            all_info = dict(bld_obj=bld_obj, pkg_obj=pkg)
-            pkg_list[pkg.pkg_id] = all_info
+                pass
 
-    return pkg_list, rev_pending
+            pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj.__jsonable__()
+            container["pkgs"].append(pkg_obj.__jsonable__())
+
+    return json.dumps(container), rev_pending
 
 
 def redirect_url(default='homepage'):
@@ -498,7 +497,8 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 if result != 'skip':
                     os.remove(f)
             if result and result != 'skip':
-                repo_queue.enqueue_call(builder.update_main_repo, (result, None, True, bld_obj.pkgname), timeout=9600)
+                repo_queue.enqueue_call(builder.update_main_repo,
+                                        (result, None, True, bld_obj.pkgname), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -635,8 +635,10 @@ def homepage(tlpage=None):
                 except (ValueError, AttributeError):
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
-                end = datetime.strptime(bld_obj.end_str, '%m/%d/%Y %I:%M%p') if bld_obj.end_str != '' else ''
-                if end != '' and (datetime.now() - end) < timedelta(hours=48) and ver not in nodup and bld_obj.pkgname:
+                end = datetime.strptime(bld_obj.end_str,
+                                        '%m/%d/%Y %I:%M%p') if bld_obj.end_str != '' else ''
+                if end != '' and (datetime.now() - end) < timedelta(
+                        hours=48) and ver not in nodup and bld_obj.pkgname:
                     within.append(bld_obj.bnum)
                     nodup.append(ver)
 
@@ -776,8 +778,9 @@ def completed(page=None, name=None):
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
 
-    return render_template("completed.html", building=building, completed=completed, all_pages=all_pages,
-                           rev_pending=rev_pending, user=user, pagination=pagination)
+    return render_template("completed.html", building=building, completed=completed,
+                           all_pages=all_pages, rev_pending=rev_pending, user=user,
+                           pagination=pagination)
 
 
 @app.route('/failed/<int:page>')
@@ -826,9 +829,9 @@ def build_info(num):
         container = None
     res = 'completed' if bld_obj.completed else 'failed'
 
-    return render_template("build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str, res=res,
-                           start=bld_obj.start_str, end=bld_obj.end_str, bnum=bld_obj.bnum, container=container,
-                           log=log, user=user)
+    return render_template("build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str,
+                           res=res, start=bld_obj.start_str, end=bld_obj.end_str,
+                           bnum=bld_obj.bnum, container=container, log=log, user=user)
 
 
 @app.route('/browse/<goto>')
@@ -890,8 +893,8 @@ def dev_pkg_check(page=None):
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
     pagination = utils.pagination.Pagination(page, 10, len(rev_pending))
     return render_template("pkg_review.html", completed=completed, all_pages=all_pages,
-                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg, user=user,
-                           rev_pending=rev_pending, pagination=pagination)
+                           set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg,
+                           user=user, rev_pending=rev_pending, pagination=pagination)
 
 
 @app.route('/build_pkg_now', methods=['POST', 'GET'])
@@ -912,7 +915,8 @@ def build_pkg_now():
         if not pexists:
             try:
                 package.Package(name=pkgname)
-                if os.path.exists('/var/tmp/antergos-packages/' + pkgname) or 'antergos-iso' in pkgname:
+                if os.path.exists(
+                                '/var/tmp/antergos-packages/' + pkgname) or 'antergos-iso' in pkgname:
                     pexists = True
             except Exception:
                 pass
@@ -929,7 +933,8 @@ def build_pkg_now():
                     break
 
             if pending:
-                flash('Unable to build %s because it is in "pending review" status.' % pkgname, category='error')
+                flash('Unable to build %s because it is in "pending review" status.' % pkgname,
+                      category='error')
             else:
                 if '-x86_64' in pkgname or '-i686' in pkgname:
                     if not status.iso_building:
@@ -946,8 +951,8 @@ def build_pkg_now():
                 q.rpush(pkgname)
                 hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 tl_event(
-                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (dev, pkgname),
-                    tl_type='0')
+                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
+                    dev, pkgname), tl_type='0')
         else:
             flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
 
@@ -968,7 +973,8 @@ def get_status():
     rerun_transaction = int(request.args.get('rerun_transaction', 0))
 
     if not iso_release and not reset_queue and rerun_transaction == 0:
-        return Response(get_live_status_updates(), direct_passthrough=True, mimetype='text/event-stream')
+        return Response(get_live_status_updates(), direct_passthrough=True,
+                        mimetype='text/event-stream')
 
     message = dict(msg='Ok')
 
@@ -1043,11 +1049,11 @@ def repo_packages(repo=None):
     :param repo:
     :return:
     """
-    if repo is None or repo not in ['antergos', 'antergos-staging']:
+    if not repo or repo not in ['antergos', 'antergos-staging']:
         abort(404)
-    is_logged_in = user.is_authenticated()
+
     building = status.now_building
-    packages, rev_pending = get_repo_info(repo, is_logged_in)
+    packages, rev_pending = get_repo_info(repo, user.is_authenticated())
     return render_template("repo_pkgs.html", building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)
 
@@ -1067,7 +1073,8 @@ def overflow():
     if 'tableflip' in request.url:
         channel = request.values.get('channel_name')
         from_user = request.values.get('user_name')
-        payload = {"text": "(╯°□°)╯︵ ┻━┻", "username": from_user, "icon_emoji": ":bam:", "channel": '#' + channel}
+        payload = {"text": "(╯°□°)╯︵ ┻━┻", "username": from_user, "icon_emoji": ":bam:",
+                   "channel": '#' + channel}
         slack = 'https://hooks.slack.com/services/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'
         requests.post(slack, data=json.dumps(payload))
 

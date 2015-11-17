@@ -63,6 +63,7 @@ class PackageMeta(RedisObject):
             redis_zset=['depends', 'groups', 'makedepends'])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+        self.all_keys.append('_build')
 
         if not name:
             raise AttributeError
@@ -113,8 +114,6 @@ class Package(PackageMeta):
     def __init__(self, name):
         super(Package, self).__init__(name=name)
 
-        self.maybe_update_pkgbuild_repo()
-
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name))):
             # Package is not in the database, so it must be new. Let's initialize it.
             for key in self.all_keys:
@@ -156,7 +155,9 @@ class Package(PackageMeta):
         if var is None:
             logger.error('get_from_pkgbuild var is none')
             raise ValueError
+
         self.maybe_update_pkgbuild_repo()
+
         if not self.pbpath:
             self.determine_pbpath()
 
@@ -201,8 +202,8 @@ class Package(PackageMeta):
             logger.error('dirpath cannot be None')
             raise ValueError
 
-        if 'numix-icon-theme-square' in self.name:
-            zpath = os.path.join(os.path.dirname(self.pbpath), self.name + '.zip')
+        if 'numix-icon-theme-square' == self.name:
+            zpath = os.path.join(dirpath, self.name + '.zip')
             gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
             gl.auth()
             nxsq = gl.Project(id='61284')

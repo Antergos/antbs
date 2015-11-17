@@ -97,6 +97,7 @@ function setup_environment() {
 
 	git config --global user.name "Antergos Build Server"
 	git config --global user.email "admin@antergos.org"
+	echo -e '[user]\n\temail = "admin@antergos.org"\n\tname = "Antergos Build Server"\n' > /.gitconfig
 
 }
 
