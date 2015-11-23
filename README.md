@@ -1,5 +1,5 @@
 # Antergos Build Server
-[![Code Health](https://landscape.io/github/Antergos/antbs/master/landscape.svg?style=flat-square)](https://landscape.io/github/Antergos/auta/master)  [![Codacy Badge](https://img.shields.io/codacy/506377f2a0374e809201fb43639a1ac4.svg?style=flat-square)](https://www.codacy.com/app/Antergos/antbs)
+[![Code Health](https://landscape.io/github/Antergos/antbs/master/landscape.svg?style=flat-square)](https://landscape.io/github/Antergos/auta/master)  [![Codacy](https://img.shields.io/codacy/506377f2a0374e809201fb43639a1ac4.svg?style=flat-square)](https://www.codacy.com/app/Antergos/antbs)
 #### Automated package build and repository management web application.
 
 ## Dependencies
