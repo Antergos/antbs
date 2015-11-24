@@ -56,7 +56,7 @@ class PackageMeta(RedisObject):
         self.key_lists = dict(
             redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
                           'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
-                          'gh_repo', 'gh_project', 'iso_md5', 'iso_url'],
+                          'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
             redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
             redis_string_int=['pkg_id'],
             redis_list=['allowed_in', 'builds', 'tl_events'],
@@ -141,8 +141,23 @@ class Package(PackageMeta):
 
             self.determine_pbpath()
 
+        self.pkgbuild = ''
+
         if not self.pkgname:
             self.pkgname = self.name
+        if not self.pkg_id:
+            next_id = db.incr('antbs:misc:pkgid:next')
+            self.pkg_id = next_id
+        if not self.pkgver:
+            self.get_from_pkgbuild('pkgver')
+        if not self.pkgdesc or not self.description:
+            self.pkgdesc = self.description = self.get_from_pkgbuild('pkgdesc')
+        if not self.url:
+            self.url = self.get_from_pkgbuild('url')
+        if not self.depends:
+            self.get_deps()
+        if not self.groups:
+            self.groups = self.get_from_pkgbuild('groups')
 
     def get_from_pkgbuild(self, var=None):
         """
@@ -156,12 +171,17 @@ class Package(PackageMeta):
             logger.error('get_from_pkgbuild var is none')
             raise ValueError
 
+        if 'dummy-' in self.name:
+            return 'n/a'
+
         self.maybe_update_pkgbuild_repo()
 
         if not self.pbpath:
             self.determine_pbpath()
 
-        parse = open(self.pbpath).read()
+        if not self.pkgbuild:
+            self.pkgbuild = open(self.pbpath).read()
+
         dirpath = os.path.dirname(self.pbpath)
 
         if var in ['source', 'depends', 'makedepends', 'arch']:
@@ -170,12 +190,15 @@ class Package(PackageMeta):
             cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
 
         if var == "pkgver":
-            exclude = ['numix-icon-theme-kde', 'numix-icon-theme', 'plymouth']
-            git_source = 'git+' in parse or 'git://' in parse
+            exclude = ['numix-icon-theme', 'plymouth']
+            use_container = ['zfs', 'spl', 'zfs-utils', 'spl-utils', 'broadcom-wl']
+            git_source = 'git+' in self.pkgbuild or 'git://' in self.pkgbuild
             if (git_source and self.name not in exclude) or 'cnchi' in self.name:
-                if 'http' not in self.git_url or '' == self.git_name:
+                if 'http' not in self.git_url or not self.git_name:
                     self.determine_git_repo_info()
                 self.prepare_package_source(dirpath=dirpath)
+
+            if self.name in use_container:
                 from utils.docker_util import DockerUtils
                 pkgver = DockerUtils().get_pkgver_inside_container(self)
                 return pkgver
@@ -223,10 +246,10 @@ class Package(PackageMeta):
             logger.error(err)
 
     def determine_git_repo_info(self):
-        if not self.git_url:
+        if not self.git_url or not self.git_url.endswith('.git'):
             source = self.get_from_pkgbuild('source')
             logger.info(source)
-            url_match = re.search("((https*)|(git:)).+", source)
+            url_match = re.search("((https*)|(git:)).+\.git", source)
             if url_match:
                 logger.info('url_match is: %s', url_match)
                 self.git_url = url_match.group(0)
@@ -261,7 +284,8 @@ class Package(PackageMeta):
                     break
         else:
             logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
-            raise ValueError
+            if 'dummy-' not in self.name:
+                raise ValueError
 
     @staticmethod
     def maybe_update_pkgbuild_repo():
@@ -350,7 +374,7 @@ class Package(PackageMeta):
             old_val = self.pkgver
             key = 'antbs:monitor:github:%s:%s' % (self.gh_project, self.gh_repo)
             changed['pkgver'] = db.get(key)
-            self.pkgver = changed['pkgver']
+            setattr(self, 'pkgver', changed['pkgver'])
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
         version = changed.get('pkgver', self.pkgver)
@@ -362,11 +386,13 @@ class Package(PackageMeta):
 
         if changed.get('pkgrel', False):
             version = version + '-' + changed['pkgrel']
-        else:
+        elif self.pkgrel:
             version = version + '-' + self.pkgrel
+        else:
+            version = version + '-' + '1'
 
-        if version and version != '-':
-            self.version_str = version
+        if version and len(version) > 2:
+            setattr(self, 'version_str', version)
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version_str

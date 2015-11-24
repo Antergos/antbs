@@ -792,26 +792,26 @@
 								{% if 'repo_packages' in request.path %}
 									var pkgs = window.antbs.pkgs,
 										tpl_map = {
-											pkg_id: '<a href="/pkg/__">__</a>',
-											bnum: '<a href-"/build/__">__</a>',
+											pkg_id: '<a href="/pkg/@@@">@@@</a>',
+											bnum: '<a href-"/build/@@@">@@@</a>',
 											manage: '<div class="btn-group">' +
 											'<button class="btn btn-default btn-xs" type="button">Action</button>' +
 											'<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">' +
 											'<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>' +
 											'</button><ul role="menu" class="dropdown-menu actions"><li>' +
-											'<a href="#" id="2" bnum="__"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a></li>' +
-											'<li><a href="#" id="3" bnum="__"><i class="fa fa-trash" style="color:red;"></i>Remove</a> </li>' +
+											'<a href="#" id="2" bnum="@@@"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a></li>' +
+											'<li><a href="#" id="3" bnum="@@@"><i class="fa fa-trash" style="color:red;"></i>Remove</a> </li>' +
 											'</ul></div>',
-											date: '<i class="fa fa-calendar"></i> __',
-											dev: '<i class="fa fa-user"></i> __'
+											date: '<i class="fa fa-calendar"></i> @@@',
+											dev: '<i class="fa fa-user"></i> @@@'
 										};
 									for (var i = 0, l = pkgs.length; i < l; i++) {
-										pkgs[i].pkg_id = tpl_map.pkg_id.replace(/__/g, pkgs[i].pkg_id);
-										pkgs[i].pkgname = tpl_map.pkg_id.replace(/__/g, pkgs[i].pkgname);
-										pkgs[i].manage = tpl_map.manage.replace(/__/g, pkgs[i]._build.bnum);
-										pkgs[i]._build.bnum = tpl_map.bnum.replace(/__/g, pkgs[i]._build.bnum);
-										pkgs[i]._build.review_dev = tpl_map.dev.replace(/__/g, pkgs[i]._build.review_dev);
-										pkgs[i]._build.review_date = tpl_map.date.replace(/__/g, pkgs[i]._build.review_date);
+										pkgs[i].pkg_id = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkg_id);
+										pkgs[i].pkgname = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkgname);
+										pkgs[i].manage = tpl_map.manage.replace(/@@@/g, pkgs[i]._build.bnum);
+										pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, pkgs[i]._build.bnum);
+										pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
+										pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
 									}
 									jQuery('table').on('init.dt', function (e, settings, data) {
 										setTimeout(function () {

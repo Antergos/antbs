@@ -199,9 +199,8 @@ def process_package_queue():
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
         depends = pkg_obj.get_deps()
 
-        if not pkg_obj.build_path or pkg_obj.build_path == '':
+        if not pkg_obj.build_path:
             paths = [os.path.join('/opt/antergos-packages/', pkg),
-                     os.path.join('/opt/antergos-packages/deepin_desktop', pkg),
                      os.path.join('/opt/antergos-packages/cinnamon', pkg)]
             for p in paths:
                 if os.path.exists(p):
@@ -291,10 +290,9 @@ def build_pkg_handler():
     :return:
     """
     status.idle = False
-    packages = status.queue
-    if len(packages) > 0:
+    if len(status.queue) > 0:
         pack = status.queue.lpop()
-        if pack and pack is not None and pack != '':
+        if pack:
             pkgobj = package.get_pkg_object(name=pack)
         else:
             return False
@@ -305,11 +303,11 @@ def build_pkg_handler():
 
         status.now_building = pkgobj.name
 
-        if pkgobj.is_iso is True or pkgobj.is_iso == 'True':
+        if pkgobj.is_iso:
             status.iso_building = True
             build_result = build_iso(pkgobj)
         else:
-            build_result = build_package(pkgobj)
+            build_result = build_package(pkgobj.name)
 
         # TODO: Move this into its own method
         if build_result is not None:
@@ -331,7 +329,7 @@ def build_pkg_handler():
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
 
-        if build_result is True:
+        if build_result:
             run_docker_clean(pkgobj.pkgname)
 
     if not status.queue and not status.hook_queue:
@@ -502,12 +500,10 @@ def process_and_save_build_metadata(pkg_obj=None):
     status.building_num = bld_obj.bnum
     status.building_start = bld_obj.start_str
     build_id = bld_obj.bnum
-    tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> started.' % (build_id,
-                                                                                   build_id,
-                                                                                   pkg_obj.name)
+    tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s-%s</strong> started.' % \
+            (build_id, build_id, pkg_obj.name, pkg_obj.version_str)
     Timeline(msg=tlmsg, tl_type=3)
-    pbuilds = pkg_obj.builds
-    pbuilds.append(build_id)
+    pkg_obj.builds.append(build_id)
     run_docker_clean(pkg_obj.name)
 
     return bld_obj
@@ -624,16 +620,18 @@ def prepare_temp_and_cache_dirs():
     return result, cache, cache_i686
 
 
-def build_package(pkg_obj=None):
+def build_package(pkg=None):
     """
 
-    :param pkg_obj:
+    :param pkg:
     :return:
 
     """
-    if pkg_obj is None:
+    if pkg is None:
         return False
+
     result, cache, cache_i686 = prepare_temp_and_cache_dirs()
+    pkg_obj = package.get_pkg_object(name=pkg)
 
     in_dir_last = len([name for name in os.listdir(result)])
     db.set('pkg_count', in_dir_last)

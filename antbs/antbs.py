@@ -413,10 +413,12 @@ def get_repo_info(repo=None, logged_in=False):
 
     if all_packages:
         for pkg in all_packages:
-            pkg = re.search('^([a-z]|[0-9]|-|_)+(?=-\d|r|v)', os.path.basename(pkg))
+            p = pkg
+            pkg = re.search('^(\w|-)+(\D|r3|g4)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
             if pkg:
                 pkg = pkg.group(0)
             else:
+                logger.error(p)
                 continue
             pkg_obj = package.get_pkg_object(pkg)
             builds = pkg_obj.builds

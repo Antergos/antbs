@@ -63,8 +63,12 @@ function setup_environment() {
 	fi
 
 	if [[ ${_GET_PKGVER_ONLY} = "True" ]]; then
-		touch "/result/$(pkgver)"
-		exit 0
+		if [[ $(type pkgver) = "function" ]]; then
+			touch "/result/$(pkgver)" && exit 0
+		else
+			touch "/result/${pkgver}" && exit 0
+		fi
+		exit 1
 	fi
 
 	if [[ "${_ALEXPKG}" = "False" ]]; then
