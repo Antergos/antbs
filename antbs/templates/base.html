@@ -703,14 +703,9 @@
 										$.gritter.add({
 											title: '{{ category|upper() }}',
 											text: '{{ message }}',
-											class_name: "clean
-											{% if category == 'error' %}error{% else %}'info'{% endif %}
-											{{ category }}",
-											sticky
-										:
-										"{% if category == 'error' %}true{% else %}false{% endif %}"
-									})
-										;
+											class_name: "clean{% if category == 'error' %}error{% else %}'info'{% endif %}{{ category }}",
+											sticky: "{% if category == 'error' %}true{% else %}false{% endif %}"
+									});
 									}, {{ loop.index * 500 }});
 								{% endfor %}
 							{% endif %}

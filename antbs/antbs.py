@@ -291,7 +291,7 @@ def get_paginated(item_list, per_page, page, timeline):
     items.reverse()
     paginated = [items[i:i + per_page] for i in range(0, len(items), per_page)]
     all_pages = len(paginated)
-    this_page = paginated[page] if not page > all_pages else paginated[-1]
+    this_page = paginated[page] if not page > all_pages else paginated[-1] if all_pages > 1 else paginated[0]
 
     return this_page, all_pages
 
