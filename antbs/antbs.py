@@ -433,7 +433,7 @@ def get_repo_info(repo=None, logged_in=False):
             pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj.__jsonable__()
             container["pkgs"].append(pkg_obj.__jsonable__())
 
-    return json.dumps(container), rev_pending
+    return container, rev_pending
 
 
 def redirect_url(default='homepage'):

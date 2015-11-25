@@ -34,9 +34,8 @@ import shutil
 import time
 
 from utils.logging_config import logger
-from utils.redis_connection import db, RedisObject,  RedisList, RedisZSet
+from utils.redis_connection import db, RedisObject, RedisList, RedisZSet
 from utils.server_status import status
-
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
@@ -53,14 +52,14 @@ class PackageMeta(RedisObject):
     def __init__(self, name=None, *args, **kwargs):
         super(PackageMeta, self).__init__()
 
-        self.key_lists = dict(
-            redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel', 'short_name', 'path', 'pbpath',
-                          'description', 'pkgdesc', 'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
-                          'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
-            redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
-            redis_string_int=['pkg_id'],
-            redis_list=['allowed_in', 'builds', 'tl_events'],
-            redis_zset=['depends', 'groups', 'makedepends'])
+        self.key_lists.update(dict(
+                redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
+                              'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
+                              'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
+                              'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
+                redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
+                redis_string_int=['pkg_id'], redis_list=['allowed_in', 'builds', 'tl_events'],
+                redis_zset=['depends', 'groups', 'makedepends']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
         self.all_keys.append('_build')
@@ -143,22 +142,6 @@ class Package(PackageMeta):
 
         self.pkgbuild = ''
 
-        if not self.pkgname:
-            self.pkgname = self.name
-        if not self.pkg_id:
-            next_id = db.incr('antbs:misc:pkgid:next')
-            self.pkg_id = next_id
-        if not self.pkgver:
-            self.get_from_pkgbuild('pkgver')
-        if not self.pkgdesc or not self.description:
-            self.pkgdesc = self.description = self.get_from_pkgbuild('pkgdesc')
-        if not self.url:
-            self.url = self.get_from_pkgbuild('url')
-        if not self.depends:
-            self.get_deps()
-        if not self.groups:
-            self.groups = self.get_from_pkgbuild('groups')
-
     def get_from_pkgbuild(self, var=None):
         """
         Get a variable from the package's PKGBUILD (which is stored in antergos-packages gh repo).
@@ -240,7 +223,8 @@ class Package(PackageMeta):
         if os.path.exists(os.path.join(dirpath, self.git_name)):
             shutil.rmtree(os.path.join(dirpath, self.git_name), ignore_errors=True)
         try:
-            res = subprocess.check_output(['/usr/bin/git', 'clone', self.git_url, self.git_name], cwd=dirpath)
+            res = subprocess.check_output(['/usr/bin/git', 'clone', self.git_url, self.git_name],
+                                          cwd=dirpath)
             logger.info(res)
         except subprocess.CalledProcessError as err:
             logger.error(err)
@@ -293,14 +277,17 @@ class Package(PackageMeta):
 
 
         """
-        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
+        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(
+                '/var/tmp/antergos-packages'):
             if db.setnx('PKGBUILD_REPO_LOCK', True):
                 db.expire('PKGBUILD_REPO_LOCK', 150)
 
                 if os.path.exists('/var/tmp/antergos-packages'):
                     shutil.rmtree('/var/tmp/antergos-packages')
                 try:
-                    subprocess.check_call(['git', 'clone', 'http://github.com/antergos/antergos-packages'], cwd='/var/tmp')
+                    subprocess.check_call(
+                            ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
+                            cwd='/var/tmp')
                     db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
                     logger.error(err)
@@ -336,7 +323,8 @@ class Package(PackageMeta):
             pbuild.write(content)
         pbuild.close()
         commit = tf.update(
-            '[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name), content)
+                '[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name),
+                content)
         if commit and commit['commit'] is not None:
             try:
                 logger.info('commit hash is %s', commit['commit'].sha)
@@ -417,14 +405,38 @@ class Package(PackageMeta):
                 dep = has_ver.group(0)
             if dep in status.all_packages and (dep in status.queue or dep in status.hook_queue):
                 depends.append(dep)
-                if dep in deps:
-                    self.depends.add(dep)
-                elif dep in mkdeps:
-                    self.makedepends.add(dep)
+            if dep in deps:
+                self.depends.add(dep)
+            elif dep in mkdeps:
+                self.makedepends.add(dep)
 
         res = (self.name, depends)
 
         return res
+
+    def sync_database_with_pkgbuild(self):
+        if not self.pkgname:
+            self.pkgname = self.name
+        if not self.pkg_id:
+            next_id = db.incr('antbs:misc:pkgid:next')
+            self.pkg_id = next_id
+        if not self.pkgver:
+            self.get_from_pkgbuild('pkgver')
+        if not self.pkgdesc or not self.description:
+            self.pkgdesc = self.description = self.get_from_pkgbuild('pkgdesc')
+        if not self.url:
+            self.url = self.get_from_pkgbuild('url')
+        if not self.depends:
+            self.get_deps()
+        if not self.groups:
+            self.groups = self.get_from_pkgbuild('groups')
+
+        for key in self.key_lists['redis_string']:
+            newval = getattr(self, key)
+            if newval and newval[0] in ['"', "'"]:
+                newval = newval[1:-2]
+                logger.info(newval)
+            setattr(self, key, newval)
 
 
 def get_pkg_object(name=None):

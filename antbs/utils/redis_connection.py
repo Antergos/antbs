@@ -61,10 +61,22 @@ class RedisField(object):
 
         return self.id_key
 
+    def __iter__(self):
+        raise NotImplementedError
+
     def delete(self):
         """ Delete this object from redis. """
 
         db.delete(self.id_key)
+
+    def __jsonable__(self):
+        """
+        Return object converted to python list so it can be serialized by json module.
+
+        :return (list):
+
+        """
+        return list(self.__iter__())
 
     @staticmethod
     def decode_value(obj_type, value):
@@ -129,23 +141,14 @@ class RedisList(RedisField, list):
 
         return helper()
 
-    def __jsonable__(self):
-        """
-        Return object converted to a type that is supported by json module.
-
-        :return (str):
-
-        """
-        return list(self.__iter__())
-
     def __str__(self):
         """ Return this object as a string """
 
         return str([x for x in self.__iter__()])
 
-    def __repr__(self):
-        """ Return this object as a string. """
-        return self.__str__()
+    # def __repr__(self):
+    #     """ Return this object as a string. """
+    #     return self.__str__()
 
     def __getitem__(self, index):
         """ Load an item by index where index is either an int or a slice. """
@@ -287,15 +290,6 @@ class RedisZSet(RedisField, set):
 
         return helper()
 
-    def __jsonable__(self):
-        """
-        Return object converted to a type that is supported by json module.
-
-        :return (str):
-
-        """
-        return list(self.__iter__())
-
     def __len__(self):
         """ Return the size of the set. """
 
@@ -312,9 +306,9 @@ class RedisZSet(RedisField, set):
 
         return str([x for x in self.__iter__()])
 
-    def __repr__(self):
-        """ Return this object as a string. """
-        return self.__str__()
+    # def __repr__(self):
+    #     """ Return this object as a string. """
+    #     return self.__str__()
 
     def __contains__(self, item):
         """
@@ -365,7 +359,8 @@ class RedisObject(object):
             redis_string_bool=[],
             redis_string_int=[],
             redis_list=[],
-            redis_zset=[])
+            redis_zset=[],
+            redis_stringex=['pkgbuild'])
         self.all_keys = []
 
     def __bool__(self):
@@ -395,24 +390,24 @@ class RedisObject(object):
 
     def __jsonable__(self):
         """
-        Return object converted to a type that is supported by json module.
+        Return object converted to a dict so it can be serialized by the json module.
 
-        :return (str):
+        :return (dict):
 
         """
-        as_string = dict()
+        as_dict = dict()
         for key in self.all_keys:
             value = getattr(self, key)
-            if 'log_str' == key or 'log' == key:
-                pass
-            elif isinstance(value, (str, dict)):
-                as_string[key] = value
-            elif isinstance(value, (bool, int)):
-                as_string[key] = str(value)
+            if key in ['log_str', 'log', 'pkgbuild']:
+                continue
+            if not isinstance(value, (str, dict, bool, int)) and hasattr(value, '__jsonable__'):
+                as_dict[key] = value.__jsonable__()
+            elif isinstance(value, (str, basestring)):
+                as_dict[key] = value
             else:
-                as_string[key] = value.__jsonable__()
+                as_dict[key] = value
 
-        return as_string
+        return as_dict
 
     def json(self):
         """
@@ -424,9 +419,9 @@ class RedisObject(object):
 
         return json.dumps(self.__jsonable__())
 
-    def __repr__(self):
-        """ Return this object as a string. """
-        return self.__str__()
+    # def __repr__(self):
+    #     """ Return this object as a string. """
+    #     return self.__str__()
 
     def delete(self):
         """ Delete this object from redis. """
@@ -458,7 +453,7 @@ class RedisObject(object):
             return RedisZSet.as_child(self, attrib, str)
 
     def __setattr__(self, attrib, value, score=None):
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build', 'pkgbuild']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__setattr__(attrib, value)

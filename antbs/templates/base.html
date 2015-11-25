@@ -434,17 +434,20 @@
 											<li {% if request.path == "/browse" %}class="active"{% endif %}>
 												<a href="/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
 											</li>
-											{% if user.is_authenticated() %}
-												<li {% if 'repo_pkgs' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
-													<a href="/repo_packages/antergos"><i class="fa   fa-list"></i><span>Repo Pkgs (Main)</span></a>
-												</li>
-												<li {% if 'repo_pkgs' in request.path and 'staging' in request.path %}class="active"{% endif %}>
-													<a href="/repo_packages/antergos-staging"><i class="fa   fa-list"></i><span>Repo Pkgs (Staging)</span></a>
-												</li>
-											{% endif %}
 										</ul>
 
 									</li>
+									<li {% if request.path == "/repo_packages" %}class="active"{% endif %}>
+										<a href="/repo_packages"><i class="fa  fa-archive"></i><span>Repos</span></a>
+										<ul class="sub-menu">
+											<li {% if 'repo_packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
+												<a href="/repo_packages/antergos"><i class="fa   fa-list"></i><span>Main</span></a>
+											</li>
+											<li {% if 'repo_packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
+												<a href="/repo_packages/antergos-staging"><i class="fa   fa-list"></i><span>Staging</span></a>
+											</li>
+										</ul>
+								</li>
 									<li {% if request.path == "/browse/releases" %}class="active"{% endif %}>
 										<a href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
@@ -793,7 +796,7 @@
 									var pkgs = window.antbs.pkgs,
 										tpl_map = {
 											pkg_id: '<a href="/pkg/@@@">@@@</a>',
-											bnum: '<a href-"/build/@@@">@@@</a>',
+											bnum: '<a href="/build/@@@">@@@</a>',
 											manage: '<div class="btn-group">' +
 											'<button class="btn btn-default btn-xs" type="button">Action</button>' +
 											'<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">' +
@@ -813,15 +816,11 @@
 										pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
 										pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
 									}
-									jQuery('table').on('init.dt', function (e, settings, data) {
-										setTimeout(function () {
-											jQuery('.loading').fadeOut();
-										}, 750)
-									}).dataTable({
+									jQuery('table').dataTable({
 										data: window.antbs.pkgs,
 										"aoColumns": [
 											{"mData": "pkg_id"},
-											{"mData": "pkgname"},
+											{"mData": "pkgname", "sWidth": "270px"},
 											{"mData": "version_str"},
 											{"mData": "_build.bnum"},
 											{"mData": "_build.review_dev"},
@@ -830,7 +829,10 @@
 										],
 										"aaSorting": [
 											[1, "asc"]
-										]
+										],
+										"fnInitComplete": function () {
+											jQuery('.loading').fadeOut();
+										}
 
 									});
 								{% endif %}

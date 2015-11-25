@@ -3,7 +3,7 @@
 {{  super() }}
 <script>
 	document.addEventListener('DOMContentLoaded', function() {
-	{% if repo_packages %}window.antbs = JSON.parse('{{ repo_packages|safe }}');{% else %}window.antbs = {pkgs: []};{% endif %}
+	{% if repo_packages %}window.antbs = JSON.parse('{{ repo_packages|tojson }}');{% else %}window.antbs = {pkgs: []};{% endif %}
 	});
 </script>
 {% endblock head %}
@@ -25,7 +25,7 @@
 					<table class="table no-border hover">
 						<thead class="no-border">
 						<tr>
-							<th>ID&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+							<th>ID&nbsp;&nbsp;</th>
 							<th>Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 							<th>Version</th>
 							<th>Build</th>
