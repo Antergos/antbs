@@ -137,7 +137,7 @@ class RedisList(RedisField, list):
             :param _:
             :return:
             """
-            return cls(parent.namespace + tag, item_type)
+            return cls(parent.full_key + ':' + tag, item_type)
 
         return helper()
 
@@ -286,7 +286,7 @@ class RedisZSet(RedisField, set):
             :param _:
             :return:
             """
-            return cls(parent.namespace + tag, item_type)
+            return cls(parent.full_key + ':' + tag, item_type)
 
         return helper()
 

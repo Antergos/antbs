@@ -42,12 +42,12 @@ class Singleton(RedisObject):
     :param kwargs:
     """
 
-    def __init__(self, *args, **kwargs):
-        super(Singleton, self).__init__()
-        globals()[self.__class__.__name__] = self
+    _instance = None
 
-    def __call__(self):
-        return self
+    def __new__(cls, *args, **kwargs):
+        if not cls._instance:
+            cls._instance = super(Singleton, cls).__new__(cls, *args)
+        return cls._instance
 
 
 class ServerStatus(Singleton):
@@ -59,7 +59,7 @@ class ServerStatus(Singleton):
     """
 
     def __init__(self, *args, **kwargs):
-        super(ServerStatus, self).__init__(self, *args, **kwargs)
+        super(ServerStatus, self).__init__()
         super(ServerStatus, self).__namespaceinit__('status', '')
 
         self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
