@@ -368,7 +368,7 @@ class RedisObject(object):
 
     def __namespaceinit__(self, prefix, key):
         self.prefix = prefix
-        self.key = key
+        self.key = str(key)
         self.full_key = self.namespace + ':' + self.prefix + ':' + self.key
         if self.full_key[-1] == ':':
             self.full_key = self.full_key[:-1]

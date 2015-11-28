@@ -180,8 +180,7 @@ class Package(PackageMeta):
                 self.prepare_package_source(dirpath=dirpath)
 
             if 'cnchi-dev' == self.name:
-                cnchi_path = os.path.join(dirpath)
-                cmd = 'cd ' + cnchi_path + '; mv lots0logs*** cnchi; /usr/bin/python cnchi/info.py'
+                cmd = 'mv lots0logs*** cnchi; /usr/bin/python cnchi/info.py'
 
             if self.name in use_container:
                 from utils.docker_util import DockerUtils
