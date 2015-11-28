@@ -48,6 +48,12 @@ class BuildObject(RedisObject):
 
         super(BuildObject, self).__init__()
 
+        next_bnum = bnum
+        if not bnum:
+            next_bnum = db.incr('antbs:misc:bnum:next')
+
+        super(BuildObject, self).__namespaceinit__('build', next_bnum)
+
         self.key_lists = dict(
             redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
                           'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
@@ -59,9 +65,6 @@ class BuildObject(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not bnum:
-            next_bnum = db.incr('antbs:misc:bnum:next')
-            self.namespace = 'antbs:build:%s:' % next_bnum
-            self.prefix = self.namespace[:-1]
             for key in self.all_keys:
                 if key in self.key_lists['redis_string']:
                     value = getattr(pkg_obj, key, '')
@@ -79,9 +82,6 @@ class BuildObject(RedisObject):
             self.bnum = next_bnum
             self.failed = False
             self.completed = False
-        else:
-            self.namespace = 'antbs:build:%s:' % bnum
-            self.prefix = self.namespace[:-1]
 
     @staticmethod
     def datetime_to_string(dt):

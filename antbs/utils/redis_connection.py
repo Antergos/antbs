@@ -346,37 +346,47 @@ class RedisZSet(RedisField, set):
 
 class RedisObject(object):
     """
+    A base object backed by redis. This is not meant to be used directly.
 
     """
+
     database = db
 
     def __init__(self):
         super(RedisObject, self).__init__()
-        self.namespace = 'antbs:'
-        self.prefix = self.namespace[:-1]
+        self.namespace = 'antbs'
+        self.prefix = ''
+        self.key = ''
+        self.full_key = self.namespace + ':' + self.prefix + ':' + self.key
         self.key_lists = dict(
             redis_string=[],
             redis_string_bool=[],
             redis_string_int=[],
             redis_list=[],
-            redis_zset=[],
-            redis_stringex=['pkgbuild'])
+            redis_zset=[])
         self.all_keys = []
 
-    def __bool__(self):
-        """ Test if an object currently exists. """
+    def __namespaceinit__(self, prefix, key):
+        self.prefix = prefix
+        self.key = key
+        self.full_key = self.namespace + ':' + self.prefix + ':' + self.key
+        if self.full_key[-1] == ':':
+            self.full_key = self.full_key[:-1]
 
-        return db.exists(self.prefix)
+    def __bool__(self):
+        """ Test if this object currently exists in database. """
+
+        return db.exists(self.full_key)
 
     def __nonzero__(self):
-        """ Test if an object currently exists in database. """
+        """ Test if this object currently exists in database. """
 
-        return db.exists(self.prefix)
+        return db.exists(self.full_key)
 
     def __eq__(self, other):
         """ Tests if two redis objects are equal (they have the same id/key). """
 
-        return self.prefix == other.prefix
+        return self.full_key == other.full_key
 
     def __str__(self):
         """ Return this object as a friendly (human readable) string. """
@@ -387,6 +397,46 @@ class RedisObject(object):
             as_string[key] = value if isinstance(value, str) else value.__str__()
 
         return str(as_string)
+
+    def __len__(self):
+        """
+        Return the len of this object (total number of fields in its redis hash)
+
+        """
+
+        return int(db.hlen(self.full_key))
+
+    def __getitem__(self, item):
+        """
+        Get and return the value of a field (item) from this objects redis hash.
+        :param item:
+        :return:
+
+        """
+
+        return self.__getattribute__(item)
+
+    def __setitem__(self, key, value):
+        """
+        Set the value of a field (item) from this objects redis hash.
+        :param key:
+        :param value:
+        :return:
+
+        """
+
+        return self.__setattribute__(key, value)
+
+    def __iter__(self):
+        """
+        Return an iterator object for all the keys in redis hash.
+        :return:
+
+        """
+        return [key for key in self.all_keys]
+
+    def iterkeys(self):
+        return self.__iter__()
 
     def __jsonable__(self):
         """
@@ -419,22 +469,19 @@ class RedisObject(object):
 
         return json.dumps(self.__jsonable__())
 
-    # def __repr__(self):
-    #     """ Return this object as a string. """
-    #     return self.__str__()
-
     def delete(self):
         """ Delete this object from redis. """
 
-        db.delete(self.prefix)
+        db.delete(self.full_key)
 
     def __getattribute__(self, attrib):
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build', 'key', 'full_key',
+                     'prefix', 'pkgbuild']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__getattribute__(attrib)
 
-        key = self.prefix
+        key = self.full_key
 
         if attrib in self.key_lists['redis_string']:
             return db.hget(key, attrib) if db.hexists(key, attrib) else ''
@@ -453,12 +500,13 @@ class RedisObject(object):
             return RedisZSet.as_child(self, attrib, str)
 
     def __setattr__(self, attrib, value, score=None):
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', 'prefix', '_build', 'pkgbuild']
+        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build', 'key', 'full_key',
+                     'prefix', 'pkgbuild']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__setattr__(attrib, value)
 
-        key = self.prefix
+        key = self.full_key
 
         if attrib in self.key_lists['redis_list'] or attrib in self.key_lists['redis_zset']:
             return super(RedisObject, self).__setattr__(attrib, value)

@@ -27,6 +27,7 @@
 import subprocess
 import os
 import re
+import zipfile
 
 from github3 import login
 from gitlab import Gitlab
@@ -50,7 +51,11 @@ class PackageMeta(RedisObject):
     """
 
     def __init__(self, name=None, *args, **kwargs):
+        if not name:
+            raise AttributeError
+
         super(PackageMeta, self).__init__()
+        super(PackageMeta, self).__namespaceinit__('pkg', name)
 
         self.key_lists.update(dict(
                 redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
@@ -63,13 +68,6 @@ class PackageMeta(RedisObject):
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
         self.all_keys.append('_build')
-
-        if not name:
-            raise AttributeError
-
-        self.namespace = 'antbs:pkg:%s:' % name
-        self.prefix = self.namespace[:-1]
-        self.name = name
 
 
 class Package(PackageMeta):
@@ -126,17 +124,17 @@ class Package(PackageMeta):
                     setattr(self, key, RedisList.as_child(self, key, str))
                 elif key in self.key_lists['redis_zset']:
                     setattr(self, key, RedisZSet.as_child(self, key, str))
-            self.pkgname = name
+                    setattr(self, 'pkgname', name)
             next_id = db.incr('antbs:misc:pkgid:next')
-            self.pkg_id = next_id
+            setattr(self, 'git_name', next_id)
             all_pkgs = status.all_packages
             all_pkgs.add(self.name)
 
             if '-x86_64' in self.name or '-i686' in self.name:
-                self.is_iso = True
+                setattr(self, 'is_iso', True)
 
-            if 'pycharm' in self.name:
-                self.autosum = True
+            if 'pycharm' in self.name or 'intellij' in self.name:
+                setattr(self, 'autosum', True)
 
             self.determine_pbpath()
 
@@ -163,7 +161,7 @@ class Package(PackageMeta):
             self.determine_pbpath()
 
         if not self.pkgbuild:
-            self.pkgbuild = open(self.pbpath).read()
+            setattr(self, 'pkgbuild', open(self.pbpath).read())
 
         dirpath = os.path.dirname(self.pbpath)
 
@@ -180,6 +178,10 @@ class Package(PackageMeta):
                 if 'http' not in self.git_url or not self.git_name:
                     self.determine_git_repo_info()
                 self.prepare_package_source(dirpath=dirpath)
+
+            if 'cnchi-dev' == self.name:
+                cnchi_path = os.path.join(dirpath)
+                cmd = 'cd ' + cnchi_path + '; mv lots0logs*** cnchi; /usr/bin/python cnchi/info.py'
 
             if self.name in use_container:
                 from utils.docker_util import DockerUtils
@@ -217,6 +219,14 @@ class Package(PackageMeta):
             with open(zpath, 'wb') as fd:
                 fd.write(source)
             return
+        if 'cnchi-dev' == self.name:
+            zpath = os.path.join(dirpath, self.name + '.zip')
+            gh = login(token=status.github_token)
+            repo = gh.repository('lots0logs', 'cnchi-dev')
+            repo.archive('zipball', zpath)
+            zfile = zipfile.ZipFile(zpath, 'r')
+            zfile.extractall(dirpath)
+            return
 
         os.putenv('srcdir', dirpath)
 
@@ -227,29 +237,27 @@ class Package(PackageMeta):
                                           cwd=dirpath)
             logger.info(res)
         except subprocess.CalledProcessError as err:
-            logger.error(err)
+            logger.error(err.output)
 
     def determine_git_repo_info(self):
         if not self.git_url or not self.git_url.endswith('.git'):
             source = self.get_from_pkgbuild('source')
-            logger.info(source)
             url_match = re.search("((https*)|(git:)).+\.git", source)
             if url_match:
                 logger.info('url_match is: %s', url_match)
-                self.git_url = url_match.group(0)
+                setattr(self, 'git_url', url_match.group(0))
             else:
-                self.git_url = ''
+                setattr(self, 'git_url', '')
 
-        logger.info('2. self.git_url is: %s', self.git_url)
         if not self.git_name:
-            self.git_name = self.name
+            setattr(self, 'git_name', self.name)
             if self.name == 'pamac-dev':
-                self.git_name = 'pamac'
+                setattr(self, 'git_name', 'pamac')
             elif self.name == 'cnchi-dev':
-                self.git_name = 'cnchi'
-                self.git_url = 'http://github.com/lots0logs/cnchi-dev.git'
+                setattr(self, 'git_name', 'cnchi')
+                setattr(self, 'git_url', 'http://github.com/lots0logs/cnchi-dev.git')
             elif self.name == 'cnchi':
-                self.git_url = 'http://github.com/antergos/cnchi.git'
+                setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
 
     def determine_pbpath(self):
         path = None
@@ -261,7 +269,7 @@ class Package(PackageMeta):
             if os.path.exists(p):
                 ppath = os.path.join(p, 'PKGBUILD')
                 logger.info(ppath)
-                if os.path.exists(ppath) and not ('cinnamon' == self.pkgname and paths[0] == p):
+                if os.path.exists(ppath) and ('cinnamon' != self.pkgname and paths[0] == p):
                     self.pbpath = ppath
                     if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
                         self.allowed_in.append('main')
@@ -277,8 +285,7 @@ class Package(PackageMeta):
 
 
         """
-        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(
-                '/var/tmp/antergos-packages'):
+        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
             if db.setnx('PKGBUILD_REPO_LOCK', True):
                 db.expire('PKGBUILD_REPO_LOCK', 150)
 
@@ -353,7 +360,8 @@ class Package(PackageMeta):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if 'cnchi-dev' == self.name and self.pkgver[-1] != '0' and self.pkgver[-1] != '5':
+            cnchiver = changed.get('pkgver', '')
+            if 'cnchi-dev' == self.name and cnchiver and cnchiver[-1] not in [0, 5]:
                 return False
 
             if not changed:
@@ -416,27 +424,21 @@ class Package(PackageMeta):
 
     def sync_database_with_pkgbuild(self):
         if not self.pkgname:
-            self.pkgname = self.name
+            setattr(self, 'pkgname', self.name)
         if not self.pkg_id:
             next_id = db.incr('antbs:misc:pkgid:next')
-            self.pkg_id = next_id
+            setattr(self, 'pkg_id', next_id)
         if not self.pkgver:
             self.get_from_pkgbuild('pkgver')
         if not self.pkgdesc or not self.description:
-            self.pkgdesc = self.description = self.get_from_pkgbuild('pkgdesc')
+            setattr(self, 'pkgdesc', self.get_from_pkgbuild('pkgdesc'))
+            setattr(self, 'description', self.pkgdesc)
         if not self.url:
-            self.url = self.get_from_pkgbuild('url')
+            setattr(self, 'url', self.get_from_pkgbuild('url'))
         if not self.depends:
             self.get_deps()
         if not self.groups:
-            self.groups = self.get_from_pkgbuild('groups')
-
-        for key in self.key_lists['redis_string']:
-            newval = getattr(self, key)
-            if newval and newval[0] in ['"', "'"]:
-                newval = newval[1:-2]
-                logger.info(newval)
-            setattr(self, key, newval)
+            setattr(self, 'groups', self.get_from_pkgbuild('groups'))
 
 
 def get_pkg_object(name=None):

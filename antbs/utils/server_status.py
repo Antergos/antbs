@@ -60,9 +60,7 @@ class ServerStatus(Singleton):
 
     def __init__(self, *args, **kwargs):
         super(ServerStatus, self).__init__(self, *args, **kwargs)
-
-        self.namespace = 'antbs:status:'
-        self.prefix = self.namespace[:-1]
+        super(ServerStatus, self).__namespaceinit__('status', '')
 
         self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
                                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
@@ -110,6 +108,12 @@ class Timeline(RedisObject):
 
         super(Timeline, self).__init__()
 
+        the_id = event_id
+        if not event_id:
+            the_id = db.incr('antbs:misc:event_id:next')
+
+        super(Timeline, self).__namespaceinit__('timeline', the_id)
+
         self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
                               redis_string_int=['event_id', 'tl_type'],
                               redis_string_bool=[],
@@ -119,10 +123,7 @@ class Timeline(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not event_id:
-            next_id = db.incr('antbs:misc:event_id:next')
-            self.namespace = 'antbs:timeline:%s:' % next_id
-            self.prefix = self.namespace[:-1]
-            self.event_id = next_id
+            self.event_id = the_id
             all_events = status.all_tl_events
             all_events.append(self.event_id)
             self.tl_type = tl_type
@@ -134,9 +135,6 @@ class Timeline(RedisObject):
                 packages = [p for p in packages if p]
                 for p in packages:
                     self.packages.append(p)
-        else:
-            self.namespace = 'antbs:timeline:%s:' % event_id
-            self.prefix = self.namespace[:-1]
 
     @staticmethod
     def dt_date_to_string(dt):
