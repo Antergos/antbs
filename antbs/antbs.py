@@ -53,22 +53,30 @@ import gevent.monkey
 import utils.pagination
 import build_pkg as builder
 from utils.redis_connection import db, RedisObject
-from utils.server_status import status as status, Timeline as tl_event
+from utils.server_status import status as status, TimelineEvent as tl_event
 import utils.logging_config as logconf
 import package
 import webhook
 import utils.slack_bot as slack_bot
 import build_obj
 import iso
-
-status.github_token = os.environ.get('GITHUB_TOKEN')
-status.gitlab_token = os.environ.get('GITLAB_TOKEN')
-status.docker_user = os.environ.get('DOCKER_USER')
-status.docker_password = os.environ.get('DOCKER_PASSWORD')
-status.gpg_key = os.environ.get('ANTBS_GPG_KEY')
-status.gpg_password = os.environ.get('ANTBS_GPG_PASS')
-
 import repo_monitor as repo_mon
+import bugsnag
+from bugsnag.flask import handle_exceptions
+from repo import Repo
+
+
+status.github_token = status.github_token if status.github_token else os.environ.get('GITHUB_TOKEN')
+status.gitlab_token = status.gitlab_token if status.gitlab_token else os.environ.get('GITLAB_TOKEN')
+status.docker_user = status.docker_user if status.docker_user else os.environ.get('DOCKER_USER')
+status.docker_password = status.docker_password if status.docker_password else os.environ.get('DOCKER_PASSWORD')
+status.gpg_key = status.gpg_key if status.gpg_key else os.environ.get('ANTBS_GPG_KEY')
+status.gpg_password = status.gpg_password if status.gpg_password else os.environ.get('ANTBS_GPG_PASS')
+status.bugsnag_key = status.bugsnag_key if status.bugsnag_key else os.environ.get('BUGSNAG_KEY')
+status.sp_session_key = status.sp_session_key if status.sp_session_key else os.environ.get('STORMPATH_SESSION_KEY')
+status.sp_api_id = status.sp_api_id if status.sp_api_id else os.environ.get('STORMPATH_API_KEY_ID')
+status.sp_api_key = status.sp_api_key if status.sp_api_key else os.environ.get('STORMPATH_API_KEY_SECRET')
+status.sp_app = status.sp_app if status.sp_app else os.environ.get('STORMPATH_APPLICATION')
 
 gevent.monkey.patch_all()
 
@@ -80,12 +88,16 @@ STAGING_32 = os.path.join(STAGING_REPO, 'i686')
 MAIN_64 = os.path.join(MAIN_REPO, 'x86_64')
 MAIN_32 = os.path.join(MAIN_REPO, 'i686')
 
+bugsnag.configure(api_key=status.bugsnag_key, project_root=SRC_DIR)
+
 # Create the variable `app` which is an instance of the Flask class
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('STORMPATH_SESSION_KEY')
-app.config['STORMPATH_API_KEY_ID'] = os.environ.get('STORMPATH_API_KEY_ID')
-app.config['STORMPATH_API_KEY_SECRET'] = os.environ.get('STORMPATH_API_KEY_SECRET')
-app.config['STORMPATH_APPLICATION'] = os.environ.get('STORMPATH_APPLICATION')
+handle_exceptions(app)
+
+app.config['SECRET_KEY'] = status.sp_session_key
+app.config['STORMPATH_API_KEY_ID'] = status.sp_api_id
+app.config['STORMPATH_API_KEY_SECRET'] = status.sp_api_key
+app.config['STORMPATH_APPLICATION'] = status.sp_app
 app.config['STORMPATH_ENABLE_USERNAME'] = True
 app.config['STORMPATH_REQUIRE_USERNAME'] = True
 app.config['STORMPATH_ENABLE_REGISTRATION'] = False
@@ -93,7 +105,9 @@ app.config['STORMPATH_REDIRECT_URL'] = '/pkg_review'
 app.config['STORMPATH_LOGIN_TEMPLATE'] = 'login.html'
 app.config['STORMPATH_COOKIE_DURATION'] = timedelta(days=14)
 app.config['STORMPATH_ENABLE_FORGOT_PASSWORD'] = True
+
 stormpath_manager = StormpathManager(app)
+
 app.jinja_options = Flask.jinja_options.copy()
 app.jinja_options['lstrip_blocks'] = True
 app.jinja_options['trim_blocks'] = True
@@ -107,6 +121,9 @@ cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
 cache.init_app(app)
 
 logger = logconf.logger
+
+Repo(name='antergos', path=MAIN_REPO)
+Repo(name='antergos-staging', path=STAGING_REPO)
 
 
 def copy(src, dst):
@@ -621,6 +638,10 @@ def homepage(tlpage=None):
     check_stats = ['queue', 'completed', 'failed']
     building = status.current_status
     tl_events, all_pages = get_timeline(tlpage)
+
+    if tlpage > all_pages:
+        abort(404)
+
     build_history, timestamps = get_build_history_chart_data()
 
     stats = {}
@@ -628,7 +649,7 @@ def homepage(tlpage=None):
         builds = getattr(status, stat)
         res = len(builds)
         if stat != "queue":
-            builds = [x for x in builds if x is not None]
+            builds = [x for x in builds if x]
             within = []
             nodup = []
             for bnum in builds:
@@ -637,10 +658,12 @@ def homepage(tlpage=None):
                 except (ValueError, AttributeError):
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
-                end = datetime.strptime(bld_obj.end_str,
-                                        '%m/%d/%Y %I:%M%p') if bld_obj.end_str != '' else ''
-                if end != '' and (datetime.now() - end) < timedelta(
-                        hours=48) and ver not in nodup and bld_obj.pkgname:
+                end = datetime.strptime(
+                        bld_obj.end_str,
+                        '%m/%d/%Y %I:%M%p') if bld_obj.end_str else ''
+                end = end if end and (datetime.now() - end) < timedelta(hours=48) else ''
+
+                if end and ver not in nodup and bld_obj.pkgname:
                     within.append(bld_obj.bnum)
                     nodup.append(ver)
 
@@ -949,8 +972,7 @@ def build_pkg_now():
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                         return redirect(redirect_url())
 
-                q = status.hook_queue
-                q.rpush(pkgname)
+                status.hook_queue.rpush(pkgname)
                 hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 tl_event(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
@@ -962,23 +984,42 @@ def build_pkg_now():
 
 
 @app.route('/get_status', methods=['GET'])
-@app.route('/api/ajax', methods=['GET'])
+@app.route('/api/ajax', methods=['GET', 'POST'])
 def get_status():
     """
 
 
     :return:
     """
-    building = status.current_status
-    iso_release = bool(request.args.get('do_iso_release', False)) and user.is_authenticated()
-    reset_queue = bool(request.args.get('reset_build_queue', False)) and user.is_authenticated()
-    rerun_transaction = int(request.args.get('rerun_transaction', 0))
-
-    if not iso_release and not reset_queue and rerun_transaction == 0:
+    if 'get_status' in request.path:
         return Response(get_live_status_updates(), direct_passthrough=True,
                         mimetype='text/event-stream')
 
+    if not user.is_authenticated():
+        abort(403)
+
+    building = status.current_status
+    iso_release = bool(request.args.get('do_iso_release', False))
+    reset_queue = bool(request.args.get('reset_build_queue', False))
+    rerun_transaction = int(request.args.get('rerun_transaction', 0))
     message = dict(msg='Ok')
+
+    if request.method == 'POST':
+        payload = json.loads(request.data)
+        pkg = payload.get('pkg', None)
+        dev = payload.get('dev', None)
+        action = payload.get('result', None)
+
+        if all(i is not None for i in (pkg, dev, action)):
+            if action in ['remove']:
+                queue.enqueue_call(builder.update_main_repo(is_action=True, action=action, action_pkg=pkg))
+            elif 'rebuild' == action:
+                status.hook_queue.rpush(pkg)
+                hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
+                tl_event(
+                        msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
+                            dev, pkg), tl_type='0')
+            return json.dumps(message)
 
     if iso_release:
         queue.enqueue_call(iso.iso_release_job)

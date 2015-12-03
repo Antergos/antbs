@@ -447,7 +447,7 @@
 												<a href="/repo_packages/antergos-staging"><i class="fa   fa-list"></i><span>Staging</span></a>
 											</li>
 										</ul>
-								</li>
+									</li>
 									<li {% if request.path == "/browse/releases" %}class="active"{% endif %}>
 										<a href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
@@ -672,13 +672,40 @@
 						src="/static/js/jquery.datatables/bootstrap-adapter/js/datatables.js"></script>
 				<script type="text/javascript"
 						src="/static/js/jquery.datatables/bootstrap-adapter/js/dataTables.bootstrap.js"></script>
-				{% if 'repo_packages' not in request.path %}
-					<script type="text/javascript"
-							src="/static/js/jquery.datatables/media/js/num-html.js"></script>
-				{% endif %}
+				<script type="text/javascript"
+						src="/static/js/jquery.datatables/media/js/num-html.js"></script>
 				<script type="text/javascript">
 					//sets up numeric sorting of links
 					jQuery(document).ready(function () {
+
+						{% if user.is_authenticated() and 'repo_pkgs' in request.path %}
+							$('.content').on('click', '.repo_actions a', function (e) {
+								e.preventDefault();
+								jQuery(this).addClass('clicked');
+								var data = {
+									pkg: jQuery(this).attr('data-pkg'),
+									result: jQuery(this).attr('id'),
+									dev: '{{ user.username }}'
+								};
+								jQuery.ajax({
+									type: 'POST',
+									url: '/api/ajax',
+									data: JSON.stringify(data, null, '\t'),
+									contentType: 'application/json;charset=UTF-8',
+									dataType: 'json',
+									success: function (result) {
+										console.log(result);
+										var res = $('.clicked').attr('id') == 'passed' ? 'span.passed' : 'span.failed';
+										if (result['msg'] == 'ok') {
+											jQuery('.clicked').parents('tr').remove();
+										} else {
+											alert('Unable to save result. Server Error Msg:\n' + result['msg']);
+										}
+									}
+
+								});
+							});
+						{% endif %}
 
 						jQuery('#do_iso_release_confirm').click(function () {
 							$.getJSON('/api/ajax?do_iso_release=True', function (data) {
@@ -705,7 +732,7 @@
 											text: '{{ message }}',
 											class_name: "clean{% if category == 'error' %}error{% else %}'info'{% endif %}{{ category }}",
 											sticky: "{% if category == 'error' %}true{% else %}false{% endif %}"
-									});
+										});
 									}, {{ loop.index * 500 }});
 								{% endfor %}
 							{% endif %}
@@ -796,7 +823,7 @@
 											'<button class="btn btn-default btn-xs" type="button">Action</button>' +
 											'<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">' +
 											'<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>' +
-											'</button><ul role="menu" class="dropdown-menu actions"><li>' +
+											'</button><ul role="menu" class="dropdown-menu actions repo_actions"><li>' +
 											'<a href="#" id="2" bnum="@@@"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a></li>' +
 											'<li><a href="#" id="3" bnum="@@@"><i class="fa fa-trash" style="color:red;"></i>Remove</a> </li>' +
 											'</ul></div>',

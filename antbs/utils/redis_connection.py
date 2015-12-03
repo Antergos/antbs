@@ -373,6 +373,19 @@ class RedisObject(object):
         if self.full_key[-1] == ':':
             self.full_key = self.full_key[:-1]
 
+    def __keysinit__(self):
+        for key in self.all_keys:
+            if key in self.key_lists['redis_string']:
+                setattr(self, key, '')
+            elif key in self.key_lists['redis_string_bool']:
+                setattr(self, key, False)
+            elif key in self.key_lists['redis_string_int']:
+                setattr(self, key, 0)
+            elif key in self.key_lists['redis_list']:
+                setattr(self, key, RedisList.as_child(self, key, str))
+            elif key in self.key_lists['redis_zset']:
+                setattr(self, key, RedisZSet.as_child(self, key, str))
+
     def __bool__(self):
         """ Test if this object currently exists in database. """
 

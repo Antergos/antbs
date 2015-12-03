@@ -63,7 +63,8 @@ class PackageMeta(RedisObject):
                               'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
                               'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
                 redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
-                redis_string_int=['pkg_id'], redis_list=['allowed_in', 'builds', 'tl_events'],
+                redis_string_int=['pkg_id'],
+                redis_list=['allowed_in', 'builds', 'tl_events'],
                 redis_zset=['depends', 'groups', 'makedepends']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
@@ -113,27 +114,16 @@ class Package(PackageMeta):
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name))):
             # Package is not in the database, so it must be new. Let's initialize it.
-            for key in self.all_keys:
-                if key in self.key_lists['redis_string'] and key != 'name':
-                    setattr(self, key, '')
-                elif key in self.key_lists['redis_string_bool']:
-                    setattr(self, key, False)
-                elif key in self.key_lists['redis_string_int']:
-                    setattr(self, key, 0)
-                elif key in self.key_lists['redis_list']:
-                    setattr(self, key, RedisList.as_child(self, key, str))
-                elif key in self.key_lists['redis_zset']:
-                    setattr(self, key, RedisZSet.as_child(self, key, str))
-                    setattr(self, 'pkgname', name)
+            self.__keysinit__()
+            setattr(self, 'pkgname', name)
             next_id = db.incr('antbs:misc:pkgid:next')
-            setattr(self, 'git_name', next_id)
-            all_pkgs = status.all_packages
-            all_pkgs.add(self.name)
+            setattr(self, 'pkg_id', next_id)
+            status.all_packages.add(self.name)
 
             if '-x86_64' in self.name or '-i686' in self.name:
                 setattr(self, 'is_iso', True)
 
-            if 'pycharm' in self.name or 'intellij' in self.name:
+            if 'pycharm' in self.name or 'intellij' in self.name or 'clion-eap' == self.name:
                 setattr(self, 'autosum', True)
 
             self.determine_pbpath()
@@ -180,7 +170,7 @@ class Package(PackageMeta):
                 self.prepare_package_source(dirpath=dirpath)
 
             if 'cnchi-dev' == self.name:
-                cmd = 'mv lots0logs*** cnchi; /usr/bin/python cnchi/info.py'
+                cmd = 'mv lots0logs*** cnchi; /usr/bin/python cnchi/cnchi/info.py'
 
             if self.name in use_container:
                 from utils.docker_util import DockerUtils

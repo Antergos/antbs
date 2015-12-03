@@ -51,7 +51,6 @@ class Singleton(RedisObject):
 
 
 class ServerStatus(Singleton):
-
     """
 
     :param args:
@@ -62,14 +61,15 @@ class ServerStatus(Singleton):
         super(ServerStatus, self).__init__()
         super(ServerStatus, self).__namespaceinit__('status', '')
 
-        self.key_lists = dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
-                                            'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                                            'docker_password', 'gpg_key', 'gpg_password', 'wp_password'],
-                              redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
-                              redis_string_int=['building_num'],
-                              redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                                          'hook_queue'],
-                              redis_zset=['all_packages', 'iso_pkgs'])
+        self.key_lists = dict(
+            redis_string=['current_status', 'now_building', 'container', 'github_token',
+                          'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                          'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
+                          'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key', 'sp_app'],
+            redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+            redis_string_int=['building_num'],
+            redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
+                        'hook_queue'], redis_zset=['all_packages', 'iso_pkgs'])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
@@ -93,7 +93,7 @@ class ServerStatus(Singleton):
             self.iso_building = False
 
 
-class Timeline(RedisObject):
+class TimelineEvent(RedisObject):
     """
 
     :param msg:
@@ -106,19 +106,17 @@ class Timeline(RedisObject):
         if (not msg or not tl_type) and not event_id:
             raise AttributeError
 
-        super(Timeline, self).__init__()
+        super(TimelineEvent, self).__init__()
 
         the_id = event_id
         if not event_id:
             the_id = db.incr('antbs:misc:event_id:next')
 
-        super(Timeline, self).__namespaceinit__('timeline', the_id)
+        super(TimelineEvent, self).__namespaceinit__('timeline', the_id)
 
         self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                              redis_string_int=['event_id', 'tl_type'],
-                              redis_string_bool=[],
-                              redis_list=['packages'],
-                              redis_zset=[])
+                              redis_string_int=['event_id', 'tl_type'], redis_string_bool=[],
+                              redis_list=['packages'], redis_zset=[])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 

@@ -48,7 +48,7 @@ import time
 from multiprocessing import Process
 import package
 from rq import Connection, Queue, get_current_job
-from utils.server_status import status, Timeline
+from utils.server_status import status, TimelineEvent
 import build_obj
 import utils.sign_pkgs as sign_pkgs
 
@@ -344,7 +344,8 @@ def build_pkg_handler():
         logger.info('All builds completed.')
 
 
-def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname=None):
+def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname=None,
+                     is_action=False, action=None, action_pkg=None):
     """
 
     :param rev_result:
@@ -353,7 +354,6 @@ def update_main_repo(rev_result=None, bld_obj=None, is_review=False, rev_pkgname
     :param rev_pkgname:
     :return:
     """
-    logger.debug('update_main_repo fired! %s', rev_result)
     if rev_result:
         repo = 'antergos'
         repodir = 'main'
@@ -502,7 +502,7 @@ def process_and_save_build_metadata(pkg_obj=None):
     build_id = bld_obj.bnum
     tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s-%s</strong> started.' % \
             (build_id, build_id, pkg_obj.name, pkg_obj.version_str)
-    Timeline(msg=tlmsg, tl_type=3)
+    TimelineEvent(msg=tlmsg, tl_type=3)
     pkg_obj.builds.append(build_id)
     run_docker_clean(pkg_obj.name)
 
@@ -698,14 +698,14 @@ def build_package(pkg=None):
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
             bld_obj.bnum, bld_obj.bnum, pkg_obj.name
         )
-        Timeline(msg=tlmsg, tl_type=4)
+        TimelineEvent(msg=tlmsg, tl_type=4)
         completed = status.completed
         completed.rpush(bld_obj.bnum)
         bld_obj.review_status = 'pending'
     else:
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (
             bld_obj.bnum, bld_obj.bnum, pkg_obj.name)
-        Timeline(msg=tlmsg, tl_type=5)
+        TimelineEvent(msg=tlmsg, tl_type=5)
         bld_obj.failed = True
 
     bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -823,14 +823,14 @@ def build_iso(pkg_obj=None):
         bld_obj.completed = True
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
             build_id, build_id, pkg_obj.name)
-        Timeline(msg=tlmsg, tl_type=4)
+        TimelineEvent(msg=tlmsg, tl_type=4)
         completed = status.completed
         completed.rpush(bld_obj.bnum)
     else:
         bld_obj.failed = True
         bld_obj.completed = False
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (build_id, build_id, pkg_obj.name)
-        Timeline(msg=tlmsg, tl_type=5)
+        TimelineEvent(msg=tlmsg, tl_type=5)
         failed = status.failed
         failed.rpush(build_id)
 

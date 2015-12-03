@@ -44,7 +44,7 @@ import build_pkg as builder
 from utils.redis_connection import db
 import utils.logging_config as logconf
 import package as package
-from utils.server_status import status, Timeline
+from utils.server_status import status, TimelineEvent
 
 logger = logconf.logger
 
@@ -339,7 +339,7 @@ class Webhook(object):
                         if len(the_pkgs) > 1:
                             html.append('</ul>')
                         the_pkgs_str = ''.join(html)
-                        tl_event = Timeline(
+                        tl_event = TimelineEvent(
                             msg='Webhook triggered by <strong>%s.</strong> Packages added to the build queue: %s' % (
                                 source, the_pkgs_str), tl_type=tltype, packages=the_pkgs)
                         p_obj = package.Package(p)
