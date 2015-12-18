@@ -489,7 +489,7 @@ class RedisObject(object):
 
     def __getattribute__(self, attrib):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build', 'key', 'full_key',
-                     'prefix', 'pkgbuild']
+                     'prefix']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__getattribute__(attrib)
@@ -514,7 +514,7 @@ class RedisObject(object):
 
     def __setattr__(self, attrib, value, score=None):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build', 'key', 'full_key',
-                     'prefix', 'pkgbuild']
+                     'prefix']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super(RedisObject, self).__setattr__(attrib, value)
