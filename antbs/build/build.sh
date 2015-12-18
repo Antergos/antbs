@@ -52,6 +52,13 @@ function setup_environment() {
 	if [[ -f /pkg/PKGBUILD ]]; then
 
 		source /pkg/PKGBUILD && export PKGNAME="${pkgname}"
+
+		if [[ "${_is_metapkg}" = 'yes' ]]; then
+			NODEPS='-d'
+		else
+			NODEPS=''
+		fi
+
 		chmod -R a+rw /pkg
 		cd /pkg
 
@@ -253,7 +260,7 @@ function build_32bit_pkg() {
 	check_pkg_sums 32bit
 	cd /32bit
 
-	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -smfL --noconfirm --noprogressbar --needed" 2>&1 && \
+	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -s -m -f -L ${NODEPS} --noconfirm --noprogressbar --needed" 2>&1 && \
       cp /32build/root/pkg/*-i686.pkg.* /staging/i686 && return 0; } || return 1
 
 }
@@ -275,7 +282,7 @@ function try_build() {
 		cd /pkg
 		print2log 'UPDATING SOURCE CHECKSUMS';
 		check_pkg_sums &&
-		{ sudo -u antbs makepkg -smfL --noconfirm --noprogressbar --needed 2>&1 && copy_any && return 0; } || return 1
+		{ sudo -u antbs makepkg -s -m -f -L ${NODEPS} --noconfirm --noprogressbar --needed 2>&1 && copy_any && return 0; } || return 1
 
 	fi
 

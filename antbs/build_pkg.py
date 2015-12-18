@@ -192,8 +192,7 @@ def process_package_queue():
             status.hook_queue.remove(pkg_obj.name)
             if 'cnchi-dev' != pkg:
                 logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
-            else:
-                continue
+            continue
 
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
@@ -275,12 +274,16 @@ def handle_hook():
 
     else:
         p = status.hook_queue.lpop()
-        if p not in status.queue:
+        if p and p not in status.queue:
             status.queue.rpush(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
 
     if saved_status and not status.idle:
         status.current_status = saved_status
+    elif 'Determining build order based on package dependencies.' == status.current_status:
+        status.idle = True
+        status.current_status = 'Idle.'
+
 
 
 def build_pkg_handler():
@@ -433,6 +436,14 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         return
     # proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
     # output = iter(proc.stdout.readline, '')
+    if 'firefox-kde' == bld_obj.name:
+        line = 'Skipping log output capture for %s.' % bld_obj.name
+        logger.info(line)
+        db.publish('build-output', line)
+        db.set('build_log_last_line', line)
+        doc.wait(container)
+        return
+
     output = doc.logs(container=container, stream=True)
     nodup = set()
     content = []

@@ -45,7 +45,7 @@ GITLAB_TOKEN = status.gitlab_token
 class PackageMeta(RedisObject):
     """
     This is the base class for ::class:`Package`. It initalizes the fields for
-    the package metadata that is stored in the database. You should not this
+    the package metadata that is stored in the database. You should not use this
     class directly.
 
     """
@@ -62,7 +62,8 @@ class PackageMeta(RedisObject):
                               'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
                               'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
                               'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
-                redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso'],
+                redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
+                                   'is_metapkg'],
                 redis_string_int=['pkg_id'],
                 redis_list=['allowed_in', 'builds', 'tl_events'],
                 redis_zset=['depends', 'groups', 'makedepends']))
@@ -127,6 +128,12 @@ class Package(PackageMeta):
                 setattr(self, 'autosum', True)
 
             self.determine_pbpath()
+
+            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
+                setattr(self, 'is_metapkg', True)
+
+        if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
+            setattr(self, 'is_metapkg', True)
 
         self.pkgbuild = ''
 
@@ -340,7 +347,7 @@ class Package(PackageMeta):
         """
         changed = {}
         old_vals = {}
-        if self.name not in ['scudcloud', 'yaourt', 'package-query']:
+        if self.name not in ['scudcloud']:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 old_val = str(getattr(self, key))
                 old_vals[key] = old_val
@@ -363,6 +370,7 @@ class Package(PackageMeta):
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
         version = changed.get('pkgver', self.pkgver)
+        logger.info(version)
 
         if changed.get('epoch', False):
             version = changed['epoch'] + ':' + version

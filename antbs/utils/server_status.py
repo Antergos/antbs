@@ -66,25 +66,16 @@ class ServerStatus(Singleton):
                           'gitlab_token', 'building_start', 'building_num', 'docker_user',
                           'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
                           'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key', 'sp_app'],
-            redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+            redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal', ],
             redis_string_int=['building_num'],
             redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                        'hook_queue'], redis_zset=['all_packages', 'iso_pkgs'])
+                        'hook_queue'],
+            redis_zset=['all_packages', 'iso_pkgs', 'repos'])
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self:
-            for key in self.all_keys:
-                if key in self.key_lists['redis_string']:
-                    setattr(self, key, '')
-                elif key in self.key_lists['redis_string_bool']:
-                    setattr(self, key, False)
-                elif key in self.key_lists['redis_string_int']:
-                    setattr(self, key, 0)
-                elif key in self.key_lists['redis_list']:
-                    setattr(self, key, RedisList.as_child(self, key, str))
-                elif key in self.key_lists['redis_zset']:
-                    setattr(self, key, RedisZSet.as_child(self, key, str))
+            self.__keysinit__()
             self.status = True
             self.current_status = 'Idle'
             self.idle = True

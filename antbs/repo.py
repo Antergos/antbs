@@ -34,7 +34,7 @@ import glob
 import tarfile
 from utils.logging_config import logger
 from utils.server_status import status
-from utils.redis_connection import RedisObject, RedisZSet, RedisList, db
+from utils.redis_connection import RedisObject
 
 
 class Repo(RedisObject):
@@ -56,13 +56,15 @@ class Repo(RedisObject):
             n/a
 
         (int)
-            pkg_count: Total number of packages in the repo.
+            pkg_count_alpm: Total number of packages in the repo (as per alpm database).
+            pkg_count_fs: Total number of packages in the repo (files found on server).
 
         (list)
             n/a
 
         (set)
-            all_pkgs: List of the packages in the repo (pkg names)
+            pkgs_fs: List of the package files in the repo's directory on the server (pkg names)
+            pkgs_alpm: List of packages that are in the repo's alpm database file (this is what pacman sees).
 
     """
 
@@ -76,50 +78,53 @@ class Repo(RedisObject):
         self.key_lists.update(dict(
                 redis_string=['name', 'path'],
                 redis_string_bool=[],
-                redis_string_int=['pkg_count'],
+                redis_string_int=['pkg_count_alpm', 'pkg_count_fs'],
                 redis_list=[],
-                redis_zset=['all_pkgs', 'unexpected_pkgs']))
+                redis_zset=['pkgs_fs', 'pkgs_alpm']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not self:
+        if not self.name:
             self.__keysinit__()
             self.name = name
-            if not self.path:
-                self.path = path
+            self.path = path
             self.sync_with_pacman_db()
+            status.repos.add(name)
 
-    def sync_with_pacman_db(self):
+        self.sync_with_alpm_db()
+        self.sync_with_filesystem()
+
+    def sync_with_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')
-        dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
         pkgs = set(p for p in os.listdir(repodir) if '.pkg.' in p and not p.endswith('.sig'))
-        print(pkgs)
-        parsed_pkgs = dict()
+        parsed_pkgs = []
 
         for pkg in pkgs:
-            print(pkg)
             pkg = os.path.basename(pkg)
-            print(pkg)
             try:
                 pkg, version, rel, suffix = pkg.rsplit('-', 3)
-                print(pkg, version, rel, suffix)
             except ValueError:
                 logger.error("unexpected pkg: " + pkg)
                 continue
             pkgver = version + '-' + rel
-            try:
-                parsed_pkgs[pkg].append((pkg, pkgver))
-            except KeyError:
-                parsed_pkgs[pkg] = [(pkg, pkgver)]
+            parsed_pkgs.append((pkg, pkgver))
+
+        self.pkgs_fs = parsed_pkgs
+        self.pkg_count_fs = len(parsed_pkgs)
+
+    def sync_with_alpm_db(self):
+        repodir = os.path.join(self.path, 'x86_64')
+        dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
+        pkgs = []
 
         with tarfile.open(dbfile, 'r') as pacman_db:
             for pkg in pacman_db.getnames():
                 pkg = pkg.split('/', 1)[0]
-                self.all_pkgs.add(pkg.rsplit('-', 2)[0])
+                pkgname, ver = pkg.rsplit('-', 2)
+                pkgs.append((pkgname, ver))
 
-        unexpected = sorted([x[0] for x in parsed_pkgs.values() if x[0] not in self.all_pkgs])
-
-        setattr(self, 'unexpected_pkgs', unexpected)
+        self.pkgs_alpm = pkgs
+        self.pkg_count_alpm = len(pkgs)
 
 
 
