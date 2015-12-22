@@ -972,6 +972,8 @@ def build_pkg_now():
                         logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
                         return redirect(redirect_url())
 
+                if 'cnchi-dev' == pkgname:
+                    db.set('CNCHI-DEV-OVERRIDE', True)
                 status.hook_queue.rpush(pkgname)
                 hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 tl_event(

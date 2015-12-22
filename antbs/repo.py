@@ -40,7 +40,7 @@ from utils.redis_connection import RedisObject
 class Repo(RedisObject):
     """
     This class represents a "repo" throughout this application. It is used to
-    get and set metadata about repos that this application manages from/to the database.
+    get and set metadata about the repos that this application manages from/to the database.
 
     Args:
         :param name: (str) The name of the repo (as it would be configured in pacman.conf).
@@ -91,8 +91,8 @@ class Repo(RedisObject):
             self.sync_with_pacman_db()
             status.repos.add(name)
 
-        self.sync_with_alpm_db()
-        self.sync_with_filesystem()
+        #self.sync_with_alpm_db()
+        #self.sync_with_filesystem()
 
     def sync_with_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')

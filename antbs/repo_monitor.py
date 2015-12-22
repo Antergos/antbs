@@ -38,7 +38,7 @@ from gitlab import Gitlab
 import json
 import requests
 import package
-from iso import WordPressBridge
+import iso
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
@@ -83,36 +83,37 @@ def check_for_new_items():
         add_to_build_queue(build_pkgs)
 
     if db.exists('antbs:misc:iso-release:do_check'):
-        check_mirror_for_iso()
+        version = db.get('antbs:misc:iso-release:do_check')
+        check_mirror_for_iso(version)
 
 
-def check_mirror_for_iso():
+def check_mirror_for_iso(version):
     synced = []
     for iso_pkg in status.iso_pkgs:
-        iso = package.get_pkg_object(name=iso_pkg)
-        req = requests.head(iso.iso_url, allow_redirects=True)
+        iso_obj = package.get_pkg_object(name=iso_pkg)
+        req = requests.head(iso_obj.iso_url, allow_redirects=True)
 
         try:
             req.raise_for_status()
-            synced.append(iso)
+            synced.append(iso_obj)
         except Exception as err:
             logger.info(err)
 
     if len(synced) == 4:
         success = add_iso_versions_to_wordpress(synced)
         if success:
+            iso.clean_up_after_release(version)
             db.delete('antbs:misc:iso-release:do_check')
 
 
 def add_iso_versions_to_wordpress(iso_pkgs):
-    bridge = WordPressBridge(auth=(status.docker_user, status.wp_password))
-    success = True
+    bridge = iso.WordPressBridge(auth=(status.docker_user, status.wp_password))
+    success = []
     for iso_pkg in iso_pkgs:
-        bridge.add_new_iso_version(iso_pkg)
-        if not bridge.success:
-            success = False
+        success.append(bridge.add_new_iso_version(iso_pkg))
+        logger.info(success)
 
-    return success
+    return all(success)
 
 
 def add_to_build_queue(pkgs=None):

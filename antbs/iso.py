@@ -162,11 +162,12 @@ class WordPressBridge(object):
     def add_new_iso_version(self, iso_pkg_obj=None):
         if iso_pkg_obj is None:
             logger.error('iso cant be None')
-            return
+            return False
         else:
-            iso = iso_pkg_obj
+            iso_obj = iso_pkg_obj
+            logger.info('adding_new_iso_version: %s', iso_obj)
 
-        pid = self.post_id_map[iso.pkgname]
+        pid = self.post_id_map[iso_obj.pkgname]
         domain = 'antergos'
         query = 'json=get_nonce&controller=' + domain + '&method=handle_request'
         post_url = 'https://' + domain + '.com/?' + query
@@ -179,39 +180,50 @@ class WordPressBridge(object):
             req.raise_for_status()
             logger.info(req.text)
             req = req.json()
+            logger.info(req)
 
             if req.get('nonce', False):
                 nonce = req.get('nonce')
                 query = 'json=' + domain + '.handle_request&nonce='
                 post_url = 'https://' + domain + '.com/?' + query + nonce
-                req = session.post(post_url, data=dict(pid=pid, url=iso.iso_url,
-                                                       md5=iso.iso_md5, version=iso.pkgver))
+                req = session.post(post_url, data=dict(pid=pid, url=iso_obj.iso_url,
+                                                       md5=iso_obj.iso_md5, version=iso_obj.pkgver))
                 req.raise_for_status()
                 logger.info(req.text)
                 self.success = True
         except Exception as err:
             self.success = False
             logger.error(err)
+            return False
+
+        return True
 
 
 def clean_up_after_release(version):
     status.current_status = 'ISO Release: Cleaning up old files.'
     logger.debug(status.current_status)
-    all_files = os.listdir(RELEASE_DIR)
+    all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
     for f in all_files:
         if version not in f:
-            moved.append(f)
+            moved.append(os.path.basename(f))
             shutil.move(f, '/opt/old-iso-images')
 
-    all_old_files = os.listdir('/opt/old-iso-images')
+    old_imgs = '/opt/old-iso-images'
+    all_old_files = [os.path.join(old_imgs, f) for f in os.listdir(old_imgs)]
     for f in all_old_files:
-        if f not in moved:
+        if os.path.basename(f) not in moved:
             os.remove(f)
 
 
 def iso_release_job():
-    status.idle = False
+    saved_status = False
+    if not status.idle and 'Idle' not in status.current_status:
+        saved_status = status.current_status
+    else:
+        status.idle = False
+
+    status.current_status = 'Starting ISO Release Job...'
     iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
     version = db = None
     for name in iso_names:
@@ -238,9 +250,13 @@ def iso_release_job():
     if version and db:
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
-        db.set('antbs:misc:iso-release:do_check', True)
+        db.set('antbs:misc:iso-release:do_check', version)
 
-    status.idle = True
+    if saved_status and not status.idle:
+        status.current_status = saved_status
+    elif 'Starting ISO Release Job...' == status.current_status:
+        status.idle = True
+        status.current_status = 'Idle.'
 
 
 

@@ -26,6 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 pkg_deps="$*"
+DEPS=''
 
 
 
@@ -55,6 +56,7 @@ function setup_environment() {
 
 		if [[ "${_is_metapkg}" = 'yes' ]]; then
 			DEPS='-d'
+			print2log 'METAPKG DETECTED...'
 		else
 			DEPS='-s'
 		fi

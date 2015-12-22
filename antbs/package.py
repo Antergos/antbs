@@ -132,8 +132,8 @@ class Package(PackageMeta):
             if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
                 setattr(self, 'is_metapkg', True)
 
-        if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
-            setattr(self, 'is_metapkg', True)
+            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
+                setattr(self, 'is_metapkg', True)
 
         self.pkgbuild = ''
 
@@ -219,7 +219,7 @@ class Package(PackageMeta):
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
             repo = gh.repository('lots0logs', 'cnchi-dev')
-            repo.archive('zipball', zpath)
+            repo.archive('zipball', zpath, ref='playing')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
             return
@@ -358,7 +358,10 @@ class Package(PackageMeta):
 
             cnchiver = changed.get('pkgver', '')
             if 'cnchi-dev' == self.name and cnchiver and cnchiver[-1] not in [0, 5]:
-                return False
+                if not db.exists('CNCHI-DEV-OVERRIDE'):
+                    return False
+                else:
+                    db.delete('CNCHI-DEV-OVERRIDE')
 
             if not changed:
                 return self.version_str

@@ -406,7 +406,7 @@ class RedisObject(object):
 
         as_string = dict()
         for key in self.all_keys:
-            value = getattr(self, key)
+            value = getattr(self, key) if hasattr(self, key) else ''
             as_string[key] = value if isinstance(value, str) else value.__str__()
 
         return str(as_string)

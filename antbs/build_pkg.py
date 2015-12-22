@@ -193,6 +193,8 @@ def process_package_queue():
             if 'cnchi-dev' != pkg:
                 logger.error('pkgbuild path is not valid for %s', pkg_obj.name)
             continue
+        else:
+            pkg_obj.version_str = version
 
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
@@ -436,8 +438,8 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         return
     # proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
     # output = iter(proc.stdout.readline, '')
-    if 'firefox-kde' == bld_obj.name:
-        line = 'Skipping log output capture for %s.' % bld_obj.name
+    if 'firefox-kde' == bld_obj.pkgname:
+        line = 'Skipping log output capture for %s.' % bld_obj.pkgname
         logger.info(line)
         db.publish('build-output', line)
         db.set('build_log_last_line', line)
