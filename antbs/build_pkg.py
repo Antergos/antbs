@@ -180,7 +180,7 @@ def process_package_queue():
             db.delete('BUILD_REPO_LOCK')
         else:
             while not db.exists('BUILD_REPO_UPDATED') and db.exists('BUILD_REPO_LOCK'):
-                time.sleep(2)
+                time.sleep(1)
 
     for pkg in status.hook_queue:
         # logger.info(pkg)
@@ -198,7 +198,10 @@ def process_package_queue():
 
         logger.info('Updating pkgver in database for %s to %s' % (pkg_obj.name, version))
         status.current_status = 'Updating pkgver in database for %s to %s' % (pkg_obj.name, version)
+
         depends = pkg_obj.get_deps()
+        if depends:
+            all_deps.append(depends)
 
         if not pkg_obj.build_path:
             paths = [os.path.join('/opt/antergos-packages/', pkg),
@@ -224,9 +227,6 @@ def process_package_queue():
             src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
             dest = os.path.join('/opt/antergos-packages/', pkg)
             shutil.move(src, dest)
-
-        if depends:
-            all_deps.append(depends)
 
     return all_deps
 
@@ -270,22 +270,20 @@ def handle_hook():
         status.current_status = 'Check deps complete. Starting build container.'
         for p in topsort:
             status.hook_queue.remove(p)
-            if p not in status.queue:
-                status.queue.rpush(p)
-                build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+            status.hook_queue.append(p)
 
-    else:
-        p = status.hook_queue.lpop()
+    for p in status.hook_queue:
         if p and p not in status.queue:
             status.queue.rpush(p)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
+
+    db.set('antbs:misc:cache_buster:flag', True)
 
     if saved_status and not status.idle:
         status.current_status = saved_status
     elif 'Determining build order based on package dependencies.' == status.current_status:
         status.idle = True
         status.current_status = 'Idle.'
-
 
 
 def build_pkg_handler():
@@ -316,26 +314,20 @@ def build_pkg_handler():
 
         # TODO: Move this into its own method
         if build_result is not None:
-            completed = status.completed
-            failed = status.failed
+            run_docker_clean(pkgobj.pkgname)
+
             blds = pkgobj.builds
             total = len(blds)
             if total > 0:
-                success = len([x for x in blds if x in completed])
-                failure = len([x for x in blds if x in failed])
+                success = len([x for x in blds if x in status.completed])
+                failure = len([x for x in blds if x in status.failed])
                 if success > 0:
                     success = 100 * success / total
-                else:
-                    success = 0
                 if failure > 0:
                     failure = 100 * failure / total
-                else:
-                    failure = 0
+
                 pkgobj.success_rate = success
                 pkgobj.failure_rate = failure
-
-        if build_result:
-            run_docker_clean(pkgobj.pkgname)
 
     if not status.queue and not status.hook_queue:
         remove('/opt/antergos-packages')
@@ -663,6 +655,7 @@ def build_package(pkg=None):
         build_env.append('_ALEXPKG=False')
 
     hconfig = docker_utils.DockerUtils().create_pkgs_host_config(pkg_obj.build_path, result)
+    container = {}
     try:
         container = doc.create_container("antergos/makepkg",
                                          command="/makepkg/build.sh " + pkg_deps_str,
@@ -671,23 +664,21 @@ def build_package(pkg=None):
                                                   '/32build', '/result', '/var/cache/pacman_i686'],
                                          environment=build_env, cpuset='0-3', name=pkg_obj.name,
                                          host_config=hconfig)
-        if container.get('Warnings') and container.get('Warnings') != '':
+        if container.get('Warnings', False):
             logger.error(container.get('Warnings'))
     except Exception as err:
         logger.error('Create container failed. Error Msg: %s' % err)
         bld_obj.failed = True
-        return False
 
-    bld_obj.container = container.get('Id')
+    bld_obj.container = container.get('Id', '')
     status.container = bld_obj.container
 
     try:
         doc.start(container.get('Id'))
-        cont = bld_obj.container
         stream_process = Process(target=publish_build_ouput,
-                                 kwargs=dict(container=cont, bld_obj=bld_obj))
+                                 kwargs=dict(container=bld_obj.container, bld_obj=bld_obj))
         stream_process.start()
-        result = doc.wait(cont)
+        result = doc.wait(bld_obj.container)
         if result != 0:
             bld_obj.failed = True
             logger.error('Container %s exited. Return code was %s' % (pkg_obj.name, result))
@@ -698,13 +689,13 @@ def build_package(pkg=None):
     except Exception as err:
         logger.error('Start container failed. Error Msg: %s' % err)
         bld_obj.failed = True
-        return False
 
     repo_updated = False
     if bld_obj.completed:
         signed = sign_pkgs.sign_packages(bld_obj.pkgname)
         if signed:
             db.publish('build-output', 'Updating staging repo database..')
+            status.current_status = 'Updating staging repo database..'
             repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
 
     if repo_updated:
@@ -712,8 +703,7 @@ def build_package(pkg=None):
             bld_obj.bnum, bld_obj.bnum, pkg_obj.name
         )
         TimelineEvent(msg=tlmsg, tl_type=4)
-        completed = status.completed
-        completed.rpush(bld_obj.bnum)
+        status.completed.rpush(bld_obj.bnum)
         bld_obj.review_status = 'pending'
     else:
         tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (
@@ -724,11 +714,16 @@ def build_package(pkg=None):
     bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
     if not bld_obj.failed:
+        pkg_obj = package.get_pkg_object(bld_obj.pkgname)
+        last_build = pkg_obj.builds[-2]
+        last_bld_obj = build_obj.get_build_object(bnum=last_build)
+        if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
+            last_bld_obj.review_status = 'skipped'
+
         db.set('antbs:misc:cache_buster:flag', True)
         return True
 
-    failed = status.failed
-    failed.rpush(build_id)
+    status.failed.rpush(build_id)
     return False
 
 

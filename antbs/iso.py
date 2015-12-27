@@ -204,16 +204,21 @@ def clean_up_after_release(version):
     logger.debug(status.current_status)
     all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
+
+    if len(all_files) <= 16:
+        return
     for f in all_files:
-        if version not in f:
+        files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
+        if version not in f and len(files) > 16:
             moved.append(os.path.basename(f))
             shutil.move(f, '/opt/old-iso-images')
 
     old_imgs = '/opt/old-iso-images'
     all_old_files = [os.path.join(old_imgs, f) for f in os.listdir(old_imgs)]
-    for f in all_old_files:
-        if os.path.basename(f) not in moved:
-            os.remove(f)
+    if len(moved) > 0:
+        for f in all_old_files:
+            if os.path.basename(f) not in moved:
+                os.remove(f)
 
 
 def iso_release_job():

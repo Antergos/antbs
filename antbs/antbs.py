@@ -337,6 +337,7 @@ def cache_buster():
     :return:
     """
     if db.exists('antbs:misc:cache_buster:flag'):
+        cache.delete_memoized('homepage')
         db.delete('antbs:misc:cache_buster:flag')
         return True
     elif user.is_authenticated():
