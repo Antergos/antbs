@@ -272,9 +272,10 @@ def handle_hook():
             status.hook_queue.remove(p)
             status.hook_queue.append(p)
 
-    for p in status.hook_queue:
-        if p and p not in status.queue:
-            status.queue.rpush(p)
+    for p in range(len(status.hook_queue)):
+        pkg = status.hook_queue.lpop()
+        if pkg and pkg not in status.queue:
+            status.queue.rpush(pkg)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
 
     db.set('antbs:misc:cache_buster:flag', True)
