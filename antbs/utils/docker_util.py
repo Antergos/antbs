@@ -211,7 +211,7 @@ class DockerUtils(object):
 
         archiso = self.build_mkarchiso()
 
-        if not archiso or archiso is None:
+        if not archiso:
             return False
 
         db.setex('antbs:docker-images:mkarchiso:built-today', 84600, 'True')

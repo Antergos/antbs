@@ -262,7 +262,7 @@ $(function(){
     }
     
     /*Porlets Actions*/
-    $('.minimize').click(function(e){
+    $('.minimize:not(.ant-disabled)').click(function(e){
       var h = $(this).parents(".header");
       var c = h.next('.content');
       var p = h.parent();
@@ -274,7 +274,7 @@ $(function(){
       e.preventDefault();
     });
     
-    $('.refresh').click(function(e){
+    $('.refresh:not(.ant-disabled)').click(function(e){
       var h = $(this).parents(".header");
       var p = h.parent();
       var loading = $('<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>');
@@ -288,7 +288,7 @@ $(function(){
       e.preventDefault();
     });
     
-    $('.close-down').click(function(e){
+    $('.close-down:not(.ant-disabled)').click(function(e){
       var h = $(this).parents(".header");
       var p = h.parent();
       

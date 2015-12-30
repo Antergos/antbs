@@ -936,13 +936,11 @@ def build_pkg_now():
         dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
-        pexists = status.all_packages
-        pexists = pexists.ismember(pkgname)
+        pexists = status.all_packages.ismember(pkgname)
         if not pexists:
             try:
-                package.Package(name=pkgname)
-                if os.path.exists(
-                                '/var/tmp/antergos-packages/' + pkgname) or 'antergos-iso' in pkgname:
+                pkg = package.get_pkg_object(name=pkgname)
+                if pkg and pkg.pkgver:
                     pexists = True
             except Exception:
                 pass
@@ -963,15 +961,11 @@ def build_pkg_now():
                       category='error')
             else:
                 if '-x86_64' in pkgname or '-i686' in pkgname:
-                    if not status.iso_building:
-                        status.iso_flag = True
-                        if 'minimal' in pkgname:
-                            status.iso_minimal = True
-                        else:
-                            status.iso_minimal = False
+                    status.iso_flag = True
+                    if 'minimal' in pkgname:
+                        status.iso_minimal = True
                     else:
-                        logger.info('RATE LIMIT ON ANTERGOS ISO IN EFFECT')
-                        return redirect(redirect_url())
+                        status.iso_minimal = False
 
                 if 'cnchi-dev' == pkgname:
                     db.set('CNCHI-DEV-OVERRIDE', True)

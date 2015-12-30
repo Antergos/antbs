@@ -37,14 +37,46 @@ from utils.logging_config import logger
 
 class BuildObject(RedisObject):
     """
-    This class represents a "build" object throughout the build server app. It is used to
-    get and set build data to the database.
+    This class represents a "build" object throughout the build server app. It is used
+    to get and set build data to the database.
+
+    Args:
+        pkg_obj (Package): Create a new build for this package.
+        bnum (int): Get an existing build identified by its `bnum`.
+
+    Attributes:
+        (str)
+            pkgname, pkgver, epoch, pkgrel: self explanatory (see `man PKGBUILD`)
+            version_str: The package's version including pkgrel for displaying on the frontend.
+            path: Absolute path to the package's directory (subdir of antergos-packages directory)
+            build_path: Absolute path to the the package's build directory.
+            start_str: The build's start timestamp.
+            end_str: The build's end timestamp.
+            container: The build's Docker container ID.
+            review_status: The build's developer review status.
+            review_dev: The developer who reviewed the build result.
+            review_date: The review's timestamp.
+            log_str: The build log, fully processed into HTML for display on the front-end.
+
+
+        (bool)
+            failed: The build failed (Only one of `failed` and `completed` can be `True`)
+            completed: The build completed (Only one of `failed` and `completed` can be `True`)
+
+        (int)
+            bnum: ID assigned to the build.
+            pkg_id: ID of the package that this build is for.
+
+        (list)
+            log: The build log, unprocessed, stored as lines in a list.
+
+    Raises:
+        ValueError: If both `pkg_obj` and `bnum` are Falsey.
 
     """
-
     def __init__(self, pkg_obj=None, bnum=None):
         if not pkg_obj and not bnum:
-            raise AttributeError
+            raise ValueError
 
         super(BuildObject, self).__init__()
 
@@ -54,54 +86,60 @@ class BuildObject(RedisObject):
 
         super(BuildObject, self).__namespaceinit__('build', next_bnum)
 
-        self.key_lists = dict(
-            redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path', 'start_str', 'end_str',
-                          'version_str', 'container', 'review_status', 'review_dev', 'review_date', 'log_str'],
-            redis_string_bool=['failed', 'completed'],
-            redis_string_int=['pkg_id', 'bnum'],
-            redis_list=['log'],
-            redis_zset=[])
+        self.key_lists.update(dict(
+                redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
+                              'start_str', 'end_str',
+                              'version_str', 'container', 'review_status', 'review_dev',
+                              'review_date', 'log_str'],
+                redis_string_bool=['failed', 'completed'],
+                redis_string_int=['pkg_id', 'bnum'],
+                redis_list=['log'],
+                redis_zset=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not bnum:
-            for key in self.all_keys:
-                if key in self.key_lists['redis_string']:
-                    value = getattr(pkg_obj, key, '')
-                    setattr(self, key, value)
-                elif key in self.key_lists['redis_string_bool']:
-                    value = getattr(pkg_obj, key, False)
-                    setattr(self, key, value)
-                elif key in self.key_lists['redis_string_int']:
-                    value = getattr(pkg_obj, key, 0)
-                    setattr(self, key, value)
-                elif key in self.key_lists['redis_list']:
-                    setattr(self, key, RedisList.as_child(self, key, str))
-                elif key in self.key_lists['redis_zset']:
-                    setattr(self, key, RedisZSet.as_child(self, key, str))
+            self.__keysinit__()
             self.bnum = next_bnum
             self.failed = False
             self.completed = False
 
+            for key in pkg_obj.all_keys:
+                if key in self.all_keys:
+                    setattr(self, key, getattr(pkg_obj, key))
+
     @staticmethod
     def datetime_to_string(dt):
         """
+        Converts a datetime to a string.
 
-        :param dt:
-        :return:
+        Args:
+            dt (datetime.datetime): `datetime` to be converted.
+
+        Returns:
+            str: The datetime string.
+
         """
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
 
 def get_build_object(pkg_obj=None, bnum=None):
     """
+    Gets an existing build or creates a new one.
 
-    :param pkg_obj:
-    :param bnum:
-    :return: :raise AttributeError:
+    Args:
+        pkg_obj (Package): Create a new build for this package.
+        bnum (int): Get an existing build identified by `bnum`.
+
+    Returns:
+        BuildObject: A fully initiallized `BuildObject`.
+
+    Raises:
+        ValueError: If both `pkg_obj` and `bnum` are Falsey.
+
     """
     if not pkg_obj and not bnum:
         logger.debug('bnum or pkg_obj is required to get build object.')
-        raise AttributeError
+        raise ValueError
     bld_obj = BuildObject(pkg_obj=pkg_obj, bnum=bnum)
     return bld_obj

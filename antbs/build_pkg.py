@@ -491,10 +491,18 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
 
 def process_and_save_build_metadata(pkg_obj=None):
     """
+    Creates a new build for a package, initializes the build data, and returns a build object.
 
-    :param pkg_obj:
-    :return: :raise AttributeError:
+    Args:
+        pkg_obj (Package): Package object for the package being built.
+
+    Returns:
+        BuildObject: A build object.
+
+    Raises:
+        AttributeError: If `pkg_obj` is Falsey.
     """
+
     if not pkg_obj:
         raise AttributeError
 
@@ -640,7 +648,7 @@ def build_package(pkg=None):
     pkg_obj = package.get_pkg_object(name=pkg)
 
     in_dir_last = len([name for name in os.listdir(result)])
-    db.set('pkg_count', in_dir_last)
+    db.setex('pkg_count', 3600, in_dir_last)
     pkg_deps_str = ' '.join(pkg_obj.depends) if pkg_obj.depends else ''
 
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
@@ -680,9 +688,9 @@ def build_package(pkg=None):
                                  kwargs=dict(container=bld_obj.container, bld_obj=bld_obj))
         stream_process.start()
         result = doc.wait(bld_obj.container)
-        if result != 0:
+        if int(result) != 0:
             bld_obj.failed = True
-            logger.error('Container %s exited. Return code was %s' % (pkg_obj.name, result))
+            logger.error('Container %s exited with a non-zero return code. Return code was %s' % (pkg_obj.name, result))
         else:
             logger.info('Container %s exited. Return code was %s' % (pkg_obj.name, result))
             bld_obj.completed = True
@@ -693,6 +701,7 @@ def build_package(pkg=None):
 
     repo_updated = False
     if bld_obj.completed:
+        logger.debug('bld_obj.completed!')
         signed = sign_pkgs.sign_packages(bld_obj.pkgname)
         if signed:
             db.publish('build-output', 'Updating staging repo database..')
@@ -790,7 +799,7 @@ def build_iso(pkg_obj=None):
     try:
         iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
                                              name=pkg_obj.name, host_config=hconfig, cpuset='0-3')
-        if iso_container.get('Warnings') and iso_container.get('Warnings') != '':
+        if iso_container.get('Warnings', False) and iso_container.get('Warnings') != '':
             logger.error(iso_container.get('Warnings'))
     except Exception as err:
         logger.error('Create container failed. Error Msg: %s' % err)

@@ -132,9 +132,6 @@ class Package(PackageMeta):
             if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
                 setattr(self, 'is_metapkg', True)
 
-            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
-                setattr(self, 'is_metapkg', True)
-
         self.pkgbuild = ''
 
     def get_from_pkgbuild(self, var=None):
