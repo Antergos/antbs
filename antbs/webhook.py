@@ -47,6 +47,7 @@ import package as package
 from utils.server_status import status, TimelineEvent
 
 logger = logconf.logger
+empty_dict = dict()
 
 with Connection(db):
     queue = Queue('hook_queue')
@@ -77,31 +78,51 @@ def rm_file_or_dir(src):
 
 class Webhook(object):
     """
+    This class handles the processing of all Webhooks.
 
-    :param request:
+    Args:
+        request (dict): The request dict (from Flask)
+
+    Attributes:
+       can_process (bool): The request is from an authorized sender.
+       is_monitor (bool): The request is internel (repo_monitor.py).
+       is_cnchi (bool): The request is from Cnchi Installer.
+       request (dict): The Flask request.
+       is_manual (bool): The request was made by a human.
+       manual_trans_index (int): The db list index of the github trans that is to be processed.
+       is_numix (bool): The request is for a numix icon repo.
+       is_github (bool): The request is from Github.
+       is_gitlab (bool): The request is from Gitlab.
+       changes (list): Packages for which changes were made to their PKGBUILD in git commit.
+       repo (string): The name of the github repo that triggered the webhook.
+       payload (dict): The webhook data payload.
+       full_name (string): The github repo's full name. eg. "org/repo"
+       pusher (string): The name of the pusher.
+       commits (list): List of commits in the payload.
+       result (string): Result string to send as response to the request.
+       building (string): The name of the package being built if a build is running currently.
+
     """
-
-    def __init__(self, request=None):
+    def __init__(self, request=empty_dict):
         self.can_process = False
         self.is_monitor = False
         self.is_cnchi = False
         try:
             self.request = request.method
-        except AttributeError:
+        except (AttributeError, KeyError):
             self.request = False
             self.is_monitor = True
-        if self.request is None or db is None or queue is None:
-            logger.error('Cant process new webhook because request or db is None.')
+        if self.request is False or db is None or queue is None:
+            logger.error('Cant process webhook because request or db or queue is None.')
         elif self.request or self.is_monitor:
             self.can_process = True
             self.request = request
             self.is_manual = False
-            self.manual_transaction_index = None
+            self.manual_trans_index = None
             self.is_numix = False
             self.is_github = False
             self.is_gitlab = False
             self.changes = []
-            self.phab_payload = False
             self.repo = 'antergos-packages'
             self.payload = None
             self.full_name = None
@@ -135,11 +156,12 @@ class Webhook(object):
                     self.result = 'Nothing to see here, move along ...'
 
     def is_from_authorized_sender(self):
-        # Determine if the request sender is authorized to send us webhooks.
         """
+        Determine if the request sender is authorized to send us webhooks.
 
+        Returns:
+            bool: The request is from an authorized sender.
 
-        :return:
         """
         if self.is_monitor is True:
             return True
@@ -149,7 +171,7 @@ class Webhook(object):
         cnchi_version = self.request.headers.get('X-Cnchi-Installer', False)
         if manual and manual > 0 and self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
             self.is_manual = True
-            self.manual_transaction_index = int(manual)
+            self.manual_trans_index = int(manual)
         elif cnchi and cnchi == db.get('CNCHI_TOKEN_NEW') and cnchi_version:
             self.is_cnchi = cnchi_version
         elif '' != gitlab and 'Push Hook' == gitlab:
@@ -184,13 +206,7 @@ class Webhook(object):
         return True
 
     def process_manual(self):
-
-        """
-
-
-        :return:
-        """
-        index = self.manual_transaction_index
+        index = self.manual_trans_index
         try:
             key = db.lrange('antbs:github:payloads:index', -index, -index)
             logger.info(key)
@@ -206,10 +222,6 @@ class Webhook(object):
         self.repo = 'antergos-packages'
 
     def process_github(self):
-        """
-
-
-        """
         if not self.is_manual:
             self.payload = json.loads(self.request.data)
             # Save payload in the database temporarily in case we need it later.
@@ -232,11 +244,11 @@ class Webhook(object):
 
         if self.repo == 'numix-icon-theme':
             rate_limit = True
-            if 'numix-icon-theme' not in self.the_queue and 'numix-icon-theme' != self.building:
+            if 'numix-icon-theme' not in status.queue and 'numix-icon-theme' != status.building:
                 if not db.exists('numix-commit-flag'):
                     self.changes.append(['numix-icon-theme'])
                     self.is_numix = True
-                    db.setex('numix-commit-flag', 1200, 'True')
+                    db.setex('numix-commit-flag', 3600, 'True')
                     rate_limit = False
 
             if rate_limit:
@@ -250,45 +262,17 @@ class Webhook(object):
             self.changes.append(['cnchi-dev'])
             self.repo = 'antergos-packages'
             self.is_cnchi = True
-        # idle = db.get('idle')
-        #     working = db.exists('creating-cnchi-archive-from-dev')
-        #     check = 'cnchi-dev' != self.building or idle == "True"
-        #     if not working and 'cnchi-dev' not in self.the_queue and check:
-        #         db.set('creating-cnchi-archive-from-dev', 'True')
-        #         cnchi_git = 'https://github.com/lots0logs/cnchi-dev.git'
-        #         cnchi_clone = '/tmp/cnchi'
-        #         git = '/tmp/cnchi/.git'
-        #         cnchi_tar_tmp = '/tmp/cnchi.tar'
-        #         cnchi_tar = '/srv/antergos.org/cnchi.tar'
-        #
-        #         for f in [cnchi_clone, cnchi_tar, cnchi_tar_tmp]:
-        #             if os.path.exists(f):
-        #                 rm_file_or_dir(f)
-        #         try:
-        #             subprocess.check_call(['git', 'clone', cnchi_git, 'cnchi'], cwd='/tmp')
-        #             shutil.rmtree(git)
-        #             subprocess.check_call(['tar', '-cf', '/tmp/cnchi.tar', '-C', '/tmp', 'cnchi'])
-        #             shutil.copy('/tmp/cnchi.tar', '/srv/antergos.org/')
-        #         except subprocess.CalledProcessError as err:
-        #             logger.error(err.output)
-        #
-        #         db.delete('creating-cnchi-archive-from-dev')
+
         elif self.pusher != "antbs":
             for commit in self.commits:
                 self.changes.append(commit['modified'])
                 self.changes.append(commit['added'])
 
     def process_changes(self):
-
-        """
-
-
-        """
         if self.repo == "antergos-packages":
             logger.info("Build hook triggered. Updating build queue.")
             has_pkgs = False
             no_dups = []
-            # logger.info(self.changes)
 
             for changed in self.changes:
                 # logger.info(changed)

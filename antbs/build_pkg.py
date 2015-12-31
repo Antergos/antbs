@@ -728,7 +728,7 @@ def build_package(pkg=None):
         last_build = pkg_obj.builds[-2]
         last_bld_obj = build_obj.get_build_object(bnum=last_build)
         if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
-            last_bld_obj.review_status = 'skipped'
+            last_bld_obj.review_status = 'skip'
 
         db.set('antbs:misc:cache_buster:flag', True)
         return True
