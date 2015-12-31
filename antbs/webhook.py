@@ -110,9 +110,9 @@ class Webhook(object):
         try:
             self.request = request.method
         except (AttributeError, KeyError):
-            self.request = False
+            self.request = True
             self.is_monitor = True
-        if self.request is False or db is None or queue is None:
+        if not self.request or db is None or queue is None:
             logger.error('Cant process webhook because request or db or queue is None.')
         elif self.request or self.is_monitor:
             self.can_process = True
