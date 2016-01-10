@@ -3,7 +3,7 @@
 #
 # package.py
 #
-# Copyright 2013-2015 Antergos
+# Copyright © 2013-2016 Antergos
 #
 # This file is part of The Antergos Build Server, (AntBS).
 #
@@ -18,9 +18,7 @@
 # GNU General Public License for more details.
 #
 # You should have received a copy of the GNU General Public License
-# along with AntBS; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+# along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 """ Package Class """
 
@@ -117,6 +115,7 @@ class Package(PackageMeta):
             # Package is not in the database, so it must be new. Let's initialize it.
             self.__keysinit__()
             setattr(self, 'pkgname', name)
+            setattr(self, 'name', name)
             next_id = db.incr('antbs:misc:pkgid:next')
             setattr(self, 'pkg_id', next_id)
             status.all_packages.add(self.name)

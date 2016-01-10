@@ -653,6 +653,8 @@ def build_package(pkg=None):
 
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
     build_id = bld_obj.bnum
+    # Try to ensure we get the updated package version
+    pkg_obj = package.get_pkg_object(name=pkg)
 
     if pkg_obj.autosum:
         build_env = ['_AUTOSUMS=True']

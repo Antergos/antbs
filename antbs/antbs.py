@@ -432,7 +432,7 @@ def get_repo_info(repo=None, logged_in=False):
     if all_packages:
         for pkg in all_packages:
             p = pkg
-            pkg = re.search('^(\w|-)+(\D|r3|g4)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
+            pkg = re.search('^(\w|-)+(\D|r3|g4|qt5)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
             if pkg:
                 pkg = pkg.group(0)
             else:
