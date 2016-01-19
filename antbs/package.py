@@ -53,7 +53,7 @@ class PackageMeta(RedisObject):
             raise AttributeError
 
         super(PackageMeta, self).__init__()
-        super(PackageMeta, self).__namespaceinit__('pkg', name)
+        super(PackageMeta, self)._namespaceinit_('pkg', name)
 
         self.key_lists.update(dict(
                 redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
@@ -76,7 +76,7 @@ class Package(PackageMeta):
     get and set package data from/to the database as well as from PKGBUILDs.
 
     Args:
-        :param name: (str) The name of the package, AKA the pkgname.
+        name (str): The name of the package, AKA the pkgname.
 
     Attributes:
         (str)
@@ -113,7 +113,7 @@ class Package(PackageMeta):
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name))):
             # Package is not in the database, so it must be new. Let's initialize it.
-            self.__keysinit__()
+            self._keysinit_()
             setattr(self, 'pkgname', name)
             setattr(self, 'name', name)
             next_id = db.incr('antbs:misc:pkgid:next')

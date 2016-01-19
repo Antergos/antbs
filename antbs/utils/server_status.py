@@ -59,7 +59,7 @@ class ServerStatus(Singleton):
 
     def __init__(self, *args, **kwargs):
         super(ServerStatus, self).__init__()
-        super(ServerStatus, self).__namespaceinit__('status', '')
+        super(ServerStatus, self)._namespaceinit_('status', '')
 
         self.key_lists = dict(
             redis_string=['current_status', 'now_building', 'container', 'github_token',
@@ -75,7 +75,7 @@ class ServerStatus(Singleton):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self:
-            self.__keysinit__()
+            self._keysinit_()
             self.status = True
             self.current_status = 'Idle'
             self.idle = True
@@ -103,7 +103,7 @@ class TimelineEvent(RedisObject):
         if not event_id:
             the_id = db.incr('antbs:misc:event_id:next')
 
-        super(TimelineEvent, self).__namespaceinit__('timeline', the_id)
+        super(TimelineEvent, self)._namespaceinit_('timeline', the_id)
 
         self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
                               redis_string_int=['event_id', 'tl_type'], redis_string_bool=[],

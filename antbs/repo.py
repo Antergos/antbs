@@ -73,7 +73,7 @@ class Repo(RedisObject):
             raise RuntimeError
 
         super(Repo, self).__init__()
-        super(Repo, self).__namespaceinit__('repo', name)
+        super(Repo, self)._namespaceinit_('repo', name)
 
         self.key_lists.update(dict(
                 redis_string=['name', 'path'],
@@ -85,7 +85,7 @@ class Repo(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self.name:
-            self.__keysinit__()
+            self._keysinit_()
             self.name = name
             self.path = path
             self.sync_with_pacman_db()

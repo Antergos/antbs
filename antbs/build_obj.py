@@ -84,7 +84,7 @@ class BuildObject(RedisObject):
         if not bnum:
             next_bnum = db.incr('antbs:misc:bnum:next')
 
-        super(BuildObject, self).__namespaceinit__('build', next_bnum)
+        super(BuildObject, self)._namespaceinit_('build', next_bnum)
 
         self.key_lists.update(dict(
                 redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
@@ -99,7 +99,7 @@ class BuildObject(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not bnum:
-            self.__keysinit__()
+            self._keysinit_()
             self.bnum = next_bnum
             self.failed = False
             self.completed = False
