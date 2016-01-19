@@ -436,6 +436,18 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         logger.info(line)
         db.publish('build-output', line)
         db.set('build_log_last_line', line)
+        killed_count = 0
+        while not status.idle and killed_count < 2:
+            time.sleep(600)
+            output = doc.logs(container=container, tail=5)
+            if 'Client failed to connect to the D-BUS daemon' in output:
+                db.publish('build-output', 'Stalled build detected. Killing Xvfb...')
+                cmd = doc.exec_create(container=container, cmd='killall Xvfb', privileged=True)
+                if cmd.get('Id', False):
+                    res = doc.exec_start(cmd['Id'])
+                    db.publish('build-output', res)
+                    killed_count += 1
+
         doc.wait(container)
         return
 
@@ -555,20 +567,21 @@ def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
         }
     }
 
-    pulled = False
     for trans_for in translations_for:
 
         if not os.path.exists(trans[trans_for]['dest_dir']):
             os.mkdir(trans[trans_for]['dest_dir'])
         try:
-            if not pulled:
-                subprocess.check_call(['tx', 'pull', '-a', '--minimum-perc=50'],
-                                      cwd=trans[trans_for]['trans_dir'])
-                pulled = True
+
+            output = subprocess.check_output(['tx', 'pull', '-a', '--minimum-perc=50'],
+                                             cwd=trans[trans_for]['trans_dir'])
+            logger.debug(output)
+
             for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
                 for tfile in f:
                     if 'cnchi' == trans_for or 'antergos-gfxboot' == trans_for:
                         tfile = os.path.join(r, tfile)
+                        logger.debug('Copying %s to %s' % (tfile, trans[trans_for]['dest_dir']))
                         shutil.copy(tfile, trans[trans_for]['dest_dir'])
                     elif 'cnchi_updater' == trans_for:
                         mofile = tfile[:-2] + 'mo'
@@ -666,10 +679,13 @@ def build_package(pkg=None):
         build_env.append('_ALEXPKG=False')
 
     hconfig = docker_utils.DockerUtils().create_pkgs_host_config(pkg_obj.build_path, result)
+    is_firefox_kde = True if 'firefox-kde' in pkg_obj.name else False
+    image_name = "antergos/makepkg" if not is_firefox_kde else "antergos/makepkg-systemd"
+    cmd = "/makepkg/build.sh" if not is_firefox_kde else "/sbin/init"
     container = {}
     try:
         container = doc.create_container("antergos/makepkg",
-                                         command="/makepkg/build.sh " + pkg_deps_str,
+                                         command='/makepkg/build.sh',
                                          volumes=['/var/cache/pacman', '/makepkg', '/antergos',
                                                   '/pkg', '/root/.gnupg', '/staging', '/32bit',
                                                   '/32build', '/result', '/var/cache/pacman_i686'],

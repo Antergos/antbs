@@ -352,13 +352,6 @@ class Package(PackageMeta):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            cnchiver = changed.get('pkgver', '')
-            if 'cnchi-dev' == self.name and cnchiver and cnchiver[-1] not in [0, 5]:
-                if not db.exists('CNCHI-DEV-OVERRIDE'):
-                    return False
-                else:
-                    db.delete('CNCHI-DEV-OVERRIDE')
-
             if not changed:
                 return self.version_str
         else:
@@ -388,6 +381,12 @@ class Package(PackageMeta):
             # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version_str
+
+        if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
+            if not db.exists('CNCHI-DEV-OVERRIDE'):
+                return False
+            else:
+                db.delete('CNCHI-DEV-OVERRIDE')
 
         return version
 

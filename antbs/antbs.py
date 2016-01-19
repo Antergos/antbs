@@ -27,7 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-"""Main AntBS (Antergos Build Server) Module"""
+""" AntBS (Antergos Build Server) Main Module """
 
 import requests
 import newrelic.agent

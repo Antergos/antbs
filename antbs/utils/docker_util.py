@@ -108,19 +108,22 @@ class DockerUtils(object):
                 {
                     'bind': '/root/.gnupg',
                     'ro': False
-                },
+                }
         }
         if 'pkgver' not in result:
             binds['/var/tmp/32bit'] = {'bind': '/32bit', 'ro': False}
             binds['/var/tmp/32build'] = {'bind': '/32build', 'ro': False}
+            if 'firefox-kde' in pkgbuild_dir:
+                binds['/sys/fs/cgroup'] = {'bind': '/sys/fs/cgroup', 'ro': True}
 
         binds[result] = {'bind': '/result', 'ro': False}
+        log_conf = {'Type': 'journald', 'Config': {}}
 
         pkgs_hconfig = self.doc.create_host_config(binds=binds,
                                                    restart_policy={"MaximumRetryCount": 2,
                                                                    "Name": "on-failure"},
                                                    privileged=True, cap_add=['ALL'],
-                                                   mem_limit='2G', memswap_limit='-1')
+                                                   mem_limit='3G', memswap_limit='-1')
 
         return pkgs_hconfig
 
