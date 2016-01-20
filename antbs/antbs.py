@@ -405,7 +405,7 @@ def redirect_url(default='homepage'):
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
     # TODO: This is garbage. Needs rewrite.
-    if any(i is None for i in (bnum, dev, result)):
+    if any([i is None for i in [bnum, dev, result]]):
         abort(500)
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -460,7 +460,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             errmsg = dict(error=True, msg=err)
 
     except (OSError, Exception) as err:
-        logger.error('@@-antbs.py-@@ | Error while moving to main: %s', err)
+        logger.error('Error while moving to main: %s', err)
         err = str(err)
         errmsg = dict(error=True, msg=err)
 
@@ -546,7 +546,6 @@ def homepage(tlpage=None):
     check_stats = ['queue', 'completed', 'failed']
     building = status.current_status
     tl_events, all_pages = get_timeline(tlpage)
-    logger.debug([x.json() for x in tl_events])
 
     if tlpage > all_pages:
         abort(404)
@@ -716,7 +715,6 @@ def build_info(num):
     log = bld_obj.log_str
     if not log:
         log = 'Unavailable'
-    log = log.decode("utf8")
     if cont:
         container = cont[:20]
     else:
@@ -764,7 +762,7 @@ def dev_pkg_check(page=None):
         bnum = payload['bnum']
         dev = payload['dev']
         result = payload['result']
-        if all(i is not None for i in (bnum, dev, result)):
+        if all([i is not None for i in [bnum, dev, result]]):
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')

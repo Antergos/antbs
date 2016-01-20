@@ -32,7 +32,6 @@
 import datetime
 from .redis_connection import RedisObject
 from .logging_config import logger
-import os
 
 
 class Singleton(RedisObject):
@@ -100,7 +99,6 @@ class TimelineEvent(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self or not event_id:
-            logger.debug('not self ({0}) or not event_id ({1})'.format(self, event_id))
             super()._keysinit_()
             self.event_id = the_id
             all_events = status.all_tl_events

@@ -31,7 +31,7 @@
 
 import datetime
 
-from utils.redis_connection import db, RedisObject, RedisList, RedisZSet
+from utils.redis_connection import RedisObject
 from utils.logging_config import logger
 
 
@@ -80,7 +80,7 @@ class BuildObject(RedisObject):
 
         the_bnum = bnum
         if not bnum:
-            the_bnum = db.incr('antbs:misc:bnum:next')
+            the_bnum = self.db.incr('antbs:misc:bnum:next')
 
         super().__init__(prefix=prefix, key=the_bnum)
 

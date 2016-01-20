@@ -33,7 +33,7 @@ import shutil
 import time
 
 from utils.logging_config import logger
-from utils.redis_connection import db, RedisObject
+from utils.redis_connection import RedisObject
 from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
@@ -73,7 +73,7 @@ class PackageMeta(RedisObject):
             # Package is not in the database, so it must be new. Let's initialize it.
             self._keysinit_()
             self.pkgname = self.name = key
-            next_id = db.incr('antbs:misc:pkgid:next')
+            next_id = self.db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
 
             status.all_packages.add(self.name)
@@ -270,11 +270,10 @@ class Package(PackageMeta):
             if 'dummy-' not in self.name:
                 raise ValueError
 
-    @staticmethod
-    def maybe_update_pkgbuild_repo():
-        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
-            if db.setnx('PKGBUILD_REPO_LOCK', True):
-                db.expire('PKGBUILD_REPO_LOCK', 150)
+    def maybe_update_pkgbuild_repo(self):
+        if not self.db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
+            if self.db.setnx('PKGBUILD_REPO_LOCK', True):
+                self.db.expire('PKGBUILD_REPO_LOCK', 150)
 
                 if os.path.exists('/var/tmp/antergos-packages'):
                     shutil.rmtree('/var/tmp/antergos-packages')
@@ -282,14 +281,14 @@ class Package(PackageMeta):
                     subprocess.check_call(
                             ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
                             cwd='/var/tmp')
-                    db.setex('PKGBUILD_REPO_UPDATED', 350, True)
+                    self.db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
                     logger.error(err)
-                    db.delete('PKGBUILD_REPO_UPDATED')
+                    self.db.delete('PKGBUILD_REPO_UPDATED')
 
-                db.delete('PKGBUILD_REPO_LOCK')
+                self.db.delete('PKGBUILD_REPO_LOCK')
             else:
-                while not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
+                while not self.db.exists('PKGBUILD_REPO_UPDATED') and self.db.exists('PKGBUILD_REPO_LOCK'):
                     time.sleep(2)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
@@ -344,7 +343,7 @@ class Package(PackageMeta):
         else:
             old_val = self.pkgver
             key = 'antbs:monitor:github:%s:%s' % (self.gh_project, self.gh_repo)
-            changed['pkgver'] = db.get(key)
+            changed['pkgver'] = self.db.get(key)
             setattr(self, 'pkgver', changed['pkgver'])
             self.update_and_push_github('pkgver', old_val, self.pkgver)
 
@@ -370,10 +369,10 @@ class Package(PackageMeta):
             version = self.version_str
 
         if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
-            if not db.exists('CNCHI-DEV-OVERRIDE'):
+            if not self.db.exists('CNCHI-DEV-OVERRIDE'):
                 return False
             else:
-                db.delete('CNCHI-DEV-OVERRIDE')
+                self.db.delete('CNCHI-DEV-OVERRIDE')
 
         return version
 
@@ -408,7 +407,7 @@ class Package(PackageMeta):
         if not self.pkgname:
             setattr(self, 'pkgname', self.name)
         if not self.pkg_id:
-            next_id = db.incr('antbs:misc:pkgid:next')
+            next_id = self.db.incr('antbs:misc:pkgid:next')
             setattr(self, 'pkg_id', next_id)
         if not self.pkgver:
             self.get_from_pkgbuild('pkgver')
