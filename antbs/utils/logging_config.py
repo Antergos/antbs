@@ -32,7 +32,7 @@
 import logging
 import logging.config
 
-from redis_connection import db
+from .redis_connection import db
 
 stmpath = logging.getLogger('stormpath.http')
 stmpath.setLevel(logging.ERROR)

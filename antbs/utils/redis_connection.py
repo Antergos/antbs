@@ -27,7 +27,7 @@
 import redis
 import json
 
-db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock')
+db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 
 
 class RedisField(object):
@@ -37,8 +37,10 @@ class RedisField(object):
 
     def __init__(self, id_key=None):
         """ Create or load a RedisField. """
+        self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[])
+
         if id_key:
-            self.id_key = id_key
+            self.id_key = self.full_key = id_key
         else:
             raise AttributeError('A key is required to initialize a redis object.')
 
@@ -67,22 +69,29 @@ class RedisField(object):
             raise NotImplementedError('Cannot __getitem__ of RedisField object')
 
         if isinstance(index, slice):
-            if slice.step != 1:
-                raise NotImplementedError('Cannot specify a step to a %s object slice',
-                                          self.__class__.__name__)
+            if index.step and index.step > 1:
+                raise NotImplementedError('Cannot specify a step to a {0} object slice'.format(
+                                          self.__class__.__name__))
 
-            return [
-                self.decode_value(self.item_type, el)
-                for el in self.db.lrange(self.id_key, slice.start, slice.stop)
+            if isinstance(self, RedisList):
+                return [
+                    RedisField.decode_value(self.item_type, el)
+                    for el in self.db.lrange(self.id_key, index.start, index.stop)
                 ]
+            if isinstance(self, RedisZSet):
+                return [
+                    RedisField.decode_value(self.item_type, el)
+                    for el in self.db.zrange(self.id_key, index.start, index.stop)
+                ]
+
         else:
-            return self.decode_value(self.item_type, self.db.lindex(self.id_key, index))
+            return RedisField.decode_value(self.item_type, self.db.lindex(self.id_key, index))
 
     def delete(self):
         """ Delete this object from redis. """
         self.db.delete(self.id_key)
 
-    def __jsonable__(self):
+    def _jsonable_(self):
         """
         Returns this object as a python data type so it can be serialized by json module.
 
@@ -98,8 +107,8 @@ class RedisField(object):
 
                 if key in ['log_str', 'log', 'pkgbuild']:
                     continue
-                elif not isinstance(val, (str, dict, bool, int)) and hasattr(val, '__jsonable__'):
-                    as_dict[key] = val.__jsonable__()
+                elif not isinstance(val, (str, dict, bool, int)) and hasattr(val, '_jsonable_'):
+                    as_dict[key] = val._jsonable_()
                 else:
                     as_dict[key] = val
 
@@ -109,7 +118,7 @@ class RedisField(object):
 
     def json(self):
         """ Return this object as a json serialized string. """
-        return json.dumps(self.__jsonable__())
+        return json.dumps(self._jsonable_())
 
     @classmethod
     def as_child(cls, parent, tag, item_type):
@@ -300,7 +309,7 @@ class RedisObject(RedisField):
     def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):
         if not all([prefix, key]) and 'status' != prefix:
             not_empty = [x for x in [prefix, key] if x]
-            raise ValueError('(4) args required, but only (%s) given', len(not_empty))
+            raise ValueError('(4) args required, but only ({0}) given'.format(len(not_empty)))
 
         id_key = '{0}:{1}:{2}'.format(namespace, prefix, key)
 
@@ -310,7 +319,6 @@ class RedisObject(RedisField):
         self.prefix = prefix
         self.key = key
         self.full_key = id_key
-        self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[])
         self.all_keys = []
 
     def _namespaceinit_(self):
@@ -320,7 +328,8 @@ class RedisObject(RedisField):
     def _keysinit_(self):
         for key in self.all_keys:
             val = getattr(self, key, '')
-            initialized = '' != val and '_' != val
+            is_string = key in self.key_lists['string']
+            initialized = (not is_string and '' != val) or (is_string and '_' != val)
 
             if initialized:
                 continue
@@ -372,7 +381,7 @@ class RedisObject(RedisField):
         """ Get attribute value if stored in redis otherwise pass call to parent class """
 
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
-                     'key', 'full_key', 'prefix', 'db']
+                     'key', 'full_key', 'prefix', 'db', 'id_key']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super().__getattribute__(attrib)
@@ -399,12 +408,14 @@ class RedisObject(RedisField):
         """ Set attribute value if stored in redis otherwise pass call to parent class """
 
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
-                     'key', 'full_key', 'prefix', 'db']
+                     'key', 'full_key', 'prefix', 'db', 'id_key']
+
+        if attrib in pass_list or attrib not in self.all_keys:
+            return super().__setattr__(attrib, value)
 
         is_child = attrib in self.key_lists['list'] or attrib in self.key_lists['set']
-        pass_it = is_child or attrib in pass_list or attrib not in self.all_keys
 
-        if pass_it:
+        if is_child:
             return super().__setattr__(attrib, value)
 
         key = self.full_key
@@ -416,11 +427,11 @@ class RedisObject(RedisField):
             if value in [True, False]:
                 self.db.hset(key, attrib, self.bool_string_helper(value))
             else:
-                raise AttributeError('%s.%s must be of type(bool), %s given.',
-                                     self.__class__.__name__, attrib, value)
+                raise AttributeError('{0}.{1} must be of type(bool), {2} given.'.format(
+                                     self.__class__.__name__, attrib, value))
         else:
-            raise AttributeError('Unable to set attribute %s of class %s. Unknown Error.',
-                                 attrib, self.__class__.__name__)
+            raise AttributeError('Unable to set attribute {0} of class {1}. Unknown Error.'.format(
+                                 attrib, self.__class__.__name__))
 
     @staticmethod
     def bool_string_helper(value):

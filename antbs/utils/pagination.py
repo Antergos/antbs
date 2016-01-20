@@ -27,7 +27,6 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-
 class Pagination(object):
     """
 
@@ -43,44 +42,22 @@ class Pagination(object):
 
     @property
     def pages(self):
-        """
-
-
-        :return:
-        """
         return int(self.total_count)
 
     @property
     def has_prev(self):
-        """
-
-
-        :return:
-        """
         return self.page > 1
 
     @property
     def has_next(self):
-        """
-
-
-        :return:
-        """
         return self.page < self.pages
 
-    def iter_pages(self, left_edge=2, left_current=2,
-                   right_current=5, right_edge=2):
-        """
-
-        :param left_edge:
-        :param left_current:
-        :param right_current:
-        :param right_edge:
-        """
+    def iter_pages(self, left_edge=2, left_current=2, right_current=5, right_edge=2):
         last = 0
-        for num in xrange(1, self.pages + 1):
-            if num <= left_edge or (self.page - left_current - 1 < num < self.page + right_current) or \
-                    num > self.pages - right_edge:
+        for num in range(1, self.pages + 1):
+            if num <= left_edge \
+                    or (self.page - left_current - 1 < num < self.page + right_current) \
+                    or num > self.pages - right_edge:
                 if last + 1 != num:
                     yield None
                 yield num

@@ -4,6 +4,7 @@ flask-stormpath
 gevent
 gunicorn
 requests
+requests_toolbelt
 redis
 rq
 docker-py

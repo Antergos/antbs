@@ -32,9 +32,9 @@ import subprocess
 import os
 import shutil
 import docker
-from logging_config import logger
-from redis_connection import db
-from server_status import status
+from .logging_config import logger
+from .redis_connection import db
+from .server_status import status
 
 doc_user = status.docker_user
 doc_pass = status.docker_password

@@ -75,11 +75,11 @@ class PacmanRepo(RedisObject):
         super().__init__(prefix=prefix, key=name)
 
         self.key_lists.update(
-                dict(redis_string=['name', 'path'],
-                     redis_string_bool=[],
-                     redis_string_int=['pkg_count_alpm', 'pkg_count_fs'],
-                     redis_list=[],
-                     redis_zset=['pkgs_fs', 'pkgs_alpm']))
+                dict(string=['name', 'path'],
+                     bool=[],
+                     int=['pkg_count_alpm', 'pkg_count_fs'],
+                     list=[],
+                     set=['pkgs_fs', 'pkgs_alpm']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 

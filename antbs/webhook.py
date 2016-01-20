@@ -28,7 +28,7 @@
 
 
 """Webhook Handler Module"""
-
+import ipaddress
 import json
 import os
 import subprocess
@@ -37,7 +37,6 @@ import datetime
 import ast
 
 from rq import Queue, Connection, Worker
-import ipaddress
 import requests
 
 import build_pkg as builder

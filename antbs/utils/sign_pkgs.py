@@ -37,9 +37,9 @@ import os
 import subprocess
 import shutil
 
-from redis_connection import db
-from logging_config import logger
-from server_status import status
+from .redis_connection import db
+from .logging_config import logger
+from .server_status import status
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'

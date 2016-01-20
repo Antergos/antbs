@@ -75,7 +75,7 @@ class BuildObject(RedisObject):
 
     """
     def __init__(self, pkg_obj=None, bnum=None, prefix='build'):
-        if not all([pkg_obj, bnum]):
+        if not any([pkg_obj, bnum]):
             raise ValueError
 
         the_bnum = bnum
@@ -85,13 +85,13 @@ class BuildObject(RedisObject):
         super().__init__(prefix=prefix, key=the_bnum)
 
         self.key_lists.update(
-                dict(redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
-                                   'start_str', 'end_str', 'version_str', 'container',
-                                   'review_status', 'review_dev', 'review_date', 'log_str'],
-                     redis_string_bool=['failed', 'completed'],
-                     redis_string_int=['pkg_id', 'bnum'],
-                     redis_list=['log'],
-                     redis_zset=[]))
+                dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
+                             'start_str', 'end_str', 'version_str', 'container',
+                             'review_status', 'review_dev', 'review_date', 'log_str'],
+                     bool=['failed', 'completed'],
+                     int=['pkg_id', 'bnum'],
+                     ist=['log'],
+                     zset=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 

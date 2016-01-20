@@ -30,8 +30,8 @@
 """ Server Status Module (handles this application's state) """
 
 import datetime
-from redis_connection import RedisObject
-from logging_config import logger
+from .redis_connection import RedisObject
+from .logging_config import logger
 import os
 
 
@@ -51,16 +51,16 @@ class ServerStatus(Singleton):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
 
         self.key_lists.update(
-                dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
-                                   'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                                   'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
-                                   'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
-                                   'sp_app'],
-                     redis_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
-                     redis_int=['building_num'],
-                     redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                                 'hook_queue'],
-                     redis_set=['all_packages', 'iso_pkgs', 'repos']))
+                dict(string=['current_status', 'now_building', 'container', 'github_token',
+                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                             'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
+                             'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
+                             'sp_app'],
+                     bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+                     int=['building_num'],
+                     list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
+                           'hook_queue'],
+                     set=['all_packages', 'iso_pkgs', 'repos']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
@@ -79,9 +79,7 @@ class ServerStatus(Singleton):
 class TimelineEvent(RedisObject):
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
-        if not all([event_id, msg, tl_type]):
-            raise ValueError('At least (1) argument required.')
-        elif not event_id and not all([msg, tl_type]):
+        if not event_id and not all([msg, tl_type]):
             raise ValueError('msg and tl_type required when event_id is not provided.')
 
         the_id = event_id
@@ -90,19 +88,20 @@ class TimelineEvent(RedisObject):
 
         super().__init__(prefix=prefix, key=the_id)
 
+        super()._namespaceinit_()
+
         self.key_lists.update(
-                dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                     redis_int=['event_id', 'tl_type'],
-                     redis_bool=[],
-                     redis_list=['packages'],
-                     redis_set=[]))
+                dict(string=['event_type', 'date_str', 'time_str', 'message'],
+                     int=['event_id', 'tl_type'],
+                     bool=[],
+                     list=['packages'],
+                     set=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        self._namespaceinit_()
-
-        if self or not event_id:
-            self._keysinit_()
+        if not self or not event_id:
+            logger.debug('not self ({0}) or not event_id ({1})'.format(self, event_id))
+            super()._keysinit_()
             self.event_id = the_id
             all_events = status.all_tl_events
             all_events.append(self.event_id)
