@@ -63,7 +63,7 @@ import iso
 import repo_monitor as repo_mon
 import bugsnag
 from bugsnag.flask import handle_exceptions
-from repo import Repo
+from repo import PacmanRepo
 
 
 status.github_token = status.github_token if status.github_token else os.environ.get('GITHUB_TOKEN')
@@ -122,8 +122,8 @@ cache.init_app(app)
 
 logger = logconf.logger
 
-Repo(name='antergos', path=MAIN_REPO)
-Repo(name='antergos-staging', path=STAGING_REPO)
+PacmanRepo(name='antergos', path=MAIN_REPO)
+PacmanRepo(name='antergos-staging', path=STAGING_REPO)
 
 
 def copy(src, dst):

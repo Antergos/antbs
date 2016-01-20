@@ -63,7 +63,7 @@ def check_for_new_items():
     """
     db.setex('FEED_CHECKED', 900, 'True')
     build_pkgs = []
-    for service, project_list in MONITOR_ITEMS.iteritems():
+    for service, project_list in MONITOR_ITEMS.items():
         projects = project_list.split(',')
         for project in projects:
             if not project or project == '':
@@ -188,7 +188,7 @@ def check_gitlab_repo(project_id=None):
     new_items = []
     gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
     gl.auth()
-    nxsq = gl.Project(id=project_id)
+    nxsq = gl.projects(id=project_id)
     key = 'antbs:monitor:gitlab:%s' % project_id
     last_updated = db.get(key)
     events = nxsq.Event()

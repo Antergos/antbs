@@ -48,26 +48,45 @@ class PackageMeta(RedisObject):
 
     """
 
-    def __init__(self, name=None, *args, **kwargs):
-        if not name:
-            raise AttributeError
+    def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):
 
-        super(PackageMeta, self).__init__()
-        super(PackageMeta, self)._namespaceinit_('pkg', name)
+        super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
 
-        self.key_lists.update(dict(
-                redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
-                              'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
-                              'build_path', 'success_rate', 'failure_rate', 'git_url', 'git_name',
-                              'gh_repo', 'gh_project', 'iso_md5', 'iso_url', 'url', 'pkgbuild'],
-                redis_string_bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
-                                   'is_metapkg'],
-                redis_string_int=['pkg_id'],
-                redis_list=['allowed_in', 'builds', 'tl_events'],
-                redis_zset=['depends', 'groups', 'makedepends']))
+        self.key_lists.update(
+                dict(redis_string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
+                                   'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
+                                   'build_path', 'success_rate', 'failure_rate', 'git_url',
+                                   'git_name', 'gh_repo', 'gh_project', 'iso_md5', 'iso_url',
+                                   'url', 'pkgbuild'],
+                     redis_bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
+                                 'is_metapkg'],
+                     redis_int=['pkg_id'],
+                     redis_list=['allowed_in', 'builds', 'tl_events'],
+                     redis_set=['depends', 'groups', 'makedepends']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
         self.all_keys.append('_build')
+
+        super()._namespaceinit_()
+
+        if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
+            # Package is not in the database, so it must be new. Let's initialize it.
+            self._keysinit_()
+            self.pkgname = self.name = key
+            next_id = db.incr('antbs:misc:pkgid:next')
+            self.pkg_id = next_id
+
+            status.all_packages.add(self.name)
+
+            if '-x86_64' in self.name or '-i686' in self.name:
+                self.is_iso = True
+            if 'pycharm' in self.name or 'intellij' in self.name or 'clion-eap' == self.name:
+                self.autosum = True
+            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
+                self.is_meta_pkg = True
+
+    def get_from_pkgbuild(self, item):
+        raise NotImplementedError('Subclass must implement this method')
 
 
 class Package(PackageMeta):
@@ -109,27 +128,12 @@ class Package(PackageMeta):
     """
 
     def __init__(self, name):
-        super(Package, self).__init__(name=name)
+        super().__init__(key=name)
 
-        if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, name))):
-            # Package is not in the database, so it must be new. Let's initialize it.
-            self._keysinit_()
-            setattr(self, 'pkgname', name)
-            setattr(self, 'name', name)
-            next_id = db.incr('antbs:misc:pkgid:next')
-            setattr(self, 'pkg_id', next_id)
-            status.all_packages.add(self.name)
-
-            if '-x86_64' in self.name or '-i686' in self.name:
-                setattr(self, 'is_iso', True)
-
-            if 'pycharm' in self.name or 'intellij' in self.name or 'clion-eap' == self.name:
-                setattr(self, 'autosum', True)
-
+        if not self.pbpath:
             self.determine_pbpath()
 
-            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
-                setattr(self, 'is_metapkg', True)
+        self.maybe_update_pkgbuild_repo()
 
         self.pkgbuild = ''
 
@@ -147,11 +151,6 @@ class Package(PackageMeta):
 
         if 'dummy-' in self.name:
             return 'n/a'
-
-        self.maybe_update_pkgbuild_repo()
-
-        if not self.pbpath:
-            self.determine_pbpath()
 
         if not self.pkgbuild:
             setattr(self, 'pkgbuild', open(self.pbpath).read())
@@ -206,7 +205,7 @@ class Package(PackageMeta):
             zpath = os.path.join(dirpath, self.name + '.zip')
             gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
             gl.auth()
-            nxsq = gl.Project(id='61284')
+            nxsq = gl.projects(id='61284')
             source = nxsq.archive()
             with open(zpath, 'wb') as fd:
                 fd.write(source)
@@ -273,10 +272,6 @@ class Package(PackageMeta):
 
     @staticmethod
     def maybe_update_pkgbuild_repo():
-        """
-
-
-        """
         if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
             if db.setnx('PKGBUILD_REPO_LOCK', True):
                 db.expire('PKGBUILD_REPO_LOCK', 150)
@@ -298,14 +293,6 @@ class Package(PackageMeta):
                     time.sleep(2)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
-        """
-
-        :param var:
-        :param old_val:
-        :param new_val:
-        :return:
-
-        """
         if not self.push_version or old_val == new_val:
             return
         gh = login(token=status.github_token)
@@ -437,11 +424,6 @@ class Package(PackageMeta):
 
 
 def get_pkg_object(name=None):
-    """
-
-    :param name:
-    :return:
-    """
     if not name:
         logger.debug('name is required to get package object.')
         return False

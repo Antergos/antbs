@@ -27,54 +27,46 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-""" A singleton class for the server status """
+""" Server Status Module (handles this application's state) """
 
 import datetime
-from redis_connection import RedisObject, db, RedisList, RedisZSet
+from redis_connection import RedisObject
 from logging_config import logger
 import os
 
 
 class Singleton(RedisObject):
-    """
-
-    :param args:
-    :param kwargs:
-    """
 
     _instance = None
 
     def __new__(cls, *args, **kwargs):
-        if not cls._instance:
-            cls._instance = super(Singleton, cls).__new__(cls, *args)
+        if cls._instance is None:
+            cls._instance = super().__new__(cls, *args, *kwargs)
         return cls._instance
 
 
 class ServerStatus(Singleton):
-    """
 
-    :param args:
-    :param kwargs:
-    """
+    def __init__(self, prefix='status', key='', *args, **kwargs):
+        super().__init__(prefix=prefix, key=key, *args, **kwargs)
 
-    def __init__(self, *args, **kwargs):
-        super(ServerStatus, self).__init__()
-        super(ServerStatus, self)._namespaceinit_('status', '')
-
-        self.key_lists = dict(
-            redis_string=['current_status', 'now_building', 'container', 'github_token',
-                          'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                          'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
-                          'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key', 'sp_app'],
-            redis_string_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal', ],
-            redis_string_int=['building_num'],
-            redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                        'hook_queue'],
-            redis_zset=['all_packages', 'iso_pkgs', 'repos'])
+        self.key_lists.update(
+                dict(redis_string=['current_status', 'now_building', 'container', 'github_token',
+                                   'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                                   'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
+                                   'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
+                                   'sp_app'],
+                     redis_bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+                     redis_int=['building_num'],
+                     redis_list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
+                                 'hook_queue'],
+                     redis_set=['all_packages', 'iso_pkgs', 'repos']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not self:
+        super()._namespaceinit_()
+
+        if not self or not self.status:
             self._keysinit_()
             self.status = True
             self.current_status = 'Idle'
@@ -85,33 +77,32 @@ class ServerStatus(Singleton):
 
 
 class TimelineEvent(RedisObject):
-    """
 
-    :param msg:
-    :param tl_type:
-    :param event_id:
-    :raise AttributeError:
-    """
-
-    def __init__(self, msg=None, tl_type=None, event_id=None, packages=None):
-        if (not msg or not tl_type) and not event_id:
-            raise AttributeError
-
-        super(TimelineEvent, self).__init__()
+    def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
+        if not all([event_id, msg, tl_type]):
+            raise ValueError('At least (1) argument required.')
+        elif not event_id and not all([msg, tl_type]):
+            raise ValueError('msg and tl_type required when event_id is not provided.')
 
         the_id = event_id
         if not event_id:
-            the_id = db.incr('antbs:misc:event_id:next')
+            the_id = self.db.incr('antbs:misc:event_id:next')
 
-        super(TimelineEvent, self)._namespaceinit_('timeline', the_id)
+        super().__init__(prefix=prefix, key=the_id)
 
-        self.key_lists = dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
-                              redis_string_int=['event_id', 'tl_type'], redis_string_bool=[],
-                              redis_list=['packages'], redis_zset=[])
+        self.key_lists.update(
+                dict(redis_string=['event_type', 'date_str', 'time_str', 'message'],
+                     redis_int=['event_id', 'tl_type'],
+                     redis_bool=[],
+                     redis_list=['packages'],
+                     redis_set=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not event_id:
+        self._namespaceinit_()
+
+        if self or not event_id:
+            self._keysinit_()
             self.event_id = the_id
             all_events = status.all_tl_events
             all_events.append(self.event_id)
@@ -127,21 +118,17 @@ class TimelineEvent(RedisObject):
 
     @staticmethod
     def dt_date_to_string(dt):
-        """
-
-        :param dt:
-        :return:
-        """
         return dt.strftime("%b %d")
 
     @staticmethod
     def dt_time_to_string(dt):
-        """
-
-        :param dt:
-        :return:
-        """
         return dt.strftime("%I:%M%p")
 
 
+def get_timeline_object(event_id=None, msg=None, tl_type=None):
+    tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type)
+    return tl_obj
+
+
 status = ServerStatus()
+

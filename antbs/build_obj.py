@@ -37,7 +37,7 @@ from utils.logging_config import logger
 
 class BuildObject(RedisObject):
     """
-    This class represents a "build" object throughout the build server app. It is used
+    This class represents a "build" throughout the build server app. It is used
     to get and set build data to the database.
 
     Args:
@@ -74,33 +74,30 @@ class BuildObject(RedisObject):
         ValueError: If both `pkg_obj` and `bnum` are Falsey.
 
     """
-    def __init__(self, pkg_obj=None, bnum=None):
-        if not pkg_obj and not bnum:
+    def __init__(self, pkg_obj=None, bnum=None, prefix='build'):
+        if not all([pkg_obj, bnum]):
             raise ValueError
 
-        super(BuildObject, self).__init__()
-
-        next_bnum = bnum
+        the_bnum = bnum
         if not bnum:
-            next_bnum = db.incr('antbs:misc:bnum:next')
+            the_bnum = db.incr('antbs:misc:bnum:next')
 
-        super(BuildObject, self)._namespaceinit_('build', next_bnum)
+        super().__init__(prefix=prefix, key=the_bnum)
 
-        self.key_lists.update(dict(
-                redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
-                              'start_str', 'end_str',
-                              'version_str', 'container', 'review_status', 'review_dev',
-                              'review_date', 'log_str'],
-                redis_string_bool=['failed', 'completed'],
-                redis_string_int=['pkg_id', 'bnum'],
-                redis_list=['log'],
-                redis_zset=[]))
+        self.key_lists.update(
+                dict(redis_string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
+                                   'start_str', 'end_str', 'version_str', 'container',
+                                   'review_status', 'review_dev', 'review_date', 'log_str'],
+                     redis_string_bool=['failed', 'completed'],
+                     redis_string_int=['pkg_id', 'bnum'],
+                     redis_list=['log'],
+                     redis_zset=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not bnum:
+        if not self or not bnum:
             self._keysinit_()
-            self.bnum = next_bnum
+            self.bnum = the_bnum
             self.failed = False
             self.completed = False
 

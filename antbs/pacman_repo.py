@@ -37,14 +37,14 @@ from utils.server_status import status
 from utils.redis_connection import RedisObject
 
 
-class Repo(RedisObject):
+class PacmanRepo(RedisObject):
     """
     This class represents a "repo" throughout this application. It is used to
-    get and set metadata about the repos that this application manages from/to the database.
+    get/set metadata about the repos that this application manages from/to the database.
 
     Args:
-        :param name: (str) The name of the repo (as it would be configured in pacman.conf).
-        :param path: (str) The absolute path to the repo's directory on the server.
+        name (str): The name of the repo (as it would be configured in pacman.conf).
+        path (str): The absolute path to the repo's directory on the server.
 
     Attributes:
         (str)
@@ -68,27 +68,27 @@ class Repo(RedisObject):
 
     """
 
-    def __init__(self, name=None, path=None):
+    def __init__(self, name=None, path=None, prefix='repo'):
         if not name:
             raise RuntimeError
 
-        super(Repo, self).__init__()
-        super(Repo, self)._namespaceinit_('repo', name)
+        super().__init__(prefix=prefix, key=name)
 
-        self.key_lists.update(dict(
-                redis_string=['name', 'path'],
-                redis_string_bool=[],
-                redis_string_int=['pkg_count_alpm', 'pkg_count_fs'],
-                redis_list=[],
-                redis_zset=['pkgs_fs', 'pkgs_alpm']))
+        self.key_lists.update(
+                dict(redis_string=['name', 'path'],
+                     redis_string_bool=[],
+                     redis_string_int=['pkg_count_alpm', 'pkg_count_fs'],
+                     redis_list=[],
+                     redis_zset=['pkgs_fs', 'pkgs_alpm']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        if not self.name:
+        super()._namespaceinit_()
+
+        if not self or not self.name:
             self._keysinit_()
             self.name = name
             self.path = path
-            self.sync_with_pacman_db()
             status.repos.add(name)
 
         #self.sync_with_alpm_db()

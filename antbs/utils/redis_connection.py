@@ -37,7 +37,6 @@ class RedisField(object):
 
     def __init__(self, id_key=None):
         """ Create or load a RedisField. """
-
         if id_key:
             self.id_key = id_key
         else:
@@ -45,7 +44,6 @@ class RedisField(object):
 
     def __bool__(self):
         """ Tests if this object currently exists in redis. """
-
         return self.db.exists(self.id_key)
 
     def __nonzero__(self):
@@ -53,20 +51,35 @@ class RedisField(object):
 
     def __eq__(self, other):
         """ Tests if two redis objects are equal (they have the same id_key). """
-
         return self.id_key == other.id_key
 
     def __str__(self):
-        """ Return this object's id_key as a string. This can easily be extended by sybclasses. """
-
+        """ Return this object's id_key as a string. This can be extended by sybclasses. """
         return self.id_key
 
     def __iter__(self):
         raise NotImplementedError
 
+    def __getitem__(self, index):
+        """ Load an item by index where index is either an int or a slice. """
+
+        if not isinstance(self, (RedisList, RedisZSet)):
+            raise NotImplementedError('Cannot __getitem__ of RedisField object')
+
+        if isinstance(index, slice):
+            if slice.step != 1:
+                raise NotImplementedError('Cannot specify a step to a %s object slice',
+                                          self.__class__.__name__)
+
+            return [
+                self.decode_value(self.item_type, el)
+                for el in self.db.lrange(self.id_key, slice.start, slice.stop)
+                ]
+        else:
+            return self.decode_value(self.item_type, self.db.lindex(self.id_key, index))
+
     def delete(self):
         """ Delete this object from redis. """
-
         self.db.delete(self.id_key)
 
     def __jsonable__(self):
@@ -96,7 +109,6 @@ class RedisField(object):
 
     def json(self):
         """ Return this object as a json serialized string. """
-
         return json.dumps(self.__jsonable__())
 
     @classmethod
@@ -107,11 +119,11 @@ class RedisField(object):
         that are also derived from `RedisField`.
 
         Args:
-            parent (RedisObject): The parent object.
-            tag (str):            Short name for this object. It will be combined with parent
-                                  object's `id_key` to create this object's `id_key`.
-            item_type (str()):    The built-in type object for the type of data stored in this
-                                  object.
+            parent (RedisObject):  The parent object.
+            tag (str):             Short name for this object. It will be combined with parent
+                                   object's `id_key` to create this object's `id_key`.
+            item_type (type(str)): The built-in type object for the type of data stored in this
+                                   object.
         """
 
         def helper(_=None):
@@ -121,11 +133,7 @@ class RedisField(object):
 
     @staticmethod
     def decode_value(obj_type, value):
-        """ Decode a value if it is non-None, otherwise, decode with no arguments.
-        :param obj_type:
-        :param value:
-        """
-
+        """ Decode a value if it is non-None, otherwise, decode with no arguments. """
         if value is None:
             return obj_type()
         else:
@@ -133,28 +141,24 @@ class RedisField(object):
 
     @staticmethod
     def encode_value(value):
-        """ Encode a value using json.dumps, with default = str.
-        :param value:
-        """
-
+        """ Encode a value using json.dumps, with default = str. """
         return str(value)
 
 
 class RedisList(RedisField, list):
-    """ An equivalent to `list` where all items are stored in Redis. """
+    """
+    A list where all items are stored in Redis.
+
+    Args:
+        id_key (str): use this as the redis key.
+        item_type (object): The constructor to use when reading items from redis.
+        items (list): Default values to store during construction.
+
+    """
 
     def __init__(self, id_key=None, item_type=str, items=None):
-        """
-        Create a new RedisList
-
-        id_key: use this as the redis key.
-        item_type: The constructor to use when reading items from redis.
-        values: Default values to store during construction.
-
-        """
 
         super().__init__(id_key=id_key)
-
         self.item_type = item_type
 
         if items:
@@ -163,84 +167,49 @@ class RedisList(RedisField, list):
 
     def __str__(self):
         """ Return this object as a string """
-
         return str([x for x in self.__iter__()])
-
-    def __getitem__(self, index):
-        """ Load an item by index where index is either an int or a slice. """
-
-        if isinstance(index, slice):
-            if slice.step != 1:
-                raise NotImplementedError('Cannot specify a step to a RedisObject slice')
-
-            return [
-                super().decode_value(self.item_type, el)
-                for el in self.db.lrange(self.id_key, slice.start, slice.end)
-                ]
-        else:
-            return super().decode_value(self.item_type, self.db.lindex(self.id_key, index))
 
     def __setitem__(self, index, val):
         """ Update an item by index. """
-
         self.db.lset(self.id_key, index, super().encode_value(val))
 
     def __len__(self):
         """ Return the size of the list. """
-
         return self.db.llen(self.id_key)
 
     def __delitem__(self, index):
         """ Delete an item from a RedisList by index. """
-
         self.db.lset(self.id_key, index, '__DELETED__')
         self.db.lrem(self.id_key, 1, '__DELETED__')
 
     def __iter__(self):
         """ Iterate over all items in this list. """
-
         for el in self.db.lrange(self.id_key, 0, -1):
             yield super().decode_value(self.item_type, el)
 
     def __contains__(self, item):
-        """
-        Check if item is in this list.
-
-        :param (str) item: Item to check.
-        :return: (bool) True if item is in list else False
-
-        """
+        """ Check if item is in this list. """
         items = self.db.lrange(self.id_key, 0, -1)
         return item in items
 
     def __add__(self, other_list):
-        """
-        Combine elements from this list (self) and other_list into a new list.
-
-        :param (list) other_list:
-        :return (list): new_list
-
-        """
+        """ Combine elements from this list (self) and other_list into a new list. """
         return [x for x in self.__iter__()] + [x for x in other_list.__iter__()]
 
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
-
         return super().decode_value(self.item_type, self.db.lpop(self.id_key))
 
     def rpop(self):
         """ Remove a value from the right (high) end of the list. """
-
         return super().decode_value(self.item_type, self.db.rpop(self.id_key))
 
     def lpush(self, val):
         """ Add an item to the left (low) end of the list. """
-
         self.db.lpush(self.id_key, super().encode_value(val))
 
     def rpush(self, val):
         """ Add an item to the right (high) end of the list. """
-
         self.db.rpush(self.id_key, super().encode_value(val))
 
     def append(self, val):
@@ -258,18 +227,16 @@ class RedisZSet(RedisField, set):
     """
     A sorted set where all items are stored in Redis.
 
-
-        Args:
-            id_key (str): use this as the redis key.
-            item_type (object): The constructor to use when reading items from redis.
-            values (list): Default values to store during construction.
+    Args:
+        id_key (str): use this as the redis key.
+        item_type (object): The constructor to use when reading items from redis.
+        values (list): Default values to store during construction.
 
     """
 
     def __init__(self, id_key=None, item_type=str, items=None):
 
         super().__init__(id_key=id_key)
-
         self.item_type = item_type
 
         if items:
@@ -330,8 +297,8 @@ class RedisObject(RedisField):
 
     """
 
-    def __init__(self, namespace='antbs', prefix='', key=''):
-        if not all([prefix, key]):
+    def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):
+        if not all([prefix, key]) and 'status' != prefix:
             not_empty = [x for x in [prefix, key] if x]
             raise ValueError('(4) args required, but only (%s) given', len(not_empty))
 
