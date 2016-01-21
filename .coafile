@@ -1,0 +1,20 @@
+[Default]
+bears = IndentBear,LineLengthBear,SpaceConsistencyBear
+max_line_length = 99
+use_spaces = True
+
+[Python]
+bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyLintBear,PyUnusedCodeBear
+files = **/*.py
+
+[Docker]
+bears= DockerfileLintBear
+files= **/Dockerfile
+
+[Markdown]
+bears = AlexBear,MarkdownBear
+files = **/*.md
+
+[JSON]
+bears = JSONFormatBear
+files = **/*.json

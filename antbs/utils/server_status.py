@@ -122,8 +122,8 @@ class TimelineEvent(RedisObject):
         return dt.strftime("%I:%M%p")
 
 
-def get_timeline_object(event_id=None, msg=None, tl_type=None):
-    tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type)
+def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None):
+    tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type, packages=packages)
     return tl_obj
 
 

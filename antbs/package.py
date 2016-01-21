@@ -214,7 +214,7 @@ class Package(PackageMeta):
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
             repo = gh.repository('lots0logs', 'cnchi-dev')
-            repo.archive('zipball', zpath, ref='playing')
+            repo.archive('zipball', zpath, ref='master')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
             return
@@ -331,9 +331,15 @@ class Package(PackageMeta):
         old_vals = {}
         if self.name not in ['scudcloud']:
             for key in ['pkgver', 'pkgrel', 'epoch']:
-                old_val = str(getattr(self, key))
+                old_val = getattr(self, key)
                 old_vals[key] = old_val
-                new_val = str(self.get_from_pkgbuild(key))
+                new_val = self.get_from_pkgbuild(key)
+                try:
+                    new_val = new_val.decode('utf-8')
+                    old_val = old_val.decode('utf-8')
+                    old_vals[key] = old_val
+                except Exception as err:
+                    logger.error(err)
                 if new_val != old_val:
                     changed[key] = new_val
                     setattr(self, key, new_val)

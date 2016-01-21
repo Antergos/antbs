@@ -23,7 +23,7 @@
 """ Transaction Class """
 
 from utils.logging_config import logger
-from utils.redis_connection import RedisList, RedisObject, RedisZSet, db
+from utils.redis_connection import db, RedisObject, RedisList, RedisZSet
 from utils.server_status import status
 
 
@@ -54,3 +54,7 @@ class Transaction(RedisObject):
 
     def __init__(self, pkg_objs=None, tnum=None):
         super(Transaction, self).__init__()
+
+
+
+

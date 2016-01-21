@@ -43,14 +43,16 @@ logging.config.dictConfig({
 
     'formatters': {
         'file': {
-            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s | %(message)s'
+            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s '
+                      '| %(message)s'
         },
         'email': {
-            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s\nFUNCTION: '
-                      '%(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
+            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s'
+                      '\nFUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
         },
         'redis': {
-            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s | %(message)s'
+            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s '
+                      '| %(message)s'
         }
     },
     'handlers': {
@@ -63,7 +65,7 @@ logging.config.dictConfig({
             'level': 'DEBUG',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': 'antbs.log',
-            'maxBytes': 5000000,
+            'maxBytes': 3000000,
             'backupCount': 3
         },
         'redis': {
@@ -94,4 +96,3 @@ logging.config.dictConfig({
 })
 
 logger = logging.getLogger()
-

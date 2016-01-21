@@ -405,7 +405,7 @@ def redirect_url(default='homepage'):
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
     # TODO: This is garbage. Needs rewrite.
-    if any([i is None for i in [bnum, dev, result]]):
+    if not any([bnum, dev, result]):
         abort(500)
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -415,7 +415,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         return errmsg
     try:
         bld_obj = build_obj.get_build_object(bnum=bnum)
-        pkg_obj = package.Package(name=bld_obj.pkgname)
+        pkg_obj = package.get_pkg_object(name=bld_obj.pkgname)
         if pkg_obj and build_obj:
             allowed = pkg_obj.allowed_in
             if 'main' not in allowed and result == 'passed':
@@ -762,7 +762,7 @@ def dev_pkg_check(page=None):
         bnum = payload['bnum']
         dev = payload['dev']
         result = payload['result']
-        if all([i is not None for i in [bnum, dev, result]]):
+        if all([bnum, dev, result]):
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')
@@ -783,8 +783,13 @@ def dev_pkg_check(page=None):
 @groups_required(['admin'])
 def build_pkg_now():
     if request.method == 'POST':
-        pkgname = request.form['pkgname']
-        dev = request.form['dev']
+        try:
+            pkgname = request.form['pkgname'].decode('utf-8')
+            dev = request.form['dev'].decode('utf-8')
+        except Exception as err:
+            logger.error(err)
+            pkgname = request.form['pkgname']
+            dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
         pexists = status.all_packages.ismember(pkgname)
@@ -803,7 +808,7 @@ def build_pkg_now():
             pending = False
             for bnum in rev_pending:
                 bld_obj = build_obj.get_build_object(bnum=bnum)
-                if pkgname == bld_obj.pkgname:
+                if bld_obj and pkgname == bld_obj.pkgname:
                     pending = True
                     break
 
@@ -956,4 +961,4 @@ def overflow():
 
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=8020, debug=False, use_reloader=False)
+    app.run(host='127.0.0.1', port=8020, debug=True, use_reloader=False)
