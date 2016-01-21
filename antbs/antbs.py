@@ -393,8 +393,8 @@ def get_repo_info(repo=None, logged_in=False):
             except Exception:
                 pass
 
-            pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj._jsonable_()
-            container["pkgs"].append(pkg_obj._jsonable_())
+            pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj.__jsonable__()
+            container["pkgs"].append(pkg_obj.__jsonable__())
 
     return container, rev_pending
 

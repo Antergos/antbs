@@ -67,11 +67,11 @@ class PackageMeta(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
         self.all_keys.append('_build')
 
-        super()._namespaceinit_()
+        super().__namespaceinit__()
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
             # Package is not in the database, so it must be new. Let's initialize it.
-            self._keysinit_()
+            self.__keysinit__()
             self.pkgname = self.name = key
             next_id = self.db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id

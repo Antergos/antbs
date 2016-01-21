@@ -96,7 +96,7 @@ class BuildObject(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self or not bnum:
-            self._keysinit_()
+            self.__keysinit__()
             self.bnum = the_bnum
             self.failed = False
             self.completed = False

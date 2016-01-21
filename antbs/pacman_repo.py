@@ -37,6 +37,7 @@ from utils.server_status import status
 from utils.redis_connection import RedisObject
 
 
+
 class PacmanRepo(RedisObject):
     """
     This class represents a "repo" throughout this application. It is used to
@@ -83,10 +84,10 @@ class PacmanRepo(RedisObject):
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        super()._namespaceinit_()
+        super().__namespaceinit__()
 
         if not self or not self.name:
-            self._keysinit_()
+            self.__keysinit__()
             self.name = name
             self.path = path
             status.repos.add(name)

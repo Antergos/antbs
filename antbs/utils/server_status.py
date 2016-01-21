@@ -63,10 +63,10 @@ class ServerStatus(Singleton):
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
-        super()._namespaceinit_()
+        super().__namespaceinit__()
 
         if not self or not self.status:
-            self._keysinit_()
+            self.__keysinit__()
             self.status = True
             self.current_status = 'Idle'
             self.idle = True
@@ -87,7 +87,7 @@ class TimelineEvent(RedisObject):
 
         super().__init__(prefix=prefix, key=the_id)
 
-        super()._namespaceinit_()
+        super().__namespaceinit__()
 
         self.key_lists.update(
                 dict(string=['event_type', 'date_str', 'time_str', 'message'],
@@ -99,7 +99,7 @@ class TimelineEvent(RedisObject):
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if not self or not event_id:
-            super()._keysinit_()
+            super().__keysinit__()
             self.event_id = the_id
             all_events = status.all_tl_events
             all_events.append(self.event_id)
