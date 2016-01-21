@@ -188,10 +188,10 @@ def check_gitlab_repo(project_id=None):
     new_items = []
     gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
     gl.auth()
-    nxsq = gl.projects(id=project_id)
-    key = 'antbs:monitor:gitlab:%s' % project_id
+    nxsq = gl.projects.get(project_id)
+    key = 'antbs:monitor:gitlab:{0}'.format(project_id)
     last_updated = db.get(key)
-    events = nxsq.Event()
+    events = nxsq.events.list()
 
     for event in events:
         if event.action_name == 'pushed to':

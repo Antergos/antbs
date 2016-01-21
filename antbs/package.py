@@ -187,7 +187,7 @@ class Package(PackageMeta):
         out, err = proc.communicate()
 
         if len(out) > 0:
-            out = out.strip()
+            out = out.decode('UTF-8').strip()
             # logger.info('proc.out is %s' % out)
         if len(err) > 0:
             logger.error('proc.err is %s', err)
@@ -233,7 +233,7 @@ class Package(PackageMeta):
     def determine_git_repo_info(self):
         if not self.git_url or not self.git_url.endswith('.git'):
             source = self.get_from_pkgbuild('source')
-            url_match = re.search("((https*)|(git:)).+\.git", source)
+            url_match = re.search(r'((https*)|(git:)).+\.git', source)
             if url_match:
                 logger.info('url_match is: %s', url_match)
                 setattr(self, 'git_url', url_match.group(0))
@@ -321,12 +321,6 @@ class Package(PackageMeta):
             return False
 
     def get_version(self):
-        """
-
-
-        :return:
-
-        """
         changed = {}
         old_vals = {}
         if self.name not in ['scudcloud']:
@@ -334,12 +328,7 @@ class Package(PackageMeta):
                 old_val = getattr(self, key)
                 old_vals[key] = old_val
                 new_val = self.get_from_pkgbuild(key)
-                try:
-                    new_val = new_val.decode('utf-8')
-                    old_val = old_val.decode('utf-8')
-                    old_vals[key] = old_val
-                except Exception as err:
-                    logger.error(err)
+
                 if new_val != old_val:
                     changed[key] = new_val
                     setattr(self, key, new_val)
@@ -395,7 +384,7 @@ class Package(PackageMeta):
 
         all_deps = deps + mkdeps
         for dep in all_deps:
-            has_ver = re.search('^[\d\w-]+(?=\=|\>|\<)', dep)
+            has_ver = re.search(r'^[\d\w-]+(?=\=|\>|\<)', dep)
             if has_ver:
                 dep = has_ver.group(0)
             if dep in status.all_packages and (dep in status.queue or dep in status.hook_queue):

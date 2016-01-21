@@ -110,13 +110,13 @@ def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
             # passphrase = getpass.getpass("Enter passphrase for %s: " % uid).encode('utf-8')
         cmd = [GPG_BIN, '-sbu', 'Antergos', '--batch', '--passphrase-fd', '0', path]
         p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = p.communicate(passphrase)
+        out, err = p.communicate(passphrase.encode('UTF-8'))
         if len(out) > 0:
-            db.publish('build-output', 'GPG OUTPUT is: %s' % out)
-            logger.info('GPG OUTPUT is: %s' % out)
+            db.publish('build-output', 'GPG OUTPUT is: {0}'.format(out.decode('UTF-8')))
+            logger.info('GPG OUTPUT is: {0}'.format(out.decode('UTF-8')))
         if len(err) > 0:
-            db.publish('build-output', 'Signing FAILED for %s. Error output: %s' % (path, err))
-            logger.error('[SIGN PKG] Signing FAILED for %s. Error output: %s' % (path, err))
+            db.publish('build-output', 'Signing FAILED for {0}. Error output: {1}'.format(path, err.decode('UTF-8')))
+            logger.error('[SIGN PKG] Signing FAILED for {0}. Error output: {1}'.format(path, err.decode('UTF-8')))
             paths = [p for p in paths if not os.path.isdir(p) and not is_iso]
             for p in paths:
                 remove(p)

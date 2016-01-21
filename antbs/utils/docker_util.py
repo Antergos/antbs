@@ -275,8 +275,6 @@ class DockerUtils(object):
             response = [line for line in self.doc.push(repo, stream=True, insecure_registry=True)]
             if not response:
                 logger.info('Pushing to Docker hub might not have completed successfully.')
-            else:
-                logger.info(response)
         except Exception as err:
             logger.error('Pushing to docker hub failed with error: %s', err)
 

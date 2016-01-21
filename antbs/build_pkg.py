@@ -165,19 +165,25 @@ def process_package_queue():
     if not db.exists('BUILD_REPO_UPDATED'):
         if db.setnx('BUILD_REPO_LOCK', True):
             db.expire('BUILD_REPO_LOCK', 300)
-            try:
-                subprocess.check_call(
-                    ['git', 'clone', 'http://github.com/antergos/antergos-packages.git'],
-                    cwd='/opt')
-                subprocess.check_call(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
-            except subprocess.CalledProcessError:
+
+            if os.path.exists(REPO_DIR):
                 try:
-                    subprocess.check_call(['git', 'reset', '--soft', 'origin/master'], cwd='/opt/antergos-packages')
-                    subprocess.check_call(['git', 'pull'], cwd='/opt/antergos-packages')
+                    subprocess.check_output(['git', 'reset', '--soft', 'origin/master'], cwd=REPO_DIR)
+                    subprocess.check_output(['git', 'pull'], cwd=REPO_DIR)
                     db.setex('BUILD_REPO_UPDATED', 120, True)
                 except subprocess.CalledProcessError as err:
-                    logger.error(err)
+                    logger.error(err.output)
+            else:
+                try:
+                    subprocess.check_output(
+                        ['git',
+                         'clone',
+                         'http://github.com/antergos/antergos-packages.git'], cwd='/opt')
+                    subprocess.check_output(['chmod', '-R', 'a+rw', REPO_DIR], cwd='/opt')
+                except subprocess.CalledProcessError as err:
+                    logger.error(err.output)
             db.delete('BUILD_REPO_LOCK')
+
         else:
             while not db.exists('BUILD_REPO_UPDATED') and db.exists('BUILD_REPO_LOCK'):
                 time.sleep(1)
@@ -232,9 +238,6 @@ def process_package_queue():
 
 
 def handle_hook():
-    """
-
-    """
     saved_status = False
     if not status.idle and 'Idle' not in status.current_status:
         saved_status = status.current_status

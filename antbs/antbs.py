@@ -43,6 +43,7 @@ import glob
 import shutil
 from datetime import datetime, timedelta
 from rq import Queue, Connection, Worker
+import rq_dashboard
 from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
 from werkzeug.contrib.fixers import ProxyFix
 import docker
@@ -114,6 +115,9 @@ app.jinja_options['trim_blocks'] = True
 
 # Use gunicorn to proxy with nginx
 app.wsgi_app = ProxyFix(app.wsgi_app)
+
+app.config.from_object(rq_dashboard.default_settings)
+app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
 
 cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
                            'CACHE_KEY_PREFIX': 'antbs:cache:',
@@ -229,17 +233,18 @@ def get_live_build_output():
     keep_alive = 0
     while True:
         message = psub.get_message()
-        if message:
-            if first_run and (message['data'] == '1' or message['data'] == 1):
+        if message and (message['data'] == '1' or message['data'] == 1):
+            if first_run:
                 message['data'] = db.get('build_log_last_line')
                 first_run = False
-            elif message['data'] == '1' or message['data'] == 1:
+            else:
                 message['data'] = '...'
 
-            yield 'event: build_output\ndata: %s\n\n' % message['data']
+            yield 'event: build_output\ndata: {0}\n\n'.format(message['data'].encode('UTF-8'))
+
         elif keep_alive > 600:
             keep_alive = 0
-            yield ':'
+            yield ':'.encode('UTF-8')
 
         keep_alive += 1
         gevent.sleep(.05)
@@ -251,17 +256,15 @@ def get_live_status_updates():
     last_event = None
     keep_alive = 0
     while True:
-        idle = status.idle
-        building = status.current_status
-        if idle and 'Idle' != last_event:
+        if status.idle and 'Idle' != last_event:
             last_event = 'Idle'
-            yield 'event: status\ndata: %s\n\n' % 'Idle'
-        elif not idle and building != last_event:
-            last_event = building
-            yield 'event: status\ndata: %s\n\n' % building
+            yield 'event: status\ndata: {0}\n\n'.format('Idle').encode('UTF-8')
+        elif not status.idle and status.current_status != last_event:
+            last_event = status.current_status
+            yield 'event: status\ndata: {0}\n\n'.format(status.current_status).encode('UTF-8')
         elif keep_alive > 30:
             keep_alive = 0
-            yield ':'
+            yield ':'.encode('UTF-8')
 
         keep_alive += 1
         gevent.sleep(1)
@@ -783,13 +786,8 @@ def dev_pkg_check(page=None):
 @groups_required(['admin'])
 def build_pkg_now():
     if request.method == 'POST':
-        try:
-            pkgname = request.form['pkgname'].decode('utf-8')
-            dev = request.form['dev'].decode('utf-8')
-        except Exception as err:
-            logger.error(err)
-            pkgname = request.form['pkgname']
-            dev = request.form['dev']
+        pkgname = request.form['pkgname']
+        dev = request.form['dev']
         if not pkgname or pkgname is None or pkgname == '':
             abort(500)
         pexists = status.all_packages.ismember(pkgname)
@@ -806,6 +804,7 @@ def build_pkg_now():
             p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
             # logger.info(rev_pending)
             pending = False
+            logger.debug(rev_pending)
             for bnum in rev_pending:
                 bld_obj = build_obj.get_build_object(bnum=bnum)
                 if bld_obj and pkgname == bld_obj.pkgname:
