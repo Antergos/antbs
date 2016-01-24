@@ -53,7 +53,7 @@ class ServerStatus(Singleton, RedisObject):
                            'hook_queue'],
                      set=['all_packages', 'iso_pkgs', 'repos'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
-                           'MAIN_64', 'MAIN_32', ]))
+                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR']))
 
         super().__namespaceinit__()
 

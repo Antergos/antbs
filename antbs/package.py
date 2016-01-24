@@ -31,6 +31,7 @@ from github3 import login
 from gitlab import Gitlab
 import shutil
 import time
+from gevent import sleep
 
 from utils.logging_config import logger
 from utils.redis_connection import RedisObject
@@ -64,10 +65,9 @@ class PackageMeta(RedisObject):
                      list=['allowed_in', 'builds', 'tl_events'],
                      set=['depends', 'groups', 'makedepends']))
 
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
-        self.all_keys.append('_build')
-
         super().__namespaceinit__()
+
+        self.all_keys.append('_build')
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
             # Package is not in the database, so it must be new. Let's initialize it.
@@ -133,8 +133,6 @@ class Package(PackageMeta):
         if not self.pbpath:
             self.determine_pbpath()
 
-        self.maybe_update_pkgbuild_repo()
-
         self.pkgbuild = ''
 
     def get_from_pkgbuild(self, var=None):
@@ -148,9 +146,10 @@ class Package(PackageMeta):
         if var is None:
             logger.error('get_from_pkgbuild var is none')
             raise ValueError
-
         if 'dummy-' in self.name:
             return 'n/a'
+
+        self.maybe_update_pkgbuild_repo()
 
         if not self.pkgbuild:
             setattr(self, 'pkgbuild', open(self.pbpath).read())
@@ -232,6 +231,7 @@ class Package(PackageMeta):
 
     def determine_git_repo_info(self):
         if not self.git_url or not self.git_url.endswith('.git'):
+            self.maybe_update_pkgbuild_repo()
             source = self.get_from_pkgbuild('source')
             url_match = re.search(r'((https*)|(git:)).+\.git', source)
             if url_match:
@@ -266,17 +266,18 @@ class Package(PackageMeta):
                         self.allowed_in.append('main')
                     break
         else:
-            logger.error('get_from_pkgbuild cant determine pkgbuild path for %s', self.name)
+            msg = 'cant determine pkgbuild path for {0}'.format(self.name)
+            logger.error(msg)
             if 'dummy-' not in self.name:
-                raise ValueError
+                raise ValueError(msg)
 
     def maybe_update_pkgbuild_repo(self):
-        if not self.db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists('/var/tmp/antergos-packages'):
+        if not self.db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(status.PKGBUILDS_DIR):
             if self.db.setnx('PKGBUILD_REPO_LOCK', True):
                 self.db.expire('PKGBUILD_REPO_LOCK', 150)
 
-                if os.path.exists('/var/tmp/antergos-packages'):
-                    shutil.rmtree('/var/tmp/antergos-packages')
+                if os.path.exists(status.PKGBUILDS_DIR):
+                    shutil.rmtree(status.PKGBUILDS_DIR)
                 try:
                     subprocess.check_call(
                             ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
@@ -289,7 +290,7 @@ class Package(PackageMeta):
                 self.db.delete('PKGBUILD_REPO_LOCK')
             else:
                 while not self.db.exists('PKGBUILD_REPO_UPDATED') and self.db.exists('PKGBUILD_REPO_LOCK'):
-                    time.sleep(2)
+                    sleep(2)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if not self.push_version or old_val == new_val:
