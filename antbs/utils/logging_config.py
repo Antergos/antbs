@@ -31,68 +31,98 @@
 
 import logging
 import logging.config
-
+from .singleton import Singleton
 from .redis_connection import db
 
-stmpath = logging.getLogger('stormpath.http')
-stmpath.setLevel(logging.ERROR)
 
-logging.config.dictConfig({
-    'version': 1,
-    'disable_existing_loggers': True,
+class LoggingConfig(Singleton):
+    _initialized = False
 
-    'formatters': {
-        'file': {
-            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s '
-                      '| %(message)s'
-        },
-        'email': {
-            'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %(module)s'
-                      '\nFUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
-        },
-        'redis': {
-            'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %(funcName)s '
-                      '| %(message)s'
-        }
-    },
-    'handlers': {
-        'default': {
-            'level': 'DEBUG',
-            'class': 'logging.StreamHandler',
-            'formatter': 'file'
-        },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': 'antbs.log',
-            'maxBytes': 3000000,
-            'backupCount': 3
-        },
-        'redis': {
-            'level': 'DEBUG',
-            'class': 'rlog.RedisHandler',
-            'channel': 'log_stream',
-            'redis_client': db,
-            'formatter': 'redis'
-        },
-        'email': {
-            'level': 'ERROR',
-            'class': 'logging.handlers.SMTPHandler',
-            'mailhost': 'localhost',
-            'fromaddr': 'error@build.antergos.org',
-            'toaddrs': 'admin@antergos.org',
-            'subject': 'AntBS Error Report',
-            'credentials': '["error@build.antergos.org", "U7tGQGoi4spS"]',
-            'formatter': 'email'
-        }
-    },
-    'loggers': {
-        '': {
-            'handlers': ['default', 'file', 'redis', 'email'],
-            'level': 'DEBUG',
-            'propagate': True
-        }
-    }
-})
+    def __init__(self):
+        self.noisy_loggers = ["github3",
+                              "github3.gists",
+                              "github3.repos",
+                              "github3.issues",
+                              "github3.search",
+                              "stormpath.http"]
+        self.logger = None
 
-logger = logging.getLogger()
+        if not self._initialized:
+            self._initialize()
+
+    def _initialize(self):
+        for logger_name in self.noisy_loggers:
+            logger = logging.getLogger(logger_name)
+            logger.setLevel(logging.ERROR)
+
+        logging.config.dictConfig(self.get_logging_config())
+
+        self.logger = logging.getLogger('antbs')
+        self._initialized = True
+        logger = None
+
+    def get_logging_config(self):
+        return {
+            'version': 1,
+            'disable_existing_loggers': True,
+
+            'formatters': {
+                'file': {
+                    'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %('
+                              'funcName)s '
+                              '| %(message)s'
+                },
+                'email': {
+                    'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %('
+                              'module)s'
+                              '\nFUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
+                },
+                'redis': {
+                    'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %('
+                              'funcName)s '
+                              '| %(message)s'
+                }
+            },
+            'handlers': {
+                'default': {
+                    'level': 'DEBUG',
+                    'class': 'logging.StreamHandler',
+                    'formatter': 'file'
+                },
+                'file': {
+                    'level': 'DEBUG',
+                    'class': 'logging.handlers.RotatingFileHandler',
+                    'filename': 'antbs.log',
+                    'maxBytes': 3000000,
+                    'backupCount': 3
+                },
+                'redis': {
+                    'level': 'DEBUG',
+                    'class': 'rlog.RedisHandler',
+                    'channel': 'log_stream',
+                    'redis_client': db,
+                    'formatter': 'redis'
+                },
+                'email': {
+                    'level': 'ERROR',
+                    'class': 'logging.handlers.SMTPHandler',
+                    'mailhost': 'localhost',
+                    'fromaddr': 'error@build.antergos.org',
+                    'toaddrs': 'admin@antergos.org',
+                    'subject': 'AntBS Error Report',
+                    'credentials': '["error@build.antergos.org", "U7tGQGoi4spS"]',
+                    'formatter': 'email'
+                }
+            },
+            'loggers': {
+                '': {
+                    'handlers': ['default', 'file', 'redis', 'email'],
+                    'level': 'DEBUG',
+                    'propagate': True
+                }
+            }
+        }
+
+
+logging_config = LoggingConfig()
+logger = logging_config.logger

@@ -164,7 +164,7 @@ class Package(PackageMeta):
 
         if var == "pkgver":
             exclude = ['numix-icon-theme', 'plymouth']
-            use_container = ['zfs', 'spl', 'zfs-utils', 'spl-utils', 'broadcom-wl']
+            use_container = []
             git_source = 'git+' in self.pkgbuild or 'git://' in self.pkgbuild
             if (git_source and self.name not in exclude) or 'cnchi' in self.name:
                 if 'http' not in self.git_url or not self.git_name:

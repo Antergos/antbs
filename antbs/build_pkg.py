@@ -56,7 +56,8 @@ SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
 DOC_DIR = os.path.join(BASE_DIR, 'build')
 REPO_DIR = "/opt/antergos-packages"
-doc = docker_utils.DockerUtils().doc
+doc_utils = docker_utils.DockerUtils()
+doc = doc_utils.doc
 logger = logconf.logger
 
 with Connection(db):
@@ -429,7 +430,7 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
     :param is_iso:
     :return:
     """
-    if not container or not bld_obj:
+    if not container and not bld_obj:
         logger.error('Unable to publish build output. (Container is None)')
         return
     # proc = subprocess.Popen(['docker', 'logs', '--follow', container], stdout=subprocess.PIPE)
@@ -440,37 +441,36 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
         db.publish('build-output', line)
         db.set('build_log_last_line', line)
         killed_count = 0
-        while not status.idle and killed_count < 2:
-            time.sleep(600)
-            output = doc.logs(container=container, tail=5)
-            if 'Client failed to connect to the D-BUS daemon' in output:
-                db.publish('build-output', 'Stalled build detected. Killing Xvfb...')
-                cmd = doc.exec_create(container=container, cmd='killall Xvfb', privileged=True)
-                if cmd.get('Id', False):
-                    res = doc.exec_start(cmd['Id'])
-                    db.publish('build-output', res)
-                    killed_count += 1
+        # while not status.idle and killed_count < 2:
+        #     time.sleep(600)
+        #     output = doc.logs(container=container, tail=5)
+        #     if 'Client failed to connect to the D-BUS daemon' in output:
+        #         db.publish('build-output', 'Stalled build detected. Killing Xvfb...')
+        #         cmd = doc.exec_create(container=container, cmd='killall Xvfb', privileged=True)
+        #         if cmd.get('Id', False):
+        #             res = doc.exec_start(cmd['Id'])
+        #             db.publish('build-output', res)
+        #             killed_count += 1
 
-        doc.wait(container)
-        return
+        # doc.wait(container)
+        # return
 
-    output = doc.logs(container=container, stream=True)
+    output = doc.logs(container=bld_obj.container, stream=True)
     nodup = set()
     content = []
     for line in output:
-        # time.sleep(.10)
-        if not line or line == '' or 'makepkg]# PS1="' in line:
+        line = line.decode('UTF-8')
+        if not line or 'makepkg]# PS1="' in line:
             continue
         line = line.rstrip()
         end = line[25:]
-        if end not in nodup or (end in nodup and 'UTF-8' in end):
+        if end not in nodup:
             nodup.add(end)
-            # line = re.sub(r'(?<=[\w\d])(( \')|(\' )(?=[\w\d]+))|(\'\n)', ' ', line)
             line = line.replace("'", '')
             line = line.replace('"', '')
-            line = '[%s]: %s' % (datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
-            if len(line) > 150:
-                line = truncate_middle(line, 150)
+            line = '[{0}]: {1}'.format(datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
+            # if len(line) > 150:
+            #     line = truncate_middle(line, 150)
             content.append(line)
             db.publish('build-output', line)
             db.set('build_log_last_line', line)
@@ -479,29 +479,25 @@ def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=Fal
     if not result_ready:
         while not result_ready:
             result_ready = bld_obj.completed != bld_obj.failed
-            time.sleep(3)
-    failed = bld_obj.failed
-    if upd_repo or failed:
+            time.sleep(2)
+
+    if upd_repo or bld_obj.failed:
         db.publish('build-output', 'ENDOFLOG')
 
-    log = bld_obj.log
-
     existing = True
-    if len(log) < 1 and not failed and not is_iso:
+    if len(bld_obj.log) < 1 and not bld_obj.failed and not is_iso:
         existing = False
 
     for line in content:
-        log.rpush(line)
+        bld_obj.log.rpush(line)
 
     if existing:
-        log_content = '\n '.join(log)
-        pretty = highlight(log_content,
-                           BashLexer(),
-                           HtmlFormatter(style='monokai',
-                                         linenos='inline',
-                                         prestyles="background:#272822;color:#fff;",
-                                         encoding='utf-8'))
-        bld_obj.log_str = pretty
+        log_content = '\n '.join(bld_obj.log)
+        bld_obj.log_str = highlight(log_content,
+                                    BashLexer(),
+                                    HtmlFormatter(style='monokai',
+                                                  linenos='inline',
+                                                  prestyles="background:#272822;color:#fff;"))
 
 
 def process_and_save_build_metadata(pkg_obj=None):
@@ -665,12 +661,8 @@ def build_package(pkg=None):
 
     in_dir_last = len([name for name in os.listdir(result)])
     db.setex('pkg_count', 3600, in_dir_last)
-    pkg_deps_str = ' '.join(pkg_obj.depends) if pkg_obj.depends else ''
 
     bld_obj = process_and_save_build_metadata(pkg_obj=pkg_obj)
-    build_id = bld_obj.bnum
-    # Try to ensure we get the updated package version
-    pkg_obj = package.get_pkg_object(name=pkg)
 
     if pkg_obj.autosum:
         build_env = ['_AUTOSUMS=True']
@@ -681,10 +673,7 @@ def build_package(pkg=None):
     else:
         build_env.append('_ALEXPKG=False')
 
-    hconfig = docker_utils.DockerUtils().create_pkgs_host_config(pkg_obj.build_path, result)
-    is_firefox_kde = True if 'firefox-kde' in pkg_obj.name else False
-    image_name = "antergos/makepkg" if not is_firefox_kde else "antergos/makepkg-systemd"
-    cmd = "/makepkg/build.sh" if not is_firefox_kde else "/sbin/init"
+    hconfig = doc_utils.create_pkgs_host_config(pkg_obj.build_path, result)
     container = {}
     try:
         container = doc.create_container("antergos/makepkg",
@@ -697,28 +686,28 @@ def build_package(pkg=None):
         if container.get('Warnings', False):
             logger.error(container.get('Warnings'))
     except Exception as err:
-        logger.error('Create container failed. Error Msg: %s' % err)
+        logger.error('Create container failed. Error Msg: %s', err)
         bld_obj.failed = True
 
     bld_obj.container = container.get('Id', '')
-    status.container = bld_obj.container
+    status.container = container.get('Id', '')
+    stream_process = Process(target=publish_build_ouput, kwargs=dict(bld_obj=bld_obj))
 
     try:
-        doc.start(container.get('Id'))
-        stream_process = Process(target=publish_build_ouput,
-                                 kwargs=dict(container=bld_obj.container, bld_obj=bld_obj))
+        doc.start(container.get('Id', ''))
         stream_process.start()
         result = doc.wait(bld_obj.container)
         if int(result) != 0:
             bld_obj.failed = True
-            logger.error('Container %s exited with a non-zero return code. Return code was %s' % (pkg_obj.name, result))
+            logger.error('Container %s exited with a non-zero return code. Return code was %s', pkg_obj.name, result)
         else:
-            logger.info('Container %s exited. Return code was %s' % (pkg_obj.name, result))
+            logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
             bld_obj.completed = True
-        stream_process.join()
     except Exception as err:
         logger.error('Start container failed. Error Msg: %s' % err)
         bld_obj.failed = True
+
+    stream_process.join()
 
     repo_updated = False
     if bld_obj.completed:
@@ -730,23 +719,26 @@ def build_package(pkg=None):
             repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
 
     if repo_updated:
-        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> was successful.' % (
-            bld_obj.bnum, bld_obj.bnum, pkg_obj.name
-        )
+        tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'.format(
+            str(bld_obj.bnum), pkg_obj.name)
         TimelineEvent(msg=tlmsg, tl_type=4)
         status.completed.rpush(bld_obj.bnum)
         bld_obj.review_status = 'pending'
     else:
-        tlmsg = 'Build <a href="/build/%s">%s</a> for <strong>%s</strong> failed.' % (
-            bld_obj.bnum, bld_obj.bnum, pkg_obj.name)
+        tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'.format(
+            str(bld_obj.bnum), pkg_obj.name)
         TimelineEvent(msg=tlmsg, tl_type=5)
         bld_obj.failed = True
+        bld_obj.completed = False
 
     bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
     if not bld_obj.failed:
         pkg_obj = package.get_pkg_object(bld_obj.pkgname)
-        last_build = pkg_obj.builds[-2]
+        last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
+        if not last_build:
+            db.set('antbs:misc:cache_buster:flag', True)
+            return True
         last_bld_obj = build_obj.get_build_object(bnum=last_build)
         if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
             last_bld_obj.review_status = 'skip'
@@ -754,7 +746,7 @@ def build_package(pkg=None):
         db.set('antbs:misc:cache_buster:flag', True)
         return True
 
-    status.failed.rpush(build_id)
+    status.failed.rpush(bld_obj.bnum)
     return False
 
 

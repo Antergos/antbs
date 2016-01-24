@@ -90,7 +90,7 @@ class BuildObject(RedisObject):
                              'review_status', 'review_dev', 'review_date', 'log_str'],
                      bool=['failed', 'completed'],
                      int=['pkg_id', 'bnum'],
-                     ist=['log'],
+                     list=['log'],
                      zset=[]))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]

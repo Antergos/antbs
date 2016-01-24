@@ -8,10 +8,12 @@ $(function(){
     if(w.hasClass("sb-collapsed")){
       $(".fa",b).addClass("fa-angle-left").removeClass("fa-angle-right");
       w.removeClass("sb-collapsed");
+      $('body').removeClass( "sb-collapsed" );
       $.cookie('FLATDREAM_sidebar','open',{expires:365, path:'/'});
     }else{
       $(".fa",b).removeClass("fa-angle-left").addClass("fa-angle-right");
       w.addClass("sb-collapsed");
+      $( 'body' ).addClass( "sb-collapsed" );
       $.cookie('FLATDREAM_sidebar','closed',{expires:365, path:'/'});
     }
     //updateHeight();
@@ -350,6 +352,7 @@ $(function(){
     //Check cookie for menu collapse (ON DOCUMENT READY)
     if($.cookie('FLATDREAM_sidebar') && $.cookie('FLATDREAM_sidebar') == 'closed'){
         $('#cl-wrapper').addClass('sb-collapsed');
+      $( 'body' ).addClass( 'sb-collapsed' );
         $('.fa',$('#sidebar-collapse')[0]).addClass('fa-angle-right').removeClass('fa-angle-left');
     }
   });

@@ -35,6 +35,7 @@ import docker
 from .logging_config import logger
 from .redis_connection import db
 from .server_status import status
+from .singleton import Singleton
 
 doc_user = status.docker_user
 doc_pass = status.docker_password
@@ -44,8 +45,8 @@ DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
 BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
 
 
-class DockerUtils(object):
-    doc = None
+class DockerUtils(Singleton):
+    _doc = None
 
     def __init__(self):
         self.cache_dir = '/var/tmp/pkg_cache'
@@ -55,14 +56,15 @@ class DockerUtils(object):
             shutil.rmtree(self.result_dir, ignore_errors=True)
         os.mkdir(self.result_dir)
 
-        if self.doc is None:
+        if self._doc is None:
             # Initiate communication with build daemon
             try:
-                self.doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
-                # doc.build(path=DOC_DIR, tag="arch-devel", quiet=False, timeout=None)
+                self._doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
             except Exception as err:
                 logger.error("Cant connect to Docker daemon. Error msg: %s", err)
                 raise RuntimeError
+
+        self.doc = self._doc
 
     def create_pkgs_host_config(self, pkgbuild_dir, result=None):
         """
@@ -113,18 +115,14 @@ class DockerUtils(object):
         if 'pkgver' not in result:
             binds['/var/tmp/32bit'] = {'bind': '/32bit', 'ro': False}
             binds['/var/tmp/32build'] = {'bind': '/32build', 'ro': False}
-            if 'firefox-kde' in pkgbuild_dir:
-                binds['/sys/fs/cgroup'] = {'bind': '/sys/fs/cgroup', 'ro': True}
 
         binds[result] = {'bind': '/result', 'ro': False}
-        log_conf = {'Type': 'journald', 'Config': {}}
 
         pkgs_hconfig = self.doc.create_host_config(binds=binds,
                                                    restart_policy={"MaximumRetryCount": 2,
                                                                    "Name": "on-failure"},
                                                    privileged=True, cap_add=['ALL'],
                                                    mem_limit='3G', memswap_limit='-1')
-
         return pkgs_hconfig
 
     def create_repo_update_host_config(self):

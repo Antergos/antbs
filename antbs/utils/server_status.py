@@ -29,22 +29,14 @@
 
 """ Server Status Module (handles this application's state) """
 
+import os
 import datetime
-from .redis_connection import RedisObject
+from .redis_connection import RedisObject, RedisList, RedisZSet
 from .logging_config import logger
+from .singleton import Singleton
 
 
-class Singleton(RedisObject):
-
-    _instance = None
-
-    def __new__(cls, *args, **kwargs):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls, *args, *kwargs)
-        return cls._instance
-
-
-class ServerStatus(Singleton):
+class ServerStatus(Singleton, RedisObject):
 
     def __init__(self, prefix='status', key='', *args, **kwargs):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
@@ -59,9 +51,9 @@ class ServerStatus(Singleton):
                      int=['building_num'],
                      list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
                            'hook_queue'],
-                     set=['all_packages', 'iso_pkgs', 'repos']))
-
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+                     set=['all_packages', 'iso_pkgs', 'repos'],
+                     path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
+                           'MAIN_64', 'MAIN_32', ]))
 
         super().__namespaceinit__()
 
@@ -73,6 +65,31 @@ class ServerStatus(Singleton):
             self.now_building = 'Idle'
             self.iso_flag = False
             self.iso_building = False
+
+    def __keysinit__(self):
+        for key in self.all_keys:
+            value = getattr(self, key, '')
+            is_string = key in self.key_lists['string']
+            initialized = (not is_string and '' != value) or (is_string and '_' != value)
+
+            if initialized:
+                continue
+
+            value = os.environ.get(key.upper())
+
+            if key in self.key_lists['string']:
+                value = value or ''
+                setattr(self, key, value)
+            elif key in self.key_lists['bool']:
+                value = value or False
+                setattr(self, key, value)
+            elif key in self.key_lists['int']:
+                value = value or 0
+                setattr(self, key, value)
+            elif key in self.key_lists['list']:
+                setattr(self, key, RedisList.as_child(self, key, str))
+            elif key in self.key_lists['set']:
+                setattr(self, key, RedisZSet.as_child(self, key, str))
 
 
 class TimelineEvent(RedisObject):

@@ -29,13 +29,16 @@
 
 """ AntBS (Antergos Build Server) Main Module """
 
+
+import gevent
+import gevent.monkey
+gevent.monkey.patch_all()
 import requests
 # import newrelic.agent
 #
 # settings = newrelic.agent.global_settings()
 # settings.app_name = 'AntBS'
 # newrelic.agent.initialize()
-
 import json
 import re
 import os
@@ -44,93 +47,106 @@ import shutil
 from datetime import datetime, timedelta
 from rq import Queue, Connection, Worker
 import rq_dashboard
-from flask import Flask, request, Response, abort, render_template, url_for, redirect, flash
+from flask import (
+    Flask, request, Response, abort, render_template, url_for,
+    redirect, flash, stream_with_context)
 from werkzeug.contrib.fixers import ProxyFix
-import docker
 from flask.ext.stormpath import StormpathManager, groups_required, user
 from flask.ext.cache import Cache
-import gevent
-import gevent.monkey
+import bugsnag
+from bugsnag.flask import handle_exceptions
+
+
 import utils.pagination
 import build_pkg as builder
 from utils.redis_connection import db
 from utils.server_status import status as status, get_timeline_object
-import utils.logging_config as logconf
 import package
 import webhook
 # import utils.slack_bot as slack_bot
 import build_obj
 import iso
 import repo_monitor as repo_mon
-import bugsnag
-from bugsnag.flask import handle_exceptions
-from pacman_repo import PacmanRepo
-
-
-status.github_token = status.github_token if status.github_token else os.environ.get('GITHUB_TOKEN')
-status.gitlab_token = status.gitlab_token if status.gitlab_token else os.environ.get('GITLAB_TOKEN')
-status.docker_user = status.docker_user if status.docker_user else os.environ.get('DOCKER_USER')
-status.docker_password = status.docker_password if status.docker_password else os.environ.get('DOCKER_PASSWORD')
-status.gpg_key = status.gpg_key if status.gpg_key else os.environ.get('ANTBS_GPG_KEY')
-status.gpg_password = status.gpg_password if status.gpg_password else os.environ.get('ANTBS_GPG_PASS')
-status.bugsnag_key = status.bugsnag_key if status.bugsnag_key else os.environ.get('BUGSNAG_KEY')
-status.sp_session_key = status.sp_session_key if status.sp_session_key else os.environ.get('STORMPATH_SESSION_KEY')
-status.sp_api_id = status.sp_api_id if status.sp_api_id else os.environ.get('STORMPATH_API_KEY_ID')
-status.sp_api_key = status.sp_api_key if status.sp_api_key else os.environ.get('STORMPATH_API_KEY_SECRET')
-status.sp_app = status.sp_app if status.sp_app else os.environ.get('STORMPATH_APPLICATION')
-
-gevent.monkey.patch_all()
-
-SRC_DIR = os.path.dirname(__file__) or '.'
-STAGING_REPO = '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging'
-MAIN_REPO = '/srv/antergos.info/repo/antergos'
-STAGING_64 = os.path.join(STAGING_REPO, 'x86_64')
-STAGING_32 = os.path.join(STAGING_REPO, 'i686')
-MAIN_64 = os.path.join(MAIN_REPO, 'x86_64')
-MAIN_32 = os.path.join(MAIN_REPO, 'i686')
-
-bugsnag.configure(api_key=status.bugsnag_key, project_root=SRC_DIR)
-
-# Create the variable `app` which is an instance of the Flask class
-app = Flask(__name__)
-handle_exceptions(app)
-
-app.config['SECRET_KEY'] = status.sp_session_key
-app.config['STORMPATH_API_KEY_ID'] = status.sp_api_id
-app.config['STORMPATH_API_KEY_SECRET'] = status.sp_api_key
-app.config['STORMPATH_APPLICATION'] = status.sp_app
-app.config['STORMPATH_ENABLE_USERNAME'] = True
-app.config['STORMPATH_REQUIRE_USERNAME'] = True
-app.config['STORMPATH_ENABLE_REGISTRATION'] = False
-app.config['STORMPATH_REDIRECT_URL'] = '/pkg_review'
-app.config['STORMPATH_LOGIN_TEMPLATE'] = 'login.html'
-app.config['STORMPATH_COOKIE_DURATION'] = timedelta(days=14)
-app.config['STORMPATH_ENABLE_FORGOT_PASSWORD'] = True
-
-stormpath_manager = StormpathManager(app)
-
-app.jinja_options = Flask.jinja_options.copy()
-app.jinja_options['lstrip_blocks'] = True
-app.jinja_options['trim_blocks'] = True
-
-# Use gunicorn to proxy with nginx
-app.wsgi_app = ProxyFix(app.wsgi_app)
-
-app.config.from_object(rq_dashboard.default_settings)
-app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
-
-cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
-                           'CACHE_KEY_PREFIX': 'antbs:cache:',
-                           'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
-cache.init_app(app)
-
-# with app.app_context():
-#     cache.clear()
+import utils.logging_config as logconf
 
 logger = logconf.logger
+cache = queue = repo_queue = hook_queue = w1 = w2 = w3 = None
 
-# PacmanRepo(name='antergos', path=MAIN_REPO)
-# PacmanRepo(name='antergos-staging', path=STAGING_REPO)
+
+def url_for_other_page(page):
+    args = request.view_args.copy()
+    args['page'] = page
+    return url_for(request.endpoint, **args)
+
+
+def initialize_app():
+    """
+    Creates flask app object, initializes settings, then returns `app`.
+
+    """
+
+    bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
+
+    # Create the variable `app` which is an instance of the Flask class
+    app = Flask(__name__)
+    handle_exceptions(app)
+
+    # Stormpath configuration
+    app.config.update({'SECRET_KEY': status.sp_session_key,
+                             'STORMPATH_API_KEY_ID': status.sp_api_id,
+                             'STORMPATH_API_KEY_SECRET': status.sp_api_key,
+                             'STORMPATH_APPLICATION': status.sp_app,
+                             'STORMPATH_ENABLE_USERNAME': True,
+                             'STORMPATH_REQUIRE_USERNAME': True,
+                             'STORMPATH_ENABLE_REGISTRATION': False,
+                             'STORMPATH_REDIRECT_URL': '/pkg_review',
+                             'STORMPATH_LOGIN_TEMPLATE': 'login.html',
+                             'STORMPATH_COOKIE_DURATION': timedelta(days=14),
+                             'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
+
+    # Create Stormpath Manager object.
+    stormpath_manager = StormpathManager(app)
+
+    # Jinja2 configuration
+    global url_for_other_page
+    app.jinja_options = Flask.jinja_options.copy()
+    app.jinja_options['lstrip_blocks'] = True
+    app.jinja_options['trim_blocks'] = True
+    app.jinja_env.globals['url_for_other_page'] = url_for_other_page
+
+    # Use gunicorn with nginx proxy
+    app.wsgi_app = ProxyFix(app.wsgi_app)
+
+    # Setup rq_dashboard (accessible at '/rq' endpoint)
+    app.config.from_object(rq_dashboard.default_settings)
+    app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
+
+    # Setup app-level caching using Flask-Cache extension.
+    global cache
+    cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
+                                     'CACHE_KEY_PREFIX': 'antbs:cache:',
+                                     'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
+    cache.init_app(app)
+
+    # Clear the cache every time the app is started.
+    with app.app_context():
+        cache.clear()
+
+    # Setup rq (background task queue manager)
+    with Connection(db):
+        global queue, repo_queue, hook_queue, w1, w2, w3
+        queue = Queue('build_queue')
+        repo_queue = Queue('repo_queue')
+        hook_queue = Queue('hook_queue')
+        w1 = Worker([queue])
+        w2 = Worker([repo_queue])
+        w3 = Worker([hook_queue])
+
+    return app
+
+
+# Make `app` available to gunicorn
+app = initialize_app()
 
 
 def copy(src, dst):
@@ -161,71 +177,6 @@ def remove(src):
         return True
 
 
-def handle_worker_exception(job, exc_type, exc_value, traceback):
-    # TODO: This needs some thought on how to recover instead of bailing on entire build queue
-    doc = docker.Client(base_url='unix://var/run/docker.sock', timeout=10)
-    if job['origin'] == 'build_queue':
-        container = db.get('container')
-    elif job['origin'] == 'repo_queue':
-        container = db.get('repo_container')
-    else:
-        container = ''
-    queue = status.queue
-    now_building = status.now_building
-    try:
-        doc.kill(container)
-        doc.remove_container(container)
-    except Exception:
-        logger.error('Unable to kill container')
-    if job['origin'] == 'build_queue':
-        db.set('%s:result' % now_building['key'], 'failed')
-        db.rpush('failed', now_building['build_id'])
-
-        if not queue or len(queue) == 0 or queue == []:
-            repo = os.path.join("/tmp", "staging")
-            cache = os.path.join("/tmp", "pkg_cache")
-
-            remove(repo)
-            remove(cache)
-            remove('/opt/antergos-packages')
-
-            # db.set('idle', "True")
-            status.idle = True
-            # db.set('building', 'Idle')
-            status.current_status = 'Idle'
-            # db.hset('now_building', 'pkg', '')
-            # db.set('container', '')
-            # db.set('building_num', '')
-            # db.set('building_start', '')
-
-    logger.error('Caught Build Exception: %s', traceback)
-
-    return True
-
-
-with Connection(db):
-    queue = Queue('build_queue')
-    repo_queue = Queue('repo_queue')
-    hook_queue = Queue('hook_queue')
-    w1 = Worker([queue])
-    w2 = Worker([repo_queue])
-    w3 = Worker([hook_queue])
-
-
-def url_for_other_page(page):
-    """
-
-    :param page:
-    :return:
-    """
-    args = request.view_args.copy()
-    args['page'] = page
-    return url_for(request.endpoint, **args)
-
-
-app.jinja_env.globals['url_for_other_page'] = url_for_other_page
-
-
 def get_live_build_output():
     psub = db.pubsub()
     psub.subscribe('build-output')
@@ -240,14 +191,14 @@ def get_live_build_output():
             else:
                 message['data'] = '...'
 
-            yield 'event: build_output\ndata: {0}\n\n'.format(message['data'].encode('UTF-8'))
+            yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
 
         elif keep_alive > 600:
             keep_alive = 0
             yield ':'.encode('UTF-8')
 
         keep_alive += 1
-        gevent.sleep(.05)
+        yield from gevent.sleep(.05)
 
     psub.close()
 
@@ -262,12 +213,12 @@ def get_live_status_updates():
         elif not status.idle and status.current_status != last_event:
             last_event = status.current_status
             yield 'event: status\ndata: {0}\n\n'.format(status.current_status).encode('UTF-8')
-        elif keep_alive > 30:
+        elif keep_alive > 15:
             keep_alive = 0
             yield ':'.encode('UTF-8')
 
         keep_alive += 1
-        gevent.sleep(1)
+        yield from gevent.sleep(1)
 
 
 def get_paginated(item_list, per_page, page, timeline):
@@ -278,7 +229,12 @@ def get_paginated(item_list, per_page, page, timeline):
     items.reverse()
     paginated = [items[i:i + per_page] for i in range(0, len(items), per_page)]
     all_pages = len(paginated)
-    this_page = paginated[page] if all_pages != 0 and not page > all_pages else paginated[-1] if all_pages > 0 else paginated
+    if all_pages and page <= all_pages:
+        this_page = paginated[page]
+    elif all_pages and page > all_pages:
+        this_page = paginated[-1]
+    else:
+        this_page = paginated[0]
 
     return this_page, all_pages
 
@@ -380,7 +336,7 @@ def get_repo_info(repo=None, logged_in=False):
     if all_packages:
         for pkg in all_packages:
             p = pkg
-            pkg = re.search('^(\w|-)+(\D|r3|g4|qt5)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
+            pkg = re.search(r'^(\w|-)+(\D|r3|g4|qt5)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
             if pkg:
                 pkg = pkg.group(0)
             else:
@@ -434,21 +390,21 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             errmsg = dict(error=False, msg=None)
             return errmsg
 
-        pkg_files_64 = glob.glob('%s/%s-***' % (STAGING_64, pkg_obj.pkgname))
-        pkg_files_32 = glob.glob('%s/%s-***' % (STAGING_32, pkg_obj.pkgname))
+        pkg_files_64 = glob.glob('%s/%s-***' % (status.STAGING_64, pkg_obj.pkgname))
+        pkg_files_32 = glob.glob('%s/%s-***' % (status.STAGING_32, pkg_obj.pkgname))
         pkg_files = pkg_files_64 + pkg_files_32
 
         if pkg_files or True:
             for f in pkg_files_64:
                 logger.debug('f in pkg_files_64 fired!')
                 if result == 'passed':
-                    copy(f, MAIN_64)
+                    copy(f, status.MAIN_64)
                     copy(f, '/tmp')
                 if result != 'skip':
                     os.remove(f)
             for f in pkg_files_32:
                 if result == 'passed':
-                    copy(f, MAIN_32)
+                    copy(f, status.MAIN_32)
                     copy(f, '/tmp')
                 if result != 'skip':
                     os.remove(f)
@@ -483,7 +439,7 @@ def get_timeline(tlpage=None):
     return this_page, all_pages
 
 
-@cache.memoize(timeout=1800, unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_build_history_chart_data(pkg_obj=None):
     if pkg_obj is None:
         builds = status.completed + status.failed
@@ -542,7 +498,7 @@ def flask_error(e):
 
 @app.route("/timeline/<int:tlpage>")
 @app.route("/")
-@cache.memoize(timeout=1800, unless=cache_buster)
+@cache.memoize(timeout=900, unless=cache_buster)
 def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
@@ -607,7 +563,6 @@ def homepage(tlpage=None):
 
 @app.route("/building")
 def build():
-    now_building = status.now_building
     ver = ''
     bnum = ''
     start = ''
@@ -615,7 +570,7 @@ def build():
     if cont:
         container = cont[:20]
     else:
-        container = None
+        container = ''
     if not status.idle:
         bnum = status.building_num
         start = status.building_start
@@ -623,8 +578,8 @@ def build():
             bld_obj = build_obj.get_build_object(bnum=bnum)
             ver = bld_obj.version_str
 
-    return render_template("building.html", building=now_building, container=container, bnum=bnum,
-                           start=start, ver=ver, idle=status.idle)
+    return render_template("building.html", building=status.now_building, container=container,
+                           bnum=bnum, start=start, ver=ver, idle=status.idle)
 
 
 @app.route('/get_log')
@@ -632,7 +587,12 @@ def get_log():
     if status.idle:
         abort(404)
 
-    return Response(get_live_build_output(), direct_passthrough=True, mimetype='text/event-stream')
+    headers = {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+    }
+    return Response(stream_with_context(get_live_build_output()), direct_passthrough=True,
+                    mimetype='text/event-stream', headers=headers)
 
 
 @app.route('/hook', methods=['POST', 'GET'])
@@ -691,6 +651,7 @@ def completed(page=None, name=None):
 
 @app.route('/failed/<int:page>')
 @app.route('/failed')
+@cache.memoize(timeout=900, unless=cache_buster)
 def failed(page=None):
     build_status = 'failed'
     if page is None:
@@ -706,6 +667,7 @@ def failed(page=None):
 
 
 @app.route('/build/<int:num>')
+@cache.memoize(timeout=900, unless=cache_buster)
 def build_info(num):
     if not num:
         abort(404)
@@ -731,6 +693,7 @@ def build_info(num):
 
 @app.route('/browse/<goto>')
 @app.route('/browse')
+@cache.memoize(timeout=900, unless=cache_buster)
 def repo_browser(goto=None):
     building = status.now_building
     release = False
@@ -765,7 +728,8 @@ def dev_pkg_check(page=None):
         bnum = payload['bnum']
         dev = payload['dev']
         result = payload['result']
-        if all([bnum, dev, result]):
+        if len([x for x in (bnum, dev, result) if x]) == 3:
+            logger.debug('fired!')
             set_review = set_pkg_review_result(bnum, dev, result)
             if set_review.get('error'):
                 set_rev_error = set_review.get('msg')
@@ -794,7 +758,7 @@ def build_pkg_now():
         if not pexists:
             try:
                 pkg = package.get_pkg_object(name=pkgname)
-                if pkg and pkg.pkgver:
+                if pkg and pkg.pkg_id:
                     pexists = True
             except Exception:
                 pass
@@ -839,8 +803,12 @@ def build_pkg_now():
 @app.route('/api/ajax', methods=['GET', 'POST'])
 def get_status():
     if 'get_status' in request.path:
+        headers = {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+        }
         return Response(get_live_status_updates(), direct_passthrough=True,
-                        mimetype='text/event-stream')
+                        mimetype='text/event-stream', headers=headers)
 
     if not user.is_authenticated():
         abort(403)
@@ -852,7 +820,7 @@ def get_status():
     message = dict(msg='Ok')
 
     if request.method == 'POST':
-        payload = json.loads(request.data)
+        payload = json.loads(request.data.decode('UTF-8'))
         pkg = payload.get('pkg', None)
         dev = payload.get('dev', None)
         action = payload.get('result', None)
@@ -898,19 +866,18 @@ def get_status():
 
 
 @app.route('/issues', methods=['GET'])
+@cache.memoize(timeout=900, unless=cache_buster)
 def show_issues():
     return render_template('issues.html')
 
 
 @app.route('/pkg/<pkgname>', methods=['GET'])
+@cache.memoize(timeout=900, unless=cache_buster)
 def get_and_show_pkg_profile(pkgname=None):
-    if pkgname is None:
-        abort(404)
-    check = status.all_packages.ismember(pkgname)
-    if not check:
+    if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)
 
-    pkgobj = package.Package(name=pkgname)
+    pkgobj = package.get_pkg_object(name=pkgname)
     if '' == pkgobj.description:
         desc = pkgobj.get_from_pkgbuild('pkgdesc')
         pkgobj.description = desc
@@ -923,6 +890,7 @@ def get_and_show_pkg_profile(pkgname=None):
 
 
 @app.route('/repo_packages/<repo>')
+@cache.memoize(timeout=900, unless=cache_buster)
 def repo_packages(repo=None):
     if not repo or repo not in ['antergos', 'antergos-staging']:
         abort(404)

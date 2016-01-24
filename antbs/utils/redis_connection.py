@@ -26,6 +26,8 @@
 
 import redis
 import json
+import os
+import errno
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 
@@ -37,7 +39,7 @@ class RedisField(object):
 
     def __init__(self, full_key=None):
         """ Create or load a RedisField. """
-        self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[])
+        self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
 
         if full_key:
             self.full_key = full_key
@@ -322,6 +324,8 @@ class RedisObject(RedisField):
         self.all_keys = []
 
     def __namespaceinit__(self):
+        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+
         if self.full_key[-1] == ':':
             self.full_key = self.full_key[:-1]
 
@@ -388,7 +392,7 @@ class RedisObject(RedisField):
 
         key = self.full_key
 
-        if attrib in self.key_lists['string']:
+        if attrib in (self.key_lists['string'] + self.key_lists['path']):
             return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else '_'
 
         elif attrib in self.key_lists['bool']:
@@ -410,37 +414,82 @@ class RedisObject(RedisField):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
                      'key', 'full_key', 'prefix', 'db', 'full_key']
 
+        # Note: These two statements cannot be combined (causes an exception during object init)
         if attrib in pass_list or attrib not in self.all_keys:
             return super().__setattr__(attrib, value)
-
-        is_child = attrib in self.key_lists['list'] or attrib in self.key_lists['set']
-
-        if is_child:
+        if attrib in (self.key_lists['list'] + self.key_lists['set']):
             return super().__setattr__(attrib, value)
 
         key = self.full_key
 
-        if attrib in self.key_lists['string'] or attrib in self.key_lists['int']:
+        if attrib in (self.key_lists['string'] + self.key_lists['int']):
             self.db.hset(key, attrib, value)
 
         elif attrib in self.key_lists['bool']:
             if value in [True, False]:
                 self.db.hset(key, attrib, self.bool_string_helper(value))
             else:
-                raise AttributeError('{0}.{1} must be of type(bool), {2} given.'.format(
-                                     self.__class__.__name__, attrib, value))
+                raise ValueError('{0}.{1} must be of type(bool), {2} given.'.format(
+                    self.__class__.__name__, attrib, value))
+
+        elif attrib in self.key_lists['path']:
+            if self.is_pathname_valid(value):
+                self.db.hset(key, attrib, value)
+            else:
+                raise ValueError('{0} must be a valid pathname (str), {1} given.'.format(
+                    self.__class__.__name__, attrib, value))
         else:
-            raise AttributeError('Unable to set attribute {0} of class {1}. Unknown Error.'.format(
-                                 attrib, self.__class__.__name__))
+            raise AttributeError('class {0} has no attribute {1}.'.format(
+                self.__class__.__name__, attrib))
 
     @staticmethod
     def bool_string_helper(value):
         """
-        If value is a `str` return value as `bool`.
-        If value is a `bool` return value as `str`.
+        Given a `str`, returns value as `bool`. Given a `bool`, returns value as `str`.
 
         """
         if isinstance(value, str):
             return True if 'True' == value else False
         elif isinstance(value, bool):
             return 'True' if value else 'False'
+        else:
+            raise ValueError('value must be of type(bool) or type(str), {0} given.'.format(value))
+
+    @staticmethod
+    def is_pathname_valid(pathname):
+        """
+        Determines whether or not a string is a valid pathname (linux only).
+
+        Args:
+            pathname (str): String to check.
+
+        Returns:
+            `True` if the passed pathname is a valid pathname. `False` otherwise.
+
+        Notes:
+            Modified version of this SO answer: http://stackoverflow.com/a/34102855/2639936
+        """
+
+        # If pathname is either not a string or empty, this pathname is invalid.
+        if not isinstance(pathname, str) or not pathname:
+            return False
+
+        try:
+            # Directory guaranteed to exist (the root directory).
+            root_dirname = os.path.sep
+
+            # Test whether each path component split from pathname is valid,
+            # ignoring non-existent and non-readable path components.
+            for pathname_part in pathname.split(os.path.sep):
+                try:
+                    os.lstat(root_dirname + pathname_part)
+                except OSError as err:
+                    if err.errno in {errno.ENAMETOOLONG, errno.ERANGE}:
+                        return False
+
+        except TypeError:
+            # pathname is invalid.
+            return False
+        else:
+            # All path components and hence pathname itself are valid.
+            return True
