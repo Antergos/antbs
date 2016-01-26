@@ -298,14 +298,13 @@ class Package(PackageMeta):
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
         tf = repo.file_contents(self.name + '/PKGBUILD')
-        content = tf.decoded
+        content = tf.decoded.decode('utf-8')
         search_str = '%s=%s' % (var, old_val)
         if 'pkgver=None' in content:
             search_str = '%s=%s' % (var, 'None')
         replace_str = '%s=%s' % (var, new_val)
         content = content.replace(search_str, replace_str)
-        ppath = os.path.join('/var/tmp/antergos-packages/', self.name, '/PKGBUILD')
-        with open(ppath, 'w') as pbuild:
+        with open(self.pbpath, 'w') as pbuild:
             pbuild.write(content)
         pbuild.close()
         commit = tf.update(

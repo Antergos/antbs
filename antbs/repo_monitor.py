@@ -57,10 +57,6 @@ def maybe_check_for_new_items():
 
 
 def check_for_new_items():
-    """
-
-
-    """
     db.setex('FEED_CHECKED', 900, 'True')
     build_pkgs = []
     for service, project_list in MONITOR_ITEMS.items():
