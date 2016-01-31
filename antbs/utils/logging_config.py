@@ -40,11 +40,9 @@ class LoggingConfig(Singleton):
 
     def __init__(self):
         self.noisy_loggers = ["github3",
-                              "github3.gists",
-                              "github3.repos",
-                              "github3.issues",
-                              "github3.search",
-                              "stormpath.http"]
+                              "requests",
+                              "stormpath.http",
+                              "docker"]
         self.logger = None
 
         if not self._initialized:
@@ -68,19 +66,17 @@ class LoggingConfig(Singleton):
 
             'formatters': {
                 'file': {
-                    'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %('
-                              'funcName)s '
-                              '| %(message)s'
+                    'format': '%(asctime)s [ %(levelname)s ] %(module)s - %(filename)s:%('
+                              'lineno)d : %(funcName)s | %(message)s'
                 },
                 'email': {
                     'format': 'LEVEL: %(levelname)s\n PATH: %(pathname)s: %(lineno)d\nMODULE: %('
-                              'module)s'
-                              '\nFUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %(message)s'
+                              'module)s\nFUNCTION: %(funcName)s\nDATE: %(asctime)s\nMSG: %('
+                              'message)s'
                 },
                 'redis': {
                     'format': '%(asctime)s [ %(levelname)s ] - %(filename)s : %(lineno)d : %('
-                              'funcName)s '
-                              '| %(message)s'
+                              'funcName)s | %(message)s'
                 }
             },
             'handlers': {

@@ -52,7 +52,7 @@ from flask import (
     redirect, flash, stream_with_context)
 from werkzeug.contrib.fixers import ProxyFix
 from flask.ext.stormpath import StormpathManager, groups_required, user
-from flask.ext.cache import Cache
+#from flask.ext.cache import Cache
 import bugsnag
 from bugsnag.flask import handle_exceptions
 
@@ -122,15 +122,15 @@ def initialize_app():
     app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
 
     # Setup app-level caching using Flask-Cache extension.
-    global cache
-    cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
-                                     'CACHE_KEY_PREFIX': 'antbs:cache:',
-                                     'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
-    cache.init_app(app)
-
-    # Clear the cache every time the app is started.
-    with app.app_context():
-        cache.clear()
+    # global cache
+    # cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
+    #                                  'CACHE_KEY_PREFIX': 'antbs:cache:',
+    #                                  'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
+    # cache.init_app(app)
+    #
+    # # Clear the cache every time the app is started.
+    # with app.app_context():
+    #     cache.clear()
 
     # Setup rq (background task queue manager)
     with Connection(db):
@@ -250,15 +250,15 @@ def match_pkg_name_build_log(bnum=None, match=None):
         return False
 
 
-def cache_buster():
-    if db.exists('antbs:misc:cache_buster:flag'):
-        cache.delete_memoized(homepage)
-        db.delete('antbs:misc:cache_buster:flag')
-        return True
-    elif user.is_authenticated():
-        return True
-
-    return False
+# def cache_buster():
+#     if db.exists('antbs:misc:cache_buster:flag'):
+#         cache.delete_memoized(homepage)
+#         db.delete('antbs:misc:cache_buster:flag')
+#         return True
+#     elif user.is_authenticated():
+#         return True
+#
+#     return False
 
 
 @app.context_processor
@@ -266,7 +266,7 @@ def inject_idle_status():
     return dict(idle=status.idle)
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
     Get paginated list of build objects.
@@ -320,7 +320,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     return pkg_list, int(all_pages), rev_pending
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def get_repo_info(repo=None, logged_in=False):
     if repo is None:
         abort(500)
@@ -426,7 +426,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
     return errmsg
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def get_timeline(tlpage=None):
     if not tlpage:
         tlpage = 1
@@ -439,7 +439,7 @@ def get_timeline(tlpage=None):
     return this_page, all_pages
 
 
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def get_build_history_chart_data(pkg_obj=None):
     if pkg_obj is None:
         builds = status.completed + status.failed
@@ -498,7 +498,7 @@ def flask_error(e):
 
 @app.route("/timeline/<int:tlpage>")
 @app.route("/")
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
@@ -651,7 +651,7 @@ def completed(page=None, name=None):
 
 @app.route('/failed/<int:page>')
 @app.route('/failed')
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def failed(page=None):
     build_status = 'failed'
     if page is None:
@@ -667,7 +667,7 @@ def failed(page=None):
 
 
 @app.route('/build/<int:num>')
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def build_info(num):
     if not num:
         abort(404)
@@ -693,7 +693,7 @@ def build_info(num):
 
 @app.route('/browse/<goto>')
 @app.route('/browse')
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def repo_browser(goto=None):
     building = status.now_building
     release = False
@@ -866,13 +866,13 @@ def get_status():
 
 
 @app.route('/issues', methods=['GET'])
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def show_issues():
     return render_template('issues.html')
 
 
 @app.route('/pkg/<pkgname>', methods=['GET'])
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def get_and_show_pkg_profile(pkgname=None):
     if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)
@@ -890,7 +890,7 @@ def get_and_show_pkg_profile(pkgname=None):
 
 
 @app.route('/repo_packages/<repo>')
-@cache.memoize(timeout=900, unless=cache_buster)
+# @cache.memoize(timeout=900, unless=cache_buster)
 def repo_packages(repo=None):
     if not repo or repo not in ['antergos', 'antergos-staging']:
         abort(404)

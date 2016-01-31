@@ -29,6 +29,7 @@
 
 """ Monitor commit activity on 3rd-party repos. Schedule a build when new commits are detected. """
 
+import logging
 from utils.logging_config import logger
 from utils.redis_connection import db
 from utils.server_status import status
@@ -43,31 +44,36 @@ import iso
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
 ITEMS_HASH = db.hgetall('antbs:monitor:list') or False
-# logger.debug(type(ITEMS_HASH))
 MONITOR_ITEMS = ITEMS_HASH if ITEMS_HASH else None
 
 
 def maybe_check_for_new_items():
-    """
-
-
-    :return:
-    """
     return db.exists('FEED_CHECKED')
+
+
+def quiet_down_noisy_loggers():
+    noisy_loggers = ["github3",
+                     "requests",
+                     "stormpath.http"]
+
+    for logger_name in noisy_loggers:
+        noisy_logger = logging.getLogger(logger_name)
+        noisy_logger.setLevel(logging.ERROR)
 
 
 def check_for_new_items():
     db.setex('FEED_CHECKED', 900, 'True')
     build_pkgs = []
+    quiet_down_noisy_loggers()
     for service, project_list in MONITOR_ITEMS.items():
         projects = project_list.split(',')
         for project in projects:
-            if not project or project == '':
+            if not project:
                 continue
             res = None
             if 'github' == service:
-                project = project.split('/')
-                res = check_github_repo(project=project[0], repo=project[1])
+                gh_project, gh_repo = project.split('/')
+                res = check_github_repo(project=gh_project, repo=gh_repo)
             elif 'gitlab' == service:
                 res = check_gitlab_repo(project_id=project)
 
@@ -140,12 +146,12 @@ def check_github_repo(project=None, repo=None):
     """
     new_items = []
     gh = login(token=GITHUB_TOKEN)
-    key = 'antbs:monitor:github:%s:%s' % (project, repo)
+    key = 'antbs:monitor:github:{0}:{1}'.format(project, repo)
     last_id = db.get(key) or ''
     gh_repo = gh.repository(project, repo)
     latest = None
 
-    if repo not in ['scudcloud', 'yaourt', 'package-query']:
+    if repo not in ['scudcloud', 'yaourt', 'package-query', 'terminix']:
         commits = gh_repo.commits()
         try:
             commit = commits.next()
@@ -156,7 +162,7 @@ def check_github_repo(project=None, repo=None):
         releases = [r for r in gh_repo.releases()]
         try:
             release = releases[0]
-            latest = release.name
+            latest = release.tag_name
             latest = latest.replace('v', '')
         except Exception as err:
             logger.error(err)

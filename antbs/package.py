@@ -297,24 +297,32 @@ class Package(PackageMeta):
             return
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
-        tf = repo.file_contents(self.name + '/PKGBUILD')
-        content = tf.decoded.decode('utf-8')
-        search_str = '%s=%s' % (var, old_val)
-        if 'pkgver=None' in content:
-            search_str = '%s=%s' % (var, 'None')
-        replace_str = '%s=%s' % (var, new_val)
-        content = content.replace(search_str, replace_str)
+        pb_contents = repo.file_contents(self.name + '/PKGBUILD').decoded.decode('utf-8')
+
+        search_str = '{0}={1}'.format(var, old_val)
+        if 'pkgver=None' in pb_contents:
+            search_str = '{0}={1}'.format(var, 'None')
+
+        replace_str = '{0}={1}'.format(var, new_val)
+        new_pb_contents = pb_contents.replace(search_str, replace_str)
+
         with open(self.pbpath, 'w') as pbuild:
-            pbuild.write(content)
+            pbuild.write(new_pb_contents)
+
         pbuild.close()
-        commit = tf.update(
-                '[ANTBS] | Updated %s to %s in PKGBUILD for %s' % (var, new_val, self.name),
-                content)
-        if commit and commit['commit'] is not None:
+
+        if 'pkgver' == var:
+            commit_msg = '[ANTBS] | [updpkg] {0} {1}'.format(self.name, new_val)
+        else:
+            commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
+                                                                                    self.name)
+        commit = pb_contents.update(commit_msg, new_pb_contents.encode('utf-8'))
+
+        if commit and 'commit' in commit:
             try:
                 logger.info('commit hash is %s', commit['commit'].sha)
             except AttributeError:
-                logger.error('commit failed. commit=%s | content=%s', commit, content)
+                logger.error('commit failed. commit=%s | content=%s', commit, new_pb_contents)
             return True
         else:
             logger.error('commit failed')
@@ -323,7 +331,7 @@ class Package(PackageMeta):
     def get_version(self):
         changed = {}
         old_vals = {}
-        if self.name not in ['scudcloud']:
+        if self.name not in ['scudcloud', 'terminix']:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 old_val = getattr(self, key)
                 old_vals[key] = old_val
@@ -337,10 +345,14 @@ class Package(PackageMeta):
                 return self.version_str
         else:
             old_val = self.pkgver
-            key = 'antbs:monitor:github:%s:%s' % (self.gh_project, self.gh_repo)
+            key = 'antbs:monitor:github:{0}:{1}'.format(self.gh_project, self.gh_repo)
             changed['pkgver'] = self.db.get(key)
             setattr(self, 'pkgver', changed['pkgver'])
-            self.update_and_push_github('pkgver', old_val, self.pkgver)
+            self.update_and_push_github('pkgver', old_val, changed['pkgver'])
+            time.sleep(10)
+            self.update_and_push_github('pkgrel', self.pkgrel, '1')
+            setattr(self, 'pkgrel', '1')
+            changed['pkgrel'] = '1'
 
         version = changed.get('pkgver', self.pkgver)
         logger.info(version)
