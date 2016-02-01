@@ -26,7 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with Cnchi; If not, see <http://www.gnu.org/licenses/>.
 
-""" Various metaclasses (kind of like mixins) """
+""" Various utility classes and metaclasses (kind of like mixins) """
 
 
 class Singleton(type):
@@ -38,11 +38,11 @@ class Singleton(type):
         return cls._instance
 
 
-class DateTimeStrings(type):
+class DateTimeStrings:
 
     @staticmethod
     def dt_date_to_string(dt):
-        return dt.strftime("%b %d")
+        return dt.strftime("%m/%d/%Y")
 
     @staticmethod
     def dt_time_to_string(dt):

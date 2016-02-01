@@ -367,7 +367,7 @@ class Webhook(WebhookMeta):
         :return: None
         """
 
-        namespace = self.is_cnchi[2:4]
+        namespace = 'cnchi' + self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
 
         install = AntergosInstallation(namespace=namespace, ip=client_ip)
@@ -380,7 +380,7 @@ class Webhook(WebhookMeta):
     def process_cnchi_end(self, install_id, result):
         """ Record install result (success/failure). """
 
-        namespace = self.is_cnchi[2:4]
+        namespace = 'cnchi' + self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
 
         install = AntergosInstallation(namespace=namespace, install_id=install_id)

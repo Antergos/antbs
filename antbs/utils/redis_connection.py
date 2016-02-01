@@ -316,7 +316,7 @@ class RedisHash(RedisObject):
     def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):
         if not all([prefix, key]) and 'status' != prefix:
             not_empty = [x for x in [prefix, key] if x]
-            raise ValueError('(4) args required, but only ({0}) given'.format(str(len(not_empty))))
+            raise ValueError('(3) args required, but only ({0}) given'.format(str(len(not_empty))))
 
         id_key = '{0}:{1}:{2}'.format(namespace, prefix, key)
 

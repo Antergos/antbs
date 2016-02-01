@@ -92,7 +92,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                 setattr(self, key, RedisZSet.as_child(self, key, str))
 
 
-class TimelineEvent(RedisHash, metaclass=DateTimeStrings):
+class TimelineEvent(RedisHash, DateTimeStrings):
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
         if not event_id and not all([msg, tl_type]):

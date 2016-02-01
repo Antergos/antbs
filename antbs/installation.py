@@ -40,12 +40,15 @@ if not db.exists(next_install_id_key):
     db.set(next_install_id_key, 0)
 
 
-class AntergosInstallation(RedisHash, metaclass=DateTimeStrings):
+class AntergosInstallation(RedisHash, DateTimeStrings):
 
     def __init__(self, namespace='cnchi', prefix='install', install_id='',
                  ip=None, *args, **kwargs):
+        if not install_id and not ip:
+            raise ValueError('ip is required to initialize this class')
+
         if not install_id:
-            raise ValueError('install_id required to initialize this class')
+            install_id = self.db.incr(next_install_id_key)
 
         super().__init__(namespace=namespace, prefix=prefix, key=install_id, *args, **kwargs)
 
@@ -59,7 +62,7 @@ class AntergosInstallation(RedisHash, metaclass=DateTimeStrings):
             if not ip:
                 raise ValueError('ip required to create a new installation object')
             self.__keysinit__()
-            self.install_id = self.db.incr(next_install_id_key)
+            self.install_id = install_id
             self.ip_address = ip
             dt = datetime.datetime.now()
             self.start_date = self.dt_date_to_string(dt)
