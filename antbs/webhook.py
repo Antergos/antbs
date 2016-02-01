@@ -44,6 +44,7 @@ from utils.redis_connection import db
 import utils.logging_config as logconf
 import package as package
 from utils.server_status import status, get_timeline_object
+from installation import AntergosInstallation, AntergosInstallationUser
 
 logger = logconf.logger
 
@@ -74,7 +75,7 @@ def rm_file_or_dir(src):
         return True
 
 
-class WebhookMeta(object):
+class WebhookMeta:
     """
     This is the base class for `Webhook`. It simply initializes attributes.
 
@@ -161,11 +162,12 @@ class Webhook(WebhookMeta):
             elif self.is_cnchi and not self.request.args.get('result', False):
                 self.process_cnchi_start()
 
-            elif self.is_cnchi and self.request.args.get('result', False):
+            elif self.is_cnchi and self.request.args.get('result', None):
                 install_id = self.request.args.get('install_id', None)
                 result = self.request.args.get('result', None)
 
-                if install_id and result:
+                if install_id and result is not None:
+                    result = AntergosInstallation.bool_string_helper(result)
                     self.process_cnchi_end(install_id, result)
 
             if self.is_github:
@@ -360,41 +362,35 @@ class Webhook(WebhookMeta):
 
     def process_cnchi_start(self):
         """
-        Generate installation ID then store it along with the clients ip in result variable.
+        Generate installation ID then save it along with the clients ip in result variable.
 
         :return: None
         """
 
-        install_id = db.incr('cnchi:install_id:next')
+        namespace = self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
-        user_hash_key = 'cnchi:user:{0}'.format(client_ip)
-        install_hash_key = 'cnchi:install:{0}'.format(install_id)
-        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        db.hsetnx(user_hash_key, 'ip', client_ip)
-        db.hsetnx(user_hash_key, str(install_id) + ':start', dt)
-        db.hsetnx(user_hash_key, str(install_id) + ':cnchi', self.is_cnchi)
-        install_hash = {'id': install_id,
-                        'ip': client_ip,
-                        'start': dt,
-                        'cnchi_version': self.is_cnchi,
-                        'successful': "False"}
-        db.hmset(install_hash_key, install_hash)
 
-        self.result = json.dumps({'id': install_id, 'ip': client_ip})
+        install = AntergosInstallation(namespace=namespace, ip=client_ip)
+        user = AntergosInstallationUser(namespace=namespace,
+                                        ip=client_ip,
+                                        install_id=install.install_id)
+
+        self.result = json.dumps({'id': install.install_id, 'ip': user.ip_address})
 
     def process_cnchi_end(self, install_id, result):
-        """
-            Record install result (success/failure).
+        """ Record install result (success/failure). """
 
-            :return: None
-        """
-        install_hash_key = 'cnchi:install:{0}'.format(install_id)
+        namespace = self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
-        user_hash_key = 'cnchi:user:{0}'.format(client_ip)
-        dt = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        db.hsetnx(user_hash_key, install_id + ':end', dt)
-        db.hsetnx(user_hash_key, install_id + ':successful', result)
-        db.hset(install_hash_key, 'successful', result)
-        db.hset(install_hash_key, 'end', dt)
+
+        install = AntergosInstallation(namespace=namespace, install_id=install_id)
+        user = AntergosInstallationUser(namespace=namespace, ip=client_ip)
+
+        if result:
+            user.installs_completed.add(install_id)
+        else:
+            user.installs_failed.add(install_id)
+
+        install.set_installation_ended()
 
         self.result = json.dumps({'msg': 'Ok!'})

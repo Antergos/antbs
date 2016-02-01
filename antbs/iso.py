@@ -49,7 +49,7 @@ PASSWORD = status.gpg_password
 GPG_KEY = status.gpg_key
 
 
-class ISOUtility(object):
+class ISOUtility:
     """
 
     :param pkg_obj:
@@ -147,7 +147,7 @@ class ISOUtility(object):
         sign.batch_sign([self.file_path], is_iso=True)
 
 
-class WordPressBridge(object):
+class WordPressBridge:
     def __init__(self, auth):
         self.post_id_map = {
             'antergos-x86_64': '1252',

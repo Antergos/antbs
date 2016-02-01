@@ -31,12 +31,12 @@
 
 import os
 import datetime
-from .redis_connection import RedisObject, RedisList, RedisZSet
+from .redis_connection import RedisHash, RedisList, RedisZSet
 from .logging_config import logger
-from .singleton import Singleton
+from .utilities import Singleton, DateTimeStrings
 
 
-class ServerStatus(Singleton, RedisObject):
+class ServerStatus(RedisHash, metaclass=Singleton):
 
     def __init__(self, prefix='status', key='', *args, **kwargs):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
@@ -92,7 +92,7 @@ class ServerStatus(Singleton, RedisObject):
                 setattr(self, key, RedisZSet.as_child(self, key, str))
 
 
-class TimelineEvent(RedisObject):
+class TimelineEvent(RedisHash, metaclass=DateTimeStrings):
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
         if not event_id and not all([msg, tl_type]):
@@ -129,14 +129,6 @@ class TimelineEvent(RedisObject):
                 packages = [p for p in packages if p]
                 for p in packages:
                     self.packages.append(p)
-
-    @staticmethod
-    def dt_date_to_string(dt):
-        return dt.strftime("%b %d")
-
-    @staticmethod
-    def dt_time_to_string(dt):
-        return dt.strftime("%I:%M%p")
 
 
 def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None):

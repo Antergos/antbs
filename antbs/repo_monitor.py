@@ -27,7 +27,11 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-""" Monitor commit activity on 3rd-party repos. Schedule a build when new commits are detected. """
+"""
+Repo Monitor Module:
+    Monitors commit activity on 3rd-party repos and schedules builds
+    when new commits are detected.
+"""
 
 import logging
 from utils.logging_config import logger

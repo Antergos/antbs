@@ -31,11 +31,11 @@
 
 import datetime
 
-from utils.redis_connection import RedisObject
+from utils.redis_connection import RedisHash
 from utils.logging_config import logger
 
 
-class BuildObject(RedisObject):
+class BuildObject(RedisHash):
     """
     This class represents a "build" throughout the build server app. It is used
     to get and set build data to the database.

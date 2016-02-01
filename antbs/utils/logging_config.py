@@ -31,11 +31,11 @@
 
 import logging
 import logging.config
-from .singleton import Singleton
+from .utilities import Singleton
 from .redis_connection import db
 
 
-class LoggingConfig(Singleton):
+class LoggingConfig(metaclass=Singleton):
     _initialized = False
 
     def __init__(self):

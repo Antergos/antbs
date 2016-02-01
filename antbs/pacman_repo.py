@@ -34,11 +34,10 @@ import glob
 import tarfile
 from utils.logging_config import logger
 from utils.server_status import status
-from utils.redis_connection import RedisObject
+from utils.redis_connection import RedisHash
 
 
-
-class PacmanRepo(RedisObject):
+class PacmanRepo(RedisHash):
     """
     This class represents a "repo" throughout this application. It is used to
     get/set metadata about the repos that this application manages from/to the database.

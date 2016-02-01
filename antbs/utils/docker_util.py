@@ -35,7 +35,7 @@ import docker
 from .logging_config import logger
 from .redis_connection import db
 from .server_status import status
-from .singleton import Singleton
+from .utilities import Singleton
 
 doc_user = status.docker_user
 doc_pass = status.docker_password
@@ -45,7 +45,7 @@ DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
 BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
 
 
-class DockerUtils(Singleton):
+class DockerUtils(metaclass=Singleton):
     _doc = None
 
     def __init__(self):

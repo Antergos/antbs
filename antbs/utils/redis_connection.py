@@ -17,10 +17,14 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
+# The following additional terms are in effect as per Section 7 of the license:
+#
+# The preservation of all legal notices and author attributions in
+# the material or in the Appropriate Legal Notices displayed
+# by works containing it is required.
+#
 # You should have received a copy of the GNU General Public License
-# along with AntBS; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-# MA 02110-1301, USA.
+# along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 """ Database module """
 
@@ -32,19 +36,19 @@ import errno
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 
 
-class RedisField(object):
+class RedisObject:
     """ A base object backed by redis. This is not meant to be used directly. """
 
     db = db
 
     def __init__(self, full_key=None):
-        """ Create or load a RedisField. """
+        """ Create or load a RedisObject. """
         self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
 
         if full_key:
             self.full_key = full_key
         else:
-            raise AttributeError('A key is required to initialize a redis object.')
+            raise ValueError('A key is required to initialize a redis object.')
 
     def __bool__(self):
         """ Tests if this object currently exists in redis. """
@@ -68,7 +72,7 @@ class RedisField(object):
         """ Load an item by index where index is either an int or a slice. """
 
         if not isinstance(self, (RedisList, RedisZSet)):
-            raise NotImplementedError('Cannot __getitem__ of RedisField object')
+            raise NotImplementedError('Cannot __getitem__ of RedisHash object')
 
         if isinstance(index, slice):
             if index.step and index.step > 1:
@@ -77,17 +81,17 @@ class RedisField(object):
 
             if isinstance(self, RedisList):
                 return [
-                    RedisField.decode_value(self.item_type, el)
+                    RedisObject.decode_value(self.item_type, el)
                     for el in self.db.lrange(self.full_key, index.start, index.stop)
-                ]
+                    ]
             if isinstance(self, RedisZSet):
                 return [
-                    RedisField.decode_value(self.item_type, el)
+                    RedisObject.decode_value(self.item_type, el)
                     for el in self.db.zrange(self.full_key, index.start, index.stop)
-                ]
+                    ]
 
         else:
-            return RedisField.decode_value(self.item_type, self.db.lindex(self.full_key, index))
+            return RedisObject.decode_value(self.item_type, self.db.lindex(self.full_key, index))
 
     def delete(self):
         """ Delete this object from redis. """
@@ -95,13 +99,13 @@ class RedisField(object):
 
     def __jsonable__(self):
         """
-        Returns this object as a python data type so it can be serialized by json module.
+        Returns this object as a python data type so it can be serialized by the json module.
 
         """
         res = None
         if isinstance(self, (RedisList, RedisZSet)):
             res = list(self.__iter__())
-        elif isinstance(self, RedisObject):
+        elif isinstance(self, RedisHash):
             as_dict = dict()
 
             for key in self.all_keys:
@@ -126,11 +130,11 @@ class RedisField(object):
     def as_child(cls, parent, tag, item_type):
         """
         Alternative callable constructor that instead defines this as a child object.
-        This allows you to store classes derived from `RedisField` inside other classes
-        that are also derived from `RedisField`.
+        This allows you to store classes derived from `RedisObject` inside other classes
+        that are also derived from `RedisObject`.
 
         Args:
-            parent (RedisObject):  The parent object.
+            parent (RedisHash):    The parent object.
             tag (str):             Short name for this object. It will be combined with parent
                                    object's `full_key` to create this object's `full_key`.
             item_type (type(str)): The built-in type object for the type of data stored in this
@@ -156,14 +160,14 @@ class RedisField(object):
         return str(value)
 
 
-class RedisList(RedisField, list):
+class RedisList(RedisObject, list):
     """
     A list where all items are stored in Redis.
 
     Args:
-        full_key (str): use this as the redis key.
+        full_key (str):     Use this as the redis key.
         item_type (object): The constructor to use when reading items from redis.
-        items (list): Default values to store during construction.
+        items (list):       Default values to store during construction.
 
     """
 
@@ -234,7 +238,7 @@ class RedisList(RedisField, list):
         self.db.lrem(self.full_key, 0, val)
 
 
-class RedisZSet(RedisField, set):
+class RedisZSet(RedisObject, set):
     """
     A sorted set where all items are stored in Redis.
 
@@ -285,9 +289,10 @@ class RedisZSet(RedisField, set):
         return True if rank else False
 
 
-class RedisObject(RedisField):
+class RedisHash(RedisObject):
     """
     This is the base class for all of the redis-backed classes in this application.
+    The class provides access to predefined keys as class attributes.
 
     Args:
         namespace (str): This is used as the first part of the redis key. It should
@@ -324,12 +329,14 @@ class RedisObject(RedisField):
         self.all_keys = []
 
     def __namespaceinit__(self):
+        """ Makes sure that the objects `full_key` and `all_keys` attributes are set properly. """
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
         if self.full_key[-1] == ':':
             self.full_key = self.full_key[:-1]
 
     def __keysinit__(self):
+        """ Initializes the object's predefined attributes as hash fields in Redis. """
         for key in self.all_keys:
             val = getattr(self, key, '')
             is_string = key in self.key_lists['string']
@@ -350,13 +357,7 @@ class RedisObject(RedisField):
 
     def __str__(self):
         """ Return this object as a friendly (human readable) string. """
-
-        as_string = dict()
-        for key in self.all_keys:
-            value = getattr(self, key) if hasattr(self, key) else ''
-            as_string[key] = value if isinstance(value, str) else value.__str__()
-
-        return str(as_string)
+        return str(self.__jsonable__())
 
     def __len__(self):
         """ Return the len of this object (total number of fields in its redis hash). """
@@ -377,10 +378,6 @@ class RedisObject(RedisField):
     def iterkeys(self):
         return self.__iter__()
 
-    def delete(self):
-        """ Delete this object from redis. """
-        self.db.delete(self.full_key)
-
     def __getattribute__(self, attrib):
         """ Get attribute value if stored in redis otherwise pass call to parent class """
 
@@ -392,7 +389,7 @@ class RedisObject(RedisField):
 
         key = self.full_key
 
-        if attrib in (self.key_lists['string'] + self.key_lists['path']):
+        if attrib in self.key_lists['string'] + self.key_lists['path']:
             return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else '_'
 
         elif attrib in self.key_lists['bool']:
@@ -417,12 +414,12 @@ class RedisObject(RedisField):
         # Note: These two statements cannot be combined (causes an exception during object init)
         if attrib in pass_list or attrib not in self.all_keys:
             return super().__setattr__(attrib, value)
-        if attrib in (self.key_lists['list'] + self.key_lists['set']):
+        if attrib in self.key_lists['list'] + self.key_lists['set']:
             return super().__setattr__(attrib, value)
 
         key = self.full_key
 
-        if attrib in (self.key_lists['string'] + self.key_lists['int']):
+        if attrib in self.key_lists['string'] + self.key_lists['int']:
             self.db.hset(key, attrib, value)
 
         elif attrib in self.key_lists['bool']:
@@ -436,7 +433,7 @@ class RedisObject(RedisField):
             if self.is_pathname_valid(value):
                 self.db.hset(key, attrib, value)
             else:
-                raise ValueError('{0} must be a valid pathname (str), {1} given.'.format(
+                raise ValueError('{0}.{1} must be a valid pathname (str), {2} given.'.format(
                     self.__class__.__name__, attrib, value))
         else:
             raise AttributeError('class {0} has no attribute {1}.'.format(

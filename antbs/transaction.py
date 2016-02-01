@@ -23,11 +23,11 @@
 """ Transaction Class """
 
 from utils.logging_config import logger
-from utils.redis_connection import RedisList, RedisObject, RedisZSet, db
+from utils.redis_connection import RedisList, RedisHash, RedisZSet, db
 from utils.server_status import status
 
 
-class Transaction(RedisObject):
+class Transaction(RedisHash):
     """
     This class represents a single "build transaction" throughout the app. It is used
     to get/set transaction data from/to the database. A transaction is comprised
@@ -53,4 +53,4 @@ class Transaction(RedisObject):
     """
 
     def __init__(self, pkg_objs=None, tnum=None):
-        super(Transaction, self).__init__()
+        super().__init__()

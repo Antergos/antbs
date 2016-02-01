@@ -34,14 +34,14 @@ import time
 from gevent import sleep
 
 from utils.logging_config import logger
-from utils.redis_connection import RedisObject
+from utils.redis_connection import RedisHash
 from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
 
 
-class PackageMeta(RedisObject):
+class PackageMeta(RedisHash):
     """
     This is the base class for ::class:`Package`. It initalizes the fields for
     the package metadata that is stored in the database. You should not use this
@@ -65,7 +65,7 @@ class PackageMeta(RedisObject):
                      list=['allowed_in', 'builds', 'tl_events'],
                      set=['depends', 'groups', 'makedepends']))
 
-        super().__namespaceinit__()
+        self.__namespaceinit__()
 
         self.all_keys.append('_build')
 
