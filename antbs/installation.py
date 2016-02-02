@@ -93,6 +93,7 @@ class AntergosInstallationUser(RedisHash):
                 raise ValueError('ip required to create a new InstallationUser object')
 
             self.__keysinit__()
+            self.ip_address = ip
 
         if install_id:
             self.installs.add(install_id)

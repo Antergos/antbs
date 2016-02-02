@@ -159,10 +159,10 @@ class Webhook(WebhookMeta):
             if self.is_manual:
                 self.process_manual()
 
-            elif self.is_cnchi and not self.request.args.get('result', False):
+            elif self.is_cnchi and self.request.args.get('result', None) is None:
                 self.process_cnchi_start()
 
-            elif self.is_cnchi and self.request.args.get('result', None):
+            elif self.is_cnchi and self.request.args.get('result', None) is not None:
                 install_id = self.request.args.get('install_id', None)
                 result = self.request.args.get('result', None)
 
