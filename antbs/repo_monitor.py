@@ -155,7 +155,7 @@ def check_github_repo(project=None, repo=None):
     gh_repo = gh.repository(project, repo)
     latest = None
 
-    if repo not in ['scudcloud', 'yaourt', 'package-query', 'terminix']:
+    if repo in ['pamac', 'numix-icon-theme']:
         commits = gh_repo.commits()
         try:
             commit = commits.next()

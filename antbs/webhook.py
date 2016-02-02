@@ -41,12 +41,10 @@ import requests
 
 import build_pkg as builder
 from utils.redis_connection import db
-import utils.logging_config as logconf
+from utils.logging_config import logger
 import package as package
 from utils.server_status import status, get_timeline_object
 from installation import AntergosInstallation, AntergosInstallationUser
-
-logger = logconf.logger
 
 with Connection(db):
     queue = Queue('hook_queue')

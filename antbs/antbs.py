@@ -218,7 +218,7 @@ def get_live_status_updates():
             yield ':'.encode('UTF-8')
 
         keep_alive += 1
-        yield from gevent.sleep(1)
+        gevent.sleep(1)
 
 
 def get_paginated(item_list, per_page, page, timeline):

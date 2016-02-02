@@ -60,7 +60,7 @@ class PackageMeta(RedisHash):
                              'git_name', 'gh_repo', 'gh_project', 'iso_md5', 'iso_url',
                              'url', 'pkgbuild'],
                      bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
-                           'is_metapkg'],
+                           'is_metapkg', 'is_monitored'],
                      int=['pkg_id'],
                      list=['allowed_in', 'builds', 'tl_events'],
                      set=['depends', 'groups', 'makedepends']))
@@ -83,7 +83,9 @@ class PackageMeta(RedisHash):
             if 'pycharm' in self.name or 'intellij' in self.name or 'clion-eap' == self.name:
                 self.autosum = True
             if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
-                self.is_meta_pkg = True
+                self.is_metapkg = True
+            if 'yes' == self.get_from_pkgbuild('_is_monitored'):
+                self.is_monitored = True
 
     def get_from_pkgbuild(self, item):
         raise NotImplementedError('Subclass must implement this method')
@@ -113,6 +115,8 @@ class Package(PackageMeta):
             autosum: Does the package's PKGBUILD download checksums when makepkg is called?
             saved_commit: When making changes to be pushed to github, do we have a saved commit not yet pushed?
             is_iso: Is this a dummy package for building an install iso image?
+            is_metapkg: Is this a "metapkg" (don't check/build dependencies).
+            is_monitored: Are we monitoring this package's releases with `RepoMonitor`?
 
         (int)
             pkg_id: ID assigned to the package when it is added to our database for the first time.
@@ -132,8 +136,8 @@ class Package(PackageMeta):
 
         if not self.pbpath:
             self.determine_pbpath()
+            setattr(self, 'pkgbuild', open(self.pbpath).read())
 
-        self.pkgbuild = ''
 
     def get_from_pkgbuild(self, var=None):
         """
@@ -297,7 +301,8 @@ class Package(PackageMeta):
             return
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
-        pb_contents = repo.file_contents(self.name + '/PKGBUILD').decoded.decode('utf-8')
+        pb_file = repo.file_contents(self.name + '/PKGBUILD')
+        pb_contents = pb_file.decoded.decode('utf-8')
 
         search_str = '{0}={1}'.format(var, old_val)
         if 'pkgver=None' in pb_contents:
@@ -316,7 +321,7 @@ class Package(PackageMeta):
         else:
             commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
                                                                                     self.name)
-        commit = pb_contents.update(commit_msg, new_pb_contents.encode('utf-8'))
+        commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
         if commit and 'commit' in commit:
             try:
@@ -331,7 +336,8 @@ class Package(PackageMeta):
     def get_version(self):
         changed = {}
         old_vals = {}
-        if self.name not in ['scudcloud', 'terminix']:
+        version_from_tag = self.is_monitored and 'pkgver()' not in self.pkgbuild
+        if not version_from_tag:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 old_val = getattr(self, key)
                 old_vals[key] = old_val
