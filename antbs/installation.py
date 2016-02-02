@@ -94,8 +94,8 @@ class AntergosInstallationUser(RedisHash):
 
             self.__keysinit__()
 
-            if install_id:
-                self.installs.add(install_id)
+        if install_id:
+            self.installs.add(install_id)
 
 
 

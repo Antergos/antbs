@@ -166,8 +166,10 @@ class Webhook(WebhookMeta):
                 install_id = self.request.args.get('install_id', None)
                 result = self.request.args.get('result', None)
 
-                if install_id and result is not None:
+                if install_id is not None and result is not None:
+                    logger.debug('Cnchi install_id {0} result is {1}'.format(install_id, result))
                     result = AntergosInstallation.bool_string_helper(result)
+                    logger.debug(result)
                     self.process_cnchi_end(install_id, result)
 
             if self.is_github:
@@ -199,7 +201,7 @@ class Webhook(WebhookMeta):
                 self.is_authorized = True
                 self.manual_trans_index = manual_flag
 
-        elif cnchi and db.get('CNCHI_TOKEN_NEW') == cnchi and cnchi_version:
+        elif cnchi and cnchi_version and db.get('CNCHI_TOKEN_NEW') == cnchi:
             self.is_cnchi = cnchi_version
             self.is_authorized = True
 
@@ -388,6 +390,7 @@ class Webhook(WebhookMeta):
 
         if result:
             user.installs_completed.add(install_id)
+            install.completed = True
         else:
             user.installs_failed.add(install_id)
 

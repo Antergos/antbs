@@ -1,18 +1,18 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#  poodle.py
+#  utilities.py
 #
 #  Copyright © 2016 Antergos
 #
-#  This file is part of Antergos Package Assistant, (Poodle).
+#  This file is part of Antergos Build Server, (AntBS).
 #
-#  Poodle is free software; you can redistribute it and/or modify
+#  AntBS is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
 #  the Free Software Foundation; either version 3 of the License, or
 #  (at your option) any later version.
 #
-#  Poodle is distributed in the hope that it will be useful,
+#  AntBS is distributed in the hope that it will be useful,
 #  but WITHOUT ANY WARRANTY; without even the implied warranty of
 #  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 #  GNU General Public License for more details.
@@ -24,7 +24,7 @@
 #  by works containing it is required.
 #
 #  You should have received a copy of the GNU General Public License
-#  along with Cnchi; If not, see <http://www.gnu.org/licenses/>.
+#  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 """ Various utility classes and metaclasses (kind of like mixins) """
 
