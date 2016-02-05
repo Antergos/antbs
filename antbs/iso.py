@@ -28,19 +28,20 @@
 
 
 """ Utility class for publishing iso releases. """
+
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 
 import requests
 from requests_toolbelt.adapters.source import SourceAddressAdapter
 
+import utils.sign_pkgs as sign
+from database import package
 from utils.logging_config import logger
 from utils.server_status import status
-import re
-import package
-import utils.sign_pkgs as sign
 
 REPO_DIR = '/srv/antergos.info/repo/iso'
 TESTING_DIR = os.path.join(REPO_DIR, 'testing')

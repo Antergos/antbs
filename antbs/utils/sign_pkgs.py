@@ -34,10 +34,10 @@
 
 import glob
 import os
-import subprocess
 import shutil
+import subprocess
 
-from .redis_connection import db
+from database.base_objects import db
 from .logging_config import logger
 from .server_status import status
 

@@ -59,15 +59,15 @@ from bugsnag.flask import handle_exceptions
 
 import utils.pagination
 import build_pkg as builder
-from utils.redis_connection import db
-from utils.server_status import status as status, get_timeline_object
-import package
+from database.base_objects import db
+from utils.server_status import status, get_timeline_object
 import webhook
 # import utils.slack_bot as slack_bot
-import build_obj
-import iso
+import database.build as build
+import database.package as package
 import repo_monitor as repo_mon
 import utils.logging_config as logconf
+import iso
 
 logger = logconf.logger
 cache = queue = repo_queue = hook_queue = w1 = w2 = w3 = None
@@ -242,7 +242,7 @@ def get_paginated(item_list, per_page, page, timeline):
 def match_pkg_name_build_log(bnum=None, match=None):
     if not bnum or not match:
         return False
-    pname = build_obj.get_build_object(bnum=bnum)
+    pname = build.get_build_object(bnum=bnum)
     logger.info(bnum)
     if pname:
         return match in pname.pkgname
@@ -307,7 +307,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
                 try:
-                    bld_obj = build_obj.get_build_object(bnum=bnum)
+                    bld_obj = build.get_build_object(bnum=bnum)
                 except Exception as err:
                     logger.error('Unable to ge build object - %s' % err)
                     continue
@@ -350,7 +350,7 @@ def get_repo_info(repo=None, logged_in=False):
             try:
                 bnum = builds[0]
                 if bnum:
-                    bld_obj = build_obj.get_build_object(bnum=bnum)
+                    bld_obj = build.get_build_object(bnum=bnum)
             except Exception:
                 pass
 
@@ -375,9 +375,9 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
         errmsg.update(error=True, msg=msg)
         return errmsg
     try:
-        bld_obj = build_obj.get_build_object(bnum=bnum)
+        bld_obj = build.get_build_object(bnum=bnum)
         pkg_obj = package.get_pkg_object(name=bld_obj.pkgname)
-        if pkg_obj and build_obj:
+        if pkg_obj and bld_obj:
             allowed = pkg_obj.allowed_in
             if 'main' not in allowed and result == 'passed':
                 msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
@@ -454,9 +454,9 @@ def get_build_history_chart_data(pkg_obj=None):
 
     if not chart_data or '{}' == chart_data:
         chart_data = dict()
-        builds = [bld for bld in builds if bld]
-        for build in builds:
-            bld_obj = build_obj.get_build_object(bnum=build)
+        builds = [b for b in builds if b]
+        for bld in builds:
+            bld_obj = build.get_build_object(bnum=bld)
             if not bld_obj.end_str:
                 continue
             dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
@@ -523,7 +523,7 @@ def homepage(tlpage=None):
             nodup = []
             for bnum in builds:
                 try:
-                    bld_obj = build_obj.get_build_object(bnum=bnum)
+                    bld_obj = build.get_build_object(bnum=bnum)
                 except (ValueError, AttributeError):
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
@@ -564,7 +564,7 @@ def homepage(tlpage=None):
 
 
 @app.route("/building")
-def build():
+def building():
     ver = ''
     bnum = ''
     start = ''
@@ -577,7 +577,7 @@ def build():
         bnum = status.building_num
         start = status.building_start
         if bnum and bnum != '':
-            bld_obj = build_obj.get_build_object(bnum=bnum)
+            bld_obj = build.get_build_object(bnum=bnum)
             ver = bld_obj.version_str
 
     return render_template("building.html", building=status.now_building, container=container,
@@ -674,7 +674,7 @@ def build_info(num):
     if not num:
         abort(404)
     try:
-        bld_obj = build_obj.get_build_object(bnum=num)
+        bld_obj = build.get_build_object(bnum=num)
     except Exception:
         abort(404)
 
@@ -701,14 +701,14 @@ def repo_browser(goto=None):
     release = False
     testing = False
     main = False
-    template = "repo_browser.html"
+    template = "repo_browser/repo_browser.html"
     if goto == 'release':
         release = True
     elif goto == 'testing':
         testing = True
     elif goto == 'main':
         main = True
-        template = "repo_browser_main.html"
+        template = "repo_browser/repo_browser_main.html"
 
     return render_template(template, building=building, release=release, testing=testing,
                            main=main, user=user)
@@ -772,7 +772,7 @@ def build_pkg_now():
             pending = False
             logger.debug(rev_pending)
             for bnum in rev_pending:
-                bld_obj = build_obj.get_build_object(bnum=bnum)
+                bld_obj = build.get_build_object(bnum=bnum)
                 if bld_obj and pkgname == bld_obj.pkgname:
                     pending = True
                     break

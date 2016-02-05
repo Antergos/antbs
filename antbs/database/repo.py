@@ -26,15 +26,13 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Repo Class """
 
-import re
 import os
-import glob
 import tarfile
+
+from database.base_objects import RedisHash
 from utils.logging_config import logger
 from utils.server_status import status
-from utils.redis_connection import RedisHash
 
 
 class PacmanRepo(RedisHash):

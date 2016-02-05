@@ -31,8 +31,9 @@
 
 import logging
 import logging.config
+
+from database.base_objects import db
 from .utilities import Singleton
-from .redis_connection import db
 
 
 class LoggingConfig(metaclass=Singleton):

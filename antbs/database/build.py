@@ -27,15 +27,13 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-""" Build Class - Represents a single build """
-
 import datetime
 
-from utils.redis_connection import RedisHash
+from database.base_objects import RedisHash
 from utils.logging_config import logger
 
 
-class BuildObject(RedisHash):
+class Build(RedisHash):
     """
     This class represents a "build" throughout the build server app. It is used
     to get and set build data to the database.
@@ -129,7 +127,7 @@ def get_build_object(pkg_obj=None, bnum=None):
         bnum (int): Get an existing build identified by `bnum`.
 
     Returns:
-        BuildObject: A fully initiallized `BuildObject`.
+        Build: A fully initiallized `Build`.
 
     Raises:
         ValueError: If both `pkg_obj` and `bnum` are Falsey.
@@ -138,5 +136,5 @@ def get_build_object(pkg_obj=None, bnum=None):
     if not pkg_obj and not bnum:
         logger.debug('bnum or pkg_obj is required to get build object.')
         raise ValueError
-    bld_obj = BuildObject(pkg_obj=pkg_obj, bnum=bnum)
+    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum)
     return bld_obj

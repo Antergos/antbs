@@ -20,21 +20,20 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Package Class """
 
-import subprocess
 import os
 import re
+import shutil
+import subprocess
+import time
 import zipfile
 
+from gevent import sleep
 from github3 import login
 from gitlab import Gitlab
-import shutil
-import time
-from gevent import sleep
 
+from database.base_objects import RedisHash
 from utils.logging_config import logger
-from utils.redis_connection import RedisHash
 from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"

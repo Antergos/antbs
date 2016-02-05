@@ -29,10 +29,10 @@
 
 """ Bot utilities for Slack """
 
-import os
-from .redis_connection import db
-from stackexchange import Site, StackOverflow, Sort, DESC
 from github3 import login
+from stackexchange import Site, StackOverflow, Sort, DESC
+
+from database.base_objects import db
 from .logging_config import logger
 
 se_key = db.get('SLACK:API-KEY')

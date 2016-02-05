@@ -29,10 +29,10 @@
 
 """ Server Status Module (handles this application's state) """
 
-import os
 import datetime
-from .redis_connection import RedisHash, RedisList, RedisZSet
-from .logging_config import logger
+import os
+
+from database.base_objects import RedisHash, RedisList, RedisZSet
 from .utilities import Singleton, DateTimeStrings
 
 

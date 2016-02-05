@@ -29,22 +29,22 @@
 
 """Webhook Handler Module"""
 
+import ast
+import datetime
 import ipaddress
 import json
 import os
 import shutil
-import datetime
-import ast
 
-from rq import Queue, Connection, Worker
 import requests
+from rq import Queue, Connection, Worker
 
 import build_pkg as builder
-from utils.redis_connection import db
+from database import package
+from database.installation import AntergosInstallation, AntergosInstallationUser
+from database.base_objects import db
 from utils.logging_config import logger
-import package as package
 from utils.server_status import status, get_timeline_object
-from installation import AntergosInstallation, AntergosInstallationUser
 
 with Connection(db):
     queue = Queue('hook_queue')

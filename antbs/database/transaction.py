@@ -20,11 +20,8 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Transaction Class """
 
-from utils.logging_config import logger
-from utils.redis_connection import RedisList, RedisHash, RedisZSet, db
-from utils.server_status import status
+from database.base_objects import RedisHash
 
 
 class Transaction(RedisHash):
@@ -32,8 +29,8 @@ class Transaction(RedisHash):
     This class represents a single "build transaction" throughout the app. It is used
     to get/set transaction data from/to the database. A transaction is comprised
     of one or more builds. When a new transaction is initialized it creates its own build
-    directory which it will once all builds are completed. This allows for build concurrency
-    across multiple transactions and can be easily scaled as needed.
+    directory which it will delete once all builds are completed. This allows for
+    build concurrency across multiple transactions and can be easily scaled as needed.
 
         Args:
             pkg_objs (list): Names of packages to build. This creates a new `Transaction`.

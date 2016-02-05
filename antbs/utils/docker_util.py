@@ -28,12 +28,14 @@
 
 """ Docker Utilities """
 
-import subprocess
 import os
 import shutil
+import subprocess
+
 import docker
+
+from database.base_objects import db
 from .logging_config import logger
-from .redis_connection import db
 from .server_status import status
 from .utilities import Singleton
 

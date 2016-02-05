@@ -34,16 +34,17 @@ Repo Monitor Module:
 """
 
 import logging
-from utils.logging_config import logger
-from utils.redis_connection import db
-from utils.server_status import status
-import webhook
+
+import requests
 from github3 import login
 from gitlab import Gitlab
-import json
-import requests
-import package
+
 import iso
+import webhook
+from database import package
+from database.base_objects import db
+from utils.logging_config import logger
+from utils.server_status import status
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token

@@ -33,7 +33,7 @@ import os
 import sys
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
-from utils.redis_connection import db
+from database.base_objects import db
 import utils.docker_util as docker_utils
 import subprocess
 import utils.logging_config as logconf
@@ -46,10 +46,9 @@ from pygments.formatters import HtmlFormatter
 import re
 import time
 from multiprocessing import Process
-import package
 from rq import Connection, Queue, get_current_job
 from utils.server_status import status, TimelineEvent
-import build_obj
+from database import build, package
 import utils.sign_pkgs as sign_pkgs
 
 SRC_DIR = os.path.dirname(__file__) or '.'
@@ -508,7 +507,7 @@ def process_and_save_build_metadata(pkg_obj=None):
         pkg_obj (Package): Package object for the package being built.
 
     Returns:
-        BuildObject: A build object.
+        Build: A build object.
 
     Raises:
         AttributeError: If `pkg_obj` is Falsey.
@@ -520,7 +519,7 @@ def process_and_save_build_metadata(pkg_obj=None):
     status.current_status = 'Building %s' % pkg_obj.name
     status.now_building = pkg_obj.name
     logger.info('Building %s' % pkg_obj.name)
-    bld_obj = build_obj.get_build_object(pkg_obj=pkg_obj)
+    bld_obj = build.get_build_object(pkg_obj=pkg_obj)
     bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
     status.building_num = bld_obj.bnum
     status.building_start = bld_obj.start_str
@@ -739,7 +738,7 @@ def build_package(pkg=None):
         if not last_build:
             db.set('antbs:misc:cache_buster:flag', True)
             return True
-        last_bld_obj = build_obj.get_build_object(bnum=last_build)
+        last_bld_obj = build.get_build_object(bnum=last_build)
         if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
             last_bld_obj.review_status = 'skip'
 

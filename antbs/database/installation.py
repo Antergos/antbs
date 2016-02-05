@@ -26,13 +26,11 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Install Module """
-
 
 import datetime
-from utils.redis_connection import RedisHash, db
+
+from database.base_objects import RedisHash, db
 from utils.utilities import DateTimeStrings
-from utils.server_status import status
 
 next_install_id_key = 'cnchi:misc:next_install_id'
 
