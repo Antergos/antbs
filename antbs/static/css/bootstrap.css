@@ -9074,7 +9074,7 @@ button.close {
 .colorpicker-saturation {
   width: 100px;
   height: 100px;
-  background-image: url(../img/saturation.png);
+  background-image: url(../images/saturation.png);
   cursor: crosshair;
   float: left;
 }
@@ -9116,10 +9116,10 @@ button.close {
   margin-top: -1px;
 }
 .colorpicker-hue {
-  background-image: url(../img/hue.png);
+  background-image: url(../images/hue.png);
 }
 .colorpicker-alpha {
-  background-image: url(../img/alpha.png);
+  background-image: url(../images/alpha.png);
   display: none;
 }
 .colorpicker {
@@ -9161,7 +9161,7 @@ button.close {
   height: 10px;
   margin-top: 5px;
   clear: both;
-  background-image: url(../img/alpha.png);
+  background-image: url(../images/alpha.png);
   background-position: 0 100%;
 }
 .colorpicker-color div {
