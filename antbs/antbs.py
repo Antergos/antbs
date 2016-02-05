@@ -342,6 +342,8 @@ def get_repo_info(repo=None, logged_in=False):
             else:
                 logger.error(p)
                 continue
+            if 'dummy' in pkg:
+                continue
             pkg_obj = package.get_pkg_object(pkg)
             builds = pkg_obj.builds
             bld_obj = dict(review_status='', review_dev='', review_date='')
@@ -479,21 +481,21 @@ def get_build_history_chart_data(pkg_obj=None):
 
 @app.errorhandler(404)
 def page_not_found(e):
-    return render_template('404.html'), 404
+    return render_template('error/404.html'), 404
 
 
 @app.errorhandler(500)
 def internal_error(e):
     if e is not None:
         logger.error(e)
-    return render_template('500.html'), 500
+    return render_template('error/500.html'), 500
 
 
 @app.errorhandler(400)
 def flask_error(e):
     if e is not None:
         logger.error(e)
-    return render_template('500.html'), 400
+    return render_template('error/500.html'), 400
 
 
 @app.route("/timeline/<int:tlpage>")
@@ -627,7 +629,7 @@ def scheduled():
             except ValueError as err:
                 logger.error(err)
 
-    return render_template("scheduled.html", building=building, queue=the_queue, user=user)
+    return render_template("builds/scheduled.html", building=building, queue=the_queue, user=user)
 
 
 @app.route('/completed/<int:page>')
@@ -644,7 +646,7 @@ def completed(page=None, name=None):
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
 
-    return render_template("completed.html", building=building, completed=completed,
+    return render_template("builds/completed.html", building=building, completed=completed,
                            all_pages=all_pages, rev_pending=rev_pending, user=user,
                            pagination=pagination)
 
@@ -662,7 +664,7 @@ def failed(page=None):
     failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
 
-    return render_template("failed.html", building=building, failed=failed, all_pages=all_pages,
+    return render_template("builds/failed.html", building=building, failed=failed, all_pages=all_pages,
                            page=page, rev_pending=rev_pending, user=user, pagination=pagination)
 
 
@@ -686,7 +688,7 @@ def build_info(num):
         container = None
     res = 'completed' if bld_obj.completed else 'failed'
 
-    return render_template("build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str,
+    return render_template("builds/build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str,
                            res=res, start=bld_obj.start_str, end=bld_obj.end_str,
                            bnum=bld_obj.bnum, container=container, log=log, user=user)
 
@@ -741,7 +743,7 @@ def dev_pkg_check(page=None):
 
     completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
     pagination = utils.pagination.Pagination(page, 10, len(rev_pending))
-    return render_template("pkg_review.html", completed=completed, all_pages=all_pages,
+    return render_template("admin/pkg_review.html", completed=completed, all_pages=all_pages,
                            set_rev_error=set_rev_error, set_rev_error_msg=set_rev_error_msg,
                            user=user, rev_pending=rev_pending, pagination=pagination)
 
@@ -897,7 +899,7 @@ def repo_packages(repo=None):
 
     building = status.now_building
     packages, rev_pending = get_repo_info(repo, user.is_authenticated())
-    return render_template("repo_pkgs.html", building=building, repo_packages=packages,
+    return render_template("repos/repo_pkgs.html", building=building, repo_packages=packages,
                            rev_pending=rev_pending, user=user, name=repo)
 
 

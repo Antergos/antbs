@@ -136,7 +136,9 @@ class Package(PackageMeta):
 
         if not self.pbpath:
             self.determine_pbpath()
-            setattr(self, 'pkgbuild', open(self.pbpath).read())
+
+        self.maybe_update_pkgbuild_repo()
+        setattr(self, 'pkgbuild', open(self.pbpath).read())
 
 
     def get_from_pkgbuild(self, var=None):
@@ -166,24 +168,22 @@ class Package(PackageMeta):
             cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
 
         if var == "pkgver":
-            exclude = ['numix-icon-theme', 'plymouth']
+            exclude = ['plymouth']
             use_container = []
             git_source = 'git+' in self.pkgbuild or 'git://' in self.pkgbuild
             if (git_source and self.name not in exclude) or 'cnchi' in self.name:
-                if 'http' not in self.git_url or not self.git_name:
+                if not self.git_url or 'http' not in self.git_url or not self.git_name:
                     self.determine_git_repo_info()
+
                 self.prepare_package_source(dirpath=dirpath)
 
             if 'cnchi-dev' == self.name:
-                cmd = 'mv lots0logs*** cnchi; /usr/bin/python cnchi/cnchi/info.py'
+                cmd = 'mv Antergos*** cnchi; /usr/bin/python cnchi/cnchi/info.py'
 
             if self.name in use_container:
                 from utils.docker_util import DockerUtils
                 pkgver = DockerUtils().get_pkgver_inside_container(self)
                 return pkgver
-
-            if 'numix-icon-theme' in self.name:
-                self.prepare_package_source(dirpath=dirpath)
 
         proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -216,7 +216,7 @@ class Package(PackageMeta):
         if 'cnchi-dev' == self.name:
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
-            repo = gh.repository('lots0logs', 'cnchi-dev')
+            repo = gh.repository('antergos', 'cnchi')
             repo.archive('zipball', zpath, ref='master')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
@@ -235,7 +235,6 @@ class Package(PackageMeta):
 
     def determine_git_repo_info(self):
         if not self.git_url or not self.git_url.endswith('.git'):
-            self.maybe_update_pkgbuild_repo()
             source = self.get_from_pkgbuild('source')
             url_match = re.search(r'((https*)|(git:)).+\.git', source)
             if url_match:
@@ -250,7 +249,7 @@ class Package(PackageMeta):
                 setattr(self, 'git_name', 'pamac')
             elif self.name == 'cnchi-dev':
                 setattr(self, 'git_name', 'cnchi')
-                setattr(self, 'git_url', 'http://github.com/lots0logs/cnchi-dev.git')
+                setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
             elif self.name == 'cnchi':
                 setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
 

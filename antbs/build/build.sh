@@ -133,7 +133,7 @@ function run_update_repo() {
 
 	for arc in i686 x86_64; do
 		cd "/${repo_dir}/${arc}"
-		repo-add -R -f "${repo}.db.tar.gz" ./${PKGNAME}**.xz
+		repo-add -R "${repo}.db.tar.gz" ./${PKGNAME}**.xz
 	done && touch "/result/${PKGNAME}" && return 0;
 
 	return 1
@@ -262,7 +262,7 @@ function build_32bit_pkg() {
 	check_pkg_sums 32bit
 	cd /32bit
 
-	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -m -f -L ${DEPS} --noconfirm --noprogressbar --needed" 2>&1 && \
+	{ arch-chroot /32build/root /usr/bin/bash -c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -m -f -L ${DEPS} --noconfirm --needed" 2>&1 && \
       cp /32build/root/pkg/*-i686.pkg.* /staging/i686 && return 0; } || return 1
 
 }
@@ -284,7 +284,7 @@ function try_build() {
 		cd /pkg
 		print2log 'UPDATING SOURCE CHECKSUMS';
 		check_pkg_sums &&
-		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --noprogressbar --needed 2>&1 && copy_any && return 0; } || return 1
+		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 && copy_any && return 0; } || return 1
 
 	fi
 
@@ -313,6 +313,10 @@ if [[ "True" != "${_UPDREPO}" ]]; then
 
 	repo=antergos-staging
 	repo_dir=staging
+
+	if [[ -d /pkg/cnchi ]]; then
+		rm -rf /pkg/cnchi
+	fi
 
 	if in_array "i686" "${arch[@]}" && ! in_array "any" "${arch[@]}"; then
 
