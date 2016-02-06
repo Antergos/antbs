@@ -31,8 +31,8 @@ import os
 import tarfile
 
 from database.base_objects import RedisHash
+from database.server_status import status
 from utils.logging_config import logger
-from utils.server_status import status
 
 
 class PacmanRepo(RedisHash):

@@ -43,8 +43,8 @@ import iso
 import webhook
 from database import package
 from database.base_objects import db
+from database.server_status import status
 from utils.logging_config import logger
-from utils.server_status import status
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token

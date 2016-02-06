@@ -33,8 +33,8 @@ from github3 import login
 from gitlab import Gitlab
 
 from database.base_objects import RedisHash
+from database.server_status import status
 from utils.logging_config import logger
-from utils.server_status import status
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
@@ -121,7 +121,7 @@ class Package(PackageMeta):
             pkg_id: ID assigned to the package when it is added to our database for the first time.
 
         (list)
-            allowed_in: The repos that the package is allowed to be in.
+            allowed_in: The repos that the package is allowed to be in (repo names).
             builds: The IDs of all builds (coompleted & failed) for the package.
             tl_events: The IDs of all timeline events that include this package.
 
@@ -137,8 +137,8 @@ class Package(PackageMeta):
             self.determine_pbpath()
 
         self.maybe_update_pkgbuild_repo()
-        setattr(self, 'pkgbuild', open(self.pbpath).read())
-
+        if os.path.exists(self.pbpath):
+            setattr(self, 'pkgbuild', open(self.pbpath).read())
 
     def get_from_pkgbuild(self, var=None):
         """

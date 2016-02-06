@@ -47,7 +47,7 @@ import re
 import time
 from multiprocessing import Process
 from rq import Connection, Queue, get_current_job
-from utils.server_status import status, TimelineEvent
+from database.server_status import status, TimelineEvent
 from database import build, package
 import utils.sign_pkgs as sign_pkgs
 

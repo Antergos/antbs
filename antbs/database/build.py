@@ -91,7 +91,7 @@ class Build(RedisHash):
                      list=['log'],
                      zset=[]))
 
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+        self.__namespaceinit__()
 
         if pkg_obj and (not self or not bnum):
             self.__keysinit__()

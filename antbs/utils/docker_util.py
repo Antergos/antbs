@@ -35,8 +35,8 @@ import subprocess
 import docker
 
 from database.base_objects import db
+from database.server_status import status
 from .logging_config import logger
-from .server_status import status
 from .utilities import Singleton
 
 doc_user = status.docker_user

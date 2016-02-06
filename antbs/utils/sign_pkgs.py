@@ -38,8 +38,8 @@ import shutil
 import subprocess
 
 from database.base_objects import db
+from database.server_status import status
 from .logging_config import logger
-from .server_status import status
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'

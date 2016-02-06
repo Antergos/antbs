@@ -33,7 +33,7 @@ import datetime
 import os
 
 from database.base_objects import RedisHash, RedisList, RedisZSet
-from .utilities import Singleton, DateTimeStrings
+from utilities import Singleton, DateTimeStrings
 
 
 class ServerStatus(RedisHash, metaclass=Singleton):
@@ -53,7 +53,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                            'hook_queue'],
                      set=['all_packages', 'iso_pkgs', 'repos'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
-                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR']))
+                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR']))
 
         super().__namespaceinit__()
 
@@ -65,31 +65,6 @@ class ServerStatus(RedisHash, metaclass=Singleton):
             self.now_building = 'Idle'
             self.iso_flag = False
             self.iso_building = False
-
-    def __keysinit__(self):
-        for key in self.all_keys:
-            value = getattr(self, key, '')
-            is_string = key in self.key_lists['string']
-            initialized = (not is_string and '' != value) or (is_string and '_' != value)
-
-            if initialized:
-                continue
-
-            value = os.environ.get(key.upper())
-
-            if key in self.key_lists['string']:
-                value = value or ''
-                setattr(self, key, value)
-            elif key in self.key_lists['bool']:
-                value = value or False
-                setattr(self, key, value)
-            elif key in self.key_lists['int']:
-                value = value or 0
-                setattr(self, key, value)
-            elif key in self.key_lists['list']:
-                setattr(self, key, RedisList.as_child(self, key, str))
-            elif key in self.key_lists['set']:
-                setattr(self, key, RedisZSet.as_child(self, key, str))
 
 
 class TimelineEvent(RedisHash, DateTimeStrings):

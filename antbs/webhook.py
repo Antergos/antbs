@@ -41,10 +41,10 @@ from rq import Queue, Connection, Worker
 
 import build_pkg as builder
 from database import package
-from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.base_objects import db
+from database.installation import AntergosInstallation, AntergosInstallationUser
+from database.server_status import status, get_timeline_object
 from utils.logging_config import logger
-from utils.server_status import status, get_timeline_object
 
 with Connection(db):
     queue = Queue('hook_queue')

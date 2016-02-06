@@ -60,7 +60,7 @@ from bugsnag.flask import handle_exceptions
 import utils.pagination
 import build_pkg as builder
 from database.base_objects import db
-from utils.server_status import status, get_timeline_object
+from database.server_status import status, get_timeline_object
 import webhook
 # import utils.slack_bot as slack_bot
 import database.build as build

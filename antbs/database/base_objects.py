@@ -338,18 +338,25 @@ class RedisHash(RedisObject):
     def __keysinit__(self):
         """ Initializes the object's predefined attributes as hash fields in Redis. """
         for key in self.all_keys:
-            val = getattr(self, key, '')
+            value = getattr(self, key, '')
             is_string = key in self.key_lists['string']
-            initialized = (not is_string and '' != val) or (is_string and '_' != val)
+            initialized = (not is_string and '' != value) or (is_string and '_' != value)
 
             if initialized:
                 continue
-            elif key in self.key_lists['string']:
-                setattr(self, key, '')
+
+            if 'ServerStatus' == self.__class__.__name__:
+                value = os.environ.get(key.upper())
+
+            if key in self.key_lists['string']:
+                value = value or ''
+                setattr(self, key, value)
             elif key in self.key_lists['bool']:
-                setattr(self, key, False)
+                value = value or False
+                setattr(self, key, value)
             elif key in self.key_lists['int']:
-                setattr(self, key, 0)
+                value = value or 0
+                setattr(self, key, value)
             elif key in self.key_lists['list']:
                 setattr(self, key, RedisList.as_child(self, key, str))
             elif key in self.key_lists['set']:
