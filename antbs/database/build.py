@@ -130,11 +130,14 @@ def get_build_object(pkg_obj=None, bnum=None):
         Build: A fully initiallized `Build`.
 
     Raises:
-        ValueError: If both `pkg_obj` and `bnum` are Falsey.
+        ValueError: If both `pkg_obj` and `bnum` are Falsey or Truthy.
 
     """
-    if not pkg_obj and not bnum:
-        logger.debug('bnum or pkg_obj is required to get build object.')
-        raise ValueError
+    if not any([pkg_obj, bnum]):
+        raise ValueError('At least one of [pkg_obj, bnum] required.')
+    elif all([pkg_obj, bnum]):
+        raise ValueError('Only one of [pkg_obj, bnum] can be given, not both.')
+
     bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum)
+
     return bld_obj

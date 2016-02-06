@@ -55,7 +55,7 @@ class DockerUtils(metaclass=Singleton):
         self.cache_i686 = '/var/tmp/pkg_cache_i686'
         self.result_dir = '/tmp/pkgver_result'
         if os.path.exists(self.result_dir):
-            shutil.rmtree(self.result_dir, ignore_errors=True)
+            shutil.rmtree(self.result_dir)
         os.mkdir(self.result_dir)
 
         if self._doc is None:

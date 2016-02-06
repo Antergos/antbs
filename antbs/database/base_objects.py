@@ -41,7 +41,7 @@ class RedisObject:
 
     db = db
 
-    def __init__(self, full_key=None):
+    def __init__(self, full_key=None, *args, **kwargs):
         """ Create or load a RedisObject. """
         self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
 

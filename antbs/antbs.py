@@ -100,7 +100,7 @@ def initialize_app():
                              'STORMPATH_REQUIRE_USERNAME': True,
                              'STORMPATH_ENABLE_REGISTRATION': False,
                              'STORMPATH_REDIRECT_URL': '/pkg_review',
-                             'STORMPATH_LOGIN_TEMPLATE': 'login.html',
+                             'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
                              'STORMPATH_COOKIE_DURATION': timedelta(days=14),
                              'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
 

@@ -72,6 +72,16 @@ class Transaction(RedisHash):
             path=['base_path', 'path']
         ))
 
+        if packages and not self:
+            self.__keysinit__()
+            self.tnum = the_tnum
+
+            for pkg in packages:
+                self.packages.add(pkg)
+
+
+
+
 
 def get_trans_object(packages=None, tnum=None):
     """
