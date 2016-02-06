@@ -46,7 +46,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                              'gitlab_token', 'building_start', 'building_num', 'docker_user',
                              'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
                              'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
-                             'sp_app'],
+                             'sp_app', 'gh_repo_url'],
                      bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
                      int=['building_num'],
                      list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',

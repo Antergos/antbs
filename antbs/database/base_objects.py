@@ -275,9 +275,13 @@ class RedisZSet(RedisObject, set):
         """ Check if item is in the set. """
         return item in self.db.zrange(self.full_key, 0, -1)
 
-    def add(self, val):
+    def add(self, *values):
         """ Add member to set if it doesn't exist. """
-        self.db.zadd(self.full_key, 1, super().encode_value(val))
+        vals = []
+        for val in vals:
+            vals.append(1)
+            vals.append(val)
+        self.db.zadd(self.full_key, 1, *vals)
 
     def remove(self, val):
         """ Remove a member from the set. """

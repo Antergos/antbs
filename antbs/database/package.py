@@ -130,11 +130,13 @@ class Package(PackageMeta):
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, pbpath=None):
         super().__init__(key=name)
 
-        if not self.pbpath:
+        if not pbpath:
             self.determine_pbpath()
+        else:
+            self.pbpath = pbpath
 
         self.maybe_update_pkgbuild_repo()
         if os.path.exists(self.pbpath):
@@ -332,7 +334,7 @@ class Package(PackageMeta):
             return False
 
     def get_version(self):
-        changed = {}
+        changed = {'epoch': None, 'pkgrel': None, 'pkgver': None}
         old_vals = {}
         version_from_tag = self.is_monitored and 'pkgver()' not in self.pkgbuild
         if not version_from_tag:
@@ -345,8 +347,8 @@ class Package(PackageMeta):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if not changed:
-                return self.version_str
+            if not any([x for x in changed.items() if changed[x] is not None]):
+                return self.epoch, self.pkgver, self.pkgrel, self.version_str
         else:
             old_val = self.pkgver
             key = 'antbs:monitor:github:{0}:{1}'.format(self.gh_project, self.gh_repo)
@@ -359,33 +361,31 @@ class Package(PackageMeta):
             changed['pkgrel'] = '1'
 
         version = changed.get('pkgver', self.pkgver)
-        logger.info(version)
 
-        if changed.get('epoch', False):
-            version = changed['epoch'] + ':' + version
+        if changed['epoch']:
+            version = '{0}:{1}'.format(changed['epoch'], version)
         elif self.epoch:
-            version = self.epoch + ':' + version
+            version = '{0}:{1}'.format(self.epoch, version)
 
-        if changed.get('pkgrel', False):
-            version = version + '-' + changed['pkgrel']
+        if changed['pkgrel']:
+            version = '{0}-{1}'.format(version, changed['pkgrel'])
         elif self.pkgrel:
-            version = version + '-' + self.pkgrel
+            version = '{0}-{1}'.format(version, self.pkgrel)
         else:
-            version = version + '-' + '1'
+            version = '{0}-{1}'.format(version, '1')
 
         if version and len(version) > 2:
             setattr(self, 'version_str', version)
-            # logger.info('@@-package.py-@@ | pkgver is %s' % pkgver)
         else:
             version = self.version_str
 
         if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
             if not self.db.exists('CNCHI-DEV-OVERRIDE'):
-                return False
+                version = False
             else:
                 self.db.delete('CNCHI-DEV-OVERRIDE')
 
-        return version
+        return self.epoch, self.pkgver, self.pkgrel, version
 
     def get_deps(self):
         """
@@ -403,16 +403,15 @@ class Package(PackageMeta):
             has_ver = re.search(r'^[\d\w-]+(?=\=|\>|\<)', dep)
             if has_ver:
                 dep = has_ver.group(0)
-            if dep in status.all_packages and (dep in status.queue or dep in status.hook_queue):
-                depends.append(dep)
+
+            depends.append(dep)
+
             if dep in deps:
                 self.depends.add(dep)
             elif dep in mkdeps:
                 self.makedepends.add(dep)
 
-        res = (self.name, depends)
-
-        return res
+        return depends
 
     def sync_database_with_pkgbuild(self):
         if not self.pkgname:
@@ -433,9 +432,8 @@ class Package(PackageMeta):
             setattr(self, 'groups', self.get_from_pkgbuild('groups'))
 
 
-def get_pkg_object(name=None):
+def get_pkg_object(name=None, pbpath=None):
     if not name:
-        logger.debug('name is required to get package object.')
-        return False
-    pkg_obj = Package(name=name)
+        raise ValueError('name is required to get package object.')
+    pkg_obj = Package(name=name, pbpath=pbpath)
     return pkg_obj

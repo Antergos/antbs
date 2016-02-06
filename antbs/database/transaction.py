@@ -21,7 +21,16 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-from database.base_objects import RedisHash
+import os, subprocess, tempfile
+import shutil
+
+from build_pkg import logger
+from .base_objects import RedisHash
+from .server_status import status
+from .package import get_pkg_object
+from utils.logging_config import logger
+from utils.utilities import remove
+
 
 
 class Transaction(RedisHash):
@@ -42,10 +51,13 @@ class Transaction(RedisHash):
             path (str): Absolute path to this transaction's build directory.
             builds (list): This transaction's builds (list of bnums)
             is_running (bool): Whether or not the transaction is currently running.
-            is_completed (bool): Whether or not the transaction is done (regardless of build results)
+            is_finished (bool): Whether or not the transaction is done (regardless of results)
             building (str): The name of the package currently building.
             start_str (str): The datetime string for when this transaction started.
             end_str (str): The datetime string for when this transaction ended.
+            completed (list): Builds that completed successfully (list of bnums).
+            failed (list): Builds that failed (list of bnums).
+            internal_deps (list): List of packages that depend on package(s) in this transaction.
 
         Raises:
             ValueError: If both `packages` and `tnum` are Falsey.
@@ -65,10 +77,10 @@ class Transaction(RedisHash):
 
         self.key_lists.update(dict(
             string=['building', 'start_str', 'end_str'],
-            bool=['is_running', 'completed'],
+            bool=['is_running', 'is_finished'],
             int=['tnum'],
             list=[],
-            zset=['packages', 'builds'],
+            zset=['packages', 'builds', 'completed', 'failed', 'internal_deps'],
             path=['base_path', 'path']
         ))
 
@@ -76,9 +88,135 @@ class Transaction(RedisHash):
             self.__keysinit__()
             self.tnum = the_tnum
 
+            if base_path:
+                self.base_path = base_path
+            else:
+                self.base_path = '/var/tmp/antbs'
+
             for pkg in packages:
                 self.packages.add(pkg)
 
+            self._internal_deps = []
+
+    def setup_transaction_directory(self):
+        self.path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
+
+        try:
+            subprocess.check_output(['git', 'clone', status.gh_repo_url], cwd=self.path)
+        except subprocess.CalledProcessError as err:
+            raise RuntimeError(err.output)
+
+    def setup_build_directory(self, pkg):
+        paths = [os.path.join(self.path, pkg),
+                 os.path.join(self.path, 'cinnamon', pkg)]
+        pbpath = None
+        for p in paths:
+            if os.path.exists(p):
+                pbpath = p
+                break
+            else:
+                raise RuntimeError('Unable to determine pb_path for {0}'.format(pkg))
+
+        return pbpath
+
+    def handle_special_cases(self, pkg, pkg_obj):
+        if 'cnchi' in pkg:
+            logger.info('cnchi package detected.')
+            status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
+            logger.info(status.current_status)
+            cnchi_dir = os.path.join(self.path, pkg)
+            self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
+            remove(os.path.join(cnchi_dir, 'cnchi/.git'))
+            subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
+
+    def process_packages(self):
+        self.setup_transaction_directory()
+
+        for pkg in self.packages:
+            if not pkg:
+                continue
+
+            pbpath = self.setup_build_directory(pkg)
+
+            pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
+            epoch, pkgver, pkgrel, version = pkg_obj.get_version()
+
+            if not version:
+                self.packages.remove(pkg)
+                logger.debug('Skipping cnchi-dev build: {0}'.format(pkg))
+                continue
+
+            pkg_obj.version_str = version
+
+            log_msg = 'Updating pkgver in database for {0} to {1}'.format(pkg, version)
+            logger.info(log_msg)
+            status.current_status = log_msg
+
+            depends = pkg_obj.get_deps()
+            if depends:
+                self.internal_deps.add(*depends)
+
+            self.handle_special_cases(pkg, pkg_obj)
+
+    def fetch_and_compile_translations(self, translations_for=None, pkg_obj=None):
+        """
+        Get and compile translations from Transifex.
+
+        :param (list) translations_for:
+        :param (Package) pkg_obj:
+
+        """
+
+        if pkg_obj is None:
+            name = ''
+        else:
+            name = pkg_obj.name
+
+        trans = {
+            "cnchi": {
+                'trans_dir': "/opt/cnchi-translations/",
+                'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
+                'dest_dir': os.path.join(self.path, name, '/cnchi/po')
+            },
+            "cnchi_updater": {
+                'trans_dir': "/opt/antergos-iso-translations/",
+                'trans_files_dir': "/opt/antergos-iso-translations/translations/antergos.cnchi_updaterpot",
+                'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
+            },
+            "antergos-gfxboot": {
+                'trans_dir': "/opt/antergos-iso-translations/",
+                'trans_files_dir': '/opt/antergos-iso-translations/translations/antergos.antergos-gfxboot',
+                'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/antergos-gfxboot'
+            }
+        }
+
+        for trans_for in translations_for:
+
+            if not os.path.exists(trans[trans_for]['dest_dir']):
+                os.mkdir(trans[trans_for]['dest_dir'])
+            try:
+
+                output = subprocess.check_output(['tx', 'pull', '-a', '--minimum-perc=50'],
+                                                 cwd=trans[trans_for]['trans_dir'])
+
+                for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
+                    for tfile in f:
+                        if trans_for in ['cnchi', 'antergos-gfxboot']:
+                            tfile = os.path.join(r, tfile)
+                            logger.debug(
+                                'Copying %s to %s' % (tfile, trans[trans_for]['dest_dir']))
+                            shutil.copy(tfile, trans[trans_for]['dest_dir'])
+                        elif 'cnchi_updater' == trans_for:
+                            mofile = tfile[:-2] + 'mo'
+                            subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile],
+                                                  cwd=trans[trans_for]['trans_files_dir'])
+                            os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
+                                      os.path.join(trans[trans_for]['dest_dir'], mofile))
+
+            except subprocess.CalledProcessError as err:
+                logger.error(err.output)
+            except Exception as err:
+                logger.error(err)
 
 
 
@@ -106,4 +244,5 @@ def get_trans_object(packages=None, tnum=None):
     trans_obj = Transaction(packages=packages, tnum=tnum)
 
     return trans_obj
+
 

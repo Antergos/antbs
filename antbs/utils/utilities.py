@@ -27,6 +27,10 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 """ Various utility classes and metaclasses (kind of like mixins) """
+import os
+import subprocess
+
+from build_pkg import logger
 
 
 class Singleton(type):
@@ -52,3 +56,31 @@ class DateTimeStrings:
     def dt_to_string(dt):
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
+
+def remove(src):
+    """
+
+    :param src:
+    :return:
+    """
+    if not isinstance(src, str):
+        raise ValueError('src must be of type(str), type({0}) given.'.format(type(src)))
+
+    if os.path.isdir(src):
+        # try:
+        #     shutil.rmtree(src)
+        # except Exception as err:
+        #     logger.error('Failed to remove {0}. Error is: {1}'.format(src, err))
+        output = None
+        try:
+            output = subprocess.check_output(['sudo', '/var/tmp/remove32.sh', src], shell=True)
+        except subprocess.CalledProcessError as err2:
+            logger.error(err2.output)
+        if output:
+            logger.error(output)
+
+    elif os.path.isfile(src):
+        try:
+            os.remove(src)
+        except Exception as err:
+            logger.error('Failed to remove {0}. Error is: {1}'.format(src, err))

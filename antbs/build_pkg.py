@@ -32,6 +32,8 @@
 import os
 import sys
 
+from database.transaction import fetch_and_compile_translations
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from database.base_objects import db
 import utils.docker_util as docker_utils
@@ -50,6 +52,7 @@ from rq import Connection, Queue, get_current_job
 from database.server_status import status, TimelineEvent
 from database import build, package
 import utils.sign_pkgs as sign_pkgs
+from utils.utilities import remove
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -63,30 +66,6 @@ with Connection(db):
     build_queue = Queue('build_queue')
     repo_queue = Queue('repo_queue')
     hook_queue = Queue('hook_queue')
-
-
-def remove(src):
-    """
-
-    :param src:
-    :return:
-    """
-    if src != str(src):
-        return True
-    if os.path.isdir(src):
-        try:
-            shutil.rmtree(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    elif os.path.isfile(src):
-        try:
-            os.remove(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    else:
-        return True
 
 
 def run_docker_clean(pkg=None):
@@ -237,14 +216,36 @@ def process_package_queue():
     return all_deps
 
 
-def handle_hook():
-    saved_status = False
-    if not status.idle and 'Idle' not in status.current_status:
-        saved_status = status.current_status
-    else:
-        status.idle = False
+def handle_hook_set_server_status(first=True, saved_status=False, early_exit=False):
+    if first:
+        saved = False
+        if not status.idle and 'Idle' not in status.current_status:
+            saved = status.current_status
+        else:
+            status.idle = False
 
-    status.current_status = 'Build hook was triggered. Checking docker images.'
+        status.current_status = 'Build hook was triggered. Checking docker images.'
+
+        return saved
+
+    elif early_exit:
+        if not saved_status:
+            status.idle = True
+            status.current_status = 'Idle'
+        else:
+            status.current_status = saved_status
+
+        return
+
+    else:
+
+
+
+
+def handle_hook():
+
+    saved_status = handle_hook_set_server_status(first=True)
+
     if not status.iso_flag:
         image = docker_utils.DockerUtils().maybe_build_base_devel()
     else:
@@ -252,11 +253,7 @@ def handle_hook():
         image = docker_utils.DockerUtils().maybe_build_mkarchiso()
 
     if not image:
-        if not saved_status:
-            status.idle = True
-            status.current_status = 'Idle'
-        else:
-            status.current_status = saved_status
+        handle_hook_set_server_status(first=False, early_exit=True, saved_status=saved_status)
         return False
 
     logger.info('Processing packages.')
@@ -281,13 +278,7 @@ def handle_hook():
             status.queue.rpush(pkg)
             build_queue.enqueue_call(build_pkg_handler, timeout=84600)
 
-    db.set('antbs:misc:cache_buster:flag', True)
-
-    if saved_status and not status.idle:
-        status.current_status = saved_status
-    elif 'Determining build order based on package dependencies.' == status.current_status:
-        status.idle = True
-        status.current_status = 'Idle.'
+    handle_hook_set_server_status(first=False, saved_status=saved_status)
 
 
 def build_pkg_handler():
@@ -533,67 +524,6 @@ def process_and_save_build_metadata(pkg_obj=None):
     return bld_obj
 
 
-def fetch_and_compile_translations(translations_for=None, pkg_obj=None):
-    """
-    Get and compile translations from Transifex.
-
-    :param (list) translations_for:
-    :param (Package) pkg_obj:
-
-    """
-
-    if pkg_obj is None:
-        name = ''
-    else:
-        name = pkg_obj.name
-
-    trans = {
-        "cnchi": {
-            'trans_dir': "/opt/cnchi-translations/",
-            'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
-            'dest_dir': '/opt/antergos-packages/' + name + '/cnchi/po'
-        },
-        "cnchi_updater": {
-            'trans_dir': "/opt/antergos-iso-translations/",
-            'trans_files_dir': "/opt/antergos-iso-translations/translations/antergos.cnchi_updaterpot",
-            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
-        },
-        "antergos-gfxboot": {
-            'trans_dir': "/opt/antergos-iso-translations/",
-            'trans_files_dir': '/opt/antergos-iso-translations/translations/antergos.antergos-gfxboot',
-            'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/antergos-gfxboot'
-        }
-    }
-
-    for trans_for in translations_for:
-
-        if not os.path.exists(trans[trans_for]['dest_dir']):
-            os.mkdir(trans[trans_for]['dest_dir'])
-        try:
-
-            output = subprocess.check_output(['tx', 'pull', '-a', '--minimum-perc=50'],
-                                             cwd=trans[trans_for]['trans_dir'])
-            logger.debug(output)
-
-            for r, d, f in os.walk(trans[trans_for]['trans_files_dir']):
-                for tfile in f:
-                    if 'cnchi' == trans_for or 'antergos-gfxboot' == trans_for:
-                        tfile = os.path.join(r, tfile)
-                        logger.debug('Copying %s to %s' % (tfile, trans[trans_for]['dest_dir']))
-                        shutil.copy(tfile, trans[trans_for]['dest_dir'])
-                    elif 'cnchi_updater' == trans_for:
-                        mofile = tfile[:-2] + 'mo'
-                        subprocess.check_call(['msgfmt', '-v', tfile, '-o', mofile],
-                                              cwd=trans[trans_for]['trans_files_dir'])
-                        os.rename(os.path.join(trans[trans_for]['trans_files_dir'], mofile),
-                                  os.path.join(trans[trans_for]['dest_dir'], mofile))
-
-        except subprocess.CalledProcessError as err:
-            logger.error(err.output)
-        except Exception as err:
-            logger.error(err)
-
-
 def prepare_temp_and_cache_dirs():
     # Create our tmp directories and clean up pacman package caches
     logger.info('Preparing temp directories and cleaning package cache')
@@ -603,8 +533,7 @@ def prepare_temp_and_cache_dirs():
     for d in [result, cache, cache_i686, '/var/tmp/32build', '/var/tmp/32bit']:
         if os.path.exists(d) and 'pkg_cache' not in d:
             # This is a temp directory that we don't want to persist across builds.
-            remove(d)
-            os.mkdir(d, 0o777)
+            remove(d) and os.mkdir(d, 0o777)
         elif os.path.exists(d) and 'pkg_cache' in d:
             # This is a pacman package cache directory. Let's clean it up.
             logger.info('Cleaning package cache...')
@@ -622,7 +551,7 @@ def prepare_temp_and_cache_dirs():
                         continue
                     pname = pname.group(0)
                     # Use globbing to check for multiple versions of the package.
-                    all_versions = glob.glob('%s/%s**.xz' % (pcache, pname))
+                    all_versions = glob.glob('{0}/{1}**.xz'.format(pcache, pname))
                     if pname in already_checked:
                         # We've already handled all versions of this package.
                         continue
@@ -632,7 +561,7 @@ def prepare_temp_and_cache_dirs():
                         continue
                     elif pname not in already_checked and len(all_versions) > 1:
                         # There are multiple versions of the package. Determine the latest.
-                        newest = max(glob.iglob('%s/%s**.xz' % (pcache, pname)),
+                        newest = max(glob.iglob('{0}/{1}**.xz'.format(pcache, pname)),
                                      key=os.path.getctime)
                         pfile = os.path.join(pcache, pfile)
                         for package_file in all_versions:
@@ -640,6 +569,7 @@ def prepare_temp_and_cache_dirs():
                                 # This file is not the newest. Remove it.
                                 remove(pfile)
         else:
+            logger.debug(d)
             os.mkdir(d, 0o777)
 
     return result, cache, cache_i686
