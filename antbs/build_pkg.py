@@ -98,38 +98,6 @@ def truncate_middle(s, n):
     return '{0}...{1}'.format(s[:n_1], s[-n_2:])
 
 
-def check_deps(source):
-    # # TODO: This still needs to be improved.
-    """perform topological sort on elements.
-
-    :param source:
-    :arg source: list of ``(name, [list of dependancies])`` pairs
-    :returns: list of names, with dependancies listed first
-    """
-    pending = [(name, set(deps)) for name, deps in source]  # copy deps so we can modify set in-place
-    emitted = []
-    try:
-        while pending:
-            next_pending = []
-            next_emitted = []
-            for entry in pending:
-                name, deps = entry
-                deps.difference_update(emitted)  # remove deps we emitted last pass
-                if deps:  # still has deps? recheck during next pass
-                    next_pending.append(entry)
-                else:  # no more deps? time to emit
-                    yield name
-                    emitted.append(name)  # <-- not required, but helps preserve original ordering
-                    next_emitted.append(name)  # remember what we emitted for difference_update() in next pass
-            if not next_emitted:  # all entries have unmet deps, one of two things is wrong...
-                logger.error("cyclic or missing dependancy detected: %r", next_pending)
-                raise ValueError
-            pending = next_pending
-            emitted = next_emitted
-    except ValueError as err:
-        logger.error(err)
-
-
 def process_package_queue():
     """
 
@@ -216,7 +184,8 @@ def process_package_queue():
     return all_deps
 
 
-def handle_hook_set_server_status(first=True, saved_status=False, early_exit=False):
+def handle_hook_set_server_status(first=True, saved_status=False):
+    ret = None
     if first:
         saved = False
         if not status.idle and 'Idle' not in status.current_status:
@@ -226,20 +195,15 @@ def handle_hook_set_server_status(first=True, saved_status=False, early_exit=Fal
 
         status.current_status = 'Build hook was triggered. Checking docker images.'
 
-        return saved
+        ret = saved
 
-    elif early_exit:
-        if not saved_status:
-            status.idle = True
-            status.current_status = 'Idle'
-        else:
-            status.current_status = saved_status
+    elif not saved_status:
+        status.idle = True
+        status.current_status = 'Idle'
+    elif saved_status and not status.idle:
+        status.current_status = saved_status
 
-        return
-
-    else:
-
-
+    return ret
 
 
 def handle_hook():

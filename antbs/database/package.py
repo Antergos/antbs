@@ -138,13 +138,12 @@ class Package(PackageMeta):
         else:
             self.pbpath = pbpath
 
-        self.maybe_update_pkgbuild_repo()
         if os.path.exists(self.pbpath):
-            setattr(self, 'pkgbuild', open(self.pbpath).read())
+            self.pkgbuild = open(self.pbpath).read()
 
     def get_from_pkgbuild(self, var=None):
         """
-        Get a variable from the package's PKGBUILD (which is stored in antergos-packages gh repo).
+        Get a variable from this package's PKGBUILD (which is stored in antergos-packages gh repo).
 
         :param var: (str) A variable to extract from the PKGBUILD.
         :return: (str) The variable's value after extracted from PKGBUILD.
@@ -347,8 +346,8 @@ class Package(PackageMeta):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if not any([x for x in changed.items() if changed[x] is not None]):
-                return self.epoch, self.pkgver, self.pkgrel, self.version_str
+            if not any([x for x in changed if changed[x] is not None]):
+                return self.version_str
         else:
             old_val = self.pkgver
             key = 'antbs:monitor:github:{0}:{1}'.format(self.gh_project, self.gh_repo)
@@ -360,7 +359,7 @@ class Package(PackageMeta):
             setattr(self, 'pkgrel', '1')
             changed['pkgrel'] = '1'
 
-        version = changed.get('pkgver', self.pkgver)
+        version = changed.get('pkgver', self.pkgver) or self.pkgver
 
         if changed['epoch']:
             version = '{0}:{1}'.format(changed['epoch'], version)
@@ -385,7 +384,7 @@ class Package(PackageMeta):
             else:
                 self.db.delete('CNCHI-DEV-OVERRIDE')
 
-        return self.epoch, self.pkgver, self.pkgrel, version
+        return version
 
     def get_deps(self):
         """
@@ -435,5 +434,11 @@ class Package(PackageMeta):
 def get_pkg_object(name=None, pbpath=None):
     if not name:
         raise ValueError('name is required to get package object.')
-    pkg_obj = Package(name=name, pbpath=pbpath)
+
+    path = pbpath
+    if not path:
+        path = os.path.join('/var/tmp/antergos-packages', name, 'PKGBUILD')
+
+    pkg_obj = Package(name=name, pbpath=path)
+
     return pkg_obj

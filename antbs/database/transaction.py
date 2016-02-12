@@ -63,7 +63,7 @@ class Transaction(RedisHash):
             ValueError: If both `packages` and `tnum` are Falsey.
     """
 
-    def __init__(self, packages=None, tnum=None, base_path=None, prefix='trans'):
+    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans'):
         if not any([packages, tnum]):
             raise ValueError('At least one of [packages, tnum] required.')
         elif all([packages, tnum]):
@@ -79,24 +79,25 @@ class Transaction(RedisHash):
             string=['building', 'start_str', 'end_str'],
             bool=['is_running', 'is_finished'],
             int=['tnum'],
-            list=[],
-            zset=['packages', 'builds', 'completed', 'failed', 'internal_deps'],
+            list=['queue'],
+            zset=['packages', 'builds', 'completed', 'failed'],
             path=['base_path', 'path']
         ))
 
         if packages and not self:
             self.__keysinit__()
             self.tnum = the_tnum
-
-            if base_path:
-                self.base_path = base_path
-            else:
-                self.base_path = '/var/tmp/antbs'
+            self.base_path = base_path
 
             for pkg in packages:
                 self.packages.add(pkg)
 
             self._internal_deps = []
+
+    def start(self):
+        self.setup_transaction_directory()
+        self.process_packages()
+
 
     def setup_transaction_directory(self):
         self.path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
@@ -106,7 +107,7 @@ class Transaction(RedisHash):
         except subprocess.CalledProcessError as err:
             raise RuntimeError(err.output)
 
-    def setup_build_directory(self, pkg):
+    def get_package_build_directory(self, pkg):
         paths = [os.path.join(self.path, pkg),
                  os.path.join(self.path, 'cinnamon', pkg)]
         pbpath = None
@@ -129,17 +130,21 @@ class Transaction(RedisHash):
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
 
+        elif 'numix-icon-theme-square' == pkg:
+            src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
+            dest = os.path.join('/opt/antergos-packages/', pkg)
+            shutil.move(src, dest)
+
     def process_packages(self):
-        self.setup_transaction_directory()
 
         for pkg in self.packages:
             if not pkg:
                 continue
 
-            pbpath = self.setup_build_directory(pkg)
+            pbpath = self.get_package_build_directory(pkg)
 
             pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
-            epoch, pkgver, pkgrel, version = pkg_obj.get_version()
+            version = pkg_obj.get_version()
 
             if not version:
                 self.packages.remove(pkg)
@@ -153,10 +158,20 @@ class Transaction(RedisHash):
             status.current_status = log_msg
 
             depends = pkg_obj.get_deps()
-            if depends:
-                self.internal_deps.add(*depends)
+            intersect = list(set(depends) & set(self.packages))
+            if depends and len(intersect) > 0:
+                self._internal_deps.append((pkg, intersect))
 
             self.handle_special_cases(pkg, pkg_obj)
+
+        pkg = None
+        if self._internal_deps:
+            for name in self.determine_build_order(self._internal_deps):
+                self.queue.append(name)
+
+        for pkg in self.packages:
+            if pkg not in self.queue:
+                self.queue.append(pkg)
 
     def fetch_and_compile_translations(self, translations_for=None, pkg_obj=None):
         """
@@ -218,7 +233,53 @@ class Transaction(RedisHash):
             except Exception as err:
                 logger.error(err)
 
+    @staticmethod
+    def determine_build_order(source):
+        """
+        Performs a topological sort on elements. This determines the order in which
+        packages must be built based on internal (to this transaction) dependencies.
 
+        Args:
+            source (list): A list of ``(name, [list of dependancies])`` pairs.
+
+        Returns:
+            A list of names, with dependancies listed first.
+
+        Raises:
+            ValueError: When cyclic or missing dependancy detected.
+
+        """
+        # copy deps so we can modify set in-place
+        pending = [(name, set(deps)) for name, deps in source]
+        emitted = []
+        try:
+            while pending:
+                next_pending = []
+                next_emitted = []
+
+                for entry in pending:
+                    name, deps = entry
+                    # remove deps we emitted last pass
+                    deps.difference_update(emitted)
+
+                    if deps:
+                        # still has deps? recheck during next pass
+                        next_pending.append(entry)
+                    else:
+                        # no more deps? time to emit
+                        yield name
+                        emitted.append(name)
+                        # remember what we emitted for difference_update() in next pass
+                        next_emitted.append(name)
+
+                if not next_emitted:
+                    # all entries have unmet deps, one of two things is wrong...
+                    logger.error("cyclic or missing dependancy detected: %r", next_pending)
+                    raise ValueError
+                pending = next_pending
+                emitted = next_emitted
+        except ValueError as err:
+            logger.error(err)
 
 
 def get_trans_object(packages=None, tnum=None):
