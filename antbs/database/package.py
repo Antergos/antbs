@@ -138,6 +138,9 @@ class Package(PackageMeta):
         else:
             self.pbpath = pbpath
 
+        if os.path.isdir(pbpath):
+            self.pbpath = os.path.join(pbpath, 'PKGBUILD')
+
         if os.path.exists(self.pbpath):
             self.pkgbuild = open(self.pbpath).read()
 

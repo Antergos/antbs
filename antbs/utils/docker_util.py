@@ -68,22 +68,38 @@ class DockerUtils(metaclass=Singleton):
 
         self.doc = self._doc
 
-    def create_pkgs_host_config(self, pkgbuild_dir, result=None):
+    def get_host_config(self, config_for, *args, **kwargs):
+        host_configs = {
+            'packages': self.create_pkgs_host_config,
+            'repo_update': self.create_repo_update_host_config
+        }
+        if config_for in host_configs:
+            host_configs[config_for](*args, **kwargs)
+
+    def create_pkgs_host_config(self, pkgbuild_dir, result_dir=None, cache_dir_x86_64=None,
+                                cache_dir_i686=None, _32build=None, _32bit=None):
         """
 
         :param cache_i686:
         :param cache:
         :param pkgbuild_dir:
-        :param result:
+        :param result_dir:
         :return:
         """
+        required_args = [result_dir, _32build, _32bit, pkgbuild_dir]
+        if any([True for arg in required_args if arg is None]):
+            raise ValueError('All of {0} are required (cannot be None).'.format(required_args))
+
+        cache_dir = cache_dir_x86_64 or self.cache_dir
+        cache_i686 = cache_dir_i686 or self.cache_i686
+
         binds = {
-            self.cache_dir:
+            cache_dir:
                 {
                     'bind': '/var/cache/pacman',
                     'ro': False
                 },
-            self.cache_i686:
+            cache_i686:
                 {
                     'bind': '/var/cache/pacman_i686',
                     'ro': False
@@ -114,17 +130,17 @@ class DockerUtils(metaclass=Singleton):
                     'ro': False
                 }
         }
-        if 'pkgver' not in result:
-            binds['/var/tmp/32bit'] = {'bind': '/32bit', 'ro': False}
-            binds['/var/tmp/32build'] = {'bind': '/32build', 'ro': False}
+        if 'pkgver' not in result_dir:
+            binds[_32bit] = {'bind': '/32bit', 'ro': False}
+            binds[_32build] = {'bind': '/32build', 'ro': False}
 
-        binds[result] = {'bind': '/result', 'ro': False}
+        binds[result_dir] = {'bind': '/result_dir', 'ro': False}
 
         pkgs_hconfig = self.doc.create_host_config(binds=binds,
                                                    restart_policy={"MaximumRetryCount": 2,
                                                                    "Name": "on-failure"},
-                                                   privileged=True, cap_add=['ALL'],
-                                                   mem_limit='3G', memswap_limit='-1')
+                                                   privileged=False, mem_limit='2G',
+                                                   memswap_limit='-1')
         return pkgs_hconfig
 
     def create_repo_update_host_config(self):

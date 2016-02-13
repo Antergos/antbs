@@ -26,9 +26,10 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Various utility classes and metaclasses (kind of like mixins) """
+""" Various utility classes and metaclasses """
 import os
 import subprocess
+import glob
 
 from build_pkg import logger
 
@@ -55,6 +56,52 @@ class DateTimeStrings:
     @staticmethod
     def dt_to_string(dt):
         return dt.strftime("%m/%d/%Y %I:%M%p")
+
+
+class PacmanPackageCache(metaclass=Singleton):
+
+    def __init__(self, cache_dir='/var/tmp/pkg_cache/pkg'):
+        self.cache = cache_dir
+        self.cache_i686 = cache_dir.replace('cache', 'cache_i686')
+        self.all_caches = [self.cache, self.cache_i686]
+        self.doing_cache_cleanup = False
+
+    def maybe_do_cache_cleanup(self):
+        if self.doing_cache_cleanup:
+            return
+        self.doing_cache_cleanup = True
+        for cache_dir in self.all_caches:
+            if not os.path.exists(cache_dir):
+                os.mkdir(cache_dir, mode=0o777)
+            elif os.path.exists(cache_dir):
+                logger.info('Cleaning package cache...')
+                already_checked = []
+                for path, dir_name, pkg_files in os.walk(cache_dir):
+                    for pkg_file in pkg_files:
+                        try:
+                            pkg, version, rel, suffix = pkg_file.rsplit('-', 3)
+                        except ValueError:
+                            logger.error("unexpected pkg: " + pkg_file)
+                            continue
+                        # Use globbing to check for multiple versions of the package.
+                        all_versions = glob.glob('{0}/{1}**.xz'.format(cache_dir, pkg))
+                        if pkg in already_checked:
+                            # We've already handled all versions of this package.
+                            continue
+                        elif len(all_versions) <= 1:
+                            # There is only one version of the package in this cache dir, keep it.
+                            already_checked.append(pkg)
+                            continue
+                        elif pkg not in already_checked and len(all_versions) > 1:
+                            # There are multiple versions of the package. Determine the latest.
+                            newest = max(glob.iglob('{0}/{1}**.xz'.format(cache_dir, pkg)),
+                                         key=os.path.getctime)
+                            for package_file in all_versions:
+                                if package_file != newest:
+                                    # This file is not the newest. Remove it.
+                                    remove(package_file)
+
+        self.doing_cache_cleanup = False
 
 
 def remove(src):

@@ -23,14 +23,22 @@
 
 import os, subprocess, tempfile
 import shutil
+import datetime
+from multiprocessing import Process
 
 from build_pkg import logger
-from .base_objects import RedisHash
-from .server_status import status
+from .base_objects import RedisHash, db
+from .server_status import status, get_timeline_object
 from .package import get_pkg_object
+from .build import get_build_object
 from utils.logging_config import logger
-from utils.utilities import remove
+from utils.utilities import remove, PacmanPackageCache
+import utils.docker_util as docker_util
 
+doc_util = docker_util.DockerUtils()
+doc = doc_util.doc
+
+pkg_cache_obj = PacmanPackageCache()
 
 
 class Transaction(RedisHash):
@@ -81,29 +89,44 @@ class Transaction(RedisHash):
             int=['tnum'],
             list=['queue'],
             zset=['packages', 'builds', 'completed', 'failed'],
-            path=['base_path', 'path']
+            path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686']
         ))
 
         if packages and not self:
             self.__keysinit__()
             self.tnum = the_tnum
             self.base_path = base_path
+            self.cache = pkg_cache_obj.cache
+            self.cache_i686 = pkg_cache_obj.cache_i686
+
+            self._internal_deps = []
+            self._build_dirpaths = {}
 
             for pkg in packages:
                 self.packages.add(pkg)
+                self._build_dirpaths[pkg] = {'build_dir': '', '32bit': '', '32build': ''}
 
-            self._internal_deps = []
+
 
     def start(self):
         self.setup_transaction_directory()
         self.process_packages()
+        status.current_status = 'Cleaning package cache...'
+        PacmanPackageCache().maybe_do_cache_cleanup()
 
+        if self.queue:
+            while self.queue:
+                pkg = self.queue.pop(0)
 
     def setup_transaction_directory(self):
-        self.path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
+        path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
+        self.result_dir = os.path.join(path, 'result')
+        self.path = os.path.join(path, 'antergos-packages')
+
+        os.mkdir(self.result_dir, mode=0o777)
 
         try:
-            subprocess.check_output(['git', 'clone', status.gh_repo_url], cwd=self.path)
+            subprocess.check_output(['git', 'clone', status.gh_repo_url], cwd=path)
         except subprocess.CalledProcessError as err:
             raise RuntimeError(err.output)
 
@@ -119,6 +142,17 @@ class Transaction(RedisHash):
                 raise RuntimeError('Unable to determine pb_path for {0}'.format(pkg))
 
         return pbpath
+
+    def setup_package_build_directory(self, pkg):
+        build_dir = self.get_package_build_directory(pkg)
+        self._build_dirpaths[pkg].update({
+            'build_dir': build_dir,
+            '32bit': os.path.join(build_dir, '32bit'),
+            '32build': os.path.join(build_dir, '32build')
+        })
+        for bdir in self._build_dirpaths:
+            if not os.path.exists(self._build_dirpaths[bdir]):
+                os.mkdir(self._build_dirpaths[bdir], mode=0o777)
 
     def handle_special_cases(self, pkg, pkg_obj):
         if 'cnchi' in pkg:
@@ -280,6 +314,156 @@ class Transaction(RedisHash):
                 emitted = next_emitted
         except ValueError as err:
             logger.error(err)
+
+    @staticmethod
+    def do_docker_clean(pkg=None):
+        try:
+            doc.remove_container(pkg, v=True)
+        except Exception as err:
+            logger.error(err)
+
+    @staticmethod
+    def process_and_save_build_metadata(pkg_obj):
+        """
+        Creates a new build for a package, initializes the build data, and returns a build object.
+
+        Args:
+            pkg_obj (Package): Package object for the package being built.
+
+        Returns:
+            Build: A build object.
+
+        """
+
+        msg = 'Building {0}'.format(pkg_obj.name)
+        logger.info(msg)
+        status.current_status = msg
+        status.now_building = pkg_obj.name
+
+        bld_obj = get_build_object(pkg_obj=pkg_obj)
+        bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+        status.building_num = bld_obj.bnum
+        status.building_start = bld_obj.start_str
+
+        tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
+        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, pkg_obj.version_str)
+
+        _ = get_timeline_object(msg=tlmsg, tl_type=3)
+
+        pkg_obj.builds.append(bld_obj.bnum)
+
+        return bld_obj
+
+    def build_package(self, pkg):
+        """
+
+        :param pkg:
+        :return:
+
+        """
+        if pkg is None:
+            return False
+
+        pbpath = self.get_package_build_directory(pkg)
+        pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
+
+        in_dir_last = len([name for name in os.listdir(self.result_dir)])
+        db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
+
+        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
+
+        self.do_docker_clean(pkg_obj.name)
+        self.setup_package_build_directory(pkg)
+
+        build_env = ['_AUTOSUMS=True'] if pkg_obj.autosum else ['_AUTOSUMS=False']
+
+        if '/cinnamon/' in pkg_obj.pbpath:
+            build_env.append('_ALEXPKG=True')
+        else:
+            build_env.append('_ALEXPKG=False')
+
+        build_dir = self._build_dirpaths[pkg]['build_dir']
+        _32bit = self._build_dirpaths[pkg]['32bit']
+        _32build = self._build_dirpaths[pkg]['32build']
+        hconfig = doc_util.get_host_config(build_dir, self.result_dir, self.cache,
+                                           self.cache_i686, _32build, _32bit)
+        container = {}
+        try:
+            container = doc.create_container("antergos/makepkg",
+                                             command='/makepkg/build.sh',
+                                             volumes=['/var/cache/pacman', '/makepkg', '/antergos',
+                                                      '/pkg', '/root/.gnupg', '/staging', '/32bit',
+                                                      '/32build', '/result',
+                                                      '/var/cache/pacman_i686'],
+                                             environment=build_env, cpuset='0-3',
+                                             name=pkg_obj.name,
+                                             host_config=hconfig)
+            if container.get('Warnings', False):
+                logger.error(container.get('Warnings'))
+        except Exception as err:
+            logger.error('Create container failed. Error Msg: %s', err)
+            bld_obj.failed = True
+
+        bld_obj.container = container.get('Id', '')
+        status.container = container.get('Id', '')
+        stream_process = Process(target=publish_build_ouput, kwargs=dict(bld_obj=bld_obj))
+
+        try:
+            doc.start(container.get('Id', ''))
+            stream_process.start()
+            result = doc.wait(bld_obj.container)
+            if int(result) != 0:
+                bld_obj.failed = True
+                logger.error('Container %s exited with a non-zero return code. Return code was %s',
+                             pkg_obj.name, result)
+            else:
+                logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
+                bld_obj.completed = True
+        except Exception as err:
+            logger.error('Start container failed. Error Msg: %s' % err)
+            bld_obj.failed = True
+
+        stream_process.join()
+
+        repo_updated = False
+        if bld_obj.completed:
+            logger.debug('bld_obj.completed!')
+            signed = sign_pkgs.sign_packages(bld_obj.pkgname)
+            if signed:
+                db.publish('build-output', 'Updating staging repo database..')
+                status.current_status = 'Updating staging repo database..'
+                repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
+
+        if repo_updated:
+            tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'.format(
+                str(bld_obj.bnum), pkg_obj.name)
+            TimelineEvent(msg=tlmsg, tl_type=4)
+            status.completed.rpush(bld_obj.bnum)
+            bld_obj.review_status = 'pending'
+        else:
+            tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'.format(
+                str(bld_obj.bnum), pkg_obj.name)
+            TimelineEvent(msg=tlmsg, tl_type=5)
+            bld_obj.failed = True
+            bld_obj.completed = False
+
+        bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+
+        if not bld_obj.failed:
+            pkg_obj = package.get_pkg_object(bld_obj.pkgname)
+            last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
+            if not last_build:
+                db.set('antbs:misc:cache_buster:flag', True)
+                return True
+            last_bld_obj = build.get_build_object(bnum=last_build)
+            if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
+                last_bld_obj.review_status = 'skip'
+
+            db.set('antbs:misc:cache_buster:flag', True)
+            return True
+
+        status.failed.rpush(bld_obj.bnum)
+        return False
 
 
 def get_trans_object(packages=None, tnum=None):
