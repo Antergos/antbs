@@ -37,7 +37,7 @@ from .build import get_build_object
 from utils.logging_config import logger
 from utils.utilities import remove, PacmanPackageCache, CustomSet
 import utils.docker_util as docker_util
-from  utils.sign_pkgs import sign_packages
+from utils.sign_pkgs import sign_packages
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -127,14 +127,17 @@ class Transaction(TransactionMeta):
     """
 
     def start(self):
+        status.current_status = 'Initializing build transaction.'
         self.setup_transaction_directory()
+        status.current_status = 'Processing packages.'
         self.process_packages()
-        status.current_status = 'Cleaning package cache...'
+        status.current_status = 'Cleaning pacman package cache.'
         PacmanPackageCache().maybe_do_cache_cleanup()
 
         if self.queue:
             while self.queue:
                 pkg = self.queue.pop(0)
+
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
@@ -220,6 +223,7 @@ class Transaction(TransactionMeta):
             self.handle_special_cases(pkg, pkg_obj)
 
         pkg = None
+        status.current_status = 'Using package dependencies to determine build order.'
         if self._internal_deps:
             for name in self.determine_build_order(self._internal_deps):
                 self.queue.append(name)
@@ -607,6 +611,131 @@ class Transaction(TransactionMeta):
             return True
 
         status.failed.rpush(bld_obj.bnum)
+        return False
+
+    def build_iso(self, pkg_obj=None):
+        # TODO: Rework this, possibly abstract away parts in common with self.build_package()
+
+        status.iso_building = True
+
+        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
+        build_id = bld_obj.bnum
+
+        self.fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])
+
+        flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
+        minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
+
+        if 'i686' in pkg_obj.name:
+            if not os.path.exists(flag):
+                open(flag, 'a').close()
+        else:
+            if os.path.exists(flag):
+                os.remove(flag)
+
+        if 'minimal' in pkg_obj.name:
+            out_dir = '/out'
+            if not os.path.exists(minimal):
+                open(minimal, 'a').close()
+        else:
+            out_dir = '/out'
+            if os.path.exists(minimal):
+                os.remove(minimal)
+
+        in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+        db.set('pkg_count_iso', in_dir_last)
+
+        # Create docker host config dict
+        hconfig = doc.create_host_config(privileged=True, cap_add=['ALL'],
+                                         binds={
+                                             '/opt/archlinux-mkarchiso':
+                                                 {
+                                                     'bind': '/start',
+                                                     'ro': False
+                                                 },
+                                             '/run/dbus':
+                                                 {
+                                                     'bind': '/var/run/dbus',
+                                                     'ro': False
+                                                 },
+                                             '/srv/antergos.info/repo/iso/testing':
+                                                 {
+                                                     'bind': out_dir,
+                                                     'ro': False
+                                                 }},
+                                         restart_policy={
+                                             "MaximumRetryCount": 2,
+                                             "Name": "on-failure"},
+                                         mem_limit='2G',
+                                         memswap_limit='-1')
+        iso_container = {}
+        try:
+            iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
+                                                 name=pkg_obj.name, host_config=hconfig,
+                                                 cpuset='0-3')
+            if iso_container.get('Warnings', False) and iso_container.get('Warnings') != '':
+                logger.error(iso_container.get('Warnings'))
+        except Exception as err:
+            logger.error('Create container failed. Error Msg: %s' % err)
+            bld_obj.failed = True
+            return False
+
+        bld_obj.container = iso_container.get('Id')
+        status.container = bld_obj.container
+        open('/opt/archlinux-mkarchiso/first-run', 'a').close()
+
+        try:
+            doc.start(bld_obj.container)
+            cont = bld_obj.container
+            stream_process = Process(target=self.publish_build_ouput,
+                                     kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True))
+            stream_process.start()
+            result = doc.wait(cont)
+            inspect = doc.inspect_container(cont)
+            if result != 0:
+                if inspect['State'].get('Restarting', '') or inspect.get('RestartCount', 0) != 2:
+                    while inspect['State'].get('Restarting', '') or inspect.get('RestartCount', 0) != 2:
+                        time.sleep(5)
+                        inspect = doc.inspect_container(cont)
+
+            if inspect['State'].get('ExitCode', 1) == 1:
+                bld_obj.failed = True
+                logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
+                             pkg_obj.name, result)
+            else:
+                bld_obj.completed = True
+                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
+                            pkg_obj.name, result)
+        except Exception as err:
+            logger.error('Start container failed. Error Msg: %s', err)
+            bld_obj.failed = True
+            return False
+
+        stream_process.join()
+        in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
+        last_count = int(db.get('pkg_count_iso'))
+
+        if in_dir > last_count:
+            bld_obj.completed = True
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'
+            tlmsg = tpl.format(build_id, pkg_obj.name)
+            _ = get_timeline_object(msg=tlmsg, tl_type=4)
+            status.completed.rpush(bld_obj.bnum)
+        else:
+            bld_obj.failed = True
+            bld_obj.completed = False
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'
+            tlmsg = tpl.format(build_id, pkg_obj.name)
+            _ = get_timeline_object(msg=tlmsg, tl_type=5)
+            status.failed.rpush(build_id)
+
+        bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+
+        if not bld_obj.failed:
+            remove('/opt/archlinux-mkarchiso/antergos-iso')
+            self.do_docker_clean(pkg_obj.name)
+            return True
+
         return False
 
 
