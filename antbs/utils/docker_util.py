@@ -143,7 +143,7 @@ class DockerUtils(metaclass=Singleton):
                                                    memswap_limit='-1')
         return pkgs_hconfig
 
-    def create_repo_update_host_config(self):
+    def create_repo_update_host_config(self, result_dir='/tmp/result'):
         """
 
 
@@ -171,12 +171,12 @@ class DockerUtils(metaclass=Singleton):
                         'bind': '/root/.gnupg',
                         'ro': False
                     },
-                '/tmp/result':
+                result_dir:
                     {
                         'bind': '/result',
                         'ro': False
                     }
-            }, privileged=True, cap_add=['ALL'], mem_limit='2G', memswap_limit='-1')
+            }, mem_limit='1G', memswap_limit='-1')
 
         return repos_hconfig
 

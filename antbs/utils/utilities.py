@@ -104,6 +104,14 @@ class PacmanPackageCache(metaclass=Singleton):
         self.doing_cache_cleanup = False
 
 
+class CustomSet(set):
+
+    def add(self, item):
+        added = item not in self
+        super().add(item)
+        return added
+
+
 def remove(src):
     """
 

@@ -21,10 +21,13 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-import os, subprocess, tempfile
+import os, subprocess, tempfile, time
 import shutil
 import datetime
 from multiprocessing import Process
+from pygments import highlight
+from pygments.lexers import BashLexer
+from pygments.formatters import HtmlFormatter
 
 from build_pkg import logger
 from .base_objects import RedisHash, db
@@ -32,8 +35,9 @@ from .server_status import status, get_timeline_object
 from .package import get_pkg_object
 from .build import get_build_object
 from utils.logging_config import logger
-from utils.utilities import remove, PacmanPackageCache
+from utils.utilities import remove, PacmanPackageCache, CustomSet
 import utils.docker_util as docker_util
+from  utils.sign_pkgs import sign_packages
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -41,7 +45,58 @@ doc = doc_util.doc
 pkg_cache_obj = PacmanPackageCache()
 
 
-class Transaction(RedisHash):
+class TransactionMeta(RedisHash):
+    """
+    This is the base class for `Transaction`(s). It simply sets up the attributes
+    which are stored in redis so they can be properly accessed. This class should
+    not be used directly.
+
+    Args:
+        See `Transaction` docstring.
+
+    Attributes:
+        See `Transaction` docstring.
+    """
+
+    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans'):
+        if not any([packages, tnum]):
+            raise ValueError('At least one of [packages, tnum] required.')
+        elif all([packages, tnum]):
+            raise ValueError('Only one of [packages, tnum] can be given, not both.')
+
+        the_tnum = tnum
+        if not tnum:
+            the_tnum = self.db.incr('antbs:misc:tnum:next')
+
+        super().__init__(prefix=prefix, key=the_tnum)
+
+        self.key_lists.update(dict(
+            string=['building', 'start_str', 'end_str'],
+            bool=['is_running', 'is_finished'],
+            int=['tnum'],
+            list=['queue'],
+            zset=['packages', 'builds', 'completed', 'failed'],
+            path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
+        ))
+
+        if packages and not self:
+            self.__keysinit__()
+            self.tnum = the_tnum
+            self.base_path = base_path
+            self.cache = pkg_cache_obj.cache
+            self.cache_i686 = pkg_cache_obj.cache_i686
+
+            self._internal_deps = []
+            self._build_dirpaths = {}
+            self._pkgvers = {}
+
+            for pkg in packages:
+                self.packages.add(pkg)
+                self._build_dirpaths[pkg] = {'build_dir': '', '32bit': '', '32build': ''}
+                self._pkgvers[pkg] = ''
+
+
+class Transaction(TransactionMeta):
     """
     This class represents a single "build transaction" throughout the app. It is used
     to get/set transaction data from/to the database. A transaction is comprised
@@ -71,43 +126,6 @@ class Transaction(RedisHash):
             ValueError: If both `packages` and `tnum` are Falsey.
     """
 
-    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans'):
-        if not any([packages, tnum]):
-            raise ValueError('At least one of [packages, tnum] required.')
-        elif all([packages, tnum]):
-            raise ValueError('Only one of [packages, tnum] can be given, not both.')
-
-        the_tnum = tnum
-        if not tnum:
-            the_tnum = self.db.incr('antbs:misc:tnum:next')
-
-        super().__init__(prefix=prefix, key=the_tnum)
-
-        self.key_lists.update(dict(
-            string=['building', 'start_str', 'end_str'],
-            bool=['is_running', 'is_finished'],
-            int=['tnum'],
-            list=['queue'],
-            zset=['packages', 'builds', 'completed', 'failed'],
-            path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686']
-        ))
-
-        if packages and not self:
-            self.__keysinit__()
-            self.tnum = the_tnum
-            self.base_path = base_path
-            self.cache = pkg_cache_obj.cache
-            self.cache_i686 = pkg_cache_obj.cache_i686
-
-            self._internal_deps = []
-            self._build_dirpaths = {}
-
-            for pkg in packages:
-                self.packages.add(pkg)
-                self._build_dirpaths[pkg] = {'build_dir': '', '32bit': '', '32build': ''}
-
-
-
     def start(self):
         self.setup_transaction_directory()
         self.process_packages()
@@ -121,9 +139,11 @@ class Transaction(RedisHash):
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
         self.result_dir = os.path.join(path, 'result')
+        self.upd_repo_result = os.path.join(path, 'upd_result')
         self.path = os.path.join(path, 'antergos-packages')
 
         os.mkdir(self.result_dir, mode=0o777)
+        os.mkdir(self.upd_repo_result, mode=0o777)
 
         try:
             subprocess.check_output(['git', 'clone', status.gh_repo_url], cwd=path)
@@ -186,6 +206,7 @@ class Transaction(RedisHash):
                 continue
 
             pkg_obj.version_str = version
+            self._pkgvers[pkg] = version
 
             log_msg = 'Updating pkgver in database for {0} to {1}'.format(pkg, version)
             logger.info(log_msg)
@@ -323,7 +344,7 @@ class Transaction(RedisHash):
             logger.error(err)
 
     @staticmethod
-    def process_and_save_build_metadata(pkg_obj):
+    def process_and_save_build_metadata(pkg_obj, version_str):
         """
         Creates a new build for a package, initializes the build data, and returns a build object.
 
@@ -342,11 +363,12 @@ class Transaction(RedisHash):
 
         bld_obj = get_build_object(pkg_obj=pkg_obj)
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
+        bld_obj.version_str = version_str if version_str else pkg_obj.version_str
         status.building_num = bld_obj.bnum
         status.building_start = bld_obj.start_str
 
         tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
-        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, pkg_obj.version_str)
+        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, version_str)
 
         _ = get_timeline_object(msg=tlmsg, tl_type=3)
 
@@ -354,13 +376,137 @@ class Transaction(RedisHash):
 
         return bld_obj
 
+    @staticmethod
+    def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False):
+        if not container and not bld_obj:
+            logger.error('Unable to publish build output. (Container is None)')
+            return
+
+        output = doc.logs(container=bld_obj.container, stream=True)
+        nodup = CustomSet()
+        content = []
+        for line in output:
+            line = line.decode('UTF-8').rstrip()
+            if not line or 'makepkg]# PS1="' in line:
+                continue
+            end = line[25:]
+            if nodup.add(end):
+                line = line.replace("'", '')
+                line = line.replace('"', '')
+                line = '[{0}]: {1}'.format(
+                    datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
+
+                content.append(line)
+                db.publish('build-output', line)
+                db.set('build_log_last_line', line)
+
+        result_ready = bld_obj.completed != bld_obj.failed
+        if not result_ready:
+            while not result_ready:
+                result_ready = bld_obj.completed != bld_obj.failed
+                time.sleep(2)
+
+        if upd_repo or bld_obj.failed:
+            db.publish('build-output', 'ENDOFLOG')
+
+        existing = True
+        if len(bld_obj.log) < 1 and not bld_obj.failed and not is_iso:
+            existing = False
+
+        for line in content:
+            bld_obj.log.rpush(line)
+
+        if existing:
+            log_content = '\n '.join(bld_obj.log)
+            bld_obj.log_str = highlight(log_content,
+                                        BashLexer(),
+                                        HtmlFormatter(style='monokai',
+                                                      linenos='inline',
+                                                      prestyles="background:#272822;color:#fff;"))
+
+    def update_repo(self, review_result=None, bld_obj=None, is_review=False, rev_pkgname=None,
+                    is_action=False, action=None, action_pkg=None):
+        if not review_result:
+            raise ValueError('review_result cannot be None.')
+        elif not any([bld_obj, is_review]):
+            raise ValueError('at least one of [bld_obj, is_review] required.')
+
+        building_saved = False
+        if not status.idle and status.current_status != 'Updating repo database.':
+            building_saved = status.current_status
+        else:
+            status.idle = False
+        status.current_status = 'Updating repo database.'
+
+        container = None
+        repo = 'antergos'
+        repodir = 'main'
+        rev_result = review_result
+        if rev_result == 'staging':
+            rev_result = ''
+            repo = 'antergos-staging'
+            repodir = 'staging'
+
+        if os.path.exists(self.upd_repo_result):
+            remove(self.upd_repo_result)
+        os.mkdir(self.upd_repo_result, 0o777)
+
+        if rev_pkgname is not None:
+            pkgname = rev_pkgname
+        else:
+            pkgname = bld_obj.pkgname
+
+        command = "/makepkg/build.sh"
+        pkgenv = ["_PKGNAME={0}".format(pkgname),
+                  "_RESULT={0}".format(review_result),
+                  "_UPDREPO=True",
+                  "_REPO={0}".format(repo),
+                  "_REPO_DIR={0}".format(repodir)]
+
+        self.do_docker_clean("update_repo")
+        hconfig = doc_util.get_host_config('repo_update', self.upd_repo_result)
+
+        try:
+            container = doc.create_container("antergos/makepkg", command=command,
+                                             name="update_repo", environment=pkgenv,
+                                             volumes=['/makepkg', '/root/.gnupg', '/main',
+                                                      '/result', '/staging'],
+                                             host_config=hconfig)
+            db.set('update_repo_container', container.get('Id', ''))
+            doc.start(container.get('Id'))
+            if not is_review:
+                stream_process = Process(target=self.publish_build_ouput,
+                                         kwargs=dict(container=container.get('Id'),
+                                                     bld_obj=bld_obj,
+                                                     upd_repo=True))
+                stream_process.start()
+
+            result = doc.wait(container.get('Id'))
+            if not is_review:
+                stream_process.join()
+
+            if result != 0:
+                logger.error('update repo failed. exit status is: %s', result)
+            else:
+                doc.remove_container(container, v=True)
+
+        except Exception as err:
+            result = 1
+            logger.error('Start container failed. Error Msg: %s' % err)
+
+        if not status.idle:
+            if building_saved:
+                status.current_status = building_saved
+            else:
+                status.idle = True
+                status.current_status = 'Idle.'
+
+        if result != 0:
+            return False
+        else:
+            return True
+
     def build_package(self, pkg):
-        """
-
-        :param pkg:
-        :return:
-
-        """
         if pkg is None:
             return False
 
@@ -370,7 +516,7 @@ class Transaction(RedisHash):
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
+        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg])
 
         self.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)
@@ -396,8 +542,7 @@ class Transaction(RedisHash):
                                                       '/32build', '/result',
                                                       '/var/cache/pacman_i686'],
                                              environment=build_env, cpuset='0-3',
-                                             name=pkg_obj.name,
-                                             host_config=hconfig)
+                                             name=pkg_obj.name, host_config=hconfig)
             if container.get('Warnings', False):
                 logger.error(container.get('Warnings'))
         except Exception as err:
@@ -406,16 +551,16 @@ class Transaction(RedisHash):
 
         bld_obj.container = container.get('Id', '')
         status.container = container.get('Id', '')
-        stream_process = Process(target=publish_build_ouput, kwargs=dict(bld_obj=bld_obj))
+        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(bld_obj=bld_obj))
 
         try:
             doc.start(container.get('Id', ''))
             stream_process.start()
-            result = doc.wait(bld_obj.container)
+            result = doc.wait(container.get('Id', ''))
             if int(result) != 0:
                 bld_obj.failed = True
-                logger.error('Container %s exited with a non-zero return code. Return code was %s',
-                             pkg_obj.name, result)
+                tpl = 'Container %s exited with a non-zero return code. Return code was %s'
+                logger.error(tpl, pkg_obj.name, result)
             else:
                 logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
                 bld_obj.completed = True
@@ -428,38 +573,37 @@ class Transaction(RedisHash):
         repo_updated = False
         if bld_obj.completed:
             logger.debug('bld_obj.completed!')
-            signed = sign_pkgs.sign_packages(bld_obj.pkgname)
-            if signed:
-                db.publish('build-output', 'Updating staging repo database..')
-                status.current_status = 'Updating staging repo database..'
-                repo_updated = update_main_repo(rev_result='staging', bld_obj=bld_obj)
+            if sign_packages(bld_obj.pkgname):
+                msg = 'Updating staging repo database..'
+                db.publish('build-output', msg)
+                status.current_status = msg
+                repo_updated = self.update_repo(review_result='staging', bld_obj=bld_obj)
 
         if repo_updated:
-            tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'.format(
-                str(bld_obj.bnum), pkg_obj.name)
-            TimelineEvent(msg=tlmsg, tl_type=4)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'
+            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name)
+            _ = get_timeline_object(msg=tlmsg, tl_type=4)
             status.completed.rpush(bld_obj.bnum)
             bld_obj.review_status = 'pending'
         else:
-            tlmsg = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'.format(
-                str(bld_obj.bnum), pkg_obj.name)
-            TimelineEvent(msg=tlmsg, tl_type=5)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'
+            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name)
+            _ = get_timeline_object(msg=tlmsg, tl_type=5)
             bld_obj.failed = True
             bld_obj.completed = False
 
         bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
         if not bld_obj.failed:
-            pkg_obj = package.get_pkg_object(bld_obj.pkgname)
+            pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
             if not last_build:
-                db.set('antbs:misc:cache_buster:flag', True)
                 return True
-            last_bld_obj = build.get_build_object(bnum=last_build)
+
+            last_bld_obj = get_build_object(bnum=last_build)
             if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
                 last_bld_obj.review_status = 'skip'
 
-            db.set('antbs:misc:cache_buster:flag', True)
             return True
 
         status.failed.rpush(bld_obj.bnum)
