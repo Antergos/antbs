@@ -44,6 +44,7 @@ from database import package
 from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.server_status import status, get_timeline_object
+from database.transaction import get_trans_object
 from utils.logging_config import logger
 
 with Connection(db):
@@ -327,10 +328,7 @@ class Webhook(WebhookMeta):
                 if len(the_pkgs) > 1:
                     html.append('<ul class="hook-pkg-list">')
                 for p in the_pkgs:
-                    if p and p in status.hook_queue:
-                        continue
-                    if p and p not in status.hook_queue:
-                        status.hook_queue.rpush(p)
+                    if p:
                         if len(the_pkgs) > 1:
                             item = '<li>{0}</li>'.format(p)
                         else:
@@ -355,6 +353,8 @@ class Webhook(WebhookMeta):
                         events.append(tl_event.event_id)
                         del p_obj
 
+                trans_obj = get_trans_object(the_pkgs)
+                status.queue.append(trans_obj.tnum)
                 queue.enqueue_call(builder.handle_hook, timeout=84600)
 
             if not self.result:

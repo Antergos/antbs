@@ -128,6 +128,7 @@ class Transaction(TransactionMeta):
 
     def start(self):
         status.current_status = 'Initializing build transaction.'
+        self.is_running = True
         self.setup_transaction_directory()
         status.current_status = 'Processing packages.'
         self.process_packages()
@@ -137,7 +138,21 @@ class Transaction(TransactionMeta):
         if self.queue:
             while self.queue:
                 pkg = self.queue.pop(0)
+                is_iso = False
 
+                for partial in ['i686', 'x86_64']:
+                    if partial in pkg:
+                        is_iso = True
+                        break
+
+                if is_iso:
+                    pkg_obj = get_pkg_object(name=pkg)
+                    self.build_iso(pkg_obj)
+                else:
+                    self.build_package(pkg)
+
+        self.is_running = False
+        self.is_finished = True
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
@@ -360,10 +375,19 @@ class Transaction(TransactionMeta):
 
         """
 
-        msg = 'Building {0}'.format(pkg_obj.name)
-        logger.info(msg)
+        if 'Building ' in status.current_status:
+            msg = '{0}, {1}-{2}'.format(status.current_status, pkg_obj.name, version_str)
+        else:
+            msg = '{0}-{1}'.format(pkg_obj.name, version_str)
+
         status.current_status = msg
-        status.now_building = pkg_obj.name
+
+        if status.now_building:
+            msg = '{0}, {1}'.format(status.now_building, pkg_obj.name)
+        else:
+            msg = pkg_obj.name
+
+        status.now_building = msg
 
         bld_obj = get_build_object(pkg_obj=pkg_obj)
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
@@ -516,6 +540,7 @@ class Transaction(TransactionMeta):
 
         pbpath = self.get_package_build_directory(pkg)
         pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
+        self.building = pkg
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
@@ -598,6 +623,7 @@ class Transaction(TransactionMeta):
 
         bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
+        self.building = ''
         if not bld_obj.failed:
             pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None

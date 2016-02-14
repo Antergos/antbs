@@ -91,11 +91,10 @@ def handle_hook():
         handle_hook_set_server_status(first=False, saved_status=saved_status)
         return False
 
-    transaction = get_trans_object(status.hook_queue)
-
-    transaction.start()
-
-
+    if status.queue:
+        tnum = status.queue.lpop()
+        transaction = get_trans_object(tnum=tnum)
+        transaction.start()
 
     handle_hook_set_server_status(first=False, saved_status=saved_status)
 
