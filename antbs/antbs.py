@@ -29,9 +29,9 @@
 
 """ AntBS (Antergos Build Server) Main Module """
 
-
 import gevent
 import gevent.monkey
+
 gevent.monkey.patch_all()
 import requests
 # import newrelic.agent
@@ -52,10 +52,9 @@ from flask import (
     redirect, flash, stream_with_context)
 from werkzeug.contrib.fixers import ProxyFix
 from flask.ext.stormpath import StormpathManager, groups_required, user
-#from flask.ext.cache import Cache
+# from flask.ext.cache import Cache
 import bugsnag
 from bugsnag.flask import handle_exceptions
-
 
 import utils.pagination
 import build_pkg as builder
@@ -93,16 +92,16 @@ def initialize_app():
 
     # Stormpath configuration
     app.config.update({'SECRET_KEY': status.sp_session_key,
-                             'STORMPATH_API_KEY_ID': status.sp_api_id,
-                             'STORMPATH_API_KEY_SECRET': status.sp_api_key,
-                             'STORMPATH_APPLICATION': status.sp_app,
-                             'STORMPATH_ENABLE_USERNAME': True,
-                             'STORMPATH_REQUIRE_USERNAME': True,
-                             'STORMPATH_ENABLE_REGISTRATION': False,
-                             'STORMPATH_REDIRECT_URL': '/pkg_review',
-                             'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
-                             'STORMPATH_COOKIE_DURATION': timedelta(days=14),
-                             'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
+                       'STORMPATH_API_KEY_ID': status.sp_api_id,
+                       'STORMPATH_API_KEY_SECRET': status.sp_api_key,
+                       'STORMPATH_APPLICATION': status.sp_app,
+                       'STORMPATH_ENABLE_USERNAME': True,
+                       'STORMPATH_REQUIRE_USERNAME': True,
+                       'STORMPATH_ENABLE_REGISTRATION': False,
+                       'STORMPATH_REDIRECT_URL': '/pkg_review',
+                       'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
+                       'STORMPATH_COOKIE_DURATION': timedelta(days=14),
+                       'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
 
     # Create Stormpath Manager object.
     stormpath_manager = StormpathManager(app)
@@ -198,7 +197,7 @@ def get_live_build_output():
             yield ':'.encode('UTF-8')
 
         keep_alive += 1
-        yield from gevent.sleep(.05)
+        gevent.sleep(.05)
 
     psub.close()
 
@@ -365,7 +364,6 @@ def redirect_url(default='homepage'):
 
 
 def set_pkg_review_result(bnum=None, dev=None, result=None):
-    # TODO: This is garbage. Needs rewrite.
     if not any([bnum, dev, result]):
         abort(500)
     errmsg = dict(error=True, msg=None)
@@ -411,7 +409,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                 if result != 'skip':
                     os.remove(f)
             if result and result != 'skip':
-                repo_queue.enqueue_call(builder.update_main_repo,
+                repo_queue.enqueue_call(builder.process_dev_review,
                                         (result, None, True, bld_obj.pkgname), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
@@ -528,8 +526,8 @@ def homepage(tlpage=None):
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
                 end = datetime.strptime(
-                        bld_obj.end_str,
-                        '%m/%d/%Y %I:%M%p') if bld_obj.end_str else ''
+                    bld_obj.end_str,
+                    '%m/%d/%Y %I:%M%p') if bld_obj.end_str else ''
                 end = end if end and (datetime.now() - end) < timedelta(hours=48) else ''
 
                 if end and ver not in nodup and bld_obj.pkgname:
@@ -590,8 +588,8 @@ def get_log():
         abort(404)
 
     headers = {
-            'Content-Type': 'text/event-stream',
-            'Cache-Control': 'no-cache',
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
     }
     return Response(stream_with_context(get_live_build_output()), direct_passthrough=True,
                     mimetype='text/event-stream', headers=headers)
@@ -664,7 +662,8 @@ def failed(page=None):
     failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
 
-    return render_template("builds/failed.html", building=building, failed=failed, all_pages=all_pages,
+    return render_template("builds/failed.html", building=building, failed=failed,
+                           all_pages=all_pages,
                            page=page, rev_pending=rev_pending, user=user, pagination=pagination)
 
 
@@ -829,13 +828,14 @@ def get_status():
 
         if all(i is not None for i in (pkg, dev, action)):
             if action in ['remove']:
-                queue.enqueue_call(builder.update_main_repo(is_action=True, action=action, action_pkg=pkg))
+                queue.enqueue_call(
+                    builder.update_main_repo(is_action=True, action=action, action_pkg=pkg))
             elif 'rebuild' == action:
                 status.hook_queue.rpush(pkg)
                 hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
                 get_timeline_object(
-                        msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-                            dev, pkg), tl_type='0')
+                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
+                        dev, pkg), tl_type='0')
             return json.dumps(message)
 
     if iso_release:

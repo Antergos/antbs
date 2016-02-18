@@ -48,7 +48,7 @@ from database.transaction import get_trans_object
 from utils.logging_config import logger
 
 with Connection(db):
-    queue = Queue('hook_queue')
+    queue = Queue('transactions')
     w = Worker([queue])
 
 

@@ -50,16 +50,16 @@ doc_utils = docker_utils.DockerUtils()
 doc = doc_utils.doc
 
 with Connection(db):
-    build_queue = Queue('build_queue')
-    repo_queue = Queue('repo_queue')
-    hook_queue = Queue('hook_queue')
+    transaction_queue = Queue('transactions')
+    repo_queue = Queue('repo_update')
 
 
 def handle_hook_set_server_status(first=True, saved_status=False):
     ret = None
     if first:
         saved = False
-        if not status.idle and 'Idle' not in status.current_status:
+        do_save = status.transactions_running and 'Idle' not in status.current_status
+        if not status.idle and do_save:
             saved = status.current_status
         else:
             status.idle = False
@@ -68,7 +68,7 @@ def handle_hook_set_server_status(first=True, saved_status=False):
 
         ret = saved
 
-    elif not saved_status:
+    elif not saved_status and not status.transactions_running:
         status.idle = True
         status.current_status = 'Idle'
     elif saved_status and not status.idle:
@@ -93,57 +93,12 @@ def handle_hook():
 
     if status.queue:
         tnum = status.queue.lpop()
-        transaction = get_trans_object(tnum=tnum)
+        transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue)
         transaction.start()
 
     handle_hook_set_server_status(first=False, saved_status=saved_status)
 
-
-def build_pkg_handler():
-    """
-
-
-    :return:
-    """
-    status.idle = False
-    if len(status.queue) > 0:
-        pack = status.queue.lpop()
-        if pack:
-            pkgobj = package.get_pkg_object(name=pack)
-        else:
-            return False
-
-        rqjob = get_current_job(db)
-        rqjob.meta['package'] = pkgobj.name
-        rqjob.save()
-
-        status.now_building = pkgobj.name
-
-        if pkgobj.is_iso:
-            status.iso_building = True
-            build_result = build_iso(pkgobj)
-        else:
-            build_result = build_package(pkgobj.name)
-
-        # TODO: Move this into its own method
-        if build_result is not None:
-            run_docker_clean(pkgobj.pkgname)
-
-            blds = pkgobj.builds
-            total = len(blds)
-            if total > 0:
-                success = len([x for x in blds if x in status.completed])
-                failure = len([x for x in blds if x in status.failed])
-                if success > 0:
-                    success = 100 * success / total
-                if failure > 0:
-                    failure = 100 * failure / total
-
-                pkgobj.success_rate = success
-                pkgobj.failure_rate = failure
-
     if not status.queue and not status.hook_queue:
-        remove('/opt/antergos-packages')
         status.idle = True
         status.building = 'Idle'
         status.now_building = 'Idle'

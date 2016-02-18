@@ -31,6 +31,7 @@
 import os
 import shutil
 import subprocess
+import time
 
 import docker
 
@@ -180,6 +181,10 @@ class DockerUtils(metaclass=Singleton):
 
         return repos_hconfig
 
+    def do_image_build_finished(self, result):
+        status.docker_image_building = False
+        return result
+
     def maybe_build_base_devel(self):
         """
 
@@ -188,8 +193,15 @@ class DockerUtils(metaclass=Singleton):
         """
         if db.exists('antbs:docker-images:base-devel:built-today'):
             return True
+        elif status.docker_image_building:
+            wait = status.docker_image_building
+            while wait:
+                time.sleep(10)
+                wait = status.docker_image_building
+            return True
 
         # No image was built in the past 24 hours, let's build one.
+        status.docker_image_building = True
         status.current_status = 'Docker images are stale. Building new images.'
         build_script = os.path.join(DOC_DIR, 'base-devel.sh')
         build_it = False
@@ -198,7 +210,7 @@ class DockerUtils(metaclass=Singleton):
         except subprocess.CalledProcessError as err:
             logger.error('@@-docker_util.py-@@ | Image build script failed with error: %s',
                          err.output)
-            return False
+            return self.do_image_build_finished(False)
         except shutil.Error as err2:
             logger(err2)
 
@@ -210,11 +222,11 @@ class DockerUtils(metaclass=Singleton):
                 pass
             mpkg = self.build_makepkg()
             if not mpkg:
-                return False
+                return self.do_image_build_finished(False)
             db.setex('antbs:docker-images:base-devel:built-today', 84600, 'True')
-            return True
+            return self.do_image_build_finished(True)
         else:
-            return False
+            return self.do_image_build_finished(False)
 
     def maybe_build_mkarchiso(self):
         """

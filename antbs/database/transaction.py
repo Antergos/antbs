@@ -58,7 +58,8 @@ class TransactionMeta(RedisHash):
         See `Transaction` docstring.
     """
 
-    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans'):
+    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans',
+                 repo_queue=None):
         if not any([packages, tnum]):
             raise ValueError('At least one of [packages, tnum] required.')
         elif all([packages, tnum]):
@@ -78,6 +79,8 @@ class TransactionMeta(RedisHash):
             zset=['packages', 'builds', 'completed', 'failed'],
             path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
         ))
+
+        self._repo_queue = repo_queue
 
         if packages and not self:
             self.__keysinit__()
@@ -127,7 +130,11 @@ class Transaction(TransactionMeta):
     """
 
     def start(self):
+        if not self._repo_queue:
+            raise AttributeError('_repo_queue is required to start a transaction.')
+
         status.current_status = 'Initializing build transaction.'
+        status.transactions_running.append(self.tnum)
         self.is_running = True
         self.setup_transaction_directory()
         status.current_status = 'Processing packages.'
@@ -139,6 +146,7 @@ class Transaction(TransactionMeta):
             while self.queue:
                 pkg = self.queue.pop(0)
                 is_iso = False
+                pkg_obj = get_pkg_object(name=pkg)
 
                 for partial in ['i686', 'x86_64']:
                     if partial in pkg:
@@ -146,13 +154,27 @@ class Transaction(TransactionMeta):
                         break
 
                 if is_iso:
-                    pkg_obj = get_pkg_object(name=pkg)
-                    self.build_iso(pkg_obj)
+                    result = self.build_iso(pkg_obj)
                 else:
-                    self.build_package(pkg)
+                    result = self.build_package(pkg)
+
+                if result in [True, False]:
+                    blds = pkg_obj.builds
+                    total = len(blds)
+                    if total > 0:
+                        success = len([x for x in blds if x in status.completed])
+                        failure = len([x for x in blds if x in status.failed])
+                        if success > 0:
+                            success = 100 * success / total
+                        if failure > 0:
+                            failure = 100 * failure / total
+
+                        pkg_obj.success_rate = success
+                        pkg_obj.failure_rate = failure
 
         self.is_running = False
         self.is_finished = True
+        status.transactions_running.remove(self.tnum)
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
@@ -459,13 +481,6 @@ class Transaction(TransactionMeta):
         elif not any([bld_obj, is_review]):
             raise ValueError('at least one of [bld_obj, is_review] required.')
 
-        building_saved = False
-        if not status.idle and status.current_status != 'Updating repo database.':
-            building_saved = status.current_status
-        else:
-            status.idle = False
-        status.current_status = 'Updating repo database.'
-
         container = None
         repo = 'antergos'
         repodir = 'main'
@@ -474,6 +489,19 @@ class Transaction(TransactionMeta):
             rev_result = ''
             repo = 'antergos-staging'
             repodir = 'staging'
+
+        if not status.get_repo_lock(repo):
+            lock = status.get_repo_lock(repo)
+            while not lock:
+                time.sleep(10)
+                lock = status.get_repo_lock(repo)
+
+        building_saved = False
+        if not status.idle and status.current_status != 'Updating repo database.':
+            building_saved = status.current_status
+        else:
+            status.idle = False
+        status.current_status = 'Updating repo database.'
 
         if os.path.exists(self.upd_repo_result):
             remove(self.upd_repo_result)
@@ -765,7 +793,7 @@ class Transaction(TransactionMeta):
         return False
 
 
-def get_trans_object(packages=None, tnum=None):
+def get_trans_object(packages=None, tnum=None, repo_queue=None):
     """
     Gets an existing transaction or creates a new one.
 
@@ -785,7 +813,7 @@ def get_trans_object(packages=None, tnum=None):
     elif all([packages, tnum]):
         raise ValueError('Only one of [packages, tnum] can be given, not both.')
 
-    trans_obj = Transaction(packages=packages, tnum=tnum)
+    trans_obj = Transaction(packages=packages, tnum=tnum, repo_queue=repo_queue)
 
     return trans_obj
 

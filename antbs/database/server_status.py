@@ -47,10 +47,11 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                              'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
                              'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
                              'sp_app', 'gh_repo_url'],
-                     bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal'],
+                     bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
+                           'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging'],
                      int=['building_num'],
                      list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                           'hook_queue'],
+                           'hook_queue', 'transactions_running'],
                      set=['all_packages', 'iso_pkgs', 'repos'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
                            'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR']))
@@ -65,6 +66,18 @@ class ServerStatus(RedisHash, metaclass=Singleton):
             self.now_building = 'Idle'
             self.iso_flag = False
             self.iso_building = False
+
+    def get_repo_lock(self, repo):
+        lock_key = 'antbs:misc:repo_locks:{0}'.format(repo)
+        if self.db.setnx(lock_key, True):
+            self.db.expire(lock_key, 300)
+            return True
+        return False
+
+    def release_repo_lock(self, repo):
+        lock_key = 'antbs:misc:repo_locks:{0}'.format(repo)
+        self.db.delete(lock_key)
+
 
 
 class TimelineEvent(RedisHash, DateTimeStrings):
