@@ -42,12 +42,14 @@ import utils.sign_pkgs as sign
 from database import package
 from database.server_status import status
 from utils.logging_config import logger
+from database.base_objects import db
 
 REPO_DIR = '/srv/antergos.info/repo/iso'
 TESTING_DIR = os.path.join(REPO_DIR, 'testing')
 RELEASE_DIR = os.path.join(REPO_DIR, 'release')
 PASSWORD = status.gpg_password
 GPG_KEY = status.gpg_key
+API_KEY = db.get('antbs:misc:antergos.com_api_key')
 
 
 class ISOUtility:
@@ -115,7 +117,8 @@ class ISOUtility:
             logger.error(err.output)
 
     def do_release(self):
-        status.current_status = 'ISO Release: Step 4/4 - Moving %s to release directory.' % self.file_name
+        tpl = 'ISO Release: Step 4/4 - Moving {0} to release directory.'
+        status.current_status = tpl.format(self.file_name)
         logger.debug(status.current_status)
         for f in self.files:
             shutil.move(f, RELEASE_DIR)
@@ -186,7 +189,7 @@ class WordPressBridge:
             if req.get('nonce', False):
                 nonce = req.get('nonce')
                 query = 'json=' + domain + '.handle_request&nonce='
-                post_url = 'https://' + domain + '.com/?' + query + nonce
+                post_url = 'https://' + domain + '.com/?' + query + nonce + '&api_key=' + API_KEY
                 req = session.post(post_url, data=dict(pid=pid, url=iso_obj.iso_url,
                                                        md5=iso_obj.iso_md5, version=iso_obj.pkgver))
                 req.raise_for_status()
@@ -246,7 +249,7 @@ def iso_release_job():
             if version is None:
                 version = iso.version
             if db is None:
-                db = pkg_obj.database
+                db = pkg_obj.db
 
             status.iso_pkgs.add(pkg_obj.name)
 

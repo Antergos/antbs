@@ -109,11 +109,12 @@ class RedisObject:
             as_dict = dict()
 
             for key in self.all_keys:
+                if key in ['log_str', 'log', 'pkgbuild', '_build']:
+                    continue
+
                 val = getattr(self, key)
 
-                if key in ['log_str', 'log', 'pkgbuild']:
-                    continue
-                elif not isinstance(val, (str, dict, bool, int)) and hasattr(val, '__jsonable__'):
+                if not isinstance(val, (str, dict, bool, int)) and hasattr(val, '__jsonable__'):
                     as_dict[key] = val.__jsonable__()
                 else:
                     as_dict[key] = val
@@ -281,7 +282,7 @@ class RedisZSet(RedisObject, set):
         for val in vals:
             vals.append(1)
             vals.append(val)
-        self.db.zadd(self.full_key, 1, *vals)
+        self.db.zadd(self.full_key, *vals)
 
     def remove(self, val):
         """ Remove a member from the set. """

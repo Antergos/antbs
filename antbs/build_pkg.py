@@ -32,8 +32,6 @@
 import os
 import sys
 
-from database.transaction import fetch_and_compile_translations
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 from database.base_objects import db
 import utils.docker_util as docker_utils
