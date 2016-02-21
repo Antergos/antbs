@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# build_pkg.py
+# transaction_handler.py
 #
 # Copyright © 2013-2016 Antergos
 #

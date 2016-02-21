@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# build_pkg.py
+# transaction_handler.py
 #
 # Copyright © 2013-2015 Antergos
 #
@@ -52,7 +52,7 @@ with Connection(db):
     repo_queue = Queue('repo_update')
 
 
-def handle_hook_set_server_status(first=True, saved_status=False):
+def set_server_status(first=True, saved_status=False, is_review=False):
     ret = None
     if first:
         saved = False
@@ -62,7 +62,10 @@ def handle_hook_set_server_status(first=True, saved_status=False):
         else:
             status.idle = False
 
-        status.current_status = 'Build hook was triggered. Checking docker images.'
+        if is_review:
+            status.current_status = 'Processing developer review result.'
+        else:
+            status.current_status = 'Build hook was triggered. Checking docker images.'
 
         ret = saved
 
@@ -77,7 +80,7 @@ def handle_hook_set_server_status(first=True, saved_status=False):
 
 def handle_hook():
 
-    saved_status = handle_hook_set_server_status(first=True)
+    saved_status = set_server_status(first=True)
 
     if not status.iso_flag:
         image = docker_utils.DockerUtils().maybe_build_base_devel()
@@ -86,7 +89,7 @@ def handle_hook():
         image = docker_utils.DockerUtils().maybe_build_mkarchiso()
 
     if not image:
-        handle_hook_set_server_status(first=False, saved_status=saved_status)
+        set_server_status(first=False, saved_status=saved_status)
         return False
 
     if status.queue:
@@ -94,7 +97,7 @@ def handle_hook():
         transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue)
         transaction.start()
 
-    handle_hook_set_server_status(first=False, saved_status=saved_status)
+    set_server_status(first=False, saved_status=saved_status)
 
     if not status.queue and not status.hook_queue:
         status.idle = True
@@ -105,4 +108,13 @@ def handle_hook():
         status.building_start = ''
         status.iso_building = False
         logger.info('All builds completed.')
+
+
+def process_dev_review(review_result, pkgname, tnum):
+    saved_status = set_server_status(True, is_review=True)
+
+    trans_obj = get_trans_object(tnum=tnum, repo_queue=repo_queue)
+    trans_obj.update_repo(review_result, None, True, pkgname)
+
+    set_server_status(False, saved_status)
 

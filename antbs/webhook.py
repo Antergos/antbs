@@ -39,7 +39,7 @@ import shutil
 import requests
 from rq import Queue, Connection, Worker
 
-import build_pkg as builder
+import transaction_handler as builder
 from database import package
 from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser

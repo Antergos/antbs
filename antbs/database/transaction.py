@@ -29,7 +29,7 @@ from pygments import highlight
 from pygments.lexers import BashLexer
 from pygments.formatters import HtmlFormatter
 
-from build_pkg import logger
+from transaction_handler import logger
 from .base_objects import RedisHash, db
 from .server_status import status, get_timeline_object
 from .package import get_pkg_object
@@ -385,7 +385,7 @@ class Transaction(TransactionMeta):
             logger.error(err)
 
     @staticmethod
-    def process_and_save_build_metadata(pkg_obj, version_str):
+    def process_and_save_build_metadata(pkg_obj=None, version_str=None, tnum=None):
         """
         Creates a new build for a package, initializes the build data, and returns a build object.
 
@@ -411,7 +411,7 @@ class Transaction(TransactionMeta):
 
         status.now_building = msg
 
-        bld_obj = get_build_object(pkg_obj=pkg_obj)
+        bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=tnum)
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
         status.building_num = bld_obj.bnum
@@ -427,14 +427,16 @@ class Transaction(TransactionMeta):
         return bld_obj
 
     @staticmethod
-    def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False):
-        if not container and not bld_obj:
+    def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False, tnum=None):
+        if not container and not bld_obj or not tnum:
             logger.error('Unable to publish build output. (Container is None)')
             return
 
         output = doc.logs(container=bld_obj.container, stream=True)
         nodup = CustomSet()
         content = []
+        live_output_key = 'live:build_output:{0}'.format(tnum)
+        last_line_key = 'tmp:build_log_last_line:{0}'.format(tnum)
         for line in output:
             line = line.decode('UTF-8').rstrip()
             if not line or 'makepkg]# PS1="' in line:
@@ -447,8 +449,8 @@ class Transaction(TransactionMeta):
                     datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
 
                 content.append(line)
-                db.publish('build-output', line)
-                db.set('build_log_last_line', line)
+                db.publish(live_output_key, line)
+                db.setex(last_line_key, 3600, line)
 
         result_ready = bld_obj.completed != bld_obj.failed
         if not result_ready:
@@ -573,7 +575,8 @@ class Transaction(TransactionMeta):
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg])
+        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg], self.tnum)
+        self.builds.append(bld_obj.bnum)
 
         self.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)
@@ -608,7 +611,8 @@ class Transaction(TransactionMeta):
 
         bld_obj.container = container.get('Id', '')
         status.container = container.get('Id', '')
-        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(bld_obj=bld_obj))
+        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(bld_obj=bld_obj,
+                                                                              tnum=self.tnum))
 
         try:
             doc.start(container.get('Id', ''))
@@ -672,7 +676,7 @@ class Transaction(TransactionMeta):
 
         status.iso_building = True
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
+        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj, tnum=self.tnum)
         build_id = bld_obj.bnum
 
         self.fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])
@@ -742,7 +746,8 @@ class Transaction(TransactionMeta):
             doc.start(bld_obj.container)
             cont = bld_obj.container
             stream_process = Process(target=self.publish_build_ouput,
-                                     kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True))
+                                     kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True,
+                                                 tnum=self.tnum))
             stream_process.start()
             result = doc.wait(cont)
             inspect = doc.inspect_container(cont)

@@ -33,6 +33,7 @@ import gevent
 import gevent.monkey
 
 gevent.monkey.patch_all()
+
 import requests
 # import newrelic.agent
 #
@@ -48,28 +49,29 @@ from datetime import datetime, timedelta
 from rq import Queue, Connection, Worker
 import rq_dashboard
 from flask import (
-    Flask, request, Response, abort, render_template, url_for,
-    redirect, flash, stream_with_context)
+    Flask, request, Response, abort, render_template, url_for, redirect, flash,
+    stream_with_context
+)
 from werkzeug.contrib.fixers import ProxyFix
 from flask.ext.stormpath import StormpathManager, groups_required, user
-# from flask.ext.cache import Cache
 import bugsnag
 from bugsnag.flask import handle_exceptions
 
 import utils.pagination
-import build_pkg as builder
+import transaction_handler
 from database.base_objects import db
 from database.server_status import status, get_timeline_object
 import webhook
-# import utils.slack_bot as slack_bot
-import database.build as build
-import database.package as package
-import repo_monitor as repo_mon
-import utils.logging_config as logconf
+from database.build import get_build_object
+from database.package import get_pkg_object
+from database.transaction import get_trans_object
+import repo_monitor
+from utils.logging_config import logger
+from utilities import copy_or_symlink, remove
 import iso
 
-logger = logconf.logger
-cache = queue = repo_queue = hook_queue = w1 = w2 = w3 = None
+
+app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = None
 
 
 def url_for_other_page(page):
@@ -87,6 +89,7 @@ def initialize_app():
     bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
 
     # Create the variable `app` which is an instance of the Flask class
+    global app
     app = Flask(__name__)
     handle_exceptions(app)
 
@@ -133,59 +136,30 @@ def initialize_app():
 
     # Setup rq (background task queue manager)
     with Connection(db):
-        global queue, repo_queue, hook_queue, w1, w2, w3
-        queue = Queue('build_queue')
-        repo_queue = Queue('repo_queue')
-        hook_queue = Queue('hook_queue')
-        w1 = Worker([queue])
+        global transaction_queue, repo_queue, webhook_queue, w1, w2, w3
+        transaction_queue = Queue('transactions')
+        repo_queue = Queue('repo_update')
+        webhook_queue = Queue('webook')
+        w1 = Worker([transaction_queue])
         w2 = Worker([repo_queue])
-        w3 = Worker([hook_queue])
-
-    return app
+        w3 = Worker([webhook_queue])
 
 
 # Make `app` available to gunicorn
-app = initialize_app()
+initialize_app()
 
 
-def copy(src, dst):
-    if os.path.islink(src):
-        linkto = os.readlink(src)
-        os.symlink(linkto, dst)
-    else:
-        try:
-            shutil.copy(src, dst)
-        except Exception:
-            pass
-
-
-def remove(src):
-    if os.path.isdir(src):
-        try:
-            shutil.rmtree(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    elif os.path.isfile(src):
-        try:
-            os.remove(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    else:
-        return True
-
-
-def get_live_build_output():
+def get_live_build_output(tnum):
     psub = db.pubsub()
-    psub.subscribe('build-output')
+    psub.subscribe('live:build_output:{0}'.format(tnum))
+    last_line_key = 'tmp:build_log_last_line:{0}'.format(tnum)
     first_run = True
     keep_alive = 0
     while True:
         message = psub.get_message()
         if message and (message['data'] == '1' or message['data'] == 1):
             if first_run:
-                message['data'] = db.get('build_log_last_line')
+                message['data'] = db.get(last_line_key)
                 first_run = False
             else:
                 message['data'] = '...'
@@ -241,7 +215,7 @@ def get_paginated(item_list, per_page, page, timeline):
 def match_pkg_name_build_log(bnum=None, match=None):
     if not bnum or not match:
         return False
-    pname = build.get_build_object(bnum=bnum)
+    pname = get_build_object(bnum=bnum)
     logger.info(bnum)
     if pname:
         return match in pname.pkgname
@@ -299,22 +273,30 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
         if search is not None:
             search_all_builds = [x for x in all_builds if
                                  x is not None and match_pkg_name_build_log(x, search)]
-            logger.info('search_all_builds is %s', search_all_builds)
+            # logger.info('search_all_builds is %s', search_all_builds)
             all_builds = search_all_builds
 
         if all_builds:
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
-                try:
-                    bld_obj = build.get_build_object(bnum=bnum)
-                except Exception as err:
-                    logger.error('Unable to ge build object - %s' % err)
-                    continue
+                if int(bnum) < 2171:
+                    try:
+                        bld_obj = get_build_object(bnum=bnum)
+                    except Exception as err:
+                        logger.error(err)
+                        continue
 
-                pkg_list.append(bld_obj)
+                    pkg_list.append(bld_obj)
 
-                if logged_in and bld_obj.review_status == "pending":
-                    rev_pending.append(bld_obj)
+                else:
+                    trans_obj = get_trans_object(tnum=bnum)
+                    trans_blds = [get_build_object(bnum=bnum) for bnum in trans_obj.builds]
+                    pkg_list.extend(trans_blds)
+
+            if logged_in:
+                for bld_obj in pkg_list:
+                    if bld_obj.review_status == "pending":
+                        rev_pending.append(bld_obj)
 
     return pkg_list, int(all_pages), rev_pending
 
@@ -330,7 +312,8 @@ def get_repo_info(repo=None, logged_in=False):
     else:
         rev_pending = []
 
-    all_packages = glob.glob('/srv/antergos.info/repo/%s/x86_64/***.pkg.tar.xz' % repo)
+    path_part = os.path.join('/srv/antergos.info/repo', repo, 'x86_64')
+    all_packages = glob.glob('{0}/***.pkg.tar.xz'.format(path_part))
 
     if all_packages:
         for pkg in all_packages:
@@ -341,17 +324,16 @@ def get_repo_info(repo=None, logged_in=False):
             else:
                 logger.error(p)
                 continue
-            if 'dummy' in pkg:
+            if 'dummy' in pkg or 'grub-zfs' in pkg:
                 continue
-            pkg_obj = package.get_pkg_object(pkg)
-            builds = pkg_obj.builds
+            pkg_obj = get_pkg_object(pkg)
             bld_obj = dict(review_status='', review_dev='', review_date='')
             try:
-                bnum = builds[0]
+                bnum = pkg_obj.builds[0]
                 if bnum:
-                    bld_obj = build.get_build_object(bnum=bnum)
+                    bld_obj = get_build_object(bnum=bnum)
             except Exception:
-                pass
+                continue
 
             pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj.__jsonable__()
             container["pkgs"].append(pkg_obj.__jsonable__())
@@ -366,19 +348,17 @@ def redirect_url(default='homepage'):
 def set_pkg_review_result(bnum=None, dev=None, result=None):
     if not any([bnum, dev, result]):
         abort(500)
+
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
-    if result in ['0', '1', '2', '3', '4']:
-        msg = 'Please clear your browser cache, refresh the page, and try again.'
-        errmsg.update(error=True, msg=msg)
-        return errmsg
+
     try:
-        bld_obj = build.get_build_object(bnum=bnum)
-        pkg_obj = package.get_pkg_object(name=bld_obj.pkgname)
+        bld_obj = get_build_object(bnum=bnum)
+        pkg_obj = get_pkg_object(name=bld_obj.pkgname)
         if pkg_obj and bld_obj:
             allowed = pkg_obj.allowed_in
             if 'main' not in allowed and result == 'passed':
-                msg = '%s is not allowed in main repo.' % pkg_obj.pkgname
+                msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
                 errmsg.update(error=True, msg=msg)
                 return errmsg
             else:
@@ -390,26 +370,26 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             errmsg = dict(error=False, msg=None)
             return errmsg
 
-        pkg_files_64 = glob.glob('%s/%s-***' % (status.STAGING_64, pkg_obj.pkgname))
-        pkg_files_32 = glob.glob('%s/%s-***' % (status.STAGING_32, pkg_obj.pkgname))
+        pkg_files_64 = glob.glob('{0}/{1}-***'.format(status.STAGING_64, pkg_obj.pkgname))
+        pkg_files_32 = glob.glob('{0}/{1}***'.format(status.STAGING_32, pkg_obj.pkgname))
         pkg_files = pkg_files_64 + pkg_files_32
 
-        if pkg_files or True:
+        if pkg_files:
             for f in pkg_files_64:
                 logger.debug('f in pkg_files_64 fired!')
                 if result == 'passed':
-                    copy(f, status.MAIN_64)
-                    copy(f, '/tmp')
+                    copy_or_symlink(f, status.MAIN_64)
+                    copy_or_symlink(f, '/tmp')
                 if result != 'skip':
                     os.remove(f)
             for f in pkg_files_32:
                 if result == 'passed':
-                    copy(f, status.MAIN_32)
-                    copy(f, '/tmp')
+                    copy_or_symlink(f, status.MAIN_32)
+                    copy_or_symlink(f, '/tmp')
                 if result != 'skip':
                     os.remove(f)
             if result and result != 'skip':
-                repo_queue.enqueue_call(builder.process_dev_review,
+                repo_queue.enqueue_call(transaction_handler.process_dev_review,
                                         (result, None, True, bld_obj.pkgname), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
@@ -454,7 +434,7 @@ def get_build_history_chart_data(pkg_obj=None):
         chart_data = dict()
         builds = [b for b in builds if b]
         for bld in builds:
-            bld_obj = build.get_build_object(bnum=bld)
+            bld_obj = get_build_object(bnum=bld)
             if not bld_obj.end_str:
                 continue
             dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
@@ -521,7 +501,7 @@ def homepage(tlpage=None):
             nodup = []
             for bnum in builds:
                 try:
-                    bld_obj = build.get_build_object(bnum=bnum)
+                    bld_obj = get_build_object(bnum=bnum)
                 except (ValueError, AttributeError):
                     continue
                 ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
@@ -575,7 +555,7 @@ def building():
         bnum = status.building_num
         start = status.building_start
         if bnum and bnum != '':
-            bld_obj = build.get_build_object(bnum=bnum)
+            bld_obj = get_build_object(bnum=bnum)
             ver = bld_obj.version_str
 
     return render_template("building.html", building=status.now_building, container=container,
@@ -606,9 +586,9 @@ def hooked():
 
 @app.before_request
 def maybe_check_for_remote_commits():
-    check = repo_mon.maybe_check_for_new_items()
+    check = repo_monitor.maybe_check_for_new_items()
     if not check:
-        repo_queue.enqueue_call(repo_mon.check_for_new_items)
+        repo_queue.enqueue_call(repo_monitor.check_for_new_items)
 
 
 @app.route('/scheduled')
@@ -622,7 +602,7 @@ def scheduled():
     if queued and len(queued) > 0:
         for pak in queued:
             try:
-                pkg_obj = package.Package(name=pak)
+                pkg_obj = get_pkg_object(name=pak)
                 the_queue.append(pkg_obj)
             except ValueError as err:
                 logger.error(err)
@@ -673,7 +653,7 @@ def build_info(num):
     if not num:
         abort(404)
     try:
-        bld_obj = build.get_build_object(bnum=num)
+        bld_obj = get_build_object(bnum=num)
     except Exception:
         abort(404)
 
@@ -758,7 +738,7 @@ def build_pkg_now():
         pexists = status.all_packages.ismember(pkgname)
         if not pexists:
             try:
-                pkg = package.get_pkg_object(name=pkgname)
+                pkg = get_pkg_object(name=pkgname)
                 if pkg and pkg.pkg_id:
                     pexists = True
             except Exception:
@@ -771,7 +751,7 @@ def build_pkg_now():
             pending = False
             logger.debug(rev_pending)
             for bnum in rev_pending:
-                bld_obj = build.get_build_object(bnum=bnum)
+                bld_obj = get_build_object(bnum=bnum)
                 if bld_obj and pkgname == bld_obj.pkgname:
                     pending = True
                     break
@@ -790,7 +770,7 @@ def build_pkg_now():
                 if 'cnchi-dev' == pkgname:
                     db.set('CNCHI-DEV-OVERRIDE', True)
                 status.hook_queue.rpush(pkgname)
-                hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
+                webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
                 get_timeline_object(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
                         dev, pkgname), tl_type='0')
@@ -828,23 +808,23 @@ def get_status():
 
         if all(i is not None for i in (pkg, dev, action)):
             if action in ['remove']:
-                queue.enqueue_call(
-                    builder.update_main_repo(is_action=True, action=action, action_pkg=pkg))
+                transaction_queue.enqueue_call(
+                    transaction_handler.update_main_repo(is_action=True, action=action, action_pkg=pkg))
             elif 'rebuild' == action:
                 status.hook_queue.rpush(pkg)
-                hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
+                webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
                 get_timeline_object(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
                         dev, pkg), tl_type='0')
             return json.dumps(message)
 
     if iso_release:
-        queue.enqueue_call(iso.iso_release_job)
+        transaction_queue.enqueue_call(iso.iso_release_job)
         return json.dumps(message)
 
     elif reset_queue:
-        if queue.count > 0:
-            queue.empty()
+        if transaction_queue.count > 0:
+            transaction_queue.empty()
         if repo_queue.count > 0:
             repo_queue.empty()
         items = len(status.queue)
@@ -863,7 +843,7 @@ def get_status():
             for pkg in pkgs:
                 if pkg not in status.hook_queue:
                     status.hook_queue.rpush(pkg)
-            hook_queue.enqueue_call(builder.handle_hook, timeout=84600)
+            webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
         return json.dumps(message)
 
 
@@ -879,7 +859,7 @@ def get_and_show_pkg_profile(pkgname=None):
     if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)
 
-    pkgobj = package.get_pkg_object(name=pkgname)
+    pkgobj = get_pkg_object(name=pkgname)
     if '' == pkgobj.description:
         desc = pkgobj.get_from_pkgbuild('pkgdesc')
         pkgobj.description = desc

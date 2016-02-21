@@ -28,10 +28,11 @@
 
 """ Various utility classes and metaclasses """
 import os
+import shutil
 import subprocess
 import glob
 
-from build_pkg import logger
+from transaction_handler import logger
 
 
 class Singleton(type):
@@ -124,29 +125,28 @@ def truncate_middle(s, n):
 
 
 def remove(src):
-    """
-
-    :param src:
-    :return:
-    """
     if not isinstance(src, str):
         raise ValueError('src must be of type(str), type({0}) given.'.format(type(src)))
 
     if os.path.isdir(src):
-        # try:
-        #     shutil.rmtree(src)
-        # except Exception as err:
-        #     logger.error('Failed to remove {0}. Error is: {1}'.format(src, err))
-        output = None
         try:
-            output = subprocess.check_output(['sudo', '/var/tmp/remove32.sh', src], shell=True)
-        except subprocess.CalledProcessError as err2:
-            logger.error(err2.output)
-        if output:
-            logger.error(output)
+            shutil.rmtree(src)
+        except Exception as err:
+            logger.error(err)
 
     elif os.path.isfile(src):
         try:
             os.remove(src)
         except Exception as err:
             logger.error('Failed to remove {0}. Error is: {1}'.format(src, err))
+
+
+def copy_or_symlink(src, dst):
+    if os.path.islink(src):
+        linkto = os.readlink(src)
+        os.symlink(linkto, dst)
+    else:
+        try:
+            shutil.copy(src, dst)
+        except Exception:
+            pass

@@ -64,6 +64,7 @@ class Build(RedisHash):
         (int)
             bnum: ID assigned to the build.
             pkg_id: ID of the package that this build is for.
+            tnum: ID of the transaction that this build is a part of.
 
         (list)
             log: The build log, unprocessed, stored as lines in a list.
@@ -72,7 +73,7 @@ class Build(RedisHash):
         ValueError: If both `pkg_obj` and `bnum` are Falsey.
 
     """
-    def __init__(self, pkg_obj=None, bnum=None, prefix='build'):
+    def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
         if not any([pkg_obj, bnum]):
             raise ValueError
 
@@ -87,7 +88,7 @@ class Build(RedisHash):
                              'start_str', 'end_str', 'version_str', 'container',
                              'review_status', 'review_dev', 'review_date', 'log_str'],
                      bool=['failed', 'completed'],
-                     int=['pkg_id', 'bnum'],
+                     int=['pkg_id', 'bnum', 'tnum'],
                      list=['log'],
                      zset=[]))
 
@@ -118,7 +119,7 @@ class Build(RedisHash):
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
 
-def get_build_object(pkg_obj=None, bnum=None):
+def get_build_object(pkg_obj=None, bnum=None, tnum=None):
     """
     Gets an existing build or creates a new one.
 
@@ -138,6 +139,6 @@ def get_build_object(pkg_obj=None, bnum=None):
     elif all([pkg_obj, bnum]):
         raise ValueError('Only one of [pkg_obj, bnum] can be given, not both.')
 
-    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum)
+    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum, tnum=tnum)
 
     return bld_obj
