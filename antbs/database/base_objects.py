@@ -52,6 +52,8 @@ class RedisObject:
 
     def __bool__(self):
         """ Tests if this object currently exists in redis. """
+        if isinstance(self, RedisList) and len(self) < 1:
+            return False
         return self.db.exists(self.full_key)
 
     def __nonzero__(self):

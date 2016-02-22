@@ -154,10 +154,10 @@ class ISOUtility:
 class WordPressBridge:
     def __init__(self, auth):
         self.post_id_map = {
-            'antergos-x86_64': '1252',
-            'antergos-i686': '1257',
-            'antergos-minimal-x86_64': '1562',
-            'antergos-minimal-i686': '1564'
+            'antergos-x86_64': '2563',
+            'antergos-i686': '2564',
+            'antergos-minimal-x86_64': '2565',
+            'antergos-minimal-i686': '2566'
         }
         self.auth = auth
         logger.info('WordPressBridge Object Initialized')

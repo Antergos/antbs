@@ -236,7 +236,12 @@ def match_pkg_name_build_log(bnum=None, match=None):
 
 @app.context_processor
 def inject_idle_status():
-    return dict(idle=status.idle)
+    return dict(
+        idle=status.idle,
+        current_status=status.current_status,
+        now_building=status.now_building,
+        rev_pending=status.review_pending
+    )
 
 
 # @cache.memoize(timeout=900, unless=cache_buster)
@@ -426,7 +431,13 @@ def get_build_history_chart_data(pkg_obj=None):
         chart_data = db.get('antbs:misc:charts:home:heatmap') or False
     else:
         builds = pkg_obj.builds
-        chart_data = False
+        chart_data = pkg_obj.heat_map
+        if chart_data:
+            chart_data = json.loads(chart_data)
+            all_builds = sum([int(num) for num in
+                              [chart_data[key]['builds'] for key in chart_data]])
+            if len(pkg_obj.builds) > all_builds:
+                chart_data = '{}'
 
     timestamps = {}
 
@@ -448,10 +459,12 @@ def get_build_history_chart_data(pkg_obj=None):
 
         if pkg_obj is None:
             db.setex('antbs:misc:charts:home:heatmap', 10800, json.dumps(chart_data))
-    else:
+        else:
+            pkg_obj.heatmap = json.dumps(chart_data)
+    elif isinstance(chart_data, str):
         chart_data = json.loads(chart_data)
 
-    for key in chart_data.keys():
+    for key in chart_data:
         timestamps[key] = chart_data[key]['builds']
 
     return chart_data, timestamps
@@ -483,7 +496,6 @@ def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
     check_stats = ['queue', 'completed', 'failed']
-    building = status.current_status
     tl_events, all_pages = get_timeline(tlpage)
 
     if tlpage > all_pages:
@@ -496,23 +508,21 @@ def homepage(tlpage=None):
         builds = getattr(status, stat)
         res = len(builds)
         if stat != "queue":
-            builds = [x for x in builds if x]
+            builds = [x for x in builds[1000:-1] if x]
             within = []
-            nodup = []
             for bnum in builds:
                 try:
                     bld_obj = get_build_object(bnum=bnum)
                 except (ValueError, AttributeError):
                     continue
-                ver = '%s:%s' % (bld_obj.pkgname, bld_obj.version_str)
-                end = datetime.strptime(
-                    bld_obj.end_str,
-                    '%m/%d/%Y %I:%M%p') if bld_obj.end_str else ''
-                end = end if end and (datetime.now() - end) < timedelta(hours=48) else ''
 
-                if end and ver not in nodup and bld_obj.pkgname:
+                end = ''
+                if bld_obj.end_str:
+                    end = datetime.strptime(bld_obj.end_str, '%m/%d/%Y %I:%M%p')
+                    end = end if (datetime.now() - end) < timedelta(hours=48) else ''
+
+                if end:
                     within.append(bld_obj.bnum)
-                    nodup.append(ver)
 
             stats[stat] = len(within)
         else:
@@ -524,46 +534,55 @@ def homepage(tlpage=None):
     for repo in [main_repo, staging_repo]:
         if repo:
             filtered = []
-            for file_path in repo:
-                new_fp = os.path.basename(file_path)
-                if 'dummy-package' not in new_fp:
-                    filtered.append(new_fp)
+
             if '-staging' not in repo[0]:
                 repo_name = 'repo_main'
             else:
                 repo_name = 'repo_staging'
+
+            for file_path in repo:
+                new_fp = os.path.basename(file_path)
+                if 'dummy-package' not in new_fp:
+                    filtered.append(new_fp)
+
             stats[repo_name] = len(set(filtered))
         else:
             stats['repo_staging'] = 0
 
-    return render_template("overview.html", stats=stats, user=user, building=building,
-                           tl_events=tl_events, all_pages=all_pages, page=tlpage, rev_pending=[],
-                           build_history=build_history, timestamps=timestamps)
+    return render_template("overview.html", stats=stats, user=user, tl_events=tl_events,
+                           all_pages=all_pages, page=tlpage, build_history=build_history,
+                           timestamps=timestamps)
 
 
 @app.route("/building")
-def building():
-    ver = ''
-    bnum = ''
+@app.route("/building/<int:bnum>")
+def building(bnum=None):
+    bld = bnum
     start = ''
-    cont = status.container
-    if cont:
-        container = cont[:20]
-    else:
-        container = ''
-    if not status.idle:
-        bnum = status.building_num
-        start = status.building_start
-        if bnum and bnum != '':
-            bld_obj = get_build_object(bnum=bnum)
-            ver = bld_obj.version_str
+    if status.now_building and not status.idle:
+        if not bld:
+            bld = status.now_building[0]
 
-    return render_template("building.html", building=status.now_building, container=container,
-                           bnum=bnum, start=start, ver=ver, idle=status.idle)
+        try:
+            bld_obj = get_build_object(bnum=bld)
+        except Exception:
+            bld_obj = None
+
+        if bld_obj:
+            start = bld_obj.start_str
+            ver = bld_obj.version_str
+            container = bld_obj.container
+
+    if not start:
+        start = ver = container = ''
+
+    return render_template("building.html", container=container, bnum=bld, start=start,
+                           ver=ver, idle=status.idle)
 
 
 @app.route('/get_log')
-def get_log():
+@app.route("/get_log/<int:tnum>")
+def get_log(tnum):
     if status.idle:
         abort(404)
 

@@ -397,30 +397,17 @@ class Transaction(TransactionMeta):
 
         """
 
-        if 'Building ' in status.current_status:
-            msg = '{0}, {1}-{2}'.format(status.current_status, pkg_obj.name, version_str)
-        else:
-            msg = '{0}-{1}'.format(pkg_obj.name, version_str)
-
-        status.current_status = msg
-
-        if status.now_building:
-            msg = '{0}, {1}'.format(status.now_building, pkg_obj.name)
-        else:
-            msg = pkg_obj.name
-
-        status.now_building = msg
-
         bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=tnum)
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
-        status.building_num = bld_obj.bnum
         status.building_start = bld_obj.start_str
+
+        status.now_building_add(bld_obj.bnum)
 
         tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
         tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, version_str)
 
-        _ = get_timeline_object(msg=tlmsg, tl_type=3)
+        get_timeline_object(msg=tlmsg, tl_type=3, ret=False)
 
         pkg_obj.builds.append(bld_obj.bnum)
 

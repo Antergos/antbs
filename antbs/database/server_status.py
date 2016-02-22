@@ -42,7 +42,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
 
         self.key_lists.update(
-                dict(string=['current_status', 'now_building', 'container', 'github_token',
+                dict(string=['current_status', 'container', 'github_token',
                              'gitlab_token', 'building_start', 'building_num', 'docker_user',
                              'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
                              'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
@@ -50,9 +50,9 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                      bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
                            'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging'],
                      int=['building_num'],
-                     list=['completed', 'failed', 'queue', 'pending_review', 'all_tl_events',
-                           'hook_queue', 'transactions_running'],
-                     set=['all_packages', 'iso_pkgs', 'repos'],
+                     list=['completed', 'failed', 'transaction_queue', 'pending_review',
+                           'all_tl_events', 'build_queue', 'transactions_running', 'now_building'],
+                     set=['all_packages', 'iso_pkgs', 'repos', 'review_pending'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
                            'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR']))
 
@@ -63,7 +63,6 @@ class ServerStatus(RedisHash, metaclass=Singleton):
             self.status = True
             self.current_status = 'Idle'
             self.idle = True
-            self.now_building = 'Idle'
             self.iso_flag = False
             self.iso_building = False
 
@@ -77,6 +76,14 @@ class ServerStatus(RedisHash, metaclass=Singleton):
     def release_repo_lock(self, repo):
         lock_key = 'antbs:misc:repo_locks:{0}'.format(repo)
         self.db.delete(lock_key)
+
+    def now_building_add(self, bnum):
+        if bnum not in self.now_building:
+            self.now_building.append(bnum)
+
+    def now_building_remove(self, bnum):
+        if bnum in self.now_building:
+            self.now_building.remove(bnum)
 
 
 
@@ -119,9 +126,10 @@ class TimelineEvent(RedisHash, DateTimeStrings):
                     self.packages.append(p)
 
 
-def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None):
+def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None, ret=True):
     tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type, packages=packages)
-    return tl_obj
+    if ret:
+        return tl_obj
 
 
 status = ServerStatus()

@@ -102,7 +102,6 @@ def handle_hook():
     if not status.queue and not status.hook_queue:
         status.idle = True
         status.building = 'Idle'
-        status.now_building = 'Idle'
         status.container = ''
         status.building_num = ''
         status.building_start = ''
