@@ -149,10 +149,28 @@ def initialize_app():
 initialize_app()
 
 
-def get_live_build_output(tnum):
+@app.before_request
+def maybe_check_for_remote_commits():
+    check = repo_monitor.maybe_check_for_new_items()
+    if not check:
+        repo_queue.enqueue_call(repo_monitor.check_for_new_items)
+
+
+@app.context_processor
+def inject_idle_status():
+    return dict(
+        idle=status.idle,
+        current_status=status.current_status,
+        now_building=status.now_building,
+        rev_pending=status.review_pending,
+        user=user
+    )
+
+
+def get_live_build_output(bnum):
     psub = db.pubsub()
-    psub.subscribe('live:build_output:{0}'.format(tnum))
-    last_line_key = 'tmp:build_log_last_line:{0}'.format(tnum)
+    psub.subscribe('live:build_output:{0}'.format(bnum))
+    last_line_key = 'tmp:build_log_last_line:{0}'.format(bnum)
     first_run = True
     keep_alive = 0
     while True:
@@ -232,16 +250,6 @@ def match_pkg_name_build_log(bnum=None, match=None):
 #         return True
 #
 #     return False
-
-
-@app.context_processor
-def inject_idle_status():
-    return dict(
-        idle=status.idle,
-        current_status=status.current_status,
-        now_building=status.now_building,
-        rev_pending=status.review_pending
-    )
 
 
 # @cache.memoize(timeout=900, unless=cache_buster)
@@ -581,16 +589,23 @@ def building(bnum=None):
 
 
 @app.route('/get_log')
-@app.route("/get_log/<int:tnum>")
-def get_log(tnum):
-    if status.idle:
+@app.route("/get_log/<int:bnum>")
+def get_log(bnum):
+    bld = bnum
+    if status.idle or not status.now_building:
+        abort(404)
+
+    if not bld:
+        bld = status.now_building[0]
+
+    if not bld:
         abort(404)
 
     headers = {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
     }
-    return Response(stream_with_context(get_live_build_output()), direct_passthrough=True,
+    return Response(get_live_build_output(bld), direct_passthrough=True,
                     mimetype='text/event-stream', headers=headers)
 
 
@@ -603,67 +618,37 @@ def hooked():
         return json.dumps(hook.result)
 
 
-@app.before_request
-def maybe_check_for_remote_commits():
-    check = repo_monitor.maybe_check_for_new_items()
-    if not check:
-        repo_queue.enqueue_call(repo_monitor.check_for_new_items)
-
-
 @app.route('/scheduled')
 def scheduled():
-    try:
-        queued = status.queue
-    except Exception:
-        queued = None
-    building = status.now_building
     the_queue = []
-    if queued and len(queued) > 0:
-        for pak in queued:
+    if status.queue and len(status.queue) > 0:
+        for tnum in status.queue:
             try:
-                pkg_obj = get_pkg_object(name=pak)
-                the_queue.append(pkg_obj)
+                trans_obj = get_trans_object(tnum=tnum)
+                pkg_objs = [get_pkg_object(pkg) for pkg in trans_obj.packages]
+                the_queue.extend(pkg_objs)
             except ValueError as err:
                 logger.error(err)
 
-    return render_template("builds/scheduled.html", building=building, queue=the_queue, user=user)
+    return render_template("builds/scheduled.html", user=user)
 
 
-@app.route('/completed/<int:page>')
-@app.route('/completed/search/<name>')
-@app.route('/completed/search/<name>/<int:page>')
-@app.route('/completed')
-def completed(page=None, name=None):
-    build_status = 'completed'
+@app.route('/<str:build_status>/search/<name>')
+@app.route('/<str:build_status>/search/<name>/<int:page>')
+@app.route('/<str:build_status>/<int:page>')
+@app.route('/<str:build_status>')
+def completed(build_status=None, page=None, name=None):
+    if not build_status:
+        abort(404)
     is_logged_in = user.is_authenticated()
-    if (page is None and name is None) or (name is not None and page is None):
-        page = 1
-
-    building = status.now_building
-    completed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
-    pagination = utils.pagination.Pagination(page, 10, all_pages)
-
-    return render_template("builds/completed.html", building=building, completed=completed,
-                           all_pages=all_pages, rev_pending=rev_pending, user=user,
-                           pagination=pagination)
-
-
-@app.route('/failed/<int:page>')
-@app.route('/failed')
-# @cache.memoize(timeout=900, unless=cache_buster)
-def failed(page=None):
-    build_status = 'failed'
     if page is None:
         page = 1
-    building = status.now_building
-    is_logged_in = user.is_authenticated()
 
-    failed, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in)
+    builds, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
+    tpl = "builds/{0}.html".format(build_status)
 
-    return render_template("builds/failed.html", building=building, failed=failed,
-                           all_pages=all_pages,
-                           page=page, rev_pending=rev_pending, user=user, pagination=pagination)
+    return render_template(tpl, builds=builds, all_pages=all_pages, pagination=pagination)
 
 
 @app.route('/build/<int:num>')
