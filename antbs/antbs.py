@@ -56,7 +56,6 @@ from werkzeug.contrib.fixers import ProxyFix
 from flask.ext.stormpath import StormpathManager, groups_required, user
 import bugsnag
 from bugsnag.flask import handle_exceptions
-
 import utils.pagination
 import transaction_handler
 from database.base_objects import db
@@ -67,7 +66,7 @@ from database.package import get_pkg_object
 from database.transaction import get_trans_object
 import repo_monitor
 from utils.logging_config import logger
-from utilities import copy_or_symlink, remove
+from utils.utilities import copy_or_symlink, remove
 import iso
 
 
@@ -157,12 +156,12 @@ def maybe_check_for_remote_commits():
 
 
 @app.context_processor
-def inject_idle_status():
+def inject_global_template_variables():
     return dict(
         idle=status.idle,
         current_status=status.current_status,
         now_building=status.now_building,
-        rev_pending=status.review_pending,
+        rev_pending=status.pending_review,
         user=user
     )
 
@@ -290,9 +289,11 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
             all_builds = search_all_builds
 
         if all_builds:
+            # if search is None:
+            #     all_builds = all_builds[10000:-1]
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
-                if int(bnum) < 2171:
+                if int(bnum) < 2227:
                     try:
                         bld_obj = get_build_object(bnum=bnum)
                     except Exception as err:
@@ -503,7 +504,7 @@ def flask_error(e):
 def homepage(tlpage=None):
     if tlpage is None:
         tlpage = 1
-    check_stats = ['queue', 'completed', 'failed']
+    check_stats = ['build_queue', 'completed', 'failed']
     tl_events, all_pages = get_timeline(tlpage)
 
     if tlpage > all_pages:
@@ -515,7 +516,7 @@ def homepage(tlpage=None):
     for stat in check_stats:
         builds = getattr(status, stat)
         res = len(builds)
-        if stat != "queue":
+        if stat != "build_queue":
             builds = [x for x in builds[1000:-1] if x]
             within = []
             for bnum in builds:
@@ -620,25 +621,24 @@ def hooked():
 
 @app.route('/scheduled')
 def scheduled():
-    the_queue = []
-    if status.queue and len(status.queue) > 0:
-        for tnum in status.queue:
+    builds = []
+    if status.build_queue and len(status.build_queue) > 0:
+        for bnum in status.build_queue:
             try:
-                trans_obj = get_trans_object(tnum=tnum)
-                pkg_objs = [get_pkg_object(pkg) for pkg in trans_obj.packages]
-                the_queue.extend(pkg_objs)
+                bld_obj = get_build_object(bnum=bnum)
+                builds.append(bld_obj)
             except ValueError as err:
                 logger.error(err)
 
-    return render_template("builds/scheduled.html", user=user)
+    return render_template("builds/scheduled.html")
 
 
-@app.route('/<str:build_status>/search/<name>')
-@app.route('/<str:build_status>/search/<name>/<int:page>')
-@app.route('/<str:build_status>/<int:page>')
-@app.route('/<str:build_status>')
-def completed(build_status=None, page=None, name=None):
-    if not build_status:
+@app.route('/builds/<build_status>/search/<name>')
+@app.route('/builds/<build_status>/search/<name>/<int:page>')
+@app.route('/builds/<build_status>/<int:page>')
+@app.route('/builds/<build_status>')
+def list_builds(build_status=None, page=None, name=None):
+    if not build_status or build_status not in ['completed', 'failed']:
         abort(404)
     is_logged_in = user.is_authenticated()
     if page is None:
@@ -648,7 +648,8 @@ def completed(build_status=None, page=None, name=None):
     pagination = utils.pagination.Pagination(page, 10, all_pages)
     tpl = "builds/{0}.html".format(build_status)
 
-    return render_template(tpl, builds=builds, all_pages=all_pages, pagination=pagination)
+    return render_template(tpl, builds=builds, all_pages=all_pages, pagination=pagination,
+                           build_status=build_status)
 
 
 @app.route('/build/<int:num>')
@@ -662,9 +663,8 @@ def build_info(num):
         abort(404)
 
     cont = status.container
-    log = bld_obj.log_str
-    if not log:
-        log = 'Unavailable'
+    if not bld_obj.log_str:
+        bld_obj.log_str = 'Unavailable'
     if cont:
         container = cont[:20]
     else:
@@ -673,7 +673,7 @@ def build_info(num):
 
     return render_template("builds/build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str,
                            res=res, start=bld_obj.start_str, end=bld_obj.end_str,
-                           bnum=bld_obj.bnum, container=container, log=log, user=user)
+                           bnum=bld_obj.bnum, container=container, log=bld_obj.log_str)
 
 
 @app.route('/browse/<goto>')

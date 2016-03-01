@@ -32,8 +32,6 @@ import shutil
 import subprocess
 import glob
 
-from transaction_handler import logger
-
 
 class Singleton(type):
     _instance = None
@@ -75,14 +73,14 @@ class PacmanPackageCache(metaclass=Singleton):
             if not os.path.exists(cache_dir):
                 os.mkdir(cache_dir, mode=0o777)
             elif os.path.exists(cache_dir):
-                logger.info('Cleaning package cache...')
+                # logger.info('Cleaning package cache...')
                 already_checked = []
                 for path, dir_name, pkg_files in os.walk(cache_dir):
                     for pkg_file in pkg_files:
                         try:
                             pkg, version, rel, suffix = pkg_file.rsplit('-', 3)
                         except ValueError:
-                            logger.error("unexpected pkg: " + pkg_file)
+                            # logger.error("unexpected pkg: " + pkg_file)
                             continue
                         # Use globbing to check for multiple versions of the package.
                         all_versions = glob.glob('{0}/{1}**.xz'.format(cache_dir, pkg))
@@ -132,13 +130,13 @@ def remove(src):
         try:
             shutil.rmtree(src)
         except Exception as err:
-            logger.error(err)
+            pass
 
     elif os.path.isfile(src):
         try:
             os.remove(src)
         except Exception as err:
-            logger.error('Failed to remove {0}. Error is: {1}'.format(src, err))
+            pass
 
 
 def copy_or_symlink(src, dst):

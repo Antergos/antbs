@@ -9,10 +9,10 @@
 		<div id="bottom-wrap" class="block-flat">
 			<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
 			<div class="header">
-				<h3>Completed Builds</h3>
+				<h3>{{ build_status|capitalize() }} Builds</h3>
 			</div>
 			<div class="content">
-				{% if not completed or completed == "0" %}
+				{% if not builds or builds == "0" %}
 					None
 				{% else %}
 					<div class="col-md-3 pull-right">
@@ -43,7 +43,7 @@
 						<tbody class="no-border-y">
 
 
-						{% for build in completed|sort(attribute='bnum') %}
+						{% for build in builds|sort(attribute='bnum') %}
 							{% if user.is_authenticated() %}
 								<tr>
 									<td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>

@@ -19,6 +19,7 @@
                             <thead class="no-border">
                             <tr>
                                 <th>Pos.</th>
+								<th>Trans.</th>
                                 <th>Name</th>
                                 <th>Version</th>
                             </tr>
@@ -27,6 +28,7 @@
                                 {% for p in queue %}
                                         <tr>
                                             <td>{{ loop.index }}</td>
+											<td>{{ loop.index }}</td>
                                             <td>{{ p.pkgname }}</td>
                                             <td>{{ p.version_str }}</td>
                                         </tr>

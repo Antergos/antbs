@@ -281,7 +281,7 @@ class RedisZSet(RedisObject, set):
     def add(self, *values):
         """ Add member to set if it doesn't exist. """
         vals = []
-        for val in vals:
+        for val in values:
             vals.append(1)
             vals.append(val)
         self.db.zadd(self.full_key, *vals)

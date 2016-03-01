@@ -33,160 +33,440 @@
 					<link href="/static/css/monokai.css" rel="stylesheet">
 					<link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
 					<style type="text/css">
-						body, .cl-mcont { background-color: #EFEFEF }
+						body, .cl-mcont {
+							background-color: #EFEFEF
+						}
 
-						.cl-mcont { margin-left: 50px; margin-right: 50px; padding-top: 40px }
+						.cl-mcont {
+							margin-left: 50px;
+							margin-right: 50px;
+							padding-top: 40px
+						}
 
-						.cl-sidebar, .cl-sidebar .collapse-button { max-width: 225px; width: 225px }
+						.cl-sidebar, .cl-sidebar .collapse-button {
+							max-width: 225px;
+							width: 225px
+						}
 
-						.cl-sidebar .collapse-button .search { width: 163px }
+						.cl-sidebar .collapse-button .search {
+							width: 163px
+						}
 
-						.sidebar-logo { background: #272930 }
+						.sidebar-logo {
+							background: #272930
+						}
 
-						.sidebar-logo .logo { display: block; margin: 0 auto }
+						.sidebar-logo .logo {
+							display: block;
+							margin: 0 auto
+						}
 
-						.sidebar-logo .logo a img { display: block; position: relative; right: 8px; top: 17px; height: auto; max-width: 79%; margin: 0 auto }
+						.sidebar-logo .logo a img {
+							display: block;
+							position: relative;
+							right: 8px;
+							top: 17px;
+							height: auto;
+							max-width: 79%;
+							margin: 0 auto
+						}
 
-						.sb-collapsed .sidebar-logo { background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930 }
+						.sb-collapsed .sidebar-logo {
+							background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930
+						}
 
-						.sb-collapsed .sidebar-logo .logo { display: initial; margin: initial }
+						.sb-collapsed .sidebar-logo .logo {
+							display: initial;
+							margin: initial
+						}
 
-						.sb-collapsed .sidebar-logo .logo a img { display: none }
+						.sb-collapsed .sidebar-logo .logo a img {
+							display: none
+						}
 
-						.pre-scrollable { margin-top: 0px; border: none; white-space: pre-wrap; }
+						.pre-scrollable {
+							margin-top: 0px;
+							border: none;
+							white-space: pre-wrap;
+						}
 
-						.block .header h3 { margin: 3px 0; font-weight: 400; font-family: "Raleway", Helvetica, sans-serif }
+						.block .header h3 {
+							margin: 3px 0;
+							font-weight: 400;
+							font-family: "Raleway", Helvetica, sans-serif
+						}
 
-						.hfloat { float: left }
+						.hfloat {
+							float: left
+						}
 
-						h3.hfloat { width: 240px }
+						h3.hfloat {
+							width: 240px
+						}
 
-						.hclear { clear: right }
+						.hclear {
+							clear: right
+						}
 
-						.sidebar-logo { padding: 0px 20px }
+						.sidebar-logo {
+							padding: 0px 20px
+						}
 
-						.sb-collapsed .sidebar-logo { background: url("/static/images/overlay.png") no-repeat scroll 12px 0px #272930; background-size: 62%; }
+						.sb-collapsed .sidebar-logo {
+							background: url("/static/images/overlay.png") no-repeat scroll 12px 0px #272930;
+							background-size: 62%;
+						}
 
-						.sb-collapsed .logo:after { display: block; position: absolute; right: 0; top: 8px; height: 35px; width: 10px; background: #272930; content: ""; z-index: 99999; }
+						.sb-collapsed .logo:after {
+							display: block;
+							position: absolute;
+							right: 0;
+							top: 8px;
+							height: 35px;
+							width: 10px;
+							background: #272930;
+							content: "";
+							z-index: 99999;
+						}
 
-						.profile_menu .dropdown-toggle { padding: 22px }
+						.profile_menu .dropdown-toggle {
+							padding: 22px
+						}
 
-						#build_now_form { display: inline-block }
+						#build_now_form {
+							display: inline-block
+						}
 
-						#status_bar { display: none }
+						#status_bar {
+							display: none
+						}
 
-						#status_bar span { float: left }
+						#status_bar span {
+							float: left
+						}
 
-						#cl-wrapper .cl-sidebar .side-user { font-size: 13px }
+						#cl-wrapper .cl-sidebar .side-user {
+							font-size: 13px
+						}
 
-						.fd-tile .content h1 { font-size: 45px }
+						.fd-tile .content h1 {
+							font-size: 45px
+						}
 
-						#status_bar_pre { float: left; margin-bottom: 0px; margin-top: 6px; padding-bottom: 1px; padding-top: 4px }
+						#status_bar_pre {
+							float: left;
+							margin-bottom: 0px;
+							margin-top: 6px;
+							padding-bottom: 1px;
+							padding-top: 4px
+						}
 
 						@media only screen and (min-width: 1200px) and (max-width: 1366px) {
-							.fd-tile .content p { font-size: 9px; font-weight: 600 }
+							.fd-tile .content p {
+								font-size: 9px;
+								font-weight: 600
+							}
 						}
 
 						@media only screen and (max-width: 568px) {
-							.cl-sidebar { max-width: 100% }
+							.cl-sidebar {
+								max-width: 100%
+							}
 						}
 
-						ul.timeline { margin-bottom: 0px; font-size: 14px }
+						ul.timeline {
+							margin-bottom: 0px;
+							font-size: 14px
+						}
 
-						ul.timeline > li > .fa-rocket { background: #7761A7 }
+						ul.timeline > li > .fa-rocket {
+							background: #7761A7
+						}
 
-						ul.timeline > li > .fa-times { background: #EA6153 }
+						ul.timeline > li > .fa-times {
+							background: #EA6153
+						}
 
-						ul.timeline > li > .fa-check { background: #2CC36B }
+						ul.timeline > li > .fa-check {
+							background: #2CC36B
+						}
 
-						ul.timeline > li .content { position: relative; margin-left: 75px; padding: 12px 10px; background: #FFF; border: 1px solid #D0D0D0; border-radius: 3px; line-height: 15px; }
+						ul.timeline > li .content {
+							position: relative;
+							margin-left: 75px;
+							padding: 12px 10px;
+							background: #FFF;
+							border: 1px solid #D0D0D0;
+							border-radius: 3px;
+							line-height: 15px;
+						}
 
-						ul.timeline > li .content:before { position: absolute; left: -6px; top: 14px; height: 10px; width: 10px; border-bottom: 1px solid #D0D0D0; border-left: 1px solid #D0D0D0; background: #FFF; content: ""; }
+						ul.timeline > li .content:before {
+							position: absolute;
+							left: -6px;
+							top: 14px;
+							height: 10px;
+							width: 10px;
+							border-bottom: 1px solid #D0D0D0;
+							border-left: 1px solid #D0D0D0;
+							background: #FFF;
+							content: "";
+						}
 
-						ul.timeline > li .content p { padding-bottom: 5px; margin: 0 }
+						ul.timeline > li .content p {
+							padding-bottom: 5px;
+							margin: 0
+						}
 
-						ul.timeline > li > .date { display: block; position: absolute; top: 49px; padding: 0 5px; color: #000; font-size: 11px; text-align: center; background: #D0D0D0; border: 1px solid #D0D0D0; border-radius: 1px; line-height: 19px; text-shadow: 0 1px 0 #fafafa; }
+						ul.timeline > li > .date {
+							display: block;
+							position: absolute;
+							top: 49px;
+							padding: 0 5px;
+							color: #000;
+							font-size: 11px;
+							text-align: center;
+							background: #D0D0D0;
+							border: 1px solid #D0D0D0;
+							border-radius: 1px;
+							line-height: 19px;
+							text-shadow: 0 1px 0 #fafafa;
+						}
 
-						ul.timeline:before { background-color: #D0D0D0 }
+						ul.timeline:before {
+							background-color: #D0D0D0
+						}
 
-						ul.timeline > li > .date { width: 69px; left: -10px; }
+						ul.timeline > li > .date {
+							width: 69px;
+							left: -10px;
+						}
 
-						ul.pagination { margin: 0 auto }
+						ul.pagination {
+							margin: 0 auto
+						}
 
-						.timeline { text-align: left }
+						.timeline {
+							text-align: left
+						}
 
-						.tlwrap { text-align: center }
+						.tlwrap {
+							text-align: center
+						}
 
-						.tlwrap h4 { text-align: left }
+						.tlwrap h4 {
+							text-align: left
+						}
 
-						ul.custom { float: right !important }
+						ul.custom {
+							float: right !important
+						}
 
-						ul.hook-pkg-list { margin-bottom: 20px; margin-top: 20px }
+						ul.hook-pkg-list {
+							margin-bottom: 20px;
+							margin-top: 20px
+						}
 
-						ul.hook-pkg-list li { font-size: 14px; list-style-type: none }
+						ul.hook-pkg-list li {
+							font-size: 14px;
+							list-style-type: none
+						}
 
-						ul.hook-pkg-list li:before { display: inline-block; margin-right: 8px; font-size: 10px; font-weight: normal; font-style: normal; -moz-osx-font-smoothing: grayscale; -webkit-font-smoothing: antialiased; content: "\f187"; font-family: FontAwesome; line-height: 1; }
+						ul.hook-pkg-list li:before {
+							display: inline-block;
+							margin-right: 8px;
+							font-size: 10px;
+							font-weight: normal;
+							font-style: normal;
+							-moz-osx-font-smoothing: grayscale;
+							-webkit-font-smoothing: antialiased;
+							content: "\f187";
+							font-family: FontAwesome;
+							line-height: 1;
+						}
 
-						.phab { position: absolute; top: 2px; height: 40px; width: 40px; background-color: #21415B !important; background-image: url('/static/images/phab.png') !important; background-position: center center !important; background-repeat: no-repeat !important; background-size: 22px 14px !important; }
+						.phab {
+							position: absolute;
+							top: 2px;
+							height: 40px;
+							width: 40px;
+							background-color: #21415B !important;
+							background-image: url('/static/images/phab.png') !important;
+							background-position: center center !important;
+							background-repeat: no-repeat !important;
+							background-size: 22px 14px !important;
+						}
 
-						.fa-github { background-color: #1f1f1f !important; font-size: 19px !important }
+						.fa-github {
+							background-color: #1f1f1f !important;
+							font-size: 19px !important
+						}
 
-						.fa-github:before { position: relative; bottom: 2px; right: 1px; content: "\f09b" }
+						.fa-github:before {
+							position: relative;
+							bottom: 2px;
+							right: 1px;
+							content: "\f09b"
+						}
 
-						.profile-info .avatar { padding-top: 10px; text-align: right }
+						.profile-info .avatar {
+							padding-top: 10px;
+							text-align: right
+						}
 
-						.profile-info .avatar img { max-height: 64px; max-width: 64px }
+						.profile-info .avatar img {
+							max-height: 64px;
+							max-width: 64px
+						}
 
-						.block-flat .actions a { color: rgba(0, 0, 0, 0.7) }
+						.block-flat .actions a {
+							color: rgba(0, 0, 0, 0.7)
+						}
 
-						.block-flat .actions a:hover { color: #fff }
+						.block-flat .actions a:hover {
+							color: #fff
+						}
 
-						b { font-weight: 600 }
+						b {
+							font-weight: 600
+						}
 
-						.navbar-nav > li.button:first-child .dropdown-menu { max-width: 300px; min-width: 280px; padding: 0 }
+						.navbar-nav > li.button:first-child .dropdown-menu {
+							max-width: 300px;
+							min-width: 280px;
+							padding: 0
+						}
 
-						.navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+						.navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
+							max-width: 280px;
+							overflow: hidden;
+							text-overflow: ellipsis;
+							white-space: nowrap;
+						}
 
-						.gritter-item-wrapper.clean.error .gritter-close { background: #ea6153 }
+						.gritter-item-wrapper.clean.error .gritter-close {
+							background: #ea6153
+						}
 
-						#gritter-notice-wrapper { max-width: 100%; width: 460px }
+						#gritter-notice-wrapper {
+							max-width: 100%;
+							width: 460px
+						}
 
-						.gritter-without-image, .gritter-with-image { max-width: 100%; width: 450px; padding-left: 7px; }
+						.gritter-without-image, .gritter-with-image {
+							max-width: 100%;
+							width: 450px;
+							padding-left: 7px;
+						}
 
-						.nano > .nano-pane { width: 7px; border-radius: 0px }
+						.nano > .nano-pane {
+							width: 7px;
+							border-radius: 0px
+						}
 
-						.dataTables_filter { display: none }
+						.dataTables_filter {
+							display: none
+						}
 
-						.cl-sidebar { width: 225px; max-width: 225px; position: fixed; left: auto; padding-top: 10px; }
+						.cl-sidebar {
+							width: 225px;
+							max-width: 225px;
+							position: fixed;
+							left: auto;
+							padding-top: 10px;
+						}
 
-						#cl-wrapper, body { background: #272930; }
-						#pcont.container-fluid { padding-left: 225px; background: #272930;}
+						#cl-wrapper, body {
+							background: #272930;
+						}
 
-						#main { background: #EFEFEF;}
+						#pcont.container-fluid {
+							padding-left: 225px;
+							background: #272930;
+						}
 
-						.sb-collapsed #pcont.container-fluid { padding-left: 70px; }
+						#main {
+							background: #EFEFEF;
+						}
 
-						.cl-sidebar .collapse-button { padding: 7px 9px;}
+						.sb-collapsed #pcont.container-fluid {
+							padding-left: 70px;
+						}
 
-						.cl-sidebar .cl-navblock { padding-bottom: 246px;}
+						.cl-sidebar .collapse-button {
+							padding: 7px 9px;
+						}
 
-						#top-bar {width: 100%; height: 31px; background: #272930; overflow: hidden;}
+						.cl-sidebar .cl-navblock {
+							padding-bottom: 246px;
+						}
 
-						#top-bar > div:first-child {width: 225px; height: 31px; float: left; background: #272930;}
-						#top-bar > div:last-child {padding: 0px 10px; float:left; height: 31px; clear: right; background: transparent;}
+						#top-bar {
+							width: 100%;
+							height: 31px;
+							background: #272930;
+							overflow: hidden;
+						}
 
-						.sb-collapsed #top-bar > div:first-child { width: 85px; }
+						#top-bar > div:first-child {
+							width: 225px;
+							height: 31px;
+							float: left;
+							background: #272930;
+						}
 
-						.sb-collapsed #top-bar > div:last-child .navbar-nav.navbar-right:last-child {margin-left:140px;}
-						#top-bar .navbar-nav.navbar-right:last-child { margin-right: 27px; }
-						#top-bar .navbar-nav > li > a { font-size: 13.5px; color: #ffffff; padding: 5.5px 12px; -webkit-font-smoothing: subpixel-antialiased; }
+						#top-bar > div:last-child {
+							padding: 0px 10px;
+							float: left;
+							height: 31px;
+							clear: right;
+							background: transparent;
+						}
 
-						#top-bar .navbar-nav > li > a:hover, #top-bar .navbar-nav > li > a:focus {background: #272930; color: #2EA3F2;}
-						.navbar {background-color: #ffffff;}
-						#et-info-email {margin-left: 8px; font-size: 13.5px; }
+						.sb-collapsed #top-bar > div:first-child {
+							width: 85px;
+						}
 
-						.cl-mcont { padding-left: 50px; padding-right: 50px; margin-right: 0px; margin-left: 0px; box-sizing: border-box; }
-						.et-social-icon a, .et-social-icon { font-size: 15px !important; }
+						.sb-collapsed #top-bar > div:last-child .navbar-nav.navbar-right:last-child {
+							margin-left: 140px;
+						}
+
+						#top-bar .navbar-nav.navbar-right:last-child {
+							margin-right: 27px;
+						}
+
+						#top-bar .navbar-nav > li > a {
+							font-size: 13.5px;
+							color: #ffffff;
+							padding: 5.5px 12px;
+							-webkit-font-smoothing: subpixel-antialiased;
+						}
+
+						#top-bar .navbar-nav > li > a:hover, #top-bar .navbar-nav > li > a:focus {
+							background: #272930;
+							color: #2EA3F2;
+						}
+
+						.navbar {
+							background-color: #ffffff;
+						}
+
+						#et-info-email {
+							margin-left: 8px;
+							font-size: 13.5px;
+						}
+
+						.cl-mcont {
+							padding-left: 50px;
+							padding-right: 50px;
+							margin-right: 0px;
+							margin-left: 0px;
+							box-sizing: border-box;
+						}
+
+						.et-social-icon a, .et-social-icon {
+							font-size: 15px !important;
+						}
 
 					</style>
 				{%- endblock styles %}
@@ -198,37 +478,38 @@
 				<div></div>
 				<div id="top-header" class="">
 					<div class="container-fluid">
-							<ul class="nav navbar-nav not-nav">
-								<li><a href="mailto:info@antergos.com"><span class="et-social-icon fa fa-envelope"></span><span id="et-info-email">info@antergos.com</span></a></li>
-								<li class="et-social-icon et-social-facebook">
-									<a href="//www.facebook.com/antergos" class="fa fa-twitter">
-									</a>
-								</li>
-								<li class="et-social-icon et-social-twitter">
-									<a href="//www.twitter.com/antergos" class="fa fa-facebook">
-									</a>
-								</li>
-								<li class="et-social-icon et-social-google-plus">
-									<a href="//plus.google.com/+Antergos" class="fa fa-google-plus">
-									</a>
-								</li>
-								<li class="et-social-icon et-social-rss">
-									<a href="http://antergos.com/feed" class="fa fa-rss">
-									</a>
-								</li>
-							</ul>
+						<ul class="nav navbar-nav not-nav">
+							<li>
+								<a href="mailto:info@antergos.com"><span class="et-social-icon fa fa-envelope"></span><span id="et-info-email">info@antergos.com</span></a>
+							</li>
+							<li class="et-social-icon et-social-facebook">
+								<a href="//www.facebook.com/antergos" class="fa fa-twitter">
+								</a>
+							</li>
+							<li class="et-social-icon et-social-twitter">
+								<a href="//www.twitter.com/antergos" class="fa fa-facebook">
+								</a>
+							</li>
+							<li class="et-social-icon et-social-google-plus">
+								<a href="//plus.google.com/+Antergos" class="fa fa-google-plus">
+								</a>
+							</li>
+							<li class="et-social-icon et-social-rss">
+								<a href="http://antergos.com/feed" class="fa fa-rss">
+								</a>
+							</li>
+						</ul>
 
-							<ul id="et-secondary-nav" class="nav navbar-nav navbar-right">
-								<li class="">
-									<a href="https://antergos.com/">Main</a></li>
-								<li class="">
-									<a href="http://forum.antergos.com/">Forum</a></li>
-								<li class="">
-									<a href="https://antergos.com/wiki">Wiki</a></li>
-								<li class="">
-									<a target="_blank" href="//github.com/antergos">Bugs</a></li>
-							</ul>
-						</div>
+						<ul id="et-secondary-nav" class="nav navbar-nav navbar-right">
+							<li class="">
+								<a href="https://antergos.com/">Main</a></li>
+							<li class="">
+								<a href="http://forum.antergos.com/">Forum</a></li>
+							<li class="">
+								<a href="https://antergos.com/wiki">Wiki</a></li>
+							<li class="">
+								<a target="_blank" href="//github.com/antergos">Bugs</a></li>
+						</ul>
 					</div>
 				</div>
 			</div>
@@ -265,8 +546,8 @@
 											<li {% if request.path == "/scheduled" %}class="active"{% endif %}>
 												<a href="/scheduled"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
 											</li>
-											<li {% if request.path == "/completed" or res == "completed" %}class="active"{% endif %}>
-												<a href="/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
+											<li {% if request.path == "/builds/completed" or res == "completed" %}class="active"{% endif %}>
+												<a href="/builds/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
 											</li>
 											<li
 												{% if request.path == "/failed" or res == "failed" %} class="active"{% endif %}>
@@ -376,7 +657,8 @@
 																	{% for build in rev_pending|sort(attribute='bnum') %}
 																		<li>
 																			<a href="/pkg_review"><i class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
-																				{{ build.version_str }} <span class="date">{{ build.end_str }}</span></a>
+																				{{ build.version_str }}
+																				<span class="date">{{ build.end_str }}</span></a>
 																		</li>
 
 																	{% endfor %}
@@ -500,35 +782,35 @@
 				<script src="/static/js/jquery.js"></script>
 				<script src="/static/js/jquery.cookie/jquery.cookie.js"></script>
 				<script src="/static/js/jquery.pushmenu/js/jPushMenu.js"></script>
-				   <script>
-					   (function($) {
-						   $(document).ready(function() {
-							   setTimeout(function() {
-								   if ( $( '#cl-wrapper' ).hasClass( 'sb-collapsed' ) ) {
-									   $('body' ).addClass('sb-collapsed');
-									   $( '#top-bar div:last-child' ).width( $( window ).width() - 105 );
-								   } else {
-									   $( 'body' ).removeClass( 'sb-collapsed' );
-									   $( '#top-bar div:last-child' ).width( $( window ).width() - 245 );
-								   }
-							   }, 800);
-						   });
-						   $( '#sidebar-collapse' ).click( function() {
-							   setTimeout( function() {
-								   if ( $( '#cl-wrapper' ).hasClass( 'sb-collapsed' ) ) {
-									   $( 'body' ).addClass( 'sb-collapsed' );
-									   $( '#top-bar div:last-child' ).width( $( window ).width() - 105 );
-								   } else {
-									   $( 'body' ).removeClass( 'sb-collapsed' );
-									   $( '#top-bar div:last-child' ).width( $( window ).width() - 245 );
-								   }
-							   }, 200 );
-						   } );
-						   $(window ).load(function() {
-							   $('#main').height($('#main' ).parent().height());
-						   })
-					   })(jQuery);
-				   </script>
+				<script>
+					(function ($) {
+						$(document).ready(function () {
+							setTimeout(function () {
+								if ($('#cl-wrapper').hasClass('sb-collapsed')) {
+									$('body').addClass('sb-collapsed');
+									$('#top-bar div:last-child').width($(window).width() - 105);
+								} else {
+									$('body').removeClass('sb-collapsed');
+									$('#top-bar div:last-child').width($(window).width() - 245);
+								}
+							}, 800);
+						});
+						$('#sidebar-collapse').click(function () {
+							setTimeout(function () {
+								if ($('#cl-wrapper').hasClass('sb-collapsed')) {
+									$('body').addClass('sb-collapsed');
+									$('#top-bar div:last-child').width($(window).width() - 105);
+								} else {
+									$('body').removeClass('sb-collapsed');
+									$('#top-bar div:last-child').width($(window).width() - 245);
+								}
+							}, 200);
+						});
+						$(window).load(function () {
+							$('#main').height($('#main').parent().height());
+						})
+					})(jQuery);
+				</script>
 
 				   <!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
 
@@ -548,128 +830,128 @@
 				<script type="text/javascript" src="/static/js/jquery.datatables/media/js/num-html.js"></script>
 				<script type="text/javascript">
 					//sets up numeric sorting of links
-					jQuery( document ).ready( function() {
+					jQuery(document).ready(function () {
 
 						{% if user.is_authenticated() and 'repo_pkgs' in request.path %}
-							$( '.content' ).on( 'click', '.repo_actions a', function( e ) {
+							$('.content').on('click', '.repo_actions a', function (e) {
 								e.preventDefault();
-								jQuery( this ).addClass( 'clicked' );
+								jQuery(this).addClass('clicked');
 								var data = {
-									pkg: jQuery( this ).attr( 'data-pkg' ),
-									result: jQuery( this ).attr( 'id' ),
+									pkg: jQuery(this).attr('data-pkg'),
+									result: jQuery(this).attr('id'),
 									dev: '{{ user.username }}'
 								};
-								jQuery.ajax( {
+								jQuery.ajax({
 									type: 'POST',
 									url: '/api/ajax',
-									data: JSON.stringify( data, null, '\t' ),
+									data: JSON.stringify(data, null, '\t'),
 									contentType: 'application/json;charset=UTF-8',
 									dataType: 'json',
-									success: function( result ) {
-										console.log( result );
-										var res = $( '.clicked' ).attr( 'id' ) == 'passed' ? 'span.passed' : 'span.failed';
-										if ( result[ 'msg' ] == 'ok' ) {
-											jQuery( '.clicked' ).parents( 'tr' ).remove();
+									success: function (result) {
+										console.log(result);
+										var res = $('.clicked').attr('id') == 'passed' ? 'span.passed' : 'span.failed';
+										if (result['msg'] == 'ok') {
+											jQuery('.clicked').parents('tr').remove();
 										} else {
-											alert( 'Unable to save result. Server Error Msg:\n' + result[ 'msg' ] );
+											alert('Unable to save result. Server Error Msg:\n' + result['msg']);
 										}
 									}
 
-								} );
-							} );
+								});
+							});
 						{% endif %}
 
-						jQuery( '#do_iso_release_confirm' ).click( function() {
-							$.getJSON( '/api/ajax?do_iso_release=True', function( data ) {
-								console.log( data );
-							} );
-						} );
-						jQuery( '#reset_build_queue' ).click( function() {
-							var $icon = $( this ).find( 'i' );
-							$icon.addClass( 'fa-spin' );
-							$.getJSON( '/api/ajax?reset_build_queue=True', function( data ) {
-								console.log( data );
-								setTimeout( function( $the_icon ) {
-									$the_icon.removeClass( 'fa-spin' );
-								}, 2000, $icon );
-							} );
-						} );
+						jQuery('#do_iso_release_confirm').click(function () {
+							$.getJSON('/api/ajax?do_iso_release=True', function (data) {
+								console.log(data);
+							});
+						});
+						jQuery('#reset_build_queue').click(function () {
+							var $icon = $(this).find('i');
+							$icon.addClass('fa-spin');
+							$.getJSON('/api/ajax?reset_build_queue=True', function (data) {
+								console.log(data);
+								setTimeout(function ($the_icon) {
+									$the_icon.removeClass('fa-spin');
+								}, 2000, $icon);
+							});
+						});
 
 						{% with messages = get_flashed_messages(with_categories=true) %}
 							{% if messages %}
 								{% for category, message in messages %}
-									setTimeout( function() {
-										$.gritter.add( {
+									setTimeout(function () {
+										$.gritter.add({
 											title: '{{ category|upper() }}',
 											text: '{{ message }}',
 											class_name: "clean{% if category == 'error' %}error{% else %}'info'{% endif %}{{ category }}",
 											sticky: "{% if category == 'error' %}true{% else %}false{% endif %}"
-										} );
-									}, {{ loop.index * 500 }} );
+										});
+									}, {{ loop.index * 500 }});
 								{% endfor %}
 							{% endif %}
 						{% endwith %}
 
 
-						jQuery( '#main pre' ).addClass( 'pre-scrollable' );
-						jQuery( '.not-idle' ).show();
-						var sse = new EventSource( '/get_status' );
-						sse.addEventListener( "status", function( message ) {
-							var current = jQuery( '#status_bar_pre' ).text();
-							if ( message.data !== current ) {
-								jQuery( '.idle' ).addClass( 'not-idle' ).removeClass( 'idle' );
-								jQuery( '.fa-dot-circle-o' ).addClass( 'fa-spinner fa-spin' ).removeClass( 'fa-dot-circle-o' );
-								jQuery( '.fa-spinner' ).addClass( 'fa-spin' );
-								jQuery( '#status_bar' ).show();
-								jQuery( '#status_bar_pre' ).text( message.data );
-								current = jQuery( '#status_bar_pre' ).text();
+						jQuery('#main pre').addClass('pre-scrollable');
+						jQuery('.not-idle').show();
+						var sse = new EventSource('/get_status');
+						sse.addEventListener("status", function (message) {
+							var current = jQuery('#status_bar_pre').text();
+							if (message.data !== current) {
+								jQuery('.idle').addClass('not-idle').removeClass('idle');
+								jQuery('.fa-dot-circle-o').addClass('fa-spinner fa-spin').removeClass('fa-dot-circle-o');
+								jQuery('.fa-spinner').addClass('fa-spin');
+								jQuery('#status_bar').show();
+								jQuery('#status_bar_pre').text(message.data);
+								current = jQuery('#status_bar_pre').text();
 							}
-							if ( message.data == 'Idle' || current == 'Idle' ) {
+							if (message.data == 'Idle' || current == 'Idle') {
 
-								jQuery( '.status' ).find( 'i' ).removeClass( 'fa-spinner fa-spin' ).addClass( 'fa-dot-circle-o' );
-								jQuery( '.fa-spin' ).removeClass( 'fa-spin' );
-								jQuery( '#status_bar' ).hide();
+								jQuery('.status').find('i').removeClass('fa-spinner fa-spin').addClass('fa-dot-circle-o');
+								jQuery('.fa-spin').removeClass('fa-spin');
+								jQuery('#status_bar').hide();
 
 							}
-						} );
+						});
 
-					} );
+					});
 
-					jQuery( window ).load( function() {
-							jQuery( '[data-toggle="tooltip"]' ).tooltip();
+					jQuery(window).load(function () {
+							jQuery('[data-toggle="tooltip"]').tooltip();
 
-							jQuery( '.loading' ).fadeIn();
-							if ( jQuery( 'table' ).length && ! jQuery( '#noDt' ).length ) {
+							jQuery('.loading').fadeIn();
+							if (jQuery('table').length && !jQuery('#noDt').length) {
 
 								{% if 'repo_packages' not in request.path %}
-									jQuery.fn.dataTableExt.oSort[ 'num-html-asc' ] = function( a, b ) {
-										var x = a.replace( /<.*?>/g, "" );
-										var y = b.replace( /<.*?>/g, "" );
-										x = parseFloat( x );
-										y = parseFloat( y );
-										return ((x < y || isNaN( y ) ) ? - 1 : ((x > y || isNaN( x )) ? 1 : 0));
+									jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
+										var x = a.replace(/<.*?>/g, "");
+										var y = b.replace(/<.*?>/g, "");
+										x = parseFloat(x);
+										y = parseFloat(y);
+										return ((x < y || isNaN(y) ) ? -1 : ((x > y || isNaN(x)) ? 1 : 0));
 									};
 
-									jQuery.fn.dataTableExt.oSort[ 'num-html-desc' ] = function( a, b ) {
-										var x = a.replace( /<.*?>/g, "" );
-										var y = b.replace( /<.*?>/g, "" );
-										x = parseFloat( x );
-										y = parseFloat( y );
-										return ((x < y || isNaN( x )) ? 1 : ((x > y || isNaN( y ) ) ? - 1 : 0));
+									jQuery.fn.dataTableExt.oSort['num-html-desc'] = function (a, b) {
+										var x = a.replace(/<.*?>/g, "");
+										var y = b.replace(/<.*?>/g, "");
+										x = parseFloat(x);
+										y = parseFloat(y);
+										return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
 									};
 
-									jQuery( 'table' ).not( '#issuetable' ).on( 'init.dt', function( e, settings, data ) {
-										setTimeout( function() {
-											jQuery( '.loading' ).fadeOut();
-										}, 750 )
-									} ).dataTable( {
+									jQuery('table').not('#issuetable').on('init.dt', function (e, settings, data) {
+										setTimeout(function () {
+											jQuery('.loading').fadeOut();
+										}, 750)
+									}).dataTable({
 										"aoColumns": [
-											{ "sType": "num-html" },
+											{"sType": "num-html"},
 											null,
 											null,
 											null,{% if 'repo_packages' in request.path %}
-											null,
-											null,
+												null,
+												null,
 											{% endif %}
 											null{% if '/completed' in request.path or '/pkg_review' in request.path %},
 											null,
@@ -682,7 +964,7 @@
 												1, "asc"{% else %}0, "desc"{% endif %}]
 										]
 
-									} );
+									});
 								{% endif %}
 								{% if 'repo_packages' in request.path %}
 									var pkgs = window.antbs.pkgs,
@@ -700,42 +982,42 @@
 											date: '<i class="fa fa-calendar"></i> @@@',
 											dev: '<i class="fa fa-user"></i> @@@'
 										};
-									for ( var i = 0, l = pkgs.length; i < l; i ++ ) {
-										pkgs[ i ].pkg_id = tpl_map.pkg_id.replace( /@@@/g, pkgs[ i ].pkg_id );
-										pkgs[ i ].pkgname = tpl_map.pkg_id.replace( /@@@/g, pkgs[ i ].pkgname );
-										pkgs[ i ].manage = tpl_map.manage.replace( /@@@/g, pkgs[ i ]._build.bnum );
-										pkgs[ i ]._build.bnum = tpl_map.bnum.replace( /@@@/g, pkgs[ i ]._build.bnum );
-										pkgs[ i ]._build.review_dev = tpl_map.dev.replace( /@@@/g, pkgs[ i ]._build.review_dev );
-										pkgs[ i ]._build.review_date = tpl_map.date.replace( /@@@/g, pkgs[ i ]._build.review_date );
+									for (var i = 0, l = pkgs.length; i < l; i++) {
+										pkgs[i].pkg_id = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkg_id);
+										pkgs[i].pkgname = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkgname);
+										pkgs[i].manage = tpl_map.manage.replace(/@@@/g, pkgs[i]._build.bnum);
+										pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, pkgs[i]._build.bnum);
+										pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
+										pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
 									}
-									jQuery( 'table' ).dataTable( {
+									jQuery('table').dataTable({
 										data: window.antbs.pkgs,
 										"aoColumns": [
-											{ "mData": "pkg_id" },
-											{ "mData": "pkgname", "sWidth": "270px" },
-											{ "mData": "version_str" },
-											{ "mData": "_build.bnum" },
-											{ "mData": "_build.review_dev" },
-											{ "mData": "_build.review_date" }{% if user.is_authenticated() %},
-												{ "mData": "manage" }{% endif %}
+											{"mData": "pkg_id"},
+											{"mData": "pkgname", "sWidth": "270px"},
+											{"mData": "version_str"},
+											{"mData": "_build.bnum"},
+											{"mData": "_build.review_dev"},
+											{"mData": "_build.review_date"}{% if user.is_authenticated() %},
+												{"mData": "manage"}{% endif %}
 										],
 										"aaSorting": [
-											[ 1, "asc" ]
+											[1, "asc"]
 										],
-										"fnInitComplete": function() {
-											jQuery( '.loading' ).fadeOut();
+										"fnInitComplete": function () {
+											jQuery('.loading').fadeOut();
 										}
 
-									} );
+									});
 								{% endif %}
-								jQuery( '#issuetable' ).bind( 'issuesReady', function() {
-									jQuery( '#issuetable' ).on( 'init.dt', function( e, settings, data ) {
-										setTimeout( function() {
-											jQuery( '.loading' ).fadeOut();
-										}, 750 )
-									} ).dataTable( {
+								jQuery('#issuetable').bind('issuesReady', function () {
+									jQuery('#issuetable').on('init.dt', function (e, settings, data) {
+										setTimeout(function () {
+											jQuery('.loading').fadeOut();
+										}, 750)
+									}).dataTable({
 										"aoColumns": [
-											{ "sType": "num-html" },
+											{"sType": "num-html"},
 											null,
 											null,
 											null,
@@ -746,14 +1028,14 @@
 											null{% endif %}
 										],
 										"aaSorting": [
-											[ 0, "desc" ]
+											[0, "desc"]
 										]
 
-									} );
+									});
 
-								} );
-								{% if 'repo_packages' not in request.path %}if (! jQuery( '#issuetable' ).length) {
-									jQuery( '#DataTables_Table_0_paginate' ).replaceWith( jQuery( 'ul.pagination.custom' ) );
+								});
+								{% if 'repo_packages' not in request.path %}if (!jQuery('#issuetable').length) {
+									jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
 								}{% endif %}
 							}
 						}
