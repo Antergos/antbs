@@ -53,12 +53,6 @@ API_KEY = db.get('antbs:misc:antergos.com_api_key')
 
 
 class ISOUtility:
-    """
-
-    :param pkg_obj:
-    :param bnum:
-    :raise AttributeError:
-    """
 
     def __init__(self, pkg_obj=None):
         if not pkg_obj:
@@ -126,7 +120,6 @@ class ISOUtility:
     @staticmethod
     def checksum_md5(filename):
         """ Generate and return md5 checksum of a file. """
-
         md5 = hashlib.md5()
         with open(filename, 'rb') as f:
             for chunk in iter(lambda: f.read(8192), b''):
@@ -135,7 +128,6 @@ class ISOUtility:
 
     def generate_checksums(self):
         """ Write checksum to a file """
-
         md5_path = self.file_path + '.md5'
         md5_sum = self.checksum_md5(self.file_path)
         self.md5 = md5_sum
@@ -147,7 +139,6 @@ class ISOUtility:
 
     def sign_with_gnupg(self):
         """ Create a detached signature using GNUPG. """
-
         sign.batch_sign([self.file_path], is_iso=True)
 
 
@@ -162,6 +153,7 @@ class WordPressBridge:
         self.auth = auth
         logger.info('WordPressBridge Object Initialized')
         self.success = False
+        self.dist = 'antergos'
 
     def add_new_iso_version(self, iso_pkg_obj=None):
         if iso_pkg_obj is None:
@@ -172,12 +164,11 @@ class WordPressBridge:
             logger.info('adding_new_iso_version: %s', iso_obj)
 
         pid = self.post_id_map[iso_obj.pkgname]
-        domain = 'antergos'
-        query = 'json=get_nonce&controller=' + domain + '&method=handle_request'
-        post_url = 'https://' + domain + '.com/?' + query
+        query = 'json=get_nonce&controller=' + self.dist + '&method=handle_request'
+        post_url = 'https://' + self.dist + '.com/?' + query
         session = requests.Session()
-        session.mount('http://', SourceAddressAdapter(('173.230.141.187', 0)))
-        session.mount('https://', SourceAddressAdapter(('173.230.141.187', 0)))
+        session.mount('http://', SourceAddressAdapter((status.request_from, 0)))
+        session.mount('https://', SourceAddressAdapter((status.request_from, 0)))
         session.auth = self.auth
         try:
             req = session.get(post_url)
@@ -188,8 +179,8 @@ class WordPressBridge:
 
             if req.get('nonce', False):
                 nonce = req.get('nonce')
-                query = 'json=' + domain + '.handle_request&nonce='
-                post_url = 'https://' + domain + '.com/?' + query + nonce + '&api_key=' + API_KEY
+                query = 'json=' + self.dist + '.handle_request&nonce='
+                post_url = 'https://' + self.dist + '.com/?' + query + nonce + '&api_key=' + API_KEY
                 req = session.post(post_url, data=dict(pid=pid, url=iso_obj.iso_url,
                                                        md5=iso_obj.iso_md5, version=iso_obj.pkgver))
                 req.raise_for_status()
@@ -214,8 +205,8 @@ def clean_up_after_release(version):
     for f in all_files:
         files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
         if version not in f and len(files) > 16:
-            moved.append(os.path.basename(f))
             shutil.move(f, '/opt/old-iso-images')
+            moved.append(os.path.basename(f))
 
     old_imgs = '/opt/old-iso-images'
     all_old_files = [os.path.join(old_imgs, f) for f in os.listdir(old_imgs)]
@@ -234,7 +225,8 @@ def iso_release_job():
 
     status.current_status = 'Starting ISO Release Job...'
     iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
-    version = db = None
+    version = None
+
     for name in iso_names:
         try:
             pkg_obj = package.get_pkg_object(name=name)
@@ -248,8 +240,6 @@ def iso_release_job():
 
             if version is None:
                 version = iso.version
-            if db is None:
-                db = pkg_obj.db
 
             status.iso_pkgs.add(pkg_obj.name)
 
@@ -263,7 +253,7 @@ def iso_release_job():
 
     if saved_status and not status.idle:
         status.current_status = saved_status
-    elif 'Starting ISO Release Job...' == status.current_status:
+    else:
         status.idle = True
         status.current_status = 'Idle.'
 

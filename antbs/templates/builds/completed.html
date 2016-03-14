@@ -4,7 +4,6 @@
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
-
 	<div class="col-md-12">
 		<div id="bottom-wrap" class="block-flat">
 			<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
@@ -12,24 +11,24 @@
 				<h3>{{ build_status|capitalize() }} Builds</h3>
 			</div>
 			<div class="content">
-				{% if not builds or builds == "0" %}
+				{% if not builds %}
 					None
 				{% else %}
 					<div class="col-md-3 pull-right">
 						<div class="form-group">
 							<div class="input-group">
-								<input id="search_input" type="text" class="form-control">
-                                            <span class="input-group-btn">
-                                            <button id="search_btn" class="btn btn-primary" type="button">Search!
-											</button>
-                                            </span>
+								<label for="search_input" class="sr-only">Search</label>
+								<input id="search_input" type="text" class="form-control"/>
+								<span class="input-group-btn">
+									<button id="search_btn" class="btn btn-primary" type="button">Search!</button>
+								</span>
 							</div>
-
 						</div>
 					</div>
 					<table class="table no-border hover">
 						<thead class="no-border">
 						<tr>
+							<th>Transaction&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 							<th>Build&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 							<th>Name</th>
 							<th>Version</th>
@@ -41,91 +40,78 @@
 						</tr>
 						</thead>
 						<tbody class="no-border-y">
-
-
 						{% for build in builds|sort(attribute='bnum') %}
 							{% if user.is_authenticated() %}
 								<tr>
+									<td><a href="/transaction/{{ build.tnum }}">{{ build.tnum }}</a></td>
 									<td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>
 									<td><a href="/pkg/{{ build.pkgname }}">{{ build.pkgname }}</a></td>
 									<td>{{ build.version_str }}</td>
 									<td>{{ build.start_str }}</td>
 									<td>{{ build.end_str }}</td>
-									<td>{% if build.review_status == 'pending' %}
+									<td>
+									{% if build.review_status == 'pending' %}
 										<div class="btn-group">
 											<button class="btn btn-default btn-xs" type="button">Set Result</button>
-											<button data-toggle="dropdown"
-													class="btn btn-xs btn-primary dropdown-toggle" type="button">
-												<span class="caret"></span>
-												<span class="sr-only">Toggle Dropdown</span></button>
+											<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">
+												<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
+											</button>
 											<ul role="menu" class="dropdown-menu set_result">
-												<li><a href="#" id="passed" bnum="{{ build.bnum }}"><i
-													class="fa fa-check"
-													style="color:green;"></i>
-													Pass</a></li>
-												<li><a href="#" id="failed" bnum="{{ build.bnum }}"><i
-													class="fa fa-exclamation" style="color:red;"></i>
-													Fail</a>
+												<li>
+													<a href="#" id="passed" bnum="{{ build.bnum }}"><i class="fa fa-check" style="color:green;"></i>Pass</a>
 												</li>
-												<li style="font-style: italic;"><a href="#" id="skip"
-																				   bnum="{{ build.bnum }}"><i
-													class="fa fa-eye-slash" style="color:#777777;"></i>
-													Skip</a>
+												<li>
+													<a href="#" id="failed" bnum="{{ build.bnum }}"><i class="fa fa-exclamation" style="color:red;"></i>Fail</a>
+												</li>
+												<li style="font-style: italic;">
+													<a href="#" id="skip" bnum="{{ build.bnum }}"><i class="fa fa-eye-slash" style="color:#777777;"></i>Skip</a>
 												</li>
 											</ul>
 										</div>
-										<span class="passed" style="display: none"><i class="fa fa-check"
-																					  style="color:green;"></i> Passed</span>
-										<span class="failed" style="display: none"><i
-											class="fa fa-exclamation-circle"
-											style="color:red;"></i> Failed</span>
+										<span class="passed" style="display: none"><i class="fa fa-check" style="color:green;"></i> Passed</span>
+										<span class="failed" style="display: none"><i class="fa fa-exclamation-circle" style="color:red;"></i> Failed</span>
 									{% elif build.review_status == 'passed' %}
-										<i class="fa fa-check" style="color:green;"></i>
-										{{ build.review_status }}{% elif build.review_status == 'failed' %}
-										<i class="fa fa-exclamation-circle" style="color:red;"></i>
-										{{ build.review_status }} {% elif build.review_status == 'skip' %}
-										<i class="fa fa-eye-slash" style="color:#999999;"></i>
-										<span style="color:#999999;"><em>skipped</em></span>
-									{% endif %}</td>
+										<i class="fa fa-check" style="color:green;"></i>{{ build.review_status }}
+									{% elif build.review_status == 'failed' %}
+										<i class="fa fa-exclamation-circle" style="color:red;"></i>{{ build.review_status }}
+									{% elif build.review_status == 'skip' %}
+										<i class="fa fa-eye-slash" style="color:#999999;"></i><span style="color:#999999;"><em>skipped</em></span>
+									{% endif %}
+									</td>
 									<td>
-										{% if build.review_dev != '' and build.review_dev is not none and build.review_dev != 'None' %}
-											<i class="fa fa-user"></i>
-											{{ build.review_dev }}{% else %}n/a{% endif %}</td>
+									{% if build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
+									</td>
 									<td>
-										{% if build.review_date != '' and build.review_date is not none and build.review_date != 'None' %}
-											<i class="fa fa-calendar"></i>
-											{{ build.review_date }}{% else %}n/a{% endif %}</td>
+									{% if build.review_date  %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}</td>
 								</tr>
-
 							{% else %}
 								<tr>
+									<td><a href="/transaction/{{ build.tnum }}">{{ build.tnum }}</a></td>
 									<td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>
 									<td>{{ build.pkgname }}</td>
 									<td>{{ build.version_str }}</td>
 									<td>{{ build.start_str }}</td>
 									<td>{{ build.end_str }}</td>
-									<td>{% if build.review_status == 'pending' %}
-										<i class="fa fa-clock-o" style="color:yellow;"></i>
-										{{ build.review_status }}{% elif build.review_status == 'passed' %}
-										<i class="fa fa-check" style="color:green;"></i>
-										{{ build.review_status }}{% elif build.review_status == 'failed' %}
-										<i class="fa fa-exclamation-circle" style="color:red;"></i>
-										{{ build.review_status }}{% elif build.review_status == 'skip' %}
-										<i class="fa fa-eye-slash" style="color:#999999;"></i>
-										<span style="color:#999999;"><em>skipped</em></span>{% endif %}</td>
 									<td>
-										{% if build.review_dev != '' and build.review_dev is not none and build.review_dev != 'None' %}
-											<i class="fa fa-user"></i>
-											{{ build.review_dev }}{% else %}n/a{% endif %}</td>
+									{% if build.review_status == 'pending' %}
+										<i class="fa fa-clock-o" style="color:yellow;"></i>{{ build.review_status }}
+									{% elif build.review_status == 'passed' %}
+										<i class="fa fa-check" style="color:green;"></i>{{ build.review_status }}
+									{% elif build.review_status == 'failed' %}
+										<i class="fa fa-exclamation-circle" style="color:red;"></i>{{ build.review_status }}
+									{% elif build.review_status == 'skip' %}
+										<i class="fa fa-eye-slash" style="color:#999999;"></i><span style="color:#999999;"><em>skipped</em></span>
+									{% endif %}
+									</td>
 									<td>
-										{% if build.review_date != '' and build.review_date is not none and build.review_date != 'None' %}
-											<i class="fa fa-calendar"></i>
-											{{ build.review_date }}{% else %}n/a{% endif %}</td>
+									{% if build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
+									</td>
+									<td>
+									{% if build.review_date %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}
+									</td>
 								</tr>
 							{% endif %}
 						{% endfor %}
-
-
 						</tbody>
 					</table>
 					{% macro render_pagination(pagination) %}
@@ -135,7 +121,6 @@
 							{% endif %}
 							{%- for page in pagination.iter_pages() %}
 								{% if page %}
-
 									{% if page != pagination.page %}
 										<li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
 									{% else %}
@@ -153,55 +138,53 @@
 					{{ render_pagination(pagination) }}
 				{% endif %}
 			</div>
-
 		</div>
 	</div>
-
 {%- endblock bottomcontent %}
+
 {% block scripts %}
 	{{ super() }}
 	<script type="text/javascript">
-		jQuery('#search_btn').on('click', function () {
-			var search = jQuery('#search_input').val();
+		jQuery( '#search_btn' ).on( 'click', function() {
+			var search = jQuery( '#search_input' ).val();
 			window.location = '/completed/search/' + search;
-		});
-		jQuery("#search_input").keyup(function (e) {
-			if (e.keyCode == 13) {
-				jQuery('#search_btn').trigger('click');
+		} );
+		jQuery( "#search_input" ).keyup( function( e ) {
+			if ( e.keyCode == 13 ) {
+				jQuery( '#search_btn' ).trigger( 'click' );
 			}
-		});
+		} );
 		{% if user.is_authenticated() %}
+			jQuery( document ).ready( function() {
 
-			jQuery(document).ready(function () {
-
-				jQuery('.set_result').on('click', 'a', function (e) {
+				jQuery( '.set_result' ).on( 'click', 'a', function( e ) {
 					e.preventDefault();
-					jQuery(this).addClass('clicked');
+					jQuery( this ).addClass( 'clicked' );
 					var data = {
-						bnum: jQuery(this).attr('bnum'),
-						result: jQuery(this).attr('id'),
+						bnum: jQuery( this ).attr( 'bnum' ),
+						result: jQuery( this ).attr( 'id' ),
 						dev: '{{ user.username }}'
 					};
-					jQuery.ajax({
+					jQuery.ajax( {
 						type: 'POST',
 						url: '/pkg_review',
-						data: JSON.stringify(data, null, '\t'),
+						data: JSON.stringify( data, null, '\t' ),
 						contentType: 'application/json;charset=UTF-8',
 						dataType: 'json',
-						success: function (result) {
-							console.log(result);
-							var res = $('.clicked').attr('id') == 'passed' ? 'span.passed' : 'span.failed';
-							if (result['msg'] == 'ok') {
-								jQuery('.clicked').parents('td').find(res).show();
-								jQuery('.clicked').removeClass('clicked').parents('.btn-group').hide();
+						success: function( result ) {
+							console.log( result );
+							var res = $( '.clicked' ).attr( 'id' ) == 'passed' ? 'span.passed' : 'span.failed';
+							if ( result[ 'msg' ] == 'ok' ) {
+								jQuery( '.clicked' ).parents( 'td' ).find( res ).show();
+								jQuery( '.clicked' ).removeClass( 'clicked' ).parents( '.btn-group' ).hide();
 							} else {
-								alert('Unable to save result. Server Error Msg:\n' + result['msg']);
+								alert( 'Unable to save result. Server Error Msg:\n' + result[ 'msg' ] );
 							}
 						}
 
-					});
-				});
-			});
+					} );
+				} );
+			} );
 		{% endif %}
 	</script>
 {% endblock scripts %}

@@ -2,45 +2,46 @@
 
 {% block pagetitle -%}Scheduled{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
+
 {% block bottomcontent -%}
-    <div class="row">
-        <div class="col-md-10">
-            <div id="bottom-wrap" class="block-flat">
-                <div class="header">
-                    <h3>Scheduled Builds</h3>
-                </div>
-                <div class="content">
-                    {% if idle %}
-                        <tr>
-                            <td>Queue is empty.</td>
-                        </tr>
-                    {% else %}
-                        <table id="noDt" class="table no-border hover">
-                            <thead class="no-border">
-                            <tr>
-                                <th>Pos.</th>
+	<div class="row">
+		<div class="col-md-10">
+			<div id="bottom-wrap" class="block-flat">
+				<div class="header">
+					<h3>Scheduled Builds</h3>
+				</div>
+				<div class="content">
+					{% if idle %}
+						<tr>
+							<td>Queue is empty.</td>
+						</tr>
+					{% else %}
+						<table id="noDt" class="table no-border hover">
+							<thead class="no-border">
+							<tr>
+								<th>Pos.</th>
 								<th>Trans.</th>
-                                <th>Name</th>
-                                <th>Version</th>
-                            </tr>
-                            </thead>
-                            <tbody class="no-border-y">
-                                {% for p in queue %}
-                                        <tr>
-                                            <td>{{ loop.index }}</td>
+								<th>Name</th>
+								<th>Version</th>
+							</tr>
+							</thead>
+							<tbody class="no-border-y">
+								{% for p in queue %}
+										<tr>
 											<td>{{ loop.index }}</td>
-                                            <td>{{ p.pkgname }}</td>
-                                            <td>{{ p.version_str }}</td>
-                                        </tr>
-                                {% endfor %}
+											<td>{{ loop.index }}</td>
+											<td>{{ p.pkgname }}</td>
+											<td>{{ p.version_str }}</td>
+										</tr>
+								{% endfor %}
 
 
-                            </tbody>
-                        </table>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
+							</tbody>
+						</table>
+					{% endif %}
+				</div>
+			</div>
+		</div>
 
-    </div>
+	</div>
 {%- endblock bottomcontent %}

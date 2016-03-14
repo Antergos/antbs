@@ -515,7 +515,7 @@ def homepage(tlpage=None):
     stats = {}
     for stat in check_stats:
         builds = getattr(status, stat)
-        res = len(builds)
+        res = len(builds) or '0'
         if stat != "build_queue":
             builds = [x for x in builds[1000:-1] if x]
             within = []
