@@ -101,9 +101,7 @@ function setup_environment() {
 	fi
 
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
-	sed -i '/CFLAGS=/c\CFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
-	sed -i '/CXXFLAGS=/c\CXXFLAGS="-march=native -mtune=generic -O2 -pipe -fstack-protector-strong --param=ssp-buffer-size=4"' /etc/makepkg.conf
-	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j6"' /etc/makepkg.conf
+	cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
 	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
 	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
 	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
@@ -202,7 +200,6 @@ function setup_32bit_env() {
 	chmod -R 777 /32build
 	chmod -R a+rw /staging/i686
 	cp /usr/share/devtools/makepkg-i686.conf /32bit/makepkg.conf
-	sed -i '/#MAKEFLAGS=/c\MAKEFLAGS="-j6"' /32bit/makepkg.conf
 	echo 'BUILDDIR=/var/tmp' >> /32bit/makepkg.conf
 	cp /etc/pacman.conf /32bit
 	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
