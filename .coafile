@@ -1,5 +1,5 @@
 [Default]
-bears = IndentBear,LineLengthBear,SpaceConsistencyBear
+bears = GNUIndentBear,LineLengthBear,SpaceConsistencyBear
 max_line_length = 99
 use_spaces = True
 
