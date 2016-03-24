@@ -4,8 +4,13 @@ max_line_length = 99
 use_spaces = True
 
 [Python]
-bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyLintBear,PyUnusedCodeBear
+bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyUnusedCodeBear
 files = **/*.py
+
+[pylint]
+enabled = nope  # Disabled as it yields nondeterministic results
+bears = PyLintBear
+pylint_disable = C0411  # Import order is done by the PyImportSortBear
 
 [Docker]
 bears= DockerfileLintBear
