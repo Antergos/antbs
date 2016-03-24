@@ -28,12 +28,12 @@ import subprocess
 import time
 import zipfile
 
-from gevent import sleep
-from github3 import login
 from gitlab import Gitlab
 
 from database.base_objects import RedisHash
 from database.server_status import status
+from gevent import sleep
+from github3 import login
 from utils.logging_config import logger
 
 REPO_DIR = "/var/tmp/antergos-packages"
@@ -108,7 +108,7 @@ class Package(PackageMeta):
             build_path: Absolute path to the the package's build directory.
             success_rate: The package's rate of successful builds.
             failure_rate: The package's rate of build failures.
-        
+
         (bool)
             push_version: Should we automatically update the version and push to Github (for pkgrel bumps)?
             autosum: Does the package's PKGBUILD download checksums when makepkg is called?
@@ -194,7 +194,6 @@ class Package(PackageMeta):
 
         if len(out) > 0:
             out = out.decode('UTF-8').strip()
-            # logger.info('proc.out is %s' % out)
         if len(err) > 0:
             logger.error('proc.err is %s', err)
 

@@ -27,8 +27,6 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-import datetime
-
 from database.base_objects import RedisHash
 from utils.logging_config import logger
 
@@ -73,6 +71,7 @@ class Build(RedisHash):
         ValueError: If both `pkg_obj` and `bnum` are Falsey.
 
     """
+
     def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
         if not any([pkg_obj, bnum]):
             raise ValueError

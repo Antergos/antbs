@@ -30,10 +30,9 @@
 """ Server Status Module (handles this application's state) """
 
 import datetime
-import os
 
 from database.base_objects import RedisHash, RedisList, RedisZSet
-from utils.utilities import Singleton, DateTimeStrings
+from utils.utilities import DateTimeStrings, Singleton
 
 
 class ServerStatus(RedisHash, metaclass=Singleton):
@@ -86,7 +85,6 @@ class ServerStatus(RedisHash, metaclass=Singleton):
             self.now_building.remove(bnum)
 
 
-
 class TimelineEvent(RedisHash, DateTimeStrings):
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
@@ -133,4 +131,3 @@ def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None, re
 
 
 status = ServerStatus()
-

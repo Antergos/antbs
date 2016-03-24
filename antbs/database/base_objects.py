@@ -28,10 +28,11 @@
 
 """ Database module """
 
-import redis
+import errno
 import json
 import os
-import errno
+
+import redis
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 

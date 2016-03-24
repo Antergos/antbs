@@ -6,6 +6,10 @@ use_spaces = True
 [Python]
 bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyUnusedCodeBear
 files = **/*.py
+default_actions = PEP8Bear: ApplyPatchAction,
+                  PyImportSortBear: ApplyPatchAction,
+                  PyCommentedCodeBear: ApplyPatchAction,
+                  PyUnusedCodeBear: ApplyPatchAction
 
 [pylint]
 enabled = nope  # Disabled as it yields nondeterministic results

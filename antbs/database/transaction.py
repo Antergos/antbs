@@ -21,23 +21,28 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-import os, subprocess, tempfile, time
-import shutil
 import datetime
+import os
+import shutil
+import subprocess
+import tempfile
+import time
 from multiprocessing import Process
-from pygments import highlight
-from pygments.lexers import BashLexer
-from pygments.formatters import HtmlFormatter
 
-from transaction_handler import logger
-from .base_objects import RedisHash, db
-from .server_status import status, get_timeline_object
-from .package import get_pkg_object
-from .build import get_build_object
-from utils.logging_config import logger
-from utils.utilities import remove, PacmanPackageCache, CustomSet
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import BashLexer
+
 import utils.docker_util as docker_util
+from transaction_handler import logger
+from utils.logging_config import logger
 from utils.sign_pkgs import sign_packages
+from utils.utilities import CustomSet, PacmanPackageCache, remove
+
+from .base_objects import RedisHash, db
+from .build import get_build_object
+from .package import get_pkg_object
+from .server_status import get_timeline_object, status
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -808,5 +813,3 @@ def get_trans_object(packages=None, tnum=None, repo_queue=None):
     trans_obj = Transaction(packages=packages, tnum=tnum, repo_queue=repo_queue)
 
     return trans_obj
-
-

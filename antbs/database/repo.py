@@ -89,9 +89,6 @@ class PacmanRepo(RedisHash):
             self.path = path
             status.repos.add(name)
 
-        #self.sync_with_alpm_db()
-        #self.sync_with_filesystem()
-
     def sync_with_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')
         pkgs = set(p for p in os.listdir(repodir) if '.pkg.' in p and not p.endswith('.sig'))
@@ -123,11 +120,3 @@ class PacmanRepo(RedisHash):
 
         self.pkgs_alpm = pkgs
         self.pkg_count_alpm = len(pkgs)
-
-
-
-
-
-
-
-

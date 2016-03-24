@@ -40,9 +40,9 @@ from requests_toolbelt.adapters.source import SourceAddressAdapter
 
 import utils.sign_pkgs as sign
 from database import package
+from database.base_objects import db
 from database.server_status import status
 from utils.logging_config import logger
-from database.base_objects import db
 
 REPO_DIR = '/srv/antergos.info/repo/iso'
 TESTING_DIR = os.path.join(REPO_DIR, 'testing')
@@ -63,7 +63,8 @@ class ISOUtility:
                           pkg_obj.pkgname.rsplit('-', 1)[-1] + '.iso')
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
-        self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.md5', self.file_path + '.torrent']
+        self.files = [self.file_path, self.file_path + '.sig',
+                      self.file_path + '.md5', self.file_path + '.torrent']
         self.md5 = None
 
     @staticmethod
@@ -143,6 +144,7 @@ class ISOUtility:
 
 
 class WordPressBridge:
+
     def __init__(self, auth):
         self.post_id_map = {
             'antergos-x86_64': '2563',
@@ -224,7 +226,8 @@ def iso_release_job():
         status.idle = False
 
     status.current_status = 'Starting ISO Release Job...'
-    iso_names = ['antergos-x86_64', 'antergos-i686', 'antergos-minimal-x86_64', 'antergos-minimal-i686']
+    iso_names = ['antergos-x86_64', 'antergos-i686',
+                 'antergos-minimal-x86_64', 'antergos-minimal-i686']
     version = None
 
     for name in iso_names:
@@ -256,6 +259,3 @@ def iso_release_job():
     else:
         status.idle = True
         status.current_status = 'Idle.'
-
-
-
