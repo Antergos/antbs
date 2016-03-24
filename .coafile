@@ -23,3 +23,8 @@ files = **/*.md
 [JSON]
 bears = JSONFormatBear
 files = **/*.json
+
+[Commits]
+bears = GitCommitBear
+# Trailing periods in shortlogs are evil!
+shortlog_trailing_period = False
