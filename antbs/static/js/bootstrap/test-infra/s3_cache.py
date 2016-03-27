@@ -1,20 +1,21 @@
 #!/usr/bin/env python2.7
 # pylint: disable=C0301
-from __future__ import absolute_import, unicode_literals, print_function, division
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-from sys import argv
-from os import environ, stat, chdir, remove as _delete_file
-from os.path import dirname, basename, abspath, realpath, expandvars
-from hashlib import sha256
-from subprocess import check_call as run
-from json import load, dump as save
 from contextlib import contextmanager
 from datetime import datetime
+from hashlib import sha256
+from json import dump as save
+from json import load
+from os import remove as _delete_file
+from os import chdir, environ, stat
+from os.path import abspath, basename, dirname, expandvars, realpath
+from subprocess import check_call as run
+from sys import argv
 
+from boto.exception import S3ResponseError
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
-from boto.exception import S3ResponseError
-
 
 CONFIG_FILE = './S3Cachefile.json'
 UPLOAD_TODO_FILE = './S3CacheTodo.json'
@@ -91,7 +92,8 @@ def _tarball_filename_for(directory):
 def _create_tarball(directory):
     print("Creating tarball of {}...".format(directory))
     with timer():
-        run(['tar', '-czf', _tarball_filename_for(directory), '-C', dirname(directory), basename(directory)])
+        run(['tar', '-czf', _tarball_filename_for(directory),
+             '-C', dirname(directory), basename(directory)])
 
 
 def _extract_tarball(directory):
@@ -179,6 +181,7 @@ if __name__ == '__main__':
             raise
         print("Error!:", exc)
         print("Unable to download from cache.")
-        print("Running fallback command to generate cache directory {!r}: {}".format(directory, fallback_cmd))
+        print("Running fallback command to generate cache directory {!r}: {}".format(
+            directory, fallback_cmd))
         with timer():
             run(fallback_cmd, shell=True)

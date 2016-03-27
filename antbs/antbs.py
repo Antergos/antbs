@@ -29,45 +29,44 @@
 
 """ AntBS (Antergos Build Server) Main Module """
 
+# Start ignoring PyImportSortBear as monkey patching needs to be done before
+# other imports
 import gevent
 import gevent.monkey
 
 gevent.monkey.patch_all()
+# Stop ignoring
+
+import glob
+import json
+import os
+import re
+from datetime import datetime, timedelta
 
 import requests
-# import newrelic.agent
-#
-# settings = newrelic.agent.global_settings()
-# settings.app_name = 'AntBS'
-# newrelic.agent.initialize()
-import json
-import re
-import os
-import glob
-import shutil
-from datetime import datetime, timedelta
-from rq import Queue, Connection, Worker
-import rq_dashboard
 from flask import (
-    Flask, request, Response, abort, render_template, url_for, redirect, flash,
-    stream_with_context
-)
-from werkzeug.contrib.fixers import ProxyFix
+    Flask, Response, abort, flash, redirect, render_template, request, stream_with_context,
+    url_for)
 from flask.ext.stormpath import StormpathManager, groups_required, user
+from werkzeug.contrib.fixers import ProxyFix
+
 import bugsnag
-from bugsnag.flask import handle_exceptions
-import utils.pagination
+import iso
+import repo_monitor
+import rq_dashboard
 import transaction_handler
-from database.base_objects import db
-from database.server_status import status, get_timeline_object
+import utils.pagination
 import webhook
+from bugsnag.flask import handle_exceptions
+from database.base_objects import db
 from database.build import get_build_object
 from database.package import get_pkg_object
+from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-import repo_monitor
+from rq import Connection, Queue, Worker
 from utils.logging_config import logger
-from utils.utilities import copy_or_symlink, remove
-import iso
+from utils.utilities import copy_or_symlink
+from utils.utilities import remove
 
 
 app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = None
@@ -121,17 +120,6 @@ def initialize_app():
     # Setup rq_dashboard (accessible at '/rq' endpoint)
     app.config.from_object(rq_dashboard.default_settings)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
-
-    # Setup app-level caching using Flask-Cache extension.
-    # global cache
-    # cache = Cache(app, config={'CACHE_TYPE': 'redis', 'CACHE_REDIS_DB': 3,
-    #                                  'CACHE_KEY_PREFIX': 'antbs:cache:',
-    #                                  'CACHE_REDIS_URL': 'unix:///var/run/redis/redis.sock'})
-    # cache.init_app(app)
-    #
-    # # Clear the cache every time the app is started.
-    # with app.app_context():
-    #     cache.clear()
 
     # Setup rq (background task queue manager)
     with Connection(db):
@@ -240,17 +228,6 @@ def match_pkg_name_build_log(bnum=None, match=None):
         return False
 
 
-# def cache_buster():
-#     if db.exists('antbs:misc:cache_buster:flag'):
-#         cache.delete_memoized(homepage)
-#         db.delete('antbs:misc:cache_buster:flag')
-#         return True
-#     elif user.is_authenticated():
-#         return True
-#
-#     return False
-
-
 # @cache.memoize(timeout=900, unless=cache_buster)
 def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     """
@@ -285,12 +262,9 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
         if search is not None:
             search_all_builds = [x for x in all_builds if
                                  x is not None and match_pkg_name_build_log(x, search)]
-            # logger.info('search_all_builds is %s', search_all_builds)
             all_builds = search_all_builds
 
         if all_builds:
-            # if search is None:
-            #     all_builds = all_builds[10000:-1]
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
                 if int(bnum) < 2227:
@@ -459,7 +433,6 @@ def get_build_history_chart_data(pkg_obj=None):
                 continue
             dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
             key = dt.strftime("%s")
-            # key = str(dt.year) + str(dt.month) + str(dt.day)
             if not chart_data.get(key, False):
                 chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
                                        timestamp=key)
@@ -751,7 +724,6 @@ def build_pkg_now():
         if pexists:
             is_logged_in = user.is_authenticated()
             p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
-            # logger.info(rev_pending)
             pending = False
             logger.debug(rev_pending)
             for bnum in rev_pending:
@@ -907,8 +879,6 @@ def overflow():
 
     text = request.values.get('text')
     command = request.values.get('command')
-
-    # res = slack_bot.overflow(command, text)
 
     return Response(res['msg'], content_type=res['content_type'])
 

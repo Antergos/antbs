@@ -1,11 +1,20 @@
 [Default]
-bears = IndentBear,LineLengthBear,SpaceConsistencyBear
+bears = GNUIndentBear,LineLengthBear,SpaceConsistencyBear
 max_line_length = 99
 use_spaces = True
 
 [Python]
-bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyLintBear,PyUnusedCodeBear
+bears=PEP8Bear,PyCommentedCodeBear,PyImportSortBear,PyUnusedCodeBear
 files = **/*.py
+default_actions = PEP8Bear: ApplyPatchAction,
+                  PyImportSortBear: ApplyPatchAction,
+                  PyCommentedCodeBear: ApplyPatchAction,
+                  PyUnusedCodeBear: ApplyPatchAction
+
+[pylint]
+enabled = nope  # Disabled as it yields nondeterministic results
+bears = PyLintBear
+pylint_disable = C0411  # Import order is done by the PyImportSortBear
 
 [Docker]
 bears= DockerfileLintBear
@@ -18,3 +27,8 @@ files = **/*.md
 [JSON]
 bears = JSONFormatBear
 files = **/*.json
+
+[Commits]
+bears = GitCommitBear
+# Trailing periods in shortlogs are evil!
+shortlog_trailing_period = False

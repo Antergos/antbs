@@ -36,7 +36,6 @@ Repo Monitor Module:
 import logging
 
 import requests
-from github3 import login
 from gitlab import Gitlab
 
 import iso
@@ -44,6 +43,7 @@ import webhook
 from database import package
 from database.base_objects import db
 from database.server_status import status
+from github3 import login
 from utils.logging_config import logger
 
 GITLAB_TOKEN = status.gitlab_token

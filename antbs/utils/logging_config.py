@@ -33,6 +33,7 @@ import logging
 import logging.config
 
 from database.base_objects import db
+
 from .utilities import Singleton
 
 

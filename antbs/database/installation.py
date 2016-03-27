@@ -95,12 +95,3 @@ class AntergosInstallationUser(RedisHash):
 
         if install_id:
             self.installs.add(install_id)
-
-
-
-
-
-
-
-
-

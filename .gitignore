@@ -6,3 +6,4 @@ repo*.sh
 *pycache
 *expect*.conf
 *.log
+*.orig

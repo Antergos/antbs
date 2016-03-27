@@ -32,13 +32,18 @@
 import os
 import sys
 
+# Ignore PyImportSortBear as this statement affects imports later
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
-from database.base_objects import db
+
 import utils.docker_util as docker_utils
-from utils.logging_config import logger
-from rq import Connection, Queue, get_current_job
+from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
+from rq import Connection
+from rq import Queue
+from rq import get_current_job
+from utils.logging_config import logger
+
 
 SRC_DIR = os.path.dirname(__file__) or '.'
 BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
@@ -116,4 +121,3 @@ def process_dev_review(review_result, pkgname, tnum):
     trans_obj.update_repo(review_result, None, True, pkgname)
 
     set_server_status(False, saved_status)
-

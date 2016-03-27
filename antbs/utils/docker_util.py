@@ -34,9 +34,9 @@ import subprocess
 import time
 
 import docker
-
 from database.base_objects import db
 from database.server_status import status
+
 from .logging_config import logger
 from .utilities import Singleton
 

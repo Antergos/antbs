@@ -37,14 +37,14 @@ import os
 import shutil
 
 import requests
-from rq import Queue, Connection, Worker
 
 import transaction_handler as builder
 from database import package
 from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser
-from database.server_status import status, get_timeline_object
+from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
+from rq import Connection, Queue, Worker
 from utils.logging_config import logger
 
 with Connection(db):
@@ -302,10 +302,8 @@ class Webhook(WebhookMeta):
             no_dups = []
 
             for changed in self.changes:
-                # logger.info(changed)
                 if len(changed) > 0:
                     for item in changed:
-                        # logger.info(item)
                         if item and self.is_gitlab or self.is_numix or self.is_cnchi:
                             pak = item
                         elif item and "PKGBUILD" in item:
@@ -314,7 +312,6 @@ class Webhook(WebhookMeta):
                         else:
                             pak = None
 
-                        # logger.info(pak)
                         if pak and 'antergos-iso' != pak:
                             logger.info('Adding %s to the build queue.' % pak)
                             no_dups.append(pak)
