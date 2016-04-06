@@ -356,7 +356,7 @@ class RedisHash(RedisObject):
             if 'ServerStatus' == self.__class__.__name__:
                 value = os.environ.get(key.upper())
 
-            if key in self.key_lists['string']:
+            if key in self.key_lists['string'] or key in self.key_lists['path']:
                 value = value or ''
                 setattr(self, key, value)
             elif key in self.key_lists['bool']:

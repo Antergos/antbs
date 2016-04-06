@@ -34,7 +34,6 @@ from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
 
 import utils.docker_util as docker_util
-from transaction_handler import logger
 from utils.logging_config import logger
 from utils.sign_pkgs import sign_packages
 from utils.utilities import CustomSet, PacmanPackageCache, remove
@@ -63,8 +62,8 @@ class TransactionMeta(RedisHash):
         See `Transaction` docstring.
     """
 
-    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', prefix='trans',
-                 repo_queue=None):
+    def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', namespace='antbs',
+                 prefix='trans', repo_queue=None):
         if not any([packages, tnum]):
             raise ValueError('At least one of [packages, tnum] required.')
         elif all([packages, tnum]):
@@ -74,34 +73,41 @@ class TransactionMeta(RedisHash):
         if not tnum:
             the_tnum = self.db.incr('antbs:misc:tnum:next')
 
-        super().__init__(prefix=prefix, key=the_tnum)
+        super().__init__(namespace=namespace, prefix=prefix, key=the_tnum)
 
         self.key_lists.update(dict(
             string=['building', 'start_str', 'end_str'],
             bool=['is_running', 'is_finished'],
             int=['tnum'],
             list=['queue'],
-            zset=['packages', 'builds', 'completed', 'failed'],
+            set=['packages', 'builds', 'completed', 'failed'],
             path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
         ))
 
-        self._repo_queue = repo_queue
+        self.__namespaceinit__()
 
-        if packages and not self:
+        logger.debug(self.key_lists)
+
+        self._repo_queue = repo_queue
+        self._internal_deps = []
+        self._build_dirpaths = {}
+        self._pkgvers = {}
+
+        if not self or not self.tnum:
             self.__keysinit__()
+            logger.debug(self.all_keys)
             self.tnum = the_tnum
             self.base_path = base_path
             self.cache = pkg_cache_obj.cache
             self.cache_i686 = pkg_cache_obj.cache_i686
 
-            self._internal_deps = []
-            self._build_dirpaths = {}
-            self._pkgvers = {}
+            if packages:
+                for pkg in packages:
+                    self.packages.add(pkg)
 
-            for pkg in packages:
-                self.packages.add(pkg)
-                self._build_dirpaths[pkg] = {'build_dir': '', '32bit': '', '32build': ''}
-                self._pkgvers[pkg] = ''
+        for pkg in self.packages:
+            self._build_dirpaths[pkg] = {'build_dir': '', '32bit': '', '32build': ''}
+            self._pkgvers[pkg] = ''
 
 
 class Transaction(TransactionMeta):
@@ -135,7 +141,8 @@ class Transaction(TransactionMeta):
     """
 
     def start(self):
-        if not self._repo_queue:
+        if self._repo_queue is None:
+            logger.debug('self._repo_queue is: %s', self._repo_queue)
             raise AttributeError('_repo_queue is required to start a transaction.')
 
         status.current_status = 'Initializing build transaction.'
@@ -149,7 +156,7 @@ class Transaction(TransactionMeta):
 
         if self.queue:
             while self.queue:
-                pkg = self.queue.pop(0)
+                pkg = self.queue.lpop()
                 is_iso = False
                 pkg_obj = get_pkg_object(name=pkg)
 
@@ -203,8 +210,8 @@ class Transaction(TransactionMeta):
             if os.path.exists(p):
                 pbpath = p
                 break
-            else:
-                raise RuntimeError('Unable to determine pb_path for {0}'.format(pkg))
+        else:
+            raise RuntimeError('Unable to determine pb_path for {0}'.format(pkg))
 
         return pbpath
 
@@ -215,9 +222,10 @@ class Transaction(TransactionMeta):
             '32bit': os.path.join(build_dir, '32bit'),
             '32build': os.path.join(build_dir, '32build')
         })
-        for bdir in self._build_dirpaths:
-            if not os.path.exists(self._build_dirpaths[bdir]):
-                os.mkdir(self._build_dirpaths[bdir], mode=0o777)
+        for bdir, path in self._build_dirpaths[pkg].items():
+            logger.debug(bdir)
+            if not os.path.exists(path):
+                os.mkdir(path, mode=0o777)
 
     def handle_special_cases(self, pkg, pkg_obj):
         if 'cnchi' in pkg:
@@ -568,7 +576,7 @@ class Transaction(TransactionMeta):
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
 
         bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg], self.tnum)
-        self.builds.append(bld_obj.bnum)
+        self.builds.add(bld_obj.bnum)
 
         self.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)

@@ -33,14 +33,13 @@ import os
 import sys
 
 # Ignore PyImportSortBear as this statement affects imports later
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 
 import utils.docker_util as docker_utils
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
-from rq import Connection
-from rq import Queue
+from rq import Connection, Queue, Worker
 from rq import get_current_job
 from utils.logging_config import logger
 
@@ -54,7 +53,9 @@ doc = doc_utils.doc
 
 with Connection(db):
     transaction_queue = Queue('transactions')
-    repo_queue = Queue('repo_update')
+    repo_queue = Queue('update_repo')
+    w1 = Worker([transaction_queue])
+    w2 = Worker([repo_queue])
 
 
 def set_server_status(first=True, saved_status=False, is_review=False):
@@ -97,14 +98,14 @@ def handle_hook():
         set_server_status(first=False, saved_status=saved_status)
         return False
 
-    if status.queue:
-        tnum = status.queue.lpop()
+    if status.transaction_queue:
+        tnum = status.transaction_queue.lpop()
         transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue)
         transaction.start()
 
     set_server_status(first=False, saved_status=saved_status)
 
-    if not status.queue and not status.hook_queue:
+    if not status.transaction_queue and not status.transactions_running:
         status.idle = True
         status.building = 'Idle'
         status.container = ''

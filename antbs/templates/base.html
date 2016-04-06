@@ -947,6 +947,7 @@
 									}).dataTable({
 										"aoColumns": [
 											{"sType": "num-html"},
+											{"sType": "num-html"},
 											null,
 											null,
 											null,{% if 'repo_packages' in request.path %}
@@ -961,7 +962,7 @@
 										],
 										"aaSorting": [
 											[{% if 'repo_packages' in request.path %}
-												1, "asc"{% else %}0, "desc"{% endif %}]
+												1, "asc"{% else %}1, "desc"{% endif %}]
 										]
 
 									});

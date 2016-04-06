@@ -125,7 +125,7 @@ def initialize_app():
     with Connection(db):
         global transaction_queue, repo_queue, webhook_queue, w1, w2, w3
         transaction_queue = Queue('transactions')
-        repo_queue = Queue('repo_update')
+        repo_queue = Queue('update_repo')
         webhook_queue = Queue('webook')
         w1 = Worker([transaction_queue])
         w2 = Worker([repo_queue])
@@ -267,7 +267,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
         if all_builds:
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
-                if int(bnum) < 2227:
+                if int(bnum) < 2502:
                     try:
                         bld_obj = get_build_object(bnum=bnum)
                     except Exception as err:
@@ -564,7 +564,7 @@ def building(bnum=None):
 
 @app.route('/get_log')
 @app.route("/get_log/<int:bnum>")
-def get_log(bnum):
+def get_log(bnum=None):
     bld = bnum
     if status.idle or not status.now_building:
         abort(404)
@@ -784,11 +784,12 @@ def get_status():
 
         if all(i is not None for i in (pkg, dev, action)):
             if action in ['remove']:
-                transaction_queue.enqueue_call(
+                repo_queue.enqueue_call(
                     transaction_handler.update_main_repo(is_action=True, action=action, action_pkg=pkg))
             elif 'rebuild' == action:
-                status.hook_queue.rpush(pkg)
-                webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
+                trans_obj = get_trans_object([pkg])
+                status.transaction_queue.rpush(trans_obj.tnum)
+                transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
                 get_timeline_object(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
                         dev, pkg), tl_type='0')
@@ -816,10 +817,9 @@ def get_status():
         event = get_timeline_object(event_id=rerun_transaction)
         pkgs = event.packages
         if pkgs:
-            for pkg in pkgs:
-                if pkg not in status.hook_queue:
-                    status.hook_queue.rpush(pkg)
-            webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
+            trans_obj = get_trans_object(pkgs)
+            status.transaction_queue.rpush(trans_obj.tnum)
+            transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
         return json.dumps(message)
 
 

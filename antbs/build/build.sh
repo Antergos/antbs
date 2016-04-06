@@ -3,7 +3,7 @@
 #
 #  build.sh
 #
-#  Copyright © 2014-2015 Antergos
+#  Copyright © 2014-2016 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
@@ -37,14 +37,14 @@ DEPS=''
 ###=====================================================================================================
 
 
-function print2log() {
+print2log() {
 
 	echo '[\^/\^/^\^/^\^/\^/\^/^\^/^\^/] ' "${1}" ' [\^/\^/^\^/^\^/\^/\^/^\^/^\^/]'
 
 }
 
 
-function setup_environment() {
+setup_environment() {
 
 	update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
 	update_success='STAGING REPO UPDATE COMPLETE'
@@ -113,7 +113,7 @@ function setup_environment() {
 }
 
 
-function in_array() {
+in_array() {
 
 	local e
 	for e in "${@:2}"; do
@@ -125,7 +125,7 @@ function in_array() {
 }
 
 
-function run_update_repo() {
+run_update_repo() {
 
 	print2log "UPDATING ${1} REPO";
 
@@ -139,7 +139,7 @@ function run_update_repo() {
 }
 
 
-function run_remove_pkg() {
+run_remove_pkg() {
 
 	local repo_dir=staging
 	local repo=antergos-staging
@@ -154,7 +154,7 @@ function run_remove_pkg() {
 
 }
 
-function try_install_deps() {
+try_install_deps() {
 
 	print2log 'TRY BUILD FAILED. TRYING TO INSTALL MISSING DEPS'
 	cd /staging
@@ -167,7 +167,7 @@ function try_install_deps() {
 	return 1
 }
 
-function copy_any() {
+copy_any() {
 
 	for file in "/${repo_dir}/x86_64/${PKGNAME}"*-any.**.xz; do
 		if [[ -f ${file} ]]; then
@@ -179,7 +179,7 @@ function copy_any() {
 
 }
 
-function check_pkg_sums() {
+check_pkg_sums() {
 
 	if [[ ${_AUTOSUMS} = "False" ]]; then
 		if [[ ${1} = '' ]]; then
@@ -195,7 +195,7 @@ function check_pkg_sums() {
 
 }
 
-function setup_32bit_env() {
+setup_32bit_env() {
 
 	chmod -R 777 /32build
 	chmod -R a+rw /staging/i686
@@ -251,7 +251,7 @@ function setup_32bit_env() {
 }
 
 
-function build_32bit_pkg() {
+build_32bit_pkg() {
 
 	print2log 'CREATING 32-BIT BUILD ENVIRONMENT';
 	setup_32bit_env
@@ -265,7 +265,7 @@ function build_32bit_pkg() {
 }
 
 
-function try_build() {
+try_build() {
 
 	print2log 'TRYING BUILD';
 	chmod -R a+rw /pkg
@@ -307,6 +307,7 @@ if [[ "True" != "${_UPDREPO}" ]]; then
 	pacman -Syyu --noconfirm
 	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
 	chmod -R a+rw /staging/x86_64
+	chmod 777 /tmp /var /var/tmp
 
 	repo=antergos-staging
 	repo_dir=staging

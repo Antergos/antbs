@@ -84,24 +84,26 @@ class Build(RedisHash):
 
         self.key_lists.update(
                 dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
-                             'start_str', 'end_str', 'version_str', 'container',
-                             'review_status', 'review_dev', 'review_date', 'log_str'],
+                             'start_str', 'end_str', 'version_str', 'container', 'review_status',
+                             'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum'],
                      bool=['failed', 'completed'],
-                     int=['pkg_id', 'bnum', 'tnum'],
+                     int=[],
                      list=['log'],
-                     zset=[]))
+                     set=[]))
 
         self.__namespaceinit__()
 
         if pkg_obj and (not self or not bnum):
             self.__keysinit__()
-            self.bnum = the_bnum
-            self.failed = False
-            self.completed = False
 
             for key in pkg_obj.all_keys:
                 if key in self.all_keys:
                     setattr(self, key, getattr(pkg_obj, key))
+
+            self.bnum = the_bnum
+            self.tnum = tnum
+            self.failed = False
+            self.completed = False
 
     @staticmethod
     def datetime_to_string(dt):

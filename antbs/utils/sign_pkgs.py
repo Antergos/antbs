@@ -138,9 +138,9 @@ def sign_packages(pkgname=None):
     if pkgname:
         db.publish('build-output', 'Signing package..')
         pkgs2sign = glob.glob(
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s-***.xz' % pkgname)
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % pkgname)
         pkgs2sign32 = glob.glob(
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s-***.xz' % pkgname)
+            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % pkgname)
         pkgs2sign = pkgs2sign + pkgs2sign32
         logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 

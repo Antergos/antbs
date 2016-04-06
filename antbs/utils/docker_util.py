@@ -43,9 +43,9 @@ from .utilities import Singleton
 doc_user = status.docker_user
 doc_pass = status.docker_password
 
-SRC_DIR = os.path.dirname(__file__) or '.'
-DOC_DIR = os.path.abspath(os.path.join(SRC_DIR, '..', 'build/docker'))
-BUILD_DIR = os.path.abspath(os.path.join(DOC_DIR, '..'))
+SRC_DIR = '/opt/antbs/antbs'
+DOC_DIR = os.path.join(SRC_DIR, 'build/docker')
+BUILD_DIR = os.path.join(SRC_DIR, 'build')
 
 
 class DockerUtils(metaclass=Singleton):

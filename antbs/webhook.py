@@ -350,8 +350,8 @@ class Webhook(WebhookMeta):
                         events.append(tl_event.event_id)
                         del p_obj
 
-                trans_obj = get_trans_object(the_pkgs)
-                status.queue.append(trans_obj.tnum)
+                trans_obj = get_trans_object(packages=the_pkgs)
+                status.transaction_queue.append(trans_obj.tnum)
                 queue.enqueue_call(builder.handle_hook, timeout=84600)
 
             if not self.result:
