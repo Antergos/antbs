@@ -267,19 +267,13 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
         if all_builds:
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
-                if int(bnum) < 2630:
-                    try:
-                        bld_obj = get_build_object(bnum=bnum)
-                    except Exception as err:
-                        logger.error(err)
-                        continue
+                try:
+                    bld_obj = get_build_object(bnum=bnum)
+                except Exception as err:
+                    logger.error(err)
+                    continue
 
-                    pkg_list.append(bld_obj)
-
-                else:
-                    trans_obj = get_trans_object(tnum=bnum)
-                    trans_blds = [get_build_object(bnum=bnum) for bnum in trans_obj.builds]
-                    pkg_list.extend(trans_blds)
+                pkg_list.append(bld_obj)
 
             if logged_in:
                 for bld_obj in pkg_list:

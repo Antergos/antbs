@@ -536,7 +536,8 @@ class Transaction(TransactionMeta):
                 stream_process = Process(target=self.publish_build_ouput,
                                          kwargs=dict(container=container.get('Id'),
                                                      bld_obj=bld_obj,
-                                                     upd_repo=True))
+                                                     upd_repo=True,
+                                                     tnum=self.tnum))
                 stream_process.start()
 
             result = doc.wait(container.get('Id'))
@@ -610,15 +611,17 @@ class Transaction(TransactionMeta):
             logger.error('Create container failed. Error Msg: %s', err)
             bld_obj.failed = True
 
-        bld_obj.container = container.get('Id', '')
-        status.container = container.get('Id', '')
-        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(bld_obj=bld_obj,
+        cont = container.get('Id', '')
+        bld_obj.container = cont
+        status.container = cont
+        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(container=cont,
+                                                                              bld_obj=bld_obj,
                                                                               tnum=self.tnum))
 
         try:
-            doc.start(container.get('Id', ''))
+            doc.start(cont)
             stream_process.start()
-            result = doc.wait(container.get('Id', ''))
+            result = doc.wait(cont)
             if int(result) != 0:
                 bld_obj.failed = True
                 tpl = 'Container %s exited with a non-zero return code. Return code was %s'
