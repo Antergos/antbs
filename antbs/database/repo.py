@@ -49,7 +49,6 @@ class PacmanRepo(RedisHash):
             name: see args description above.
             path: see args description above.
 
-
         (bool)
             n/a
 

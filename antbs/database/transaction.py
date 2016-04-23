@@ -77,7 +77,7 @@ class TransactionMeta(RedisHash):
 
         self.key_lists.update(dict(
             string=['building', 'start_str', 'end_str'],
-            bool=['is_running', 'is_finished'],
+            bool=['is_running', 'is_finished', 'is_dev_review'],
             int=['tnum'],
             list=['queue'],
             set=['packages', 'builds', 'completed', 'failed'],
@@ -189,7 +189,7 @@ class Transaction(TransactionMeta):
         status.transactions_running.remove(self.tnum)
 
     def setup_transaction_directory(self):
-        path = tempfile.mkdtemp(prefix=self.full_key, dir=self.base_path)
+        path = tempfile.mkdtemp(prefix='{0}_'.format(str(self.tnum)), dir=self.base_path)
         self.result_dir = os.path.join(path, 'result')
         self.upd_repo_result = os.path.join(path, 'upd_result')
         self.path = os.path.join(path, 'antergos-packages')
@@ -552,12 +552,13 @@ class Transaction(TransactionMeta):
             result = 1
             logger.error('Start container failed. Error Msg: %s' % err)
 
-        if not status.idle:
-            if building_saved:
-                status.current_status = building_saved
-            else:
-                status.idle = True
-                status.current_status = 'Idle.'
+        if self.is_dev_review:
+            if not status.idle:
+                if building_saved:
+                    status.current_status = building_saved
+                else:
+                    status.idle = True
+                    status.current_status = 'Idle.'
 
         if result != 0:
             return False
@@ -591,7 +592,7 @@ class Transaction(TransactionMeta):
         build_dir = self._build_dirpaths[pkg]['build_dir']
         _32bit = self._build_dirpaths[pkg]['32bit']
         _32build = self._build_dirpaths[pkg]['32build']
-        hconfig = doc_util.get_host_config(build_dir, self.result_dir, self.cache,
+        hconfig = doc_util.get_host_config('packages', build_dir, self.result_dir, self.cache,
                                            self.cache_i686, _32build, _32bit)
         container = {}
         try:
@@ -641,8 +642,8 @@ class Transaction(TransactionMeta):
                 repo_updated = self.update_repo(review_result='staging', bld_obj=bld_obj)
 
         if repo_updated:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'
-            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
+            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
             status.completed.rpush(bld_obj.bnum)
             bld_obj.review_status = 'pending'

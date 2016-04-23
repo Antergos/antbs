@@ -119,6 +119,7 @@ def process_dev_review(review_result, pkgname, tnum):
     saved_status = set_server_status(True, is_review=True)
 
     trans_obj = get_trans_object(tnum=tnum, repo_queue=repo_queue)
+    trans_obj.is_dev_review = True
     trans_obj.update_repo(review_result, None, True, pkgname)
 
     set_server_status(False, saved_status)

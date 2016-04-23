@@ -267,7 +267,7 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
         if all_builds:
             builds, all_pages = get_paginated(all_builds, 10, page, False)
             for bnum in builds:
-                if int(bnum) < 2502:
+                if int(bnum) < 2630:
                     try:
                         bld_obj = get_build_object(bnum=bnum)
                     except Exception as err:
@@ -745,8 +745,9 @@ def build_pkg_now():
 
                 if 'cnchi-dev' == pkgname:
                     db.set('CNCHI-DEV-OVERRIDE', True)
-                status.hook_queue.rpush(pkgname)
-                webhook_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
+                trans = get_trans_object(packages=[pkgname], repo_queue=repo_queue)
+                status.transaction_queue.rpush(trans.tnum)
+                transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
                 get_timeline_object(
                     msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
                         dev, pkgname), tl_type='0')

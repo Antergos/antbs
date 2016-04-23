@@ -75,7 +75,7 @@ class DockerUtils(metaclass=Singleton):
             'repo_update': self.create_repo_update_host_config
         }
         if config_for in host_configs:
-            host_configs[config_for](*args, **kwargs)
+            return host_configs[config_for](*args, **kwargs)
 
     def create_pkgs_host_config(self, pkgbuild_dir, result_dir=None, cache_dir_x86_64=None,
                                 cache_dir_i686=None, _32build=None, _32bit=None):
