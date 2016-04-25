@@ -39,6 +39,7 @@ import utils.docker_util as docker_utils
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
+from database.repo import get_repo_object
 from rq import Connection, Queue, Worker
 from rq import get_current_job
 from utils.logging_config import logger
@@ -119,7 +120,9 @@ def process_dev_review(review_result, pkgname, tnum):
     saved_status = set_server_status(True, is_review=True)
 
     trans_obj = get_trans_object(tnum=tnum, repo_queue=repo_queue)
+    repo_obj = get_repo_object('antergos')
     trans_obj.is_dev_review = True
-    trans_obj.update_repo(review_result, None, True, pkgname)
+    repo_obj.update_repo(review_result=review_result, is_review=True, rev_pkgname=pkgname,
+                         publish_build_output=trans_obj.publish_build_ouput)
 
     set_server_status(False, saved_status)

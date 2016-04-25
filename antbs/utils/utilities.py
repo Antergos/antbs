@@ -30,6 +30,7 @@
 import glob
 import os
 import shutil
+import gevent
 
 
 class Singleton(type):
@@ -66,7 +67,10 @@ class PacmanPackageCache(metaclass=Singleton):
 
     def maybe_do_cache_cleanup(self):
         if self.doing_cache_cleanup:
+            while self.doing_cache_cleanup:
+                gevent.sleep(2)
             return
+
         self.doing_cache_cleanup = True
         for cache_dir in self.all_caches:
             if not os.path.exists(cache_dir):

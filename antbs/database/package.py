@@ -141,8 +141,10 @@ class Package(PackageMeta):
         if os.path.isdir(pbpath):
             self.pbpath = os.path.join(pbpath, 'PKGBUILD')
 
-        if os.path.exists(self.pbpath):
-            self.pkgbuild = open(self.pbpath).read()
+        if not os.path.exists(self.pbpath):
+            raise RuntimeError('pbpath: {0} does not exist!'.format(self.pbpath))
+
+        self.pkgbuild = open(self.pbpath).read()
 
     def get_from_pkgbuild(self, var=None):
         """
@@ -257,8 +259,8 @@ class Package(PackageMeta):
 
     def determine_pbpath(self):
         path = None
-        paths = [os.path.join('/var/tmp/antergos-packages/', self.pkgname),
-                 os.path.join('/var/tmp/antergos-packages/cinnamon/', self.pkgname)]
+        paths = [os.path.join('/var/tmp/antergos-packages/cinnamon/', self.pkgname),
+                 os.path.join('/var/tmp/antergos-packages/', self.pkgname)]
         self.maybe_update_pkgbuild_repo()
         for p in paths:
             logger.info(p)

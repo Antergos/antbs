@@ -31,6 +31,8 @@
 
 import logging
 import logging.config
+import bugsnag
+from bugsnag.handlers import BugsnagHandler
 
 from database.base_objects import db
 
@@ -58,6 +60,7 @@ class LoggingConfig(metaclass=Singleton):
         logging.config.dictConfig(self.get_logging_config())
 
         self.logger = logging.getLogger('antbs')
+        self.logger.addHandler(BugsnagHandler())
         self._initialized = True
         logger = None
 

@@ -45,28 +45,30 @@ from datetime import datetime, timedelta
 
 import requests
 from flask import (
-    Flask, Response, abort, flash, redirect, render_template, request, stream_with_context,
-    url_for)
+    Flask, Response, abort, flash, redirect, render_template, request,
+    stream_with_context, url_for
+)
 from flask.ext.stormpath import StormpathManager, groups_required, user
 from werkzeug.contrib.fixers import ProxyFix
 
 import bugsnag
-import iso
-import repo_monitor
+from bugsnag.flask import handle_exceptions
+
+from rq import Connection, Queue, Worker
 import rq_dashboard
+
 import transaction_handler
 import utils.pagination
 import webhook
-from bugsnag.flask import handle_exceptions
+import iso
+import repo_monitor
 from database.base_objects import db
 from database.build import get_build_object
 from database.package import get_pkg_object
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-from rq import Connection, Queue, Worker
 from utils.logging_config import logger
 from utils.utilities import copy_or_symlink
-from utils.utilities import remove
 
 
 app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = None
@@ -372,7 +374,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(transaction_handler.process_dev_review,
-                                        (result, None, True, bld_obj.pkgname), timeout=9600)
+                                        (result, bld_obj.pkgname, bld_obj.tnum), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -782,7 +784,7 @@ def get_status():
                 repo_queue.enqueue_call(
                     transaction_handler.update_main_repo(is_action=True, action=action, action_pkg=pkg))
             elif 'rebuild' == action:
-                trans_obj = get_trans_object([pkg])
+                trans_obj = get_trans_object([pkg], repo_queue=repo_queue)
                 status.transaction_queue.rpush(trans_obj.tnum)
                 transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
                 get_timeline_object(
@@ -812,7 +814,7 @@ def get_status():
         event = get_timeline_object(event_id=rerun_transaction)
         pkgs = event.packages
         if pkgs:
-            trans_obj = get_trans_object(pkgs)
+            trans_obj = get_trans_object(pkgs, repo_queue=repo_queue)
             status.transaction_queue.rpush(trans_obj.tnum)
             transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
         return json.dumps(message)

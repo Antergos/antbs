@@ -69,6 +69,12 @@ class DockerUtils(metaclass=Singleton):
 
         self.doc = self._doc
 
+    def do_docker_clean(self, pkg=None):
+        try:
+            self.doc.remove_container(pkg, v=True)
+        except Exception as err:
+            logger.info(err)
+
     def get_host_config(self, config_for, *args, **kwargs):
         host_configs = {
             'packages': self.create_pkgs_host_config,
@@ -140,7 +146,7 @@ class DockerUtils(metaclass=Singleton):
         pkgs_hconfig = self.doc.create_host_config(binds=binds,
                                                    restart_policy={"MaximumRetryCount": 2,
                                                                    "Name": "on-failure"},
-                                                   privileged=False, mem_limit='2G',
+                                                   privileged=True, mem_limit='2G',
                                                    memswap_limit='-1')
         return pkgs_hconfig
 

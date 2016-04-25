@@ -42,6 +42,7 @@ from .base_objects import RedisHash, db
 from .build import get_build_object
 from .package import get_pkg_object
 from .server_status import get_timeline_object, status
+from .repo import get_repo_object
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -86,16 +87,15 @@ class TransactionMeta(RedisHash):
 
         self.__namespaceinit__()
 
-        logger.debug(self.key_lists)
-
         self._repo_queue = repo_queue
         self._internal_deps = []
         self._build_dirpaths = {}
         self._pkgvers = {}
+        self._main_repo = get_repo_object('antergos')
+        self._staging_repo = get_repo_object('antergos-staging')
 
         if not self or not self.tnum:
             self.__keysinit__()
-            logger.debug(self.all_keys)
             self.tnum = the_tnum
             self.base_path = base_path
             self.cache = pkg_cache_obj.cache
@@ -158,7 +158,8 @@ class Transaction(TransactionMeta):
             while self.queue:
                 pkg = self.queue.lpop()
                 is_iso = False
-                pkg_obj = get_pkg_object(name=pkg)
+                pbpath = self.get_package_build_directory(pkg)
+                pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
 
                 for partial in ['i686', 'x86_64']:
                     if partial in pkg:
@@ -203,8 +204,8 @@ class Transaction(TransactionMeta):
             raise RuntimeError(err.output)
 
     def get_package_build_directory(self, pkg):
-        paths = [os.path.join(self.path, pkg),
-                 os.path.join(self.path, 'cinnamon', pkg)]
+        paths = [os.path.join(self.path, 'cinnamon', pkg),
+                 os.path.join(self.path, pkg)]
         pbpath = None
         for p in paths:
             if os.path.exists(p):
@@ -391,13 +392,6 @@ class Transaction(TransactionMeta):
             logger.error(err)
 
     @staticmethod
-    def do_docker_clean(pkg=None):
-        try:
-            doc.remove_container(pkg, v=True)
-        except Exception as err:
-            logger.error(err)
-
-    @staticmethod
     def process_and_save_build_metadata(pkg_obj=None, version_str=None, tnum=None):
         """
         Creates a new build for a package, initializes the build data, and returns a build object.
@@ -415,8 +409,6 @@ class Transaction(TransactionMeta):
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
         status.building_start = bld_obj.start_str
 
-        status.now_building_add(bld_obj.bnum)
-
         tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
         tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, version_str)
 
@@ -425,6 +417,11 @@ class Transaction(TransactionMeta):
         pkg_obj.builds.append(bld_obj.bnum)
 
         return bld_obj
+
+    # @staticmethod
+    # def push_new_checksums_to_github(self, pkg_obj):
+
+
 
     @staticmethod
     def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False, tnum=None):
@@ -476,96 +473,6 @@ class Transaction(TransactionMeta):
                                                       linenos='inline',
                                                       prestyles="background:#272822;color:#fff;"))
 
-    def update_repo(self, review_result=None, bld_obj=None, is_review=False, rev_pkgname=None,
-                    is_action=False, action=None, action_pkg=None):
-        if not review_result:
-            raise ValueError('review_result cannot be None.')
-        elif not any([bld_obj, is_review]):
-            raise ValueError('at least one of [bld_obj, is_review] required.')
-
-        container = None
-        repo = 'antergos'
-        repodir = 'main'
-        rev_result = review_result
-        if rev_result == 'staging':
-            rev_result = ''
-            repo = 'antergos-staging'
-            repodir = 'staging'
-
-        if not status.get_repo_lock(repo):
-            lock = status.get_repo_lock(repo)
-            while not lock:
-                time.sleep(10)
-                lock = status.get_repo_lock(repo)
-
-        building_saved = False
-        if not status.idle and status.current_status != 'Updating repo database.':
-            building_saved = status.current_status
-        else:
-            status.idle = False
-        status.current_status = 'Updating repo database.'
-
-        if os.path.exists(self.upd_repo_result):
-            remove(self.upd_repo_result)
-        os.mkdir(self.upd_repo_result, 0o777)
-
-        if rev_pkgname is not None:
-            pkgname = rev_pkgname
-        else:
-            pkgname = bld_obj.pkgname
-
-        command = "/makepkg/build.sh"
-        pkgenv = ["_PKGNAME={0}".format(pkgname),
-                  "_RESULT={0}".format(review_result),
-                  "_UPDREPO=True",
-                  "_REPO={0}".format(repo),
-                  "_REPO_DIR={0}".format(repodir)]
-
-        self.do_docker_clean("update_repo")
-        hconfig = doc_util.get_host_config('repo_update', self.upd_repo_result)
-
-        try:
-            container = doc.create_container("antergos/makepkg", command=command,
-                                             name="update_repo", environment=pkgenv,
-                                             volumes=['/makepkg', '/root/.gnupg', '/main',
-                                                      '/result', '/staging'],
-                                             host_config=hconfig)
-            db.set('update_repo_container', container.get('Id', ''))
-            doc.start(container.get('Id'))
-            if not is_review:
-                stream_process = Process(target=self.publish_build_ouput,
-                                         kwargs=dict(container=container.get('Id'),
-                                                     bld_obj=bld_obj,
-                                                     upd_repo=True,
-                                                     tnum=self.tnum))
-                stream_process.start()
-
-            result = doc.wait(container.get('Id'))
-            if not is_review:
-                stream_process.join()
-
-            if result != 0:
-                logger.error('update repo failed. exit status is: %s', result)
-            else:
-                doc.remove_container(container, v=True)
-
-        except Exception as err:
-            result = 1
-            logger.error('Start container failed. Error Msg: %s' % err)
-
-        if self.is_dev_review:
-            if not status.idle:
-                if building_saved:
-                    status.current_status = building_saved
-                else:
-                    status.idle = True
-                    status.current_status = 'Idle.'
-
-        if result != 0:
-            return False
-        else:
-            return True
-
     def build_package(self, pkg):
         if pkg is None:
             return False
@@ -573,12 +480,14 @@ class Transaction(TransactionMeta):
         pbpath = self.get_package_build_directory(pkg)
         pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
         self.building = pkg
+        status.current_status = 'Building {0}-{1} with makepkg.'.format(pkg, pkg_obj.version_str)
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
 
         bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg], self.tnum)
         self.builds.add(bld_obj.bnum)
+        status.now_building_add(bld_obj.bnum)
 
         self.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)
@@ -642,7 +551,8 @@ class Transaction(TransactionMeta):
                 msg = 'Updating staging repo database..'
                 db.publish('build-output', msg)
                 status.current_status = msg
-                repo_updated = self.update_repo(review_result='staging', bld_obj=bld_obj)
+                repo_updated = self._staging_repo.update_repo(bld_obj=bld_obj,
+                                                              publish_build_output=self.publish_build_ouput)
 
         if repo_updated:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
@@ -660,6 +570,7 @@ class Transaction(TransactionMeta):
         bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
         self.building = ''
+        status.now_building_remove(bld_obj.bnum)
         if not bld_obj.failed:
             pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
