@@ -489,7 +489,7 @@ class Transaction(TransactionMeta):
         self.builds.add(bld_obj.bnum)
         status.now_building_add(bld_obj.bnum)
 
-        self.do_docker_clean(pkg_obj.name)
+        doc_util.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)
 
         build_env = ['_AUTOSUMS=True'] if pkg_obj.autosum else ['_AUTOSUMS=False']
@@ -707,7 +707,7 @@ class Transaction(TransactionMeta):
 
         if not bld_obj.failed:
             remove('/opt/archlinux-mkarchiso/antergos-iso')
-            self.do_docker_clean(pkg_obj.name)
+            doc_util.do_docker_clean(pkg_obj.name)
             return True
 
         return False

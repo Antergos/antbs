@@ -54,6 +54,8 @@ class DockerUtils(metaclass=Singleton):
     def __init__(self):
         self.cache_dir = '/var/tmp/pkg_cache'
         self.cache_i686 = '/var/tmp/pkg_cache_i686'
+        self.is_building_images = False
+
         self.result_dir = '/tmp/pkgver_result'
         if os.path.exists(self.result_dir):
             shutil.rmtree(self.result_dir)

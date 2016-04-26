@@ -60,6 +60,8 @@ class LoggingConfig(metaclass=Singleton):
         logging.config.dictConfig(self.get_logging_config())
 
         self.logger = logging.getLogger('antbs')
+        bugsnag_handler = BugsnagHandler()
+        bugsnag_handler.setLevel(logging.WARNING)
         self.logger.addHandler(BugsnagHandler())
         self._initialized = True
         logger = None

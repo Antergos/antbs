@@ -125,8 +125,8 @@ class PacmanRepo(RedisHash, metaclass=Singleton):
         with tarfile.open(dbfile, 'r') as pacman_db:
             for pkg in pacman_db.getnames():
                 pkg = pkg.split('/', 1)[0]
-                pkgname, ver = pkg.rsplit('-', 2)
-                pkgs.append('{0}|{1}'.format(pkgname, ver))
+                pkgname, ver, rel = pkg.rsplit('-', 2)
+                pkgs.append('{0}|{1}-{2}'.format(pkgname, ver, rel))
 
         self.pkgs_alpm = pkgs
         self.pkg_count_alpm = len(pkgs)
