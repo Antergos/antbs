@@ -591,7 +591,7 @@ class Transaction(TransactionMeta):
         try:
             doc.start(bld_obj.container)
             cont = bld_obj.container
-            stream_process = Process(target=self.publish_build_ouput,
+            stream_process = Process(target=self.publish_build_output,
                                      kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True,
                                                  tnum=self.tnum))
             stream_process.start()

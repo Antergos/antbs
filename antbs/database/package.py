@@ -252,8 +252,8 @@ class Package(PackageMeta):
             if self.name == 'pamac-dev':
                 setattr(self, 'git_name', 'pamac')
             elif self.name == 'cnchi-dev':
-                setattr(self, 'git_name', 'cnchi')
-                setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
+                setattr(self, 'git_name', 'cnchi-dev')
+                setattr(self, 'git_url', 'http://github.com/lots0logs/cnchi-dev.git')
             elif self.name == 'cnchi':
                 setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
 
@@ -350,7 +350,7 @@ class Package(PackageMeta):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if not any([x for x in changed if changed[x] is not None]):
+            if not any([True for x in changed if changed[x] is not None]):
                 return self.version_str
         else:
             old_val = self.pkgver

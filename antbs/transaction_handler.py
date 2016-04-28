@@ -39,6 +39,7 @@ import utils.docker_util as docker_utils
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
+from database.build import get_build_object
 from database.repo import get_repo_object
 from rq import Connection, Queue, Worker
 from rq import get_current_job
@@ -116,13 +117,11 @@ def handle_hook():
         logger.info('All builds completed.')
 
 
-def process_dev_review(review_result, pkgname, tnum):
+def process_dev_review(bnum):
     saved_status = set_server_status(True, is_review=True)
 
-    trans_obj = get_trans_object(tnum=tnum, repo_queue=repo_queue)
+    bld_obj = get_build_object(bnum=bnum)
     repo_obj = get_repo_object('antergos')
-    trans_obj.is_dev_review = True
-    repo_obj.update_repo(review_result=review_result, is_review=True, rev_pkgname=pkgname,
-                         publish_build_output=trans_obj.publish_build_ouput)
+    repo_obj.update_repo(bld_obj=bld_obj, review_result=bld_obj.review_status)
 
     set_server_status(False, saved_status)

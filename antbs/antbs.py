@@ -329,7 +329,7 @@ def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
 
 
-def set_pkg_review_result(bnum=None, dev=None, result=None):
+def set_pkg_review_result(bnum=False, dev=False, result=False):
     if not any([bnum, dev, result]):
         abort(500)
 
@@ -376,7 +376,7 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(transaction_handler.process_dev_review,
-                                        (result, bld_obj.pkgname, bld_obj.tnum), timeout=9600)
+                                        (bld_obj.bnum), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -537,47 +537,39 @@ def homepage(tlpage=None):
 @app.route("/building")
 @app.route("/building/<int:bnum>")
 def building(bnum=None):
-    bld = bnum
-    start = ''
     if status.now_building and not status.idle:
-        if not bld:
-            bld = status.now_building[0]
-
         try:
-            bld_obj = get_build_object(bnum=bld)
-        except Exception:
-            bld_obj = None
+            bld_objs = {b: get_build_object(bnum=b) for b in status.now_building if b}
+        except Exception as err:
+            logger.error(err)
+            abort(500)
+        if not bnum:
+            bnum = sorted(bld_objs.keys())[0]
 
-        if bld_obj:
-            start = bld_obj.start_str
-            ver = bld_obj.version_str
-            container = bld_obj.container
+        selected = dict(bnum=bnum, pkgname=bld_objs[bnum].pkgname,
+                        version=bld_objs[bnum].version_str, start=bld_objs[bnum].start_str,
+                        container=bld_objs[bnum].container)
 
-    if not start:
-        start = ver = container = ''
-
-    return render_template("building.html", container=container, bnum=bld, start=start,
-                           ver=ver, idle=status.idle)
+    return render_template('building.html', bld_objs=bld_objs, selected=selected)
 
 
 @app.route('/get_log')
 @app.route("/get_log/<int:bnum>")
 def get_log(bnum=None):
-    bld = bnum
     if status.idle or not status.now_building:
         abort(404)
 
-    if not bld:
-        bld = status.now_building[0]
+    if not bnum:
+        bnum = status.now_building[0]
 
-    if not bld:
+    if not bnum:
         abort(404)
 
     headers = {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
     }
-    return Response(get_live_build_output(bld), direct_passthrough=True,
+    return Response(get_live_build_output(bnum), direct_passthrough=True,
                     mimetype='text/event-stream', headers=headers)
 
 

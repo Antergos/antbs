@@ -1,126 +1,140 @@
 {% extends "base.html" %}
 
-{% block pagetitle -%}<i class="glyphicon glyphicon-briefcase"></i> Building{%- endblock pagetitle %}
+{% block pagetitle -%}Now Building{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
 {%- block topcontent -%}
-        <div class="col-md-4">
-            <div id="summary"
-                 class="block no-padding block-color primary">
-                <div class="header">
-                    <div class="actions">
-                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
-                    </div>
-                    <h3>
-                        <i class="fa fa-archive"></i>
+	<div class="col-md-4">
+		<div id="summary"
+			 class="block no-padding block-color primary">
+			<div class="header">
+				<div class="actions">
+					<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+					<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+					<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+				</div>
+				<h3>
+					<i class="fa fa-archive"></i>
 
-                        Build Number: {{ bnum }}</h3>
-                </div>
-                <div class="content no-padding">
-                    <table id="noDt" class="table no-border hover">
-                        <tbody class="no-border-y">
-                        <tr>
-                            <td>Package:</td>
-                            <td>{{ building }}</td>
-                        </tr>
-                        <tr>
-                            <td>Version:</td>
-                            <td>{{ ver }}</td>
-                        </tr>
-                        <tr>
-                            <td>Start:</td>
-                            <td>{{ start }}</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
+					Build Number: {{ selected.bnum }}</h3>
+			</div>
+			<div class="content no-padding">
+				<table id="noDt" class="table no-border hover">
+					<tbody class="no-border-y">
+					<tr>
+						<td>Build No.:</td>
+						<td>
+							<form>
+								<select id="build-number-select" name="build number">
+									{% for bnum, bld_obj in bld_objs.items() %}
+										<option value="{{ bld_obj.bnum }}"{% if selected.bnum == bld_obj.bnum %}selected{% endif %}>{{ bld_obj.bnum }}</option>
+									{% endfor %}
+								</select>
+							</form>
+						</td>
+					</tr>
+					<tr>
+						<td>Package:</td>
+						<td>{{ selected.pkgname }}</td>
+					</tr>
+					<tr>
+						<td>Version:</td>
+						<td>{{ selected.version }}</td>
+					</tr>
+					<tr>
+						<td>Start:</td>
+						<td>{{ selected.start }}</td>
+					</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
 
 {%- endblock topcontent -%}
 {% block bottomcontent -%}
-    <div class="row">
-    <div class="col-md-10">
-    <div id="" class="block">
-        <div class="header dark">
+	<div class="row">
+		<div class="col-md-10">
+			<div id="" class="block">
+				<div class="header dark">
 
-            <h3 class="hfloat">{% if not idle %}<i class="fa fa-cog fa-spin" style="font-size:26px;"></i>{% else %}<i class="fa fa-cog"></i>{% endif %} Live Build Output</h3>
-            {%- if not idle %}
-                <h5 class="hfloat"><strong>Docker Container ID:</strong> {{ container }}</h5>
-                {% else %}
-                <h5 class="hfloat">&nbsp;</h5>
-            {% endif -%}
-            <div class="actions">
-                <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-                <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-                <a class="close-down" href="#"><i class="fa fa-times"></i></a>
-            </div>
-        <div class="clearfix"></div>
+					<h3 class="hfloat">{% if not idle %}
+						<i class="fa fa-cog fa-spin" style="font-size:26px;"></i>{% else %}
+						<i class="fa fa-cog"></i>{% endif %} Live Build Output</h3>
+					{%- if not idle %}
+						<h5 class="hfloat"><strong>Docker Container ID:</strong> {{ selected.container[:7] }}</h5>
+					{% else %}
+						<h5 class="hfloat">&nbsp;</h5>
+					{% endif -%}
+					<div class="actions">
+						<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+						<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+						<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+					</div>
+					<div class="clearfix"></div>
 
-        </div>
-        <div class="content no-padding">
-            <div id="data" class="no-padding" style=height:350px;"></div>
-        </div>
-    </div>
-    </div>
-    </div>
+				</div>
+				<div class="content no-padding">
+					<div id="data" class="no-padding" style=height:350px;"></div>
+				</div>
+			</div>
+		</div>
+	</div>
 {%- endblock bottomcontent %}
 {#<link href="/static/css/prism.css" rel="stylesheet"/>#}
 {% block scripts %}
-    {{ super() }}
+	{{ super() }}
 
-    {# {%- for line in data %}
+	{# {%- for line in data %}
         <script type="text/javascript">
             $('#data').append('{{ line }}<br/>');
             $('#data').scrollTop($('#data')[0].scrollHeight);
         </script>
     {% endfor -%}#}
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js" type="text/javascript" charset="utf-8"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-sh.js" type="text/javascript" charset="utf-8"></script>
-    <script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
-    <script type="text/javascript">
-         jQuery(window).load(
-                function () {
-                    var editor = ace.edit("data");
-                    editor.getSession().setMode("ace/mode/sh");
-                    editor.setValue("{% if idle %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
-                    editor.setTheme("ace/theme/monokai");
-                    editor.setShowPrintMargin(false);
-                    editor.getSession().setUseWrapMode(true);
-                    editor.setReadOnly(true);
-                    editor.setHighlightActiveLine(false);
-                    editor.clearSelection();
-                    var doc = editor.getSession().getDocument();
-                    var sse = new EventSource('/get_log');
-                    var endOfLog = false,
-                            lastMsg = '';
-                    sse.addEventListener("build_output", function (message) {
-                        if (false === endOfLog) {
-                            if (message.data.indexOf('ENDOFLOG') >= 0) {
-                                console.log('ENDOFLOG');
-                                endOfLog = true;
-                                sse.close();
-                                jQuery('.fa-spin').removeClass('fa-spin');
-                                jQuery('.header_dark h5').css('color', 'transparent');
-                                return;
-                            }
-                            if (message.data.indexOf("There are no active builds") >= 0) {
-                                editor.insert(message.data);
-                                jQuery('.fa-spin').removeClass('fa-spin');
-                                jQuery('.header_dark h5').css('color', 'transparent');
-                                console.log('NO ACTIVE BUILDS');
+	<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/ace.js" type="text/javascript" charset="utf-8"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-sh.js" type="text/javascript" charset="utf-8"></script>
+	<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
+	<script type="text/javascript">
+		jQuery(window).load(
+			function () {
+				var editor = ace.edit("data");
+				editor.getSession().setMode("ace/mode/sh");
+				editor.setValue("{% if idle %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
+				editor.setTheme("ace/theme/monokai");
+				editor.setShowPrintMargin(false);
+				editor.getSession().setUseWrapMode(true);
+				editor.setReadOnly(true);
+				editor.setHighlightActiveLine(false);
+				editor.clearSelection();
+				var doc = editor.getSession().getDocument();
+				var sse = new EventSource('/get_log/{{ selected.bnum }}');
+				var endOfLog = false,
+					lastMsg = '';
+				sse.addEventListener("build_output", function (message) {
+					if (false === endOfLog) {
+						if (message.data.indexOf('ENDOFLOG') >= 0) {
+							console.log('ENDOFLOG');
+							endOfLog = true;
+							sse.close();
+							jQuery('.fa-spin').removeClass('fa-spin');
+							jQuery('.header_dark h5').css('color', 'transparent');
+							return;
+						}
+						if (message.data.indexOf("There are no active builds") >= 0) {
+							editor.insert(message.data);
+							jQuery('.fa-spin').removeClass('fa-spin');
+							jQuery('.header_dark h5').css('color', 'transparent');
+							console.log('NO ACTIVE BUILDS');
 
-                                sse.close();
-                                return;
-                            }
-                            if (message.data === lastMsg) return;
-                            lastMsg = message.data;
-                            pos = doc.getLength();
-                            doc.insert({row: pos, column: -1}, '\n' + message.data);
-                        }
-                    });
-                });
-    </script>
-    {#    <script src="/static/js/prism.js"></script>#}
+							sse.close();
+							return;
+						}
+						if (message.data === lastMsg) return;
+						lastMsg = message.data;
+						pos = doc.getLength();
+						doc.insert({row: pos, column: -1}, '\n' + message.data);
+					}
+				});
+			});
+	</script>
+	{#    <script src="/static/js/prism.js"></script>#}
 {% endblock scripts %}
