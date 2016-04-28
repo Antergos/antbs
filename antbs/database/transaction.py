@@ -494,8 +494,8 @@ class Transaction(TransactionMeta):
             status.completed.rpush(bld_obj.bnum)
             bld_obj.review_status = 'pending'
         else:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'
-            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
+            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=5)
             bld_obj.failed = True
             bld_obj.completed = False

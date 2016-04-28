@@ -130,7 +130,7 @@ class Build(RedisHash):
         """
         return dt.strftime("%m/%d/%Y %I:%M%p")
 
-    def publish_build_ouput(self, upd_repo=False):
+    def publish_build_output(self, upd_repo=False):
         if not self.container or (upd_repo and not self.repo_container):
             logger.error('Unable to publish build output. (Container is None)')
             return
