@@ -46,7 +46,7 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
             raise ValueError('ip is required to initialize this class')
 
         if not install_id:
-            install_id = self.db.incr(next_install_id_key)
+            install_id = db.incr(next_install_id_key)
 
         super().__init__(namespace=namespace, prefix=prefix, key=install_id, *args, **kwargs)
 

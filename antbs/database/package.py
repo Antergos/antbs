@@ -133,12 +133,12 @@ class Package(PackageMeta):
     def __init__(self, name, pbpath=None):
         super().__init__(key=name)
 
-        if not pbpath:
+        if not pbpath or not os.path.exists(pbpath):
             self.determine_pbpath()
         else:
             self.pbpath = pbpath
 
-        if os.path.isdir(pbpath):
+        if os.path.isdir(self.pbpath):
             self.pbpath = os.path.join(pbpath, 'PKGBUILD')
 
         if not os.path.exists(self.pbpath):
@@ -267,9 +267,9 @@ class Package(PackageMeta):
             if os.path.exists(p):
                 ppath = os.path.join(p, 'PKGBUILD')
                 logger.info(ppath)
-                if os.path.exists(ppath) and ('cinnamon' != self.pkgname and paths[0] == p):
+                if os.path.exists(ppath):
                     self.pbpath = ppath
-                    if p == paths[0] and 'cinnamon' != self.pkgname and len(self.allowed_in) == 0:
+                    if p == paths[0] and len(self.allowed_in) == 0:
                         self.allowed_in.append('main')
                     break
         else:

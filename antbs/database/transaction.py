@@ -29,10 +29,6 @@ import tempfile
 import time
 from multiprocessing import Process
 
-from pygments import highlight
-from pygments.formatters import HtmlFormatter
-from pygments.lexers import BashLexer
-
 import utils.docker_util as docker_util
 from utils.logging_config import logger
 from utils.sign_pkgs import sign_packages
@@ -78,7 +74,7 @@ class TransactionMeta(RedisHash):
 
         self.key_lists.update(dict(
             string=['building', 'start_str', 'end_str'],
-            bool=['is_running', 'is_finished', 'is_dev_review'],
+            bool=['is_running', 'is_finished'],
             int=['tnum'],
             list=['queue'],
             set=['packages', 'builds', 'completed', 'failed'],
@@ -164,6 +160,7 @@ class Transaction(TransactionMeta):
                 for partial in ['i686', 'x86_64']:
                     if partial in pkg:
                         is_iso = True
+                        pkg_obj.is_iso = True
                         break
 
                 if is_iso:
@@ -391,8 +388,7 @@ class Transaction(TransactionMeta):
         except ValueError as err:
             logger.error(err)
 
-    @staticmethod
-    def process_and_save_build_metadata(pkg_obj=None, version_str=None, tnum=None):
+    def process_and_save_build_metadata(self, pkg_obj, version_str=None):
         """
         Creates a new build for a package, initializes the build data, and returns a build object.
 
@@ -404,10 +400,9 @@ class Transaction(TransactionMeta):
 
         """
 
-        bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=tnum)
+        bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum)
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
-        status.building_start = bld_obj.start_str
 
         tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
         tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, version_str)
@@ -415,67 +410,12 @@ class Transaction(TransactionMeta):
         get_timeline_object(msg=tlmsg, tl_type=3, ret=False)
 
         pkg_obj.builds.append(bld_obj.bnum)
+        self.builds.add(bld_obj.bnum)
+        status.now_building.append(bld_obj.bnum)
 
         return bld_obj
 
-    # @staticmethod
-    # def push_new_checksums_to_github(self, pkg_obj):
-
-
-
-    @staticmethod
-    def publish_build_ouput(container=None, bld_obj=None, upd_repo=False, is_iso=False, tnum=None):
-        if not container and not bld_obj or not tnum:
-            logger.error('Unable to publish build output. (Container is None)')
-            return
-
-        output = doc.logs(container=bld_obj.container, stream=True)
-        nodup = CustomSet()
-        content = []
-        live_output_key = 'live:build_output:{0}'.format(tnum)
-        last_line_key = 'tmp:build_log_last_line:{0}'.format(tnum)
-        for line in output:
-            line = line.decode('UTF-8').rstrip()
-            if not line or 'makepkg]# PS1="' in line:
-                continue
-            end = line[25:]
-            if nodup.add(end):
-                line = line.replace("'", '')
-                line = line.replace('"', '')
-                line = '[{0}]: {1}'.format(
-                    datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
-
-                content.append(line)
-                db.publish(live_output_key, line)
-                db.setex(last_line_key, 3600, line)
-
-        result_ready = bld_obj.completed != bld_obj.failed
-        if not result_ready:
-            while not result_ready:
-                result_ready = bld_obj.completed != bld_obj.failed
-                time.sleep(2)
-
-        if upd_repo or bld_obj.failed:
-            db.publish('build-output', 'ENDOFLOG')
-
-        existing = True
-        if len(bld_obj.log) < 1 and not bld_obj.failed and not is_iso:
-            existing = False
-
-        for line in content:
-            bld_obj.log.rpush(line)
-
-        if existing:
-            log_content = '\n '.join(bld_obj.log)
-            bld_obj.log_str = highlight(log_content,
-                                        BashLexer(),
-                                        HtmlFormatter(style='monokai',
-                                                      linenos='inline',
-                                                      prestyles="background:#272822;color:#fff;"))
-
     def build_package(self, pkg):
-        if pkg is None:
-            return False
 
         pbpath = self.get_package_build_directory(pkg)
         pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
@@ -483,11 +423,9 @@ class Transaction(TransactionMeta):
         status.current_status = 'Building {0}-{1} with makepkg.'.format(pkg, pkg_obj.version_str)
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
-        db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 3600, in_dir_last)
+        db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 86400, in_dir_last)
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg], self.tnum)
-        self.builds.add(bld_obj.bnum)
-        status.now_building_add(bld_obj.bnum)
+        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg])
 
         doc_util.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg)
@@ -523,9 +461,7 @@ class Transaction(TransactionMeta):
         cont = container.get('Id', '')
         bld_obj.container = cont
         status.container = cont
-        stream_process = Process(target=self.publish_build_ouput, kwargs=dict(container=cont,
-                                                                              bld_obj=bld_obj,
-                                                                              tnum=self.tnum))
+        stream_process = Process(target=bld_obj.publish_build_ouput, kwargs=dict(upd_repo=False))
 
         try:
             doc.start(cont)
@@ -536,25 +472,22 @@ class Transaction(TransactionMeta):
                 tpl = 'Container %s exited with a non-zero return code. Return code was %s'
                 logger.error(tpl, pkg_obj.name, result)
             else:
-                logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
                 bld_obj.completed = True
+                logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
         except Exception as err:
-            logger.error('Start container failed. Error Msg: %s' % err)
             bld_obj.failed = True
+            logger.error('Start container failed. Error Msg: %s', err)
 
         stream_process.join()
 
-        repo_updated = False
+        packages_signed = False
         if bld_obj.completed:
             logger.debug('bld_obj.completed!')
             if sign_packages(bld_obj.pkgname):
-                msg = 'Updating staging repo database..'
-                db.publish('build-output', msg)
-                status.current_status = msg
-                repo_updated = self._staging_repo.update_repo(bld_obj=bld_obj,
-                                                              publish_build_output=self.publish_build_ouput)
+                packages_signed = True
+                self._staging_repo.update_repo(bld_obj=bld_obj)
 
-        if repo_updated:
+        if packages_signed:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
             tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
@@ -570,16 +503,14 @@ class Transaction(TransactionMeta):
         bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
         self.building = ''
-        status.now_building_remove(bld_obj.bnum)
+        status.now_building.remove(bld_obj.bnum)
         if not bld_obj.failed:
             pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
-            if not last_build:
-                return True
-
-            last_bld_obj = get_build_object(bnum=last_build)
-            if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
-                last_bld_obj.review_status = 'skip'
+            if last_build:
+                last_bld_obj = get_build_object(bnum=last_build)
+                if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
+                    last_bld_obj.review_status = 'skip'
 
             return True
 
@@ -591,7 +522,7 @@ class Transaction(TransactionMeta):
 
         status.iso_building = True
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj, tnum=self.tnum)
+        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
         build_id = bld_obj.bnum
 
         self.fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])

@@ -35,12 +35,14 @@ import os
 import redis
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
+db4 = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True, db=4)
 
 
 class RedisObject:
     """ A base object backed by redis. This is not meant to be used directly. """
 
     db = db
+    db4 = db4
 
     def __init__(self, full_key=None, *args, **kwargs):
         """ Create or load a RedisObject. """
@@ -51,11 +53,16 @@ class RedisObject:
         else:
             raise ValueError('A key is required to initialize a redis object.')
 
+        if type(self).__name__ in ['AntergosInstallation', 'AntergosInstallationUser']:
+            self._db = self.db4
+        else:
+            self._db = self.db
+
     def __bool__(self):
         """ Tests if this object currently exists in redis. """
         if isinstance(self, RedisList) and len(self) < 1:
             return False
-        return self.db.exists(self.full_key)
+        return self._db.exists(self.full_key)
 
     def __nonzero__(self):
         return self.__bool__()
@@ -85,20 +92,20 @@ class RedisObject:
             if isinstance(self, RedisList):
                 return [
                     RedisObject.decode_value(self.item_type, el)
-                    for el in self.db.lrange(self.full_key, index.start, index.stop)
+                    for el in self._db.lrange(self.full_key, index.start, index.stop)
                     ]
             if isinstance(self, RedisZSet):
                 return [
                     RedisObject.decode_value(self.item_type, el)
-                    for el in self.db.zrange(self.full_key, index.start, index.stop)
+                    for el in self._db.zrange(self.full_key, index.start, index.stop)
                     ]
 
         else:
-            return RedisObject.decode_value(self.item_type, self.db.lindex(self.full_key, index))
+            return RedisObject.decode_value(self.item_type, self._db.lindex(self.full_key, index))
 
     def delete(self):
         """ Delete this object from redis. """
-        self.db.delete(self.full_key)
+        self._db.delete(self.full_key)
 
     def __jsonable__(self):
         """
@@ -190,25 +197,25 @@ class RedisList(RedisObject, list):
 
     def __setitem__(self, index, val):
         """ Update an item by index. """
-        self.db.lset(self.full_key, index, super().encode_value(val))
+        self._db.lset(self.full_key, index, super().encode_value(val))
 
     def __len__(self):
         """ Return the size of the list. """
-        return self.db.llen(self.full_key)
+        return self._db.llen(self.full_key)
 
     def __delitem__(self, index):
         """ Delete an item from a RedisList by index. """
-        self.db.lset(self.full_key, index, '__DELETED__')
-        self.db.lrem(self.full_key, 1, '__DELETED__')
+        self._db.lset(self.full_key, index, '__DELETED__')
+        self._db.lrem(self.full_key, 1, '__DELETED__')
 
     def __iter__(self):
         """ Iterate over all items in this list. """
-        for el in self.db.lrange(self.full_key, 0, -1):
+        for el in self._db.lrange(self.full_key, 0, -1):
             yield super().decode_value(self.item_type, el)
 
     def __contains__(self, item):
         """ Check if item is in this list. """
-        items = self.db.lrange(self.full_key, 0, -1)
+        items = self._db.lrange(self.full_key, 0, -1)
         return item in items
 
     def __add__(self, other_list):
@@ -217,29 +224,29 @@ class RedisList(RedisObject, list):
 
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
-        return super().decode_value(self.item_type, self.db.lpop(self.full_key))
+        return super().decode_value(self.item_type, self._db.lpop(self.full_key))
 
     def rpop(self):
         """ Remove a value from the right (high) end of the list. """
-        return super().decode_value(self.item_type, self.db.rpop(self.full_key))
+        return super().decode_value(self.item_type, self._db.rpop(self.full_key))
 
     def lpush(self, val):
         """ Add an item to the left (low) end of the list. """
-        self.db.lpush(self.full_key, super().encode_value(val))
+        self._db.lpush(self.full_key, super().encode_value(val))
 
     def rpush(self, val):
         """ Add an item to the right (high) end of the list. """
-        self.db.rpush(self.full_key, super().encode_value(val))
+        self._db.rpush(self.full_key, super().encode_value(val))
 
     def append(self, val):
         self.rpush(val)
 
     def reverse(self):
-        cp = list(self.db.lrange(self.full_key, 0, -1))
+        cp = list(self._db.lrange(self.full_key, 0, -1))
         return cp.reverse()
 
     def remove(self, val):
-        self.db.lrem(self.full_key, 0, val)
+        self._db.lrem(self.full_key, 0, val)
 
 
 class RedisZSet(RedisObject, set):
@@ -264,11 +271,11 @@ class RedisZSet(RedisObject, set):
 
     def __len__(self):
         """ Return the size of the set. """
-        return self.db.zcard(self.full_key) if self.db.exists(self.full_key) else 0
+        return self._db.zcard(self.full_key) if self._db.exists(self.full_key) else 0
 
     def __iter__(self):
         """ Iterate over all items in this set. """
-        for el in self.db.zrange(self.full_key, 0, -1):
+        for el in self._db.zrange(self.full_key, 0, -1):
             yield super().decode_value(self.item_type, el)
 
     def __str__(self):
@@ -277,7 +284,7 @@ class RedisZSet(RedisObject, set):
 
     def __contains__(self, item):
         """ Check if item is in the set. """
-        return item in self.db.zrange(self.full_key, 0, -1)
+        return item in self._db.zrange(self.full_key, 0, -1)
 
     def add(self, *values):
         """ Add member to set if it doesn't exist. """
@@ -285,15 +292,15 @@ class RedisZSet(RedisObject, set):
         for val in values:
             vals.append(1)
             vals.append(val)
-        self.db.zadd(self.full_key, *vals)
+        self._db.zadd(self.full_key, *vals)
 
     def remove(self, val):
         """ Remove a member from the set. """
-        self.db.zrem(self.full_key, super().encode_value(val))
+        self._db.zrem(self.full_key, super().encode_value(val))
 
     def ismember(self, val):
         """ Check if value is a member of set. """
-        rank = self.db.zrank(self.full_key, super().encode_value(val))
+        rank = self._db.zrank(self.full_key, super().encode_value(val))
         return True if rank else False
 
 
@@ -376,7 +383,7 @@ class RedisHash(RedisObject):
 
     def __len__(self):
         """ Return the len of this object (total number of fields in its redis hash). """
-        return int(self.db.hlen(self.full_key))
+        return int(self._db.hlen(self.full_key))
 
     def __getitem__(self, item):
         """ Get and return the value of a field (item) from this objects redis hash."""
@@ -397,7 +404,7 @@ class RedisHash(RedisObject):
         """ Get attribute value if stored in redis otherwise pass call to parent class """
 
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
-                     'key', 'full_key', 'prefix', 'db', 'full_key']
+                     'key', 'full_key', 'prefix', 'db', 'full_key', 'db4', '_db']
 
         if attrib in pass_list or attrib not in self.all_keys:
             return super().__getattribute__(attrib)
@@ -405,14 +412,14 @@ class RedisHash(RedisObject):
         key = self.full_key
 
         if attrib in self.key_lists['string'] + self.key_lists['path']:
-            return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else '_'
+            return self._db.hget(key, attrib) if self._db.hexists(key, attrib) else '_'
 
         elif attrib in self.key_lists['bool']:
-            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else ''
+            val = self._db.hget(key, attrib) if self._db.hexists(key, attrib) else ''
             return self.bool_string_helper(val) if '' != val else ''
 
         elif attrib in self.key_lists['int']:
-            return int(self.db.hget(key, attrib)) if self.db.hexists(key, attrib) else ''
+            return int(self._db.hget(key, attrib)) if self._db.hexists(key, attrib) else ''
 
         elif attrib in self.key_lists['list']:
             return RedisList.as_child(self, attrib, str)
@@ -424,7 +431,7 @@ class RedisHash(RedisObject):
         """ Set attribute value if stored in redis otherwise pass call to parent class """
 
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
-                     'key', 'full_key', 'prefix', 'db', 'full_key']
+                     'key', 'full_key', 'prefix', 'db', 'full_key', 'db4', '_db']
 
         # Note: These two statements cannot be combined (causes an exception during object init)
         if attrib in pass_list or attrib not in self.all_keys:
@@ -435,18 +442,18 @@ class RedisHash(RedisObject):
         key = self.full_key
 
         if attrib in self.key_lists['string'] + self.key_lists['int']:
-            self.db.hset(key, attrib, value)
+            self._db.hset(key, attrib, value)
 
         elif attrib in self.key_lists['bool']:
             if value in [True, False]:
-                self.db.hset(key, attrib, self.bool_string_helper(value))
+                self._db.hset(key, attrib, self.bool_string_helper(value))
             else:
                 raise ValueError('{0}.{1} must be of type(bool), {2} given.'.format(
                     self.__class__.__name__, attrib, value))
 
         elif attrib in self.key_lists['path']:
             if self.is_pathname_valid(value):
-                self.db.hset(key, attrib, value)
+                self._db.hset(key, attrib, value)
             else:
                 raise ValueError('{0}.{1} must be a valid pathname (str), {2} given.'.format(
                     self.__class__.__name__, attrib, value))

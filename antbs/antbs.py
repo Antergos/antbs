@@ -354,8 +354,10 @@ def set_pkg_review_result(bnum=None, dev=None, result=None):
             errmsg = dict(error=False, msg=None)
             return errmsg
 
-        pkg_files_64 = glob.glob('{0}/{1}-***'.format(status.STAGING_64, pkg_obj.pkgname))
-        pkg_files_32 = glob.glob('{0}/{1}***'.format(status.STAGING_32, pkg_obj.pkgname))
+        glob_string_64 = '{0}/**/{1}-***'.format(status.STAGING_64, pkg_obj.pkgname)
+        glob_string_32 = '{0}/**/{1}-***'.format(status.STAGING_32, pkg_obj.pkgname)
+        pkg_files_64 = glob.glob(glob_string_64, recursive=True)
+        pkg_files_32 = glob.glob(glob_string_32, recursive=True)
         pkg_files = pkg_files_64 + pkg_files_32
 
         if pkg_files:
@@ -615,10 +617,9 @@ def list_builds(build_status=None, page=None, name=None):
 
     builds, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
     pagination = utils.pagination.Pagination(page, 10, all_pages)
-    tpl = "builds/{0}.html".format(build_status)
 
-    return render_template(tpl, builds=builds, all_pages=all_pages, pagination=pagination,
-                           build_status=build_status)
+    return render_template('builds/listing.html', builds=builds, all_pages=all_pages,
+                           pagination=pagination, build_status=build_status)
 
 
 @app.route('/build/<int:num>')
@@ -801,10 +802,10 @@ def get_status():
             transaction_queue.empty()
         if repo_queue.count > 0:
             repo_queue.empty()
-        items = len(status.queue)
+        items = len(status.transaction_queue)
         if items > 0:
             for item in range(items):
-                popped = status.queue.rpop()
+                popped = status.transaction_queue.rpop()
                 logger.debug(popped)
         status.idle = True
         status.current_status = 'Idle.'

@@ -42,7 +42,7 @@ doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
 
 
-class PacmanRepo(RedisHash, metaclass=Singleton):
+class PacmanRepo(RedisHash):
     """
     This class represents a "repo" throughout this application. It is used to
     get/set metadata about the repos that this application manages from/to the database.
@@ -79,12 +79,12 @@ class PacmanRepo(RedisHash, metaclass=Singleton):
         super().__init__(prefix=prefix, key=name)
 
         self.key_lists.update(
-                dict(string=['name'],
-                     bool=['locked'],
-                     int=['pkg_count_alpm', 'pkg_count_fs'],
-                     list=[],
-                     set=['pkgs_fs', 'pkgs_alpm'],
-                     path=['path']))
+            dict(string=['name'],
+                 bool=['locked'],
+                 int=['pkg_count_alpm', 'pkg_count_fs'],
+                 list=[],
+                 set=['pkgs_fs', 'pkgs_alpm'],
+                 path=['path']))
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
 
@@ -131,37 +131,29 @@ class PacmanRepo(RedisHash, metaclass=Singleton):
         self.pkgs_alpm = pkgs
         self.pkg_count_alpm = len(pkgs)
 
-    def update_repo(self, review_result=None, bld_obj=None, is_review=False, rev_pkgname=None,
-                    is_action=False, action=None, action_pkg=None, result_dir=None,
-                    publish_build_output=None):
-        if not review_result:
-            raise ValueError('review_result cannot be None.')
-        elif not any([bld_obj, is_review]):
+    def update_repo(self, bld_obj=False, pkg_obj=False, action=False, review_result=False,
+                    result_dir='/tmp/update_repo_redult'):
+
+        if not any([bld_obj, review_result]):
             raise ValueError('at least one of [bld_obj, is_review] required.')
 
-        container = None
-        rev_result = review_result
         repodir = 'staging' if 'staging' in self.name else 'main'
-
-        if self.locked:
-            while self.locked:
-                gevent.sleep(2)
-
-        self.locked = True
-
         building_saved = False
-        if not status.idle and status.current_status != 'Updating repo database.':
+        update_repo_status_msg = 'Updating {0} repo database.'.format(self.name)
+
+        if not status.idle and status.current_status != update_repo_status_msg:
             building_saved = status.current_status
         else:
             status.idle = False
-        status.current_status = 'Updating repo database.'
+
+        status.current_status = update_repo_status_msg
 
         if os.path.exists(result_dir):
             remove(result_dir)
         os.mkdir(result_dir, 0o777)
 
-        if rev_pkgname is not None:
-            pkgname = rev_pkgname
+        if review_result:
+            pkgname = pkg_obj.name
         else:
             pkgname = bld_obj.pkgname
 
@@ -172,31 +164,28 @@ class PacmanRepo(RedisHash, metaclass=Singleton):
                   "_REPO={0}".format(self.name),
                   "_REPO_DIR={0}".format(repodir)]
 
-        self.do_docker_clean("update_repo")
-        hconfig = doc_util.get_host_config('repo_update', self.upd_repo_result)
+        doc_util.do_docker_clean("update_repo")
+        hconfig = doc_util.get_host_config('repo_update', result_dir)
+        volumes = ['/makepkg', '/root/.gnupg', '/main', '/result', '/staging']
 
         try:
             container = doc.create_container("antergos/makepkg", command=command,
                                              name="update_repo", environment=pkgenv,
-                                             volumes=['/makepkg', '/root/.gnupg', '/main',
-                                                      '/result', '/staging'],
-                                             host_config=hconfig)
+                                             volumes=volumes, host_config=hconfig)
 
             cont = container.get('Id')
+            bld_obj.repo_container = cont
             doc.start(cont)
-            if not is_review:
-                stream_process = Process(target=publish_build_output,
-                                         kwargs=dict(container=cont,
-                                                     bld_obj=bld_obj,
-                                                     upd_repo=True,
-                                                     tnum=self.tnum))
+            if not review_result:
+                stream_process = Process(target=bld_obj.publish_build_output,
+                                         kwargs=dict(upd_repo=True))
                 stream_process.start()
 
             result = doc.wait(cont)
-            if not is_review:
+            if not review_result:
                 stream_process.join()
 
-            if result != 0:
+            if int(result) != 0:
                 logger.error('update repo failed. exit status is: %s', result)
             else:
                 doc.remove_container(container, v=True)
@@ -205,20 +194,32 @@ class PacmanRepo(RedisHash, metaclass=Singleton):
             result = 1
             logger.error('Start container failed. Error Msg: %s' % err)
 
-        if is_review:
-            if not status.idle:
-                if building_saved:
-                    status.current_status = building_saved
-                else:
-                    status.idle = True
-                    status.current_status = 'Idle.'
+        if not status.idle:
+            if building_saved:
+                status.current_status = building_saved
+            else:
+                status.idle = True
+                status.current_status = 'Idle.'
 
-        if result != 0:
-            return False
-        else:
-            return True
+        return result == 0
+
+
+class AntergosRepo(PacmanRepo, metaclass=Singleton):
+    def __init__(self, name='antergos', *args, **kwargs):
+        super().__init__(name=name, *args, **kwargs)
+
+
+class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
+    def __init__(self, name='antergos-staging', *args, **kwargs):
+        super().__init__(name=name, *args, **kwargs)
 
 
 def get_repo_object(name, path=None):
-    return PacmanRepo(name=name, path=path)
+    if 'antergos' == name:
+        repo = AntergosRepo(name=name, path=path)
+    elif 'antergos-staging' == name:
+        repo = AntergosStagingRepo(name=name, path=path)
+    else:
+        raise TypeError('name must be one of [antergos, antergos-staging]')
 
+    return repo

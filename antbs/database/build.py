@@ -26,9 +26,19 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+import gevent
+from pygments import highlight
+from pygments.formatters import HtmlFormatter
+from pygments.lexers import BashLexer
 
 from database.base_objects import RedisHash
 from utils.logging_config import logger
+from utils.docker_util import DockerUtils
+from utils.utilities import CustomSet
+from datetime import datetime
+
+
+doc = DockerUtils().doc
 
 
 class Build(RedisHash):
@@ -85,7 +95,8 @@ class Build(RedisHash):
         self.key_lists.update(
                 dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
                              'start_str', 'end_str', 'version_str', 'container', 'review_status',
-                             'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum'],
+                             'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
+                             'repo_container'],
                      bool=['failed', 'completed'],
                      int=[],
                      list=['log'],
@@ -118,6 +129,56 @@ class Build(RedisHash):
 
         """
         return dt.strftime("%m/%d/%Y %I:%M%p")
+
+    def publish_build_ouput(self, upd_repo=False):
+        if not self.container or (upd_repo and not self.repo_container):
+            logger.error('Unable to publish build output. (Container is None)')
+            return
+
+        container = self.container if not upd_repo else self.repo_container
+
+        output = doc.logs(container=container, stream=True)
+        nodup = CustomSet()
+        content = []
+        live_output_key = 'live:build_output:{0}'.format(self.bnum)
+        last_line_key = 'tmp:build_log_last_line:{0}'.format(self.bnum)
+        for line in output:
+            line = line.decode('UTF-8').rstrip()
+            if not line or 'makepkg]# PS1="' in line:
+                continue
+            end = line[25:]
+            if nodup.add(end):
+                line = line.replace("'", '')
+                line = line.replace('"', '')
+                line = '[{0}]: {1}'.format(datetime.now().strftime("%m/%d/%Y %I:%M%p"), line)
+
+                content.append(line)
+                self.db.publish(live_output_key, line)
+                self.db.setex(last_line_key, 3600, line)
+
+        result_ready = self.completed != self.failed
+        if not result_ready:
+            while not result_ready:
+                result_ready = self.completed != self.failed
+                gevent.sleep(2)
+
+        if upd_repo or self.failed:
+            self.db.publish('build-output', 'ENDOFLOG')
+
+        existing = True
+        if len(self.log) < 1 and not any([self.failed, self.is_iso]):
+            existing = False
+
+        for line in content:
+            self.log.rpush(line)
+
+        if existing:
+            log_content = '\n '.join(self.log)
+            self.log_str = highlight(log_content,
+                                     BashLexer(),
+                                     HtmlFormatter(style='monokai',
+                                                   linenos='inline',
+                                                   prestyles="background:#272822;color:#fff;"))
 
 
 def get_build_object(pkg_obj=None, bnum=None, tnum=None):

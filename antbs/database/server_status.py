@@ -65,25 +65,6 @@ class ServerStatus(RedisHash, metaclass=Singleton):
             self.iso_flag = False
             self.iso_building = False
 
-    def get_repo_lock(self, repo):
-        lock_key = 'antbs:misc:repo_locks:{0}'.format(repo)
-        if self.db.setnx(lock_key, True):
-            self.db.expire(lock_key, 300)
-            return True
-        return False
-
-    def release_repo_lock(self, repo):
-        lock_key = 'antbs:misc:repo_locks:{0}'.format(repo)
-        self.db.delete(lock_key)
-
-    def now_building_add(self, bnum):
-        if bnum not in self.now_building:
-            self.now_building.append(bnum)
-
-    def now_building_remove(self, bnum):
-        if bnum in self.now_building:
-            self.now_building.remove(bnum)
-
 
 class TimelineEvent(RedisHash, DateTimeStrings):
 
