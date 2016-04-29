@@ -79,10 +79,10 @@
 									{% endif %}
 									</td>
 									<td>
-									{% if build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
+									{% if '_' != build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
 									</td>
 									<td>
-									{% if build.review_date  %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}</td>
+									{% if '_' != build.review_date  %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}</td>
 								</tr>
 							{% else %}
 								<tr>
@@ -104,10 +104,10 @@
 									{% endif %}
 									</td>
 									<td>
-									{% if build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
+									{% if '_' != build.review_dev %}<i class="fa fa-user"></i>{{ build.review_dev }}{% else %}n/a{% endif %}
 									</td>
 									<td>
-									{% if build.review_date %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}
+									{% if '_' != build.review_date %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}
 									</td>
 								</tr>
 							{% endif %}

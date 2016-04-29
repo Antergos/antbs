@@ -461,7 +461,7 @@ class Transaction(TransactionMeta):
         cont = container.get('Id', '')
         bld_obj.container = cont
         status.container = cont
-        stream_process = Process(target=bld_obj.publish_build_ouput, kwargs=dict(upd_repo=False))
+        stream_process = Process(target=bld_obj.publish_build_output, kwargs=dict(upd_repo=False))
 
         try:
             doc.start(cont)
@@ -485,7 +485,6 @@ class Transaction(TransactionMeta):
             logger.debug('bld_obj.completed!')
             if sign_packages(bld_obj.pkgname):
                 packages_signed = True
-                self._staging_repo.update_repo(bld_obj=bld_obj)
 
         if packages_signed:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
@@ -493,6 +492,7 @@ class Transaction(TransactionMeta):
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
             status.completed.rpush(bld_obj.bnum)
             bld_obj.review_status = 'pending'
+            self._staging_repo.update_repo(bld_obj=bld_obj)
         else:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
             tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)

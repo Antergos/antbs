@@ -152,10 +152,7 @@ class PacmanRepo(RedisHash):
             remove(result_dir)
         os.mkdir(result_dir, 0o777)
 
-        if review_result:
-            pkgname = pkg_obj.name
-        else:
-            pkgname = bld_obj.pkgname
+        pkgname = bld_obj.pkgname
 
         command = "/makepkg/build.sh"
         pkgenv = ["_PKGNAME={0}".format(pkgname),

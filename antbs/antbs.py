@@ -360,7 +360,7 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         pkg_files_32 = glob.glob(glob_string_32, recursive=True)
         pkg_files = pkg_files_64 + pkg_files_32
 
-        if pkg_files:
+        if pkg_files or True:
             for f in pkg_files_64:
                 logger.debug('f in pkg_files_64 fired!')
                 if result == 'passed':
@@ -376,7 +376,7 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
                     os.remove(f)
             if result and result != 'skip':
                 repo_queue.enqueue_call(transaction_handler.process_dev_review,
-                                        (bld_obj.bnum), timeout=9600)
+                                        args=(bld_obj.bnum,), timeout=9600)
                 errmsg = dict(error=False, msg=None)
 
         else:
@@ -537,6 +537,8 @@ def homepage(tlpage=None):
 @app.route("/building")
 @app.route("/building/<int:bnum>")
 def building(bnum=None):
+    bld_objs = {}
+    selected = None
     if status.now_building and not status.idle:
         try:
             bld_objs = {b: get_build_object(bnum=b) for b in status.now_building if b}

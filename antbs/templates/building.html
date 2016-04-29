@@ -15,34 +15,36 @@
 				<h3>
 					<i class="fa fa-archive"></i>
 
-					Build Number: {{ selected.bnum }}</h3>
+					Build Number: {% if selected.bnum %}{{ selected.bnum }}{% else %}n/a{% endif %}</h3>
 			</div>
 			<div class="content no-padding">
-				<table id="noDt" class="table no-border hover">
+				<table id="noDt" class="table no-border hover now_building_stats">
 					<tbody class="no-border-y">
 					<tr>
 						<td>Build No.:</td>
 						<td>
+							{% if bld_objs %}
 							<form>
-								<select id="build-number-select" name="build number">
+								<select id="build-number-select" name="build_number" class="form-control">
 									{% for bnum, bld_obj in bld_objs.items() %}
 										<option value="{{ bld_obj.bnum }}"{% if selected.bnum == bld_obj.bnum %}selected{% endif %}>{{ bld_obj.bnum }}</option>
 									{% endfor %}
 								</select>
 							</form>
+							{% endif %}
 						</td>
 					</tr>
 					<tr>
 						<td>Package:</td>
-						<td>{{ selected.pkgname }}</td>
+						<td>{% if selected.pkgname %}{{ selected.pkgname }}{% endif %}</td>
 					</tr>
 					<tr>
 						<td>Version:</td>
-						<td>{{ selected.version }}</td>
+						<td>{% if selected.version %}{{ selected.version }}{% endif %}</td>
 					</tr>
 					<tr>
 						<td>Start:</td>
-						<td>{{ selected.start }}</td>
+						<td>{% if selected.start %}{{ selected.start }}{% endif %}</td>
 					</tr>
 					</tbody>
 				</table>
