@@ -57,7 +57,7 @@ class PackageMeta(RedisHash):
                              'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
                              'build_path', 'success_rate', 'failure_rate', 'git_url',
                              'git_name', 'gh_repo', 'gh_project', 'iso_md5', 'iso_url',
-                             'url', 'pkgbuild', 'heatmap'],
+                             'url', 'pkgbuild', 'heat_map'],
                      bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
                            'is_metapkg', 'is_monitored'],
                      int=['pkg_id'],
