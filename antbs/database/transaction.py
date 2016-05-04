@@ -185,6 +185,7 @@ class Transaction(TransactionMeta):
         self.is_running = False
         self.is_finished = True
         status.transactions_running.remove(self.tnum)
+        remove(self.path)
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix='{0}_'.format(str(self.tnum)), dir=self.base_path)

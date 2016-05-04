@@ -413,7 +413,7 @@ def get_build_history_chart_data(pkg_obj=None):
     else:
         builds = pkg_obj.builds
         chart_data = pkg_obj.heat_map
-        if chart_data:
+        if chart_data and '_' != chart_data:
             chart_data = json.loads(chart_data)
             all_builds = sum([int(num) for num in
                               [chart_data[key]['builds'] for key in chart_data]])
@@ -422,7 +422,7 @@ def get_build_history_chart_data(pkg_obj=None):
 
     timestamps = {}
 
-    if not chart_data or '{}' == chart_data:
+    if not chart_data or chart_data in ['{}', '_']:
         chart_data = dict()
         builds = [b for b in builds if b]
         for bld in builds:

@@ -163,10 +163,10 @@ class Build(RedisHash):
                 gevent.sleep(2)
 
         if upd_repo or self.failed:
-            self.db.publish('build-output', 'ENDOFLOG')
+            self.db.publish(live_output_key, 'ENDOFLOG')
 
         existing = True
-        if len(self.log) < 1 and not any([self.failed, self.is_iso]):
+        if len(self.log) < 1 and not self.failed and not self.is_iso:
             existing = False
 
         for line in content:
