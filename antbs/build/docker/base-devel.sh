@@ -49,7 +49,7 @@ sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	pacman-key --populate archlinux
 	# Base without the following packages, to save space.
 	# linux jfsutils lvm2 cryptsetup groff man-db man-pages mdadm pciutils pcmciautils reiserfsprogs s-nail xfsprogs vi
-	pacman -Syyu --noconfirm wget bash bzip2 coreutils dhcpcd gcc-libs gettext glibc grep gzip inetutils iproute2 iputils less libutil-linux licenses logrotate psmisc sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux which nano
+	pacman -Syyu --noconfirm wget bash bzip2 coreutils dhcpcd gawk gcc-libs gettext git glibc grep gzip inetutils iproute2 iputils less libutil-linux licenses logrotate psmisc sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux which nano
 	# Pacman doesn't let us force ignore files, so clean up.
 	pacman -S --noconfirm base-devel git gcc arch-install-scripts reflector lzo2
 	reflector -l 30 -f 15 --save /etc/pacman.d/mirrorlist
