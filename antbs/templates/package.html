@@ -30,8 +30,8 @@
 					<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
 
 					<div class="progress">
-						<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate }}% Completed</div>
-						<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate }}% Failed</div>
+						<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate|float|round(2) }}% Completed</div>
+						<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate|float|round(2) }}% Failed</div>
 					</div>
 					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>
 				</div>

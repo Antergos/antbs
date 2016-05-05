@@ -119,7 +119,7 @@ class RedisObject:
             as_dict = dict()
 
             for key in self.all_keys:
-                if key in ['log_str', 'log', 'pkgbuild', '_build']:
+                if key in ['log_str', 'log', 'pkgbuild']:
                     continue
 
                 val = getattr(self, key)

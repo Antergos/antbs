@@ -557,13 +557,13 @@
 											</li>
 											<li
 												{% if request.path == "/failed" or res == "failed" %} class="active"{% endif %}>
-												<a href="/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
+												<a href="/builds/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
 											</li>
 										</ul>
 									</li>
 
 									<li {% if request.path == "/browse" %}class="active"{% endif %}>
-										<a href="/browse"><i class="fa  fa-archive"></i><span>Packages</span></a>
+										<a href="/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
 										<ul class="sub-menu">
 											<li {% if request.path == "/browse/main" %}class="active"{% endif %}>
 												<a href="/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
@@ -575,7 +575,7 @@
 
 									</li>
 									<li {% if request.path == "/repo_packages" %}class="active"{% endif %}>
-										<a href="/repo_packages"><i class="fa  fa-archive"></i><span>Repos</span></a>
+										<a href="/repo_packages"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
 										<ul class="sub-menu">
 											<li {% if 'repo_packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
 												<a href="/repo_packages/antergos"><i class="fa   fa-list"></i><span>Main</span></a>
@@ -960,7 +960,7 @@
 												null,
 												null,
 											{% endif %}
-											null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+											null{% if '/builds/completed' in request.path or '/pkg_review' in request.path %},
 											null,
 											null,
 											null{% endif %}{% if '/issues' in request.path %},
@@ -992,10 +992,18 @@
 									for (var i = 0, l = pkgs.length; i < l; i++) {
 										pkgs[i].pkg_id = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkg_id);
 										pkgs[i].pkgname = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkgname);
-										pkgs[i].manage = tpl_map.manage.replace(/@@@/g, pkgs[i]._build.bnum);
-										pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, pkgs[i]._build.bnum);
-										pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
-										pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
+										if ('undefined' !== typeof(pkgs[i]._build)) {
+											pkgs[i].manage = tpl_map.manage.replace(/@@@/g, pkgs[i]._build.bnum);
+											pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, pkgs[i]._build.bnum);
+											pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
+											pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
+										} else {
+											pkgs[i]._build = {};
+											pkgs[i].manage = tpl_map.manage.replace(/@@@/g, '');
+											pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, '');
+											pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, '');
+											pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, '');
+										}
 									}
 									jQuery('table').dataTable({
 										data: window.antbs.pkgs,
@@ -1028,7 +1036,7 @@
 											null,
 											null,
 											null,
-											null{% if '/completed' in request.path or '/pkg_review' in request.path %},
+											null{% if '/builds/completed' in request.path or '/pkg_review' in request.path %},
 											null,
 											null,
 											null{% endif %}{% if '/issues' in request.path %},

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block pagetitle -%}Completed{%- endblock pagetitle %}
+{% block pagetitle -%}{{ build_status|capitalize() }}{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
@@ -34,9 +34,11 @@
 							<th>Version</th>
 							<th>Start</th>
 							<th>End</th>
+							{% if '/builds/failed' not in request.path %}
 							<th>Review Status</th>
 							<th>Reviewed By</th>
 							<th>Review Date</th>
+							{% endif %}
 						</tr>
 						</thead>
 						<tbody class="no-border-y">
@@ -49,6 +51,7 @@
 									<td>{{ build.version_str }}</td>
 									<td>{{ build.start_str }}</td>
 									<td>{{ build.end_str }}</td>
+									{% if '/builds/failed' not in request.path %}
 									<td>
 									{% if build.review_status == 'pending' %}
 										<div class="btn-group">
@@ -83,6 +86,7 @@
 									</td>
 									<td>
 									{% if '_' != build.review_date  %}<i class="fa fa-calendar"></i>{{ build.review_date }}{% else %}n/a{% endif %}</td>
+										{% endif %}
 								</tr>
 							{% else %}
 								<tr>
@@ -147,7 +151,11 @@
 	<script type="text/javascript">
 		jQuery( '#search_btn' ).on( 'click', function() {
 			var search = jQuery( '#search_input' ).val();
-			window.location = '/completed/search/' + search;
+			{% if '/builds/completed' in request.path %}
+			window.location = '/builds/completed/search/' + search;
+			{% elif '/builds/failed' in request.path %}
+			window.location = '/builds/failed/search/' + search;
+			{% endif %}
 		} );
 		jQuery( "#search_input" ).keyup( function( e ) {
 			if ( e.keyCode == 13 ) {
