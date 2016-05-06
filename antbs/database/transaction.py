@@ -231,7 +231,7 @@ class Transaction(TransactionMeta):
             logger.info('cnchi package detected.')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             logger.info(status.current_status)
-            cnchi_dir = os.path.join(self.path, pkg)
+            cnchi_dir = self.get_package_build_directory(pkg)
             self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
@@ -293,13 +293,18 @@ class Transaction(TransactionMeta):
         if pkg_obj is None:
             name = ''
         else:
-            name = pkg_obj.name
+            name = pkg_obj.name or pkg_obj.pkgname
+
+        pbdir = self.get_package_build_directory(name)
+        dest_dir = os.path.join(pbdir, 'cnchi/po')
+        logger.debug(pbdir)
+        logger.debug(dest_dir)
 
         trans = {
             "cnchi": {
                 'trans_dir': "/opt/cnchi-translations/",
                 'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
-                'dest_dir': os.path.join(self.path, name, '/cnchi/po')
+                'dest_dir': dest_dir
             },
             "cnchi_updater": {
                 'trans_dir': "/opt/antergos-iso-translations/",

@@ -304,7 +304,7 @@ class Webhook(WebhookMeta):
             for changed in self.changes:
                 if len(changed) > 0:
                     for item in changed:
-                        if item and self.is_gitlab or self.is_numix or self.is_cnchi:
+                        if item and (self.is_gitlab or self.is_numix or self.is_cnchi):
                             pak = item
                         elif item and "PKGBUILD" in item:
                             pak, pkb = item.rsplit('/', 1)
