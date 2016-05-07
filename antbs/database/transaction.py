@@ -513,6 +513,8 @@ class Transaction(TransactionMeta):
         status.now_building.remove(bld_obj.bnum)
         if own_status == status.current_status:
             status.current_status = ''
+            if not status.now_building:
+                status.idle = True
         if not bld_obj.failed:
             pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None

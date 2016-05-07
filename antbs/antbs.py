@@ -203,7 +203,7 @@ def get_live_status_updates():
 
 def get_paginated(item_list, per_page, page, timeline):
     if len(item_list) < 1:
-        return [], []
+        return item_list, 0
     page -= 1
     items = list(item_list)
     items.reverse()
