@@ -426,7 +426,8 @@ class Transaction(TransactionMeta):
         pbpath = self.get_package_build_directory(pkg)
         pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
         self.building = pkg
-        status.current_status = 'Building {0}-{1} with makepkg.'.format(pkg, pkg_obj.version_str)
+        own_status = 'Building {0}-{1} with makepkg.'.format(pkg, pkg_obj.version_str)
+        status.current_status = own_status
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 86400, in_dir_last)
@@ -510,6 +511,8 @@ class Transaction(TransactionMeta):
 
         self.building = ''
         status.now_building.remove(bld_obj.bnum)
+        if own_status == status.current_status:
+            status.current_status = ''
         if not bld_obj.failed:
             pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None

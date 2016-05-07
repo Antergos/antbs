@@ -139,14 +139,15 @@ class PacmanRepo(RedisHash):
 
         repodir = 'staging' if 'staging' in self.name else 'main'
         building_saved = False
-        update_repo_status_msg = 'Updating {0} repo database.'.format(self.name)
+        excluded = ['Updating {0} repo database.'.format(self.name),
+                    'Processing developer review result.']
 
-        if not status.idle and status.current_status != update_repo_status_msg:
+        if not status.idle and status.current_status not in excluded:
             building_saved = status.current_status
         else:
             status.idle = False
 
-        status.current_status = update_repo_status_msg
+        status.current_status = excluded[0]
 
         if os.path.exists(result_dir):
             remove(result_dir)
