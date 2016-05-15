@@ -278,14 +278,17 @@ class Package(PackageMeta):
                 ppath = os.path.join(p, 'PKGBUILD')
                 logger.info(ppath)
                 if os.path.exists(ppath):
+                    path = ppath
                     if p == paths[0] and len(self.allowed_in) == 0:
                         self.allowed_in.append('main')
-                    return ppath
+                    break
         else:
             msg = 'cant determine pkgbuild path for {0}'.format(self.name)
             logger.error(msg)
             if 'dummy-' not in self.name:
                 raise ValueError(msg)
+
+        return path
 
     @staticmethod
     def maybe_update_pkgbuild_repo():

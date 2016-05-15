@@ -74,8 +74,8 @@ class DockerUtils(metaclass=Singleton):
     def do_docker_clean(self, pkg=None):
         try:
             self.doc.remove_container(pkg, v=True)
-        except Exception as err:
-            logger.info(err)
+        except Exception:
+            pass
 
     def get_host_config(self, config_for, *args, **kwargs):
         host_configs = {

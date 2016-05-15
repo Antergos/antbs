@@ -61,9 +61,9 @@ class TransactionMeta(RedisHash):
 
     def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', namespace='antbs',
                  prefix='trans', repo_queue=None):
-        if not any([packages, tnum]):
+        if not packages and not tnum:
             raise ValueError('At least one of [packages, tnum] required.')
-        elif all([packages, tnum]):
+        elif packages and tnum:
             raise ValueError('Only one of [packages, tnum] can be given, not both.')
 
         the_tnum = tnum
@@ -155,6 +155,10 @@ class Transaction(TransactionMeta):
                 pkg = self.queue.lpop()
                 is_iso = False
                 pbpath = self.get_package_build_directory(pkg)
+
+                if not pbpath:
+                    raise RuntimeError('pbpath cannot be None.')
+
                 pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
 
                 for partial in ['i686', 'x86_64']:
@@ -166,7 +170,7 @@ class Transaction(TransactionMeta):
                 if is_iso:
                     result = self.build_iso(pkg_obj)
                 else:
-                    result = self.build_package(pkg)
+                    result = self.build_package(pkg_obj)
 
                 if result in [True, False]:
                     blds = pkg_obj.builds
@@ -197,7 +201,7 @@ class Transaction(TransactionMeta):
         os.mkdir(self.upd_repo_result, mode=0o777)
 
         try:
-            subprocess.check_output(['git', 'clone', status.gh_repo_url], cwd=path)
+            subprocess.check_output(['/usr/bin/git', 'clone', status.gh_repo_url], cwd=path)
         except subprocess.CalledProcessError as err:
             raise RuntimeError(err.output)
 
@@ -238,16 +242,18 @@ class Transaction(TransactionMeta):
 
         elif 'numix-icon-theme-square' == pkg:
             src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
-            dest = os.path.join('/opt/antergos-packages/', pkg)
+            dest = os.path.join(self.path, pkg)
             shutil.move(src, dest)
 
     def process_packages(self):
-
         for pkg in self.packages:
             if not pkg:
                 continue
 
             pbpath = self.get_package_build_directory(pkg)
+
+            if not pbpath:
+                raise RuntimeError('pbpath cannot be None.')
 
             pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
             version = pkg_obj.get_version()
@@ -275,7 +281,8 @@ class Transaction(TransactionMeta):
         status.current_status = 'Using package dependencies to determine build order.'
         if self._internal_deps:
             for name in self.determine_build_order(self._internal_deps):
-                self.queue.append(name)
+                if pkg not in self.queue:
+                    self.queue.append(name)
 
         for pkg in self.packages:
             if pkg not in self.queue:
@@ -411,7 +418,7 @@ class Transaction(TransactionMeta):
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
 
         tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
-        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, version_str)
+        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, bld_obj.version_str)
 
         get_timeline_object(msg=tlmsg, tl_type=3, ret=False)
 
@@ -421,21 +428,19 @@ class Transaction(TransactionMeta):
 
         return bld_obj
 
-    def build_package(self, pkg):
-
-        pbpath = self.get_package_build_directory(pkg)
-        pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
-        self.building = pkg
-        own_status = 'Building {0}-{1} with makepkg.'.format(pkg, pkg_obj.version_str)
+    def build_package(self, pkg_obj):
+        self.building = pkg_obj.name
+        own_status = 'Building {0}-{1} with makepkg.'.format(pkg_obj.name,
+                                                             self._pkgvers[pkg_obj.name])
         status.current_status = own_status
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 86400, in_dir_last)
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg])
+        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg_obj.name])
 
         doc_util.do_docker_clean(pkg_obj.name)
-        self.setup_package_build_directory(pkg)
+        self.setup_package_build_directory(pkg_obj.name)
 
         build_env = ['_AUTOSUMS=True'] if pkg_obj.autosum else ['_AUTOSUMS=False']
 
@@ -444,9 +449,9 @@ class Transaction(TransactionMeta):
         else:
             build_env.append('_ALEXPKG=False')
 
-        build_dir = self._build_dirpaths[pkg]['build_dir']
-        _32bit = self._build_dirpaths[pkg]['32bit']
-        _32build = self._build_dirpaths[pkg]['32build']
+        build_dir = self._build_dirpaths[pkg_obj.name]['build_dir']
+        _32bit = self._build_dirpaths[pkg_obj.name]['32bit']
+        _32build = self._build_dirpaths[pkg_obj.name]['32build']
         hconfig = doc_util.get_host_config('packages', build_dir, self.result_dir, self.cache,
                                            self.cache_i686, _32build, _32bit)
         container = {}
@@ -465,15 +470,15 @@ class Transaction(TransactionMeta):
             logger.error('Create container failed. Error Msg: %s', err)
             bld_obj.failed = True
 
-        cont = container.get('Id', '')
-        bld_obj.container = cont
-        status.container = cont
+        container_id = container.get('Id', '')
+        bld_obj.container = container_id
+        status.container = container_id
         stream_process = Process(target=bld_obj.publish_build_output, kwargs=dict(upd_repo=False))
 
         try:
-            doc.start(cont)
+            doc.start(container_id)
             stream_process.start()
-            result = doc.wait(cont)
+            result = doc.wait(container_id)
             if int(result) != 0:
                 bld_obj.failed = True
                 tpl = 'Container %s exited with a non-zero return code. Return code was %s'
@@ -517,7 +522,6 @@ class Transaction(TransactionMeta):
                 status.idle = True
 
         if not bld_obj.failed:
-            pkg_obj = get_pkg_object(bld_obj.pkgname)
             last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
             if last_build:
                 last_bld_obj = get_build_object(bnum=last_build)
