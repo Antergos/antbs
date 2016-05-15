@@ -83,7 +83,7 @@ class Build(RedisHash):
     """
 
     def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
-        if not pkg_obj or not bnum:
+        if not pkg_obj and not bnum:
             raise ValueError
 
         the_bnum = bnum
