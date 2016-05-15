@@ -97,7 +97,7 @@ class Build(RedisHash):
                              'start_str', 'end_str', 'version_str', 'container', 'review_status',
                              'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
                              'repo_container'],
-                     bool=['failed', 'completed'],
+                     bool=['failed', 'completed', 'is_iso'],
                      int=[],
                      list=['log'],
                      set=[]))
@@ -109,7 +109,9 @@ class Build(RedisHash):
 
             for key in pkg_obj.all_keys:
                 if key in self.all_keys:
-                    setattr(self, key, getattr(pkg_obj, key))
+                    val = getattr(pkg_obj, key)
+                    value = False if 'is_iso' == key and '' == val else val
+                    setattr(self, key, value)
 
             self.bnum = the_bnum
             self.tnum = tnum

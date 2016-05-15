@@ -108,7 +108,7 @@
 				editor.setHighlightActiveLine(false);
 				editor.clearSelection();
 				var doc = editor.getSession().getDocument();
-				var sse = new EventSource('/get_log/{{ selected.bnum }}');
+				var sse = new EventSource('/api/get_log/{{ selected.bnum }}');
 				var endOfLog = false,
 					lastMsg = '';
 				sse.addEventListener("build_output", function (message) {

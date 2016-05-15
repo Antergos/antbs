@@ -442,7 +442,7 @@ class RedisHash(RedisObject):
                 self.db.hset(key, attrib, self.bool_string_helper(value))
             else:
                 raise ValueError('{0}.{1} must be of type(bool), {2} given.'.format(
-                    self.__class__.__name__, attrib, value))
+                    self.__class__.__name__, attrib, type(value)))
 
         elif attrib in self.key_lists['path']:
             if self.is_pathname_valid(value):

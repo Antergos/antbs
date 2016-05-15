@@ -606,7 +606,7 @@
 					</div>
 					<div class="text-right collapse-button">
 						{% if user.is_authenticated() %}
-							<form action="/build_pkg_now" role="form" id="build_now_form" method="post">
+							<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
 								<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
 								<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
 							</form>
@@ -901,7 +901,7 @@
 
 						jQuery('#main pre').addClass('pre-scrollable');
 						jQuery('.not-idle').show();
-						var sse = new EventSource('/get_status');
+						var sse = new EventSource('/api/get_status');
 						sse.addEventListener("status", function (message) {
 							var current = jQuery('#status_bar_pre').text();
 							if (message.data !== current) {

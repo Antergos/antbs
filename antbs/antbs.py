@@ -51,9 +51,6 @@ from flask import (
 from flask.ext.stormpath import StormpathManager, groups_required, user
 from werkzeug.contrib.fixers import ProxyFix
 
-import bugsnag
-from bugsnag.flask import handle_exceptions
-
 from rq import Connection, Queue, Worker
 import rq_dashboard
 
@@ -82,16 +79,13 @@ def url_for_other_page(page):
 
 def initialize_app():
     """
-    Creates flask app object, initializes settings, then returns `app`.
+    Creates global flask app object and initializes settings.
 
     """
-
-    bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
 
     # Create the variable `app` which is an instance of the Flask class
     global app
     app = Flask(__name__)
-    handle_exceptions(app)
 
     # Stormpath configuration
     app.config.update({'SECRET_KEY': status.sp_session_key,
@@ -555,8 +549,8 @@ def building(bnum=None):
     return render_template('building.html', bld_objs=bld_objs, selected=selected)
 
 
-@app.route('/get_log')
-@app.route("/get_log/<int:bnum>")
+@app.route('/api/get_log')
+@app.route("/api/get_log/<int:bnum>")
 def get_log(bnum=None):
     if status.idle or not status.now_building:
         abort(404)
@@ -575,7 +569,7 @@ def get_log(bnum=None):
                     mimetype='text/event-stream', headers=headers)
 
 
-@app.route('/hook', methods=['POST', 'GET'])
+@app.route('/api/hook', methods=['POST', 'GET'])
 def hooked():
     hook = webhook.Webhook(request)
     if hook.result is int:
@@ -695,7 +689,7 @@ def dev_pkg_check(page=None):
                            user=user, rev_pending=rev_pending, pagination=pagination)
 
 
-@app.route('/build_pkg_now', methods=['POST', 'GET'])
+@app.route('/api/build_pkg_now', methods=['POST', 'GET'])
 @groups_required(['admin'])
 def build_pkg_now():
     if request.method == 'POST':
@@ -748,7 +742,7 @@ def build_pkg_now():
     return redirect(redirect_url())
 
 
-@app.route('/get_status', methods=['GET'])
+@app.route('/api/get_status', methods=['GET'])
 @app.route('/api/ajax', methods=['GET', 'POST'])
 def get_status():
     if 'get_status' in request.path:
