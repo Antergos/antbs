@@ -28,6 +28,7 @@ import subprocess
 import time
 import zipfile
 
+import gevent
 from gitlab import Gitlab
 
 from database.base_objects import RedisHash
@@ -38,6 +39,7 @@ from utils.logging_config import logger
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
+GITHUB_REPO = 'http://github.com/antergos/antergos-packages'
 
 
 class PackageMeta(RedisHash):
@@ -52,21 +54,23 @@ class PackageMeta(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
 
+        self.__namespaceinit__()
+
         self.key_lists.update(
                 dict(string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
                              'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
                              'build_path', 'success_rate', 'failure_rate', 'git_url',
                              'git_name', 'gh_repo', 'gh_project', 'iso_md5', 'iso_url',
-                             'url', 'pkgbuild', 'heat_map'],
+                             'url', 'pkgbuild', 'heat_map', 'monitored_service', 'monitored_type',
+                             'monitored_project', 'monitored_repo', 'monitored_last_result'],
                      bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
                            'is_metapkg', 'is_monitored'],
                      int=['pkg_id'],
-                     list=['allowed_in', 'builds', 'tl_events'],
+                     list=['allowed_in', 'builds', 'tl_events', 'transactions'],
                      set=['depends', 'groups', 'makedepends']))
 
-        self.__namespaceinit__()
-
         self.all_keys.append('_build')
+        self.maybe_update_pkgbuild_repo()
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
             # Package is not in the database, so it must be new. Let's initialize it.
@@ -83,10 +87,13 @@ class PackageMeta(RedisHash):
                 self.autosum = True
             if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
                 self.is_metapkg = True
-            if 'yes' == self.get_from_pkgbuild('_is_monitored'):
+            if 'True' == self.get_from_pkgbuild('_is_monitored'):
                 self.is_monitored = True
 
     def get_from_pkgbuild(self, item):
+        raise NotImplementedError('Subclass must implement this method')
+
+    def maybe_update_pkgbuild_repo(self):
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -283,12 +290,12 @@ class Package(PackageMeta):
             if self.db.setnx('PKGBUILD_REPO_LOCK', True):
                 self.db.expire('PKGBUILD_REPO_LOCK', 150)
 
-                if os.path.exists(status.PKGBUILDS_DIR):
-                    shutil.rmtree(status.PKGBUILDS_DIR)
                 try:
+                    subprocess.check_call(['git', 'fetch'], cwd=status.PKGBUILDS_DIR)
                     subprocess.check_call(
-                            ['git', 'clone', 'http://github.com/antergos/antergos-packages'],
-                            cwd='/var/tmp')
+                            ['git', 'reset', '--hard', 'origin/master'],
+                            cwd=status.PKGBUILDS_DIR
+                    )
                     self.db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
                     logger.error(err)
@@ -297,7 +304,7 @@ class Package(PackageMeta):
                 self.db.delete('PKGBUILD_REPO_LOCK')
             else:
                 while not self.db.exists('PKGBUILD_REPO_UPDATED') and self.db.exists('PKGBUILD_REPO_LOCK'):
-                    sleep(2)
+                    gevent.sleep(2)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
         if not self.push_version or old_val == new_val:

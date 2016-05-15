@@ -72,16 +72,16 @@ class TransactionMeta(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=the_tnum)
 
+        self.__namespaceinit__()
+
         self.key_lists.update(dict(
-            string=['building', 'start_str', 'end_str'],
+            string=['building', 'start_str', 'end_str', 'initiated_by'],
             bool=['is_running', 'is_finished'],
             int=['tnum'],
             list=['queue'],
             set=['packages', 'builds', 'completed', 'failed'],
             path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
         ))
-
-        self.__namespaceinit__()
 
         self._repo_queue = repo_queue
         self._internal_deps = []

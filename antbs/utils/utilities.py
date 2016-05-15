@@ -26,8 +26,10 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Various utility classes and metaclasses """
+""" Various utility classes, metaclasses, and functions. """
+
 import glob
+import logging
 import os
 import shutil
 import gevent
@@ -149,3 +151,13 @@ def copy_or_symlink(src, dst):
             shutil.copy(src, dst)
         except Exception:
             pass
+
+
+def quiet_down_noisy_loggers():
+    noisy_loggers = ["github3",
+                     "requests",
+                     "stormpath.http"]
+
+    for logger_name in noisy_loggers:
+        noisy_logger = logging.getLogger(logger_name)
+        noisy_logger.setLevel(logging.ERROR)

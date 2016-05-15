@@ -26,19 +26,19 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Database module """
 
 import errno
 import json
 import os
 
 import redis
+import time
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 
 
 class RedisObject:
-    """ A base object backed by redis. This is not meant to be used directly. """
+    """ A base object backed by redis. This class should not be used directly. """
 
     db = db
 
@@ -102,12 +102,18 @@ class RedisObject:
 
     def __jsonable__(self):
         """
-        Returns this object as a python data type so it can be serialized by the json module.
+        Returns this object as a python built-in type so it can be serialized by the json module.
 
         """
         res = None
         if isinstance(self, (RedisList, RedisZSet)):
             res = list(self.__iter__())
+
+        elif 'ServerStatus' == self.__class__.__name__:
+            raise RuntimeError(
+                'ServerStatus object cant be converted to json (it contains private data!!)'
+            )
+
         elif isinstance(self, RedisHash):
             as_dict = dict()
 
@@ -197,7 +203,7 @@ class RedisList(RedisObject, list):
         return self.db.llen(self.full_key)
 
     def __delitem__(self, index):
-        """ Delete an item from a RedisList by index. """
+        """ Delete an item from this list by index. """
         self.db.lset(self.full_key, index, '__DELETED__')
         self.db.lrem(self.full_key, 1, '__DELETED__')
 
@@ -300,7 +306,7 @@ class RedisZSet(RedisObject, set):
 class RedisHash(RedisObject):
     """
     This is the base class for all of the redis-backed classes in this application.
-    The class provides access to predefined keys as class attributes.
+    The class provides access to predefined keys as class attributes which are stored in redis.
 
     Args:
         namespace (str): This is used as the first part of the redis key. It should
@@ -315,16 +321,15 @@ class RedisHash(RedisObject):
         prefix (str):     See Args.
         key (str):        See Args.
         full_key (str):   This objects redis key, eg. `namespace:prefix:key`.
-        key_lists (dict): Contains lists of object attributes that are stored in redis
+        key_lists (dict): Contains lists of class attributes that are stored in redis
                           organized by their value type.
-        all_keys (list):  List of all object attributes that are stored in redis.
+        all_keys (list):  List of all class attributes that are stored in redis.
 
     """
 
     def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):
-        if not all([prefix, key]) and 'status' != prefix:
-            not_empty = [x for x in [prefix, key] if x]
-            raise ValueError('(3) args required, but only ({0}) given'.format(str(len(not_empty))))
+        if 'status' != prefix and not key and not prefix:
+            raise ValueError('Both "prefix" and "key" are required')
 
         id_key = '{0}:{1}:{2}'.format(namespace, prefix, key)
 
@@ -356,7 +361,7 @@ class RedisHash(RedisObject):
             if 'ServerStatus' == self.__class__.__name__:
                 value = os.environ.get(key.upper())
 
-            if key in self.key_lists['string'] or key in self.key_lists['path']:
+            if key in self.key_lists['string'] + self.key_lists['path']:
                 value = value or ''
                 setattr(self, key, value)
             elif key in self.key_lists['bool']:
@@ -372,7 +377,7 @@ class RedisHash(RedisObject):
 
     def __str__(self):
         """ Return this object as a friendly (human readable) string. """
-        return str(self.__jsonable__())
+        return '<{0} {1}>'.format(self.__class__.__name__, self.key)
 
     def __len__(self):
         """ Return the len of this object (total number of fields in its redis hash). """
@@ -399,7 +404,7 @@ class RedisHash(RedisObject):
         pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
                      'key', 'full_key', 'prefix', 'db', 'full_key']
 
-        if attrib in pass_list or attrib not in self.all_keys:
+        if attrib in pass_list or (attrib not in self.all_keys and '__exp' not in attrib):
             return super().__getattribute__(attrib)
 
         key = self.full_key
@@ -420,6 +425,10 @@ class RedisHash(RedisObject):
         elif attrib in self.key_lists['set']:
             return RedisZSet.as_child(self, attrib, str)
 
+        elif attrib.endswith('__exp'):
+            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else time.time()
+            return int(val) - 1
+
     def __setattr__(self, attrib, value, score=None):
         """ Set attribute value if stored in redis otherwise pass call to parent class """
 
@@ -427,15 +436,16 @@ class RedisHash(RedisObject):
                      'key', 'full_key', 'prefix', 'db', 'full_key']
 
         # Note: These two statements cannot be combined (causes an exception during object init)
-        if attrib in pass_list or attrib not in self.all_keys:
+        if attrib in pass_list or (attrib not in self.all_keys and '__exp' not in attrib):
             return super().__setattr__(attrib, value)
         if attrib in self.key_lists['list'] + self.key_lists['set']:
             return super().__setattr__(attrib, value)
 
         key = self.full_key
 
-        if attrib in self.key_lists['string'] + self.key_lists['int']:
-            self.db.hset(key, attrib, value)
+        if attrib in self.key_lists['string'] + self.key_lists['int'] or attrib.endswith('__exp'):
+            val = value if '_' != value else ''
+            self.db.hset(key, attrib, val)
 
         elif attrib in self.key_lists['bool']:
             if value in [True, False]:
@@ -450,9 +460,24 @@ class RedisHash(RedisObject):
             else:
                 raise ValueError('{0}.{1} must be a valid pathname (str), {2} given.'.format(
                     self.__class__.__name__, attrib, value))
+
         else:
             raise AttributeError('class {0} has no attribute {1}.'.format(
                 self.__class__.__name__, attrib))
+
+    def __is_expired__(self, attrib):
+        exp_key = attrib + '__exp'
+        expire_time = self.db.hget(self.full_key, exp_key)
+        now = int(time.time())
+
+        return now > expire_time
+
+    def expire_in(self, attrib, seconds):
+        expires = int(time.time()) + seconds
+        attrib_key = attrib + '__exp'
+
+        self.db.hset(self.full_key, attrib_key, expires)
+
 
     @staticmethod
     def bool_string_helper(value):
@@ -465,7 +490,9 @@ class RedisHash(RedisObject):
         elif isinstance(value, bool):
             return 'True' if value else 'False'
         else:
-            raise ValueError('value must be of type(bool) or type(str), {0} given.'.format(value))
+            raise ValueError(
+                'value must be of type(bool) or type(str), {0} given.'.format(type(value))
+            )
 
     @staticmethod
     def is_pathname_valid(pathname):

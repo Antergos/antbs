@@ -83,7 +83,7 @@ class Build(RedisHash):
     """
 
     def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
-        if not any([pkg_obj, bnum]):
+        if not pkg_obj or not bnum:
             raise ValueError
 
         the_bnum = bnum
@@ -91,6 +91,8 @@ class Build(RedisHash):
             the_bnum = self.db.incr('antbs:misc:bnum:next')
 
         super().__init__(prefix=prefix, key=the_bnum)
+
+        self.__namespaceinit__()
 
         self.key_lists.update(
                 dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
@@ -100,11 +102,10 @@ class Build(RedisHash):
                      bool=['failed', 'completed', 'is_iso'],
                      int=[],
                      list=['log'],
-                     set=[]))
+                     set=[],
+                     path=[]))
 
-        self.__namespaceinit__()
-
-        if pkg_obj and (not self or not bnum):
+        if pkg_obj and (not self or not self.bnum):
             self.__keysinit__()
 
             for key in pkg_obj.all_keys:

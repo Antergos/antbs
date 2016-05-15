@@ -44,10 +44,11 @@ import re
 from datetime import datetime, timedelta
 
 import requests
+
 from flask import (
-    Flask, Response, abort, flash, redirect, render_template, request,
-    stream_with_context, url_for
+    Flask, Response, abort, flash, redirect, render_template, request, url_for
 )
+
 from flask.ext.stormpath import StormpathManager, groups_required, user
 from werkzeug.contrib.fixers import ProxyFix
 
@@ -58,7 +59,7 @@ import transaction_handler
 import utils.pagination
 import webhook
 import iso
-import repo_monitor
+from database.monitor import get_monitor_object
 from database.base_objects import db
 from database.build import get_build_object
 from database.package import get_pkg_object
@@ -83,7 +84,6 @@ def initialize_app():
 
     """
 
-    # Create the variable `app` which is an instance of the Flask class
     global app
     app = Flask(__name__)
 
@@ -134,9 +134,11 @@ initialize_app()
 
 @app.before_request
 def maybe_check_for_remote_commits():
-    check = repo_monitor.maybe_check_for_new_items()
-    if not check:
-        repo_queue.enqueue_call(repo_monitor.check_for_new_items)
+    monitor = get_monitor_object(name='github')
+    check_expired = monitor.__is_expired__('checked_recently')
+
+    if not monitor.checked_recently or check_expired:
+        repo_queue.enqueue_call(monitor.check_repos_for_changes)
 
 
 @app.context_processor

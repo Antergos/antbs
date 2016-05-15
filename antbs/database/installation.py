@@ -40,15 +40,14 @@ if not db.exists(next_install_id_key):
 
 class AntergosInstallation(RedisHash, DateTimeStrings):
 
-    def __init__(self, namespace='cnchi14', prefix='install', install_id='',
-                 ip=None, *args, **kwargs):
+    def __init__(self, namespace='cnchi14', prefix='install', install_id='', ip=None):
         if not install_id and not ip:
             raise ValueError('ip is required to initialize this class')
 
         if not install_id:
             install_id = db.incr(next_install_id_key)
 
-        super().__init__(namespace=namespace, prefix=prefix, key=install_id, *args, **kwargs)
+        super().__init__(namespace=namespace, prefix=prefix, key=install_id)
 
         self.key_lists.update(dict(string=['install_id', 'ip_address', 'start_date', 'start_time',
                                            'start_str', 'end_date', 'end_time', 'end_str'],
@@ -76,10 +75,9 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
 
 class AntergosInstallationUser(RedisHash):
 
-    def __init__(self, ip=None, install_id=None, namespace='cnchi14',
-                 prefix='user', *args, **kwargs):
+    def __init__(self, ip=None, install_id=None, namespace='cnchi14', prefix='user'):
 
-        super().__init__(namespace=namespace, prefix=prefix, key=ip, *args, **kwargs)
+        super().__init__(namespace=namespace, prefix=prefix, key=ip)
 
         self.key_lists.update(dict(string=['ip_address', 'country'],
                                    set=['installs', 'installs_completed', 'installs_failed']))

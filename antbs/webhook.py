@@ -168,7 +168,6 @@ class Webhook(WebhookMeta):
                 if install_id is not None and result is not None:
                     logger.debug('Cnchi install_id {0} result is {1}'.format(install_id, result))
                     result = AntergosInstallation.bool_string_helper(result)
-                    logger.debug(result)
                     self.process_cnchi_end(install_id, result)
 
             if self.is_github:
