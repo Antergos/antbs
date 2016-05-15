@@ -92,8 +92,6 @@ class Build(RedisHash):
 
         super().__init__(prefix=prefix, key=the_bnum)
 
-        self.__namespaceinit__()
-
         self.key_lists.update(
                 dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
                              'start_str', 'end_str', 'version_str', 'container', 'review_status',
@@ -104,6 +102,8 @@ class Build(RedisHash):
                      list=['log'],
                      set=[],
                      path=[]))
+
+        self.__namespaceinit__()
 
         if pkg_obj and (not self or not self.bnum):
             self.__keysinit__()

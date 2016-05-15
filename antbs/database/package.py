@@ -31,7 +31,7 @@ import zipfile
 import gevent
 from gitlab import Gitlab
 
-from database.base_objects import RedisHash
+from database.base_objects import RedisHash, db
 from database.server_status import status
 from gevent import sleep
 from github3 import login
@@ -54,8 +54,6 @@ class PackageMeta(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
 
-        self.__namespaceinit__()
-
         self.key_lists.update(
                 dict(string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
                              'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
@@ -70,6 +68,7 @@ class PackageMeta(RedisHash):
                      set=['depends', 'groups', 'makedepends']))
 
         self.all_keys.append('_build')
+        self.__namespaceinit__()
         self.maybe_update_pkgbuild_repo()
 
         if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
@@ -93,7 +92,8 @@ class PackageMeta(RedisHash):
     def get_from_pkgbuild(self, item):
         raise NotImplementedError('Subclass must implement this method')
 
-    def maybe_update_pkgbuild_repo(self):
+    @staticmethod
+    def maybe_update_pkgbuild_repo():
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -140,18 +140,21 @@ class Package(PackageMeta):
     def __init__(self, name, pbpath=None):
         super().__init__(key=name)
 
-        if not pbpath or not os.path.exists(pbpath):
-            self.determine_pbpath()
+        if not pbpath:
+            pbpath = os.path.join('/var/tmp/antergos-packages/', name)
+
+        if not os.path.exists(pbpath):
+            self._pbpath = self.determine_pbpath()
         else:
-            self.pbpath = pbpath
+            self._pbpath = pbpath
 
-        if os.path.isdir(self.pbpath):
-            self.pbpath = os.path.join(pbpath, 'PKGBUILD')
+        if os.path.isdir(self._pbpath):
+            self._pbpath = os.path.join(self._pbpath, 'PKGBUILD')
 
-        if not os.path.exists(self.pbpath):
-            raise RuntimeError('pbpath: {0} does not exist!'.format(self.pbpath))
+        if not os.path.exists(self._pbpath):
+            raise RuntimeError('pbpath: {0} does not exist!'.format(self._pbpath))
 
-        self.pkgbuild = open(self.pbpath).read()
+        self.pkgbuild = open(self._pbpath).read()
 
     def get_from_pkgbuild(self, var=None):
         """
@@ -170,9 +173,9 @@ class Package(PackageMeta):
         self.maybe_update_pkgbuild_repo()
 
         if not self.pkgbuild:
-            setattr(self, 'pkgbuild', open(self.pbpath).read())
+            setattr(self, 'pkgbuild', open(self._pbpath).read())
 
-        dirpath = os.path.dirname(self.pbpath)
+        dirpath = os.path.dirname(self._pbpath)
 
         if var in ['source', 'depends', 'makedepends', 'arch']:
             cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '[*]}'
@@ -275,39 +278,45 @@ class Package(PackageMeta):
                 ppath = os.path.join(p, 'PKGBUILD')
                 logger.info(ppath)
                 if os.path.exists(ppath):
-                    self.pbpath = ppath
                     if p == paths[0] and len(self.allowed_in) == 0:
                         self.allowed_in.append('main')
-                    break
+                    return ppath
         else:
             msg = 'cant determine pkgbuild path for {0}'.format(self.name)
             logger.error(msg)
             if 'dummy-' not in self.name:
                 raise ValueError(msg)
 
-    def maybe_update_pkgbuild_repo(self):
-        if not self.db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(status.PKGBUILDS_DIR):
-            if self.db.setnx('PKGBUILD_REPO_LOCK', True):
-                self.db.expire('PKGBUILD_REPO_LOCK', 150)
+    @staticmethod
+    def maybe_update_pkgbuild_repo():
+        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(status.PKGBUILDS_DIR):
+            if db.setnx('PKGBUILD_REPO_LOCK', True):
+                db.expire('PKGBUILD_REPO_LOCK', 150)
+
+                if not os.path.exists(status.PKGBUILDS_DIR):
+                    subprocess.check_call(
+                        ['/usr/bin/git', 'clone', GITHUB_REPO],
+                        cwd=os.path.dirname(status.PKGBUILDS_DIR)
+                    )
 
                 try:
-                    subprocess.check_call(['git', 'fetch'], cwd=status.PKGBUILDS_DIR)
+                    subprocess.check_call(['/usr/bin/git', 'fetch'], cwd=status.PKGBUILDS_DIR)
                     subprocess.check_call(
-                            ['git', 'reset', '--hard', 'origin/master'],
+                            ['/usr/bin/git', 'reset', '--hard', 'origin/master'],
                             cwd=status.PKGBUILDS_DIR
                     )
-                    self.db.setex('PKGBUILD_REPO_UPDATED', 350, True)
+                    db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
                     logger.error(err)
-                    self.db.delete('PKGBUILD_REPO_UPDATED')
+                    db.delete('PKGBUILD_REPO_UPDATED')
 
-                self.db.delete('PKGBUILD_REPO_LOCK')
+                db.delete('PKGBUILD_REPO_LOCK')
             else:
-                while not self.db.exists('PKGBUILD_REPO_UPDATED') and self.db.exists('PKGBUILD_REPO_LOCK'):
+                while not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
                     gevent.sleep(2)
 
     def update_and_push_github(self, var=None, old_val=None, new_val=None):
-        if not self.push_version or old_val == new_val:
+        if not (self.push_version and not self.is_monitored) or old_val == new_val:
             return
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
@@ -321,7 +330,7 @@ class Package(PackageMeta):
         replace_str = '{0}={1}'.format(var, new_val)
         new_pb_contents = pb_contents.replace(search_str, replace_str)
 
-        with open(self.pbpath, 'w') as pbuild:
+        with open(self._pbpath, 'w') as pbuild:
             pbuild.write(new_pb_contents)
 
         pbuild.close()
@@ -344,33 +353,30 @@ class Package(PackageMeta):
             return False
 
     def get_version(self):
+        # TODO: This is so ugly. Needs rewrite.
         changed = {'epoch': None, 'pkgrel': None, 'pkgver': None}
-        old_vals = {}
-        version_from_tag = self.is_monitored and 'pkgver()' not in self.pkgbuild
+        old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
+        version_from_tag = self.is_monitored and 'releases' == self.monitored_type
         if not version_from_tag:
             for key in ['pkgver', 'pkgrel', 'epoch']:
-                old_val = getattr(self, key)
-                old_vals[key] = old_val
                 new_val = self.get_from_pkgbuild(key)
 
-                if new_val != old_val:
+                if new_val != old_vals[key]:
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
             if not any([True for x in changed if changed[x] is not None]):
                 return self.version_str
         else:
-            old_val = self.pkgver
-            key = 'antbs:monitor:github:{0}:{1}'.format(self.gh_project, self.gh_repo)
-            changed['pkgver'] = self.db.get(key)
+            changed['pkgver'] = self.monitored_last_result
             setattr(self, 'pkgver', changed['pkgver'])
-            self.update_and_push_github('pkgver', old_val, changed['pkgver'])
-            time.sleep(10)
-            self.update_and_push_github('pkgrel', self.pkgrel, '1')
+            self.update_and_push_github('pkgver', old_vals['pkgver'], changed['pkgver'])
+            gevent.sleep(8)
+            self.update_and_push_github('pkgrel', old_vals['pkgrel'], '1')
             setattr(self, 'pkgrel', '1')
             changed['pkgrel'] = '1'
 
-        version = changed.get('pkgver', self.pkgver) or self.pkgver
+        version = changed.get('pkgver', self.pkgver)
 
         if changed['epoch']:
             version = '{0}:{1}'.format(changed['epoch'], version)

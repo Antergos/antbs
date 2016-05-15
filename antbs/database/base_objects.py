@@ -467,10 +467,10 @@ class RedisHash(RedisObject):
 
     def __is_expired__(self, attrib):
         exp_key = attrib + '__exp'
-        expire_time = self.db.hget(self.full_key, exp_key)
+        expire_time = self.db.hget(self.full_key, exp_key) or 0
         now = int(time.time())
 
-        return now > expire_time
+        return now > int(expire_time)
 
     def expire_in(self, attrib, seconds):
         expires = int(time.time()) + seconds

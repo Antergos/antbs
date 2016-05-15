@@ -59,7 +59,7 @@ import transaction_handler
 import utils.pagination
 import webhook
 import iso
-from database.monitor import get_monitor_object
+from database.monitor import get_monitor_object, check_repos_for_changes
 from database.base_objects import db
 from database.build import get_build_object
 from database.package import get_pkg_object
@@ -138,7 +138,7 @@ def maybe_check_for_remote_commits():
     check_expired = monitor.__is_expired__('checked_recently')
 
     if not monitor.checked_recently or check_expired:
-        repo_queue.enqueue_call(monitor.check_repos_for_changes)
+        repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
 
 
 @app.context_processor

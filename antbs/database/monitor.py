@@ -43,7 +43,7 @@ from database import package
 from database.base_objects import RedisHash
 from database.server_status import status
 from database.package import get_pkg_object
-from utilities import quiet_down_noisy_loggers
+from utils.utilities import quiet_down_noisy_loggers
 from utils.logging_config import logger
 
 GITLAB_TOKEN = status.gitlab_token
@@ -59,8 +59,6 @@ class Monitor(RedisHash):
     def __init__(self, name):
         super().__init__(prefix='monitor', key=name)
 
-        self.__namespaceinit__()
-
         key_lists = dict(
             string=['name'],
             bool=['checked_recently'],
@@ -71,35 +69,11 @@ class Monitor(RedisHash):
         )
         self.key_lists.update(key_lists)
 
+        self.__namespaceinit__()
+
         if not self or not self.name:
             self.__keysinit__()
-
-            # Import data from old format
-            lists = self.db.hgetall('antbs:monitor:list')
-
-            for item in lists['github'].split(','):
-                project, repo = item.split('/')
-
-                if 'pamac' == repo:
-                    pkgname = 'pamac-dev'
-                elif 'paper-gtk-theme' == repo:
-                    pkgname = 'gtk-theme-paper'
-                elif 'Arc-theme' == repo:
-                    pkgname = 'gtk-theme-arc'
-                else:
-                    pkgname = repo
-
-                if repo in ['pamac', 'numix-icon-theme', 'paper-gtk-theme']:
-                    mtype = 'commits'
-                else:
-                    mtype = 'releases'
-
-                pkg_obj = get_pkg_object(name=pkgname)
-                pkg_obj.is_monitored = True
-                pkg_obj.monitored_service = 'github'
-                pkg_obj.monitored_type = mtype
-                pkg_obj.monitored_repo = repo
-                pkg_obj.monitored_project = project
+            self.name = name
 
     def check_repos_for_changes(self):
         self.checked_recently = True
@@ -236,3 +210,9 @@ def get_monitor_object(name):
     monitor_obj = Monitor(name=name)
 
     return monitor_obj
+
+
+def check_repos_for_changes(name):
+    monitor_obj = get_monitor_object(name)
+    monitor_obj.check_repos_for_changes()
+
