@@ -44,7 +44,7 @@ class RedisObject:
 
     def __init__(self, full_key=None, *args, **kwargs):
         """ Create or load a RedisObject. """
-        self.key_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
+        self.attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
 
         if full_key:
             self.full_key = full_key
@@ -117,7 +117,7 @@ class RedisObject:
         elif isinstance(self, RedisHash):
             as_dict = dict()
 
-            for key in self.all_keys:
+            for key in self.all_attribs:
                 if key in ['log_str', 'log', 'pkgbuild']:
                     continue
 
@@ -339,20 +339,20 @@ class RedisHash(RedisObject):
         self.prefix = prefix
         self.key = key
         self.full_key = id_key
-        self.all_keys = []
+        self.all_attribs = []
 
     def __namespaceinit__(self):
-        """ Makes sure that the objects `full_key` and `all_keys` attributes are set properly. """
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+        """ Makes sure that the objects `full_key` and `all_attribs` attributes are set properly. """
+        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
 
         if self.full_key[-1] == ':':
             self.full_key = self.full_key[:-1]
 
     def __keysinit__(self):
         """ Initializes the object's predefined attributes as hash fields in Redis. """
-        for key in self.all_keys:
+        for key in self.all_attribs:
             value = getattr(self, key, '')
-            is_string = key in self.key_lists['string']
+            is_string = key in self.attrib_lists['string']
             initialized = (not is_string and '' != value) or (is_string and '_' != value)
 
             if initialized:
@@ -361,18 +361,18 @@ class RedisHash(RedisObject):
             if 'ServerStatus' == self.__class__.__name__:
                 value = os.environ.get(key.upper())
 
-            if key in self.key_lists['string'] + self.key_lists['path']:
+            if key in self.attrib_lists['string'] + self.attrib_lists['path']:
                 value = value or ''
                 setattr(self, key, value)
-            elif key in self.key_lists['bool']:
+            elif key in self.attrib_lists['bool']:
                 value = value or False
                 setattr(self, key, value)
-            elif key in self.key_lists['int']:
+            elif key in self.attrib_lists['int']:
                 value = value or 0
                 setattr(self, key, value)
-            elif key in self.key_lists['list']:
+            elif key in self.attrib_lists['list']:
                 setattr(self, key, RedisList.as_child(self, key, str))
-            elif key in self.key_lists['set']:
+            elif key in self.attrib_lists['set']:
                 setattr(self, key, RedisZSet.as_child(self, key, str))
 
     def __str__(self):
@@ -393,7 +393,7 @@ class RedisHash(RedisObject):
 
     def __iter__(self):
         """ Return an iterator with all the keys in redis hash. """
-        return [key for key in self.all_keys]
+        return [key for key in self.all_attribs]
 
     def iterkeys(self):
         return self.__iter__()
@@ -401,28 +401,28 @@ class RedisHash(RedisObject):
     def __getattribute__(self, attrib):
         """ Get attribute value if stored in redis otherwise pass call to parent class """
 
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
+        pass_list = ['attrib_lists', 'all_attribs', 'namespace', 'database', '_build',
                      'key', 'full_key', 'prefix', 'db', 'full_key']
 
-        if attrib in pass_list or (attrib not in self.all_keys and '__exp' not in attrib):
+        if attrib in pass_list or (attrib not in self.all_attribs and '__exp' not in attrib):
             return super().__getattribute__(attrib)
 
         key = self.full_key
 
-        if attrib in self.key_lists['string'] + self.key_lists['path']:
+        if attrib in self.attrib_lists['string'] + self.attrib_lists['path']:
             return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else '_'
 
-        elif attrib in self.key_lists['bool']:
+        elif attrib in self.attrib_lists['bool']:
             val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else ''
             return self.bool_string_helper(val) if '' != val else ''
 
-        elif attrib in self.key_lists['int']:
+        elif attrib in self.attrib_lists['int']:
             return int(self.db.hget(key, attrib)) if self.db.hexists(key, attrib) else ''
 
-        elif attrib in self.key_lists['list']:
+        elif attrib in self.attrib_lists['list']:
             return RedisList.as_child(self, attrib, str)
 
-        elif attrib in self.key_lists['set']:
+        elif attrib in self.attrib_lists['set']:
             return RedisZSet.as_child(self, attrib, str)
 
         elif attrib.endswith('__exp'):
@@ -432,29 +432,29 @@ class RedisHash(RedisObject):
     def __setattr__(self, attrib, value, score=None):
         """ Set attribute value if stored in redis otherwise pass call to parent class """
 
-        pass_list = ['key_lists', 'all_keys', 'namespace', 'database', '_build',
+        pass_list = ['attrib_lists', 'all_attribs', 'namespace', 'database', '_build',
                      'key', 'full_key', 'prefix', 'db', 'full_key']
 
         # Note: These two statements cannot be combined (causes an exception during object init)
-        if attrib in pass_list or (attrib not in self.all_keys and '__exp' not in attrib):
+        if attrib in pass_list or (attrib not in self.all_attribs and '__exp' not in attrib):
             return super().__setattr__(attrib, value)
-        if attrib in self.key_lists['list'] + self.key_lists['set']:
+        if attrib in self.attrib_lists['list'] + self.attrib_lists['set']:
             return super().__setattr__(attrib, value)
 
         key = self.full_key
 
-        if attrib in self.key_lists['string'] + self.key_lists['int'] or attrib.endswith('__exp'):
+        if attrib in self.attrib_lists['string'] + self.attrib_lists['int'] or attrib.endswith('__exp'):
             val = value if '_' != value else ''
             self.db.hset(key, attrib, val)
 
-        elif attrib in self.key_lists['bool']:
+        elif attrib in self.attrib_lists['bool']:
             if value in [True, False]:
                 self.db.hset(key, attrib, self.bool_string_helper(value))
             else:
                 raise ValueError('{0}.{1} must be of type(bool), {2} given.'.format(
                     self.__class__.__name__, attrib, type(value)))
 
-        elif attrib in self.key_lists['path']:
+        elif attrib in self.attrib_lists['path']:
             if self.is_pathname_valid(value):
                 self.db.hset(key, attrib, value)
             else:

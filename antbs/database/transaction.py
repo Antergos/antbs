@@ -72,7 +72,7 @@ class TransactionMeta(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=the_tnum)
 
-        self.key_lists.update(dict(
+        self.attrib_lists.update(dict(
             string=['building', 'start_str', 'end_str', 'initiated_by'],
             bool=['is_running', 'is_finished'],
             int=['tnum'],
@@ -442,7 +442,7 @@ class Transaction(TransactionMeta):
         doc_util.do_docker_clean(pkg_obj.name)
         self.setup_package_build_directory(pkg_obj.name)
 
-        build_env = ['_AUTOSUMS=True'] if pkg_obj.autosum else ['_AUTOSUMS=False']
+        build_env = ['_AUTOSUMS=True'] if pkg_obj.auto_sum else ['_AUTOSUMS=False']
 
         if '/cinnamon/' in pkg_obj.pbpath:
             build_env.append('_ALEXPKG=True')
@@ -495,7 +495,7 @@ class Transaction(TransactionMeta):
         packages_signed = False
         if bld_obj.completed:
             logger.debug('bld_obj.completed!')
-            if sign_packages(bld_obj.pkgname):
+            if sign_packages(pkg_obj):
                 packages_signed = True
 
         if packages_signed:

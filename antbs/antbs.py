@@ -356,6 +356,14 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         pkg_files_32 = glob.glob(glob_string_32, recursive=True)
         pkg_files = pkg_files_64 + pkg_files_32
 
+        if pkg_obj.is_split_package and pkg_obj.split_packages:
+            for split_pkg in pkg_obj.split_packages:
+                glob_string_64 = '{0}/**/{1}-***'.format(status.STAGING_64, split_pkg)
+                glob_string_32 = '{0}/**/{1}-***'.format(status.STAGING_32, split_pkg)
+                pkg_files_64.extend(glob.glob(glob_string_64, recursive=True))
+                pkg_files_32.extend(glob.glob(glob_string_32, recursive=True))
+                pkg_files.extend(pkg_files_64 + pkg_files_32)
+
         if pkg_files or True:
             for f in pkg_files_64:
                 logger.debug('f in pkg_files_64 fired!')

@@ -49,9 +49,9 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
 
         super().__init__(namespace=namespace, prefix=prefix, key=install_id)
 
-        self.key_lists.update(dict(string=['install_id', 'ip_address', 'start_date', 'start_time',
+        self.attrib_lists.update(dict(string=['install_id', 'ip_address', 'start_date', 'start_time',
                                            'start_str', 'end_date', 'end_time', 'end_str'],
-                                   bool=['completed']))
+                                      bool=['completed']))
 
         self.__namespaceinit__()
 
@@ -79,8 +79,8 @@ class AntergosInstallationUser(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=ip)
 
-        self.key_lists.update(dict(string=['ip_address', 'country'],
-                                   set=['installs', 'installs_completed', 'installs_failed']))
+        self.attrib_lists.update(dict(string=['ip_address', 'country'],
+                                      set=['installs', 'installs_completed', 'installs_failed']))
 
         self.__namespaceinit__()
 

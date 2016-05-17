@@ -92,7 +92,7 @@ class Build(RedisHash):
 
         super().__init__(prefix=prefix, key=the_bnum)
 
-        self.key_lists.update(
+        self.attrib_lists.update(
                 dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
                              'start_str', 'end_str', 'version_str', 'container', 'review_status',
                              'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
@@ -109,7 +109,7 @@ class Build(RedisHash):
             self.__keysinit__()
 
             for key in pkg_obj.all_keys:
-                if key in self.all_keys:
+                if key in self.all_attribs:
                     val = getattr(pkg_obj, key)
                     value = False if 'is_iso' == key and '' == val else val
                     setattr(self, key, value)

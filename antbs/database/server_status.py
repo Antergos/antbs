@@ -40,7 +40,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
     def __init__(self, prefix='status', key='', *args, **kwargs):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
 
-        self.key_lists.update(
+        self.attrib_lists.update(
                 dict(string=['current_status', 'container', 'github_token',
                              'gitlab_token', 'building_start', 'building_num', 'docker_user',
                              'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
@@ -80,14 +80,14 @@ class TimelineEvent(RedisHash, DateTimeStrings):
 
         super().__namespaceinit__()
 
-        self.key_lists.update(
+        self.attrib_lists.update(
                 dict(string=['event_type', 'date_str', 'time_str', 'message'],
                      int=['event_id', 'tl_type'],
                      bool=[],
                      list=['packages'],
                      set=[]))
 
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
 
         if not self or not event_id:
             super().__keysinit__()

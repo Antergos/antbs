@@ -67,7 +67,7 @@ class Monitor(RedisHash):
             set=['packages'],
             path=[]
         )
-        self.key_lists.update(key_lists)
+        self.attrib_lists.update(key_lists)
 
         self.__namespaceinit__()
 

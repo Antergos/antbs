@@ -48,7 +48,7 @@ setup_environment() {
 
 	update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
 	update_success='STAGING REPO UPDATE COMPLETE'
-	export HOME=/root
+	export HOME=/pkg
 
 	if [[ -f /pkg/PKGBUILD ]]; then
 
@@ -80,6 +80,9 @@ setup_environment() {
 		exit 1
 	fi
 
+	cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
+	sed -i 's|unknown|x86_64|g' /etc/makepkg.conf
+
 	if [[ "${_ALEXPKG}" = "False" ]]; then
 
 		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
@@ -101,7 +104,6 @@ setup_environment() {
 	fi
 
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
-	cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
 	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
 	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
 	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
@@ -109,6 +111,7 @@ setup_environment() {
 	git config --global user.name "Antergos Build Server"
 	git config --global user.email "admin@antergos.org"
 	echo -e '[user]\n\temail = "admin@antergos.org"\n\tname = "Antergos Build Server"\n' > /.gitconfig
+	cp /.gitconfig /pkg
 
 }
 
@@ -217,6 +220,7 @@ setup_32bit_env() {
 		sed -i '/\[antergos-staging/,+1 d' /32bit/pacman.conf
 		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /32bit/pacman.conf
 	fi
+	sed -i 's|unknown|i686|g' /32bit/makepkg.conf
 
 	if [[ -e /32build/root ]]; then
 		rm -rf /32build/root

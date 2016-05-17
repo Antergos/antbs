@@ -51,49 +51,68 @@ class PackageMeta(RedisHash):
     """
 
     def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):
-
         super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
 
-        self.key_lists.update(
-                dict(string=['name', 'pkgname', 'version_str', 'pkgver', 'epoch', 'pkgrel',
-                             'short_name', 'path', 'pbpath', 'description', 'pkgdesc',
-                             'build_path', 'success_rate', 'failure_rate', 'git_url',
-                             'git_name', 'gh_repo', 'gh_project', 'iso_md5', 'iso_url',
-                             'url', 'pkgbuild', 'heat_map', 'monitored_service', 'monitored_type',
-                             'monitored_project', 'monitored_repo', 'monitored_last_result'],
-                     bool=['push_version', 'autosum', 'saved_commit', 'is_iso',
-                           'is_metapkg', 'is_monitored'],
-                     int=['pkg_id'],
-                     list=['allowed_in', 'builds', 'tl_events', 'transactions'],
-                     set=['depends', 'groups', 'makedepends']))
+        self.attrib_lists.update(dict(
+            string=['git_name',     'build_path',     'description',    'epoch',
+                    'git_url',      'failure_rate',   'gh_project',     'iso_md5',
+                    'name',         'gh_repo',        'iso_url',        'monitored_last_result',
+                    'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
+                    'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
+                    'pkgver',       'pkgname',        'pkgbuild',       'short_name',
+                    'success_rate', 'url',            'version_str'],
 
-        self.all_keys.append('_build')
+            bool=['is_metapkg',   'auto_sum',      'is_split_package', 'is_iso',
+                  'push_version', 'is_monitored', 'saved_commit'],
+
+            int=['pkg_id'],
+
+            list=['allowed_in',    'builds', 'tl_events', 'transactions',
+                  'split_packages'],
+
+            set=['depends', 'groups', 'makedepends']
+        ))
+
+        self.all_attribs.append('_build')
         self.__namespaceinit__()
-        self.maybe_update_pkgbuild_repo()
 
-        if not self or (not self.pkg_id and os.path.exists(os.path.join(REPO_DIR, key))):
+        is_on_github = self.is_package_on_github(key, self.full_key)
+
+        if not self or (not self.pkg_id and (key in status.all_packages or is_on_github)):
             # Package is not in the database, so it must be new. Let's initialize it.
             self.__keysinit__()
+
             self.pkgname = self.name = key
+
             next_id = self.db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
 
-            status.all_packages.add(self.name)
+            allowed_in = self.get_from_pkgbuild('_allowed_in')
+            auto_sum = self.get_from_pkgbuild('_auto_sum')
 
             if '-x86_64' in self.name or '-i686' in self.name:
                 self.is_iso = True
-            if 'pycharm' in self.name or 'intellij' in self.name or 'clion-eap' == self.name:
-                self.autosum = True
-            if 'yes' == self.get_from_pkgbuild('_is_metapkg'):
+
+            if auto_sum:
+                self.auto_sum = True
+
+            if self.get_from_pkgbuild('_is_metapkg') in [True, 'yes']:
                 self.is_metapkg = True
-            if 'True' == self.get_from_pkgbuild('_is_monitored'):
+
+            if self.get_from_pkgbuild('_is_monitored') in [True, 'yes']:
                 self.is_monitored = True
 
-    def get_from_pkgbuild(self, item):
+            if allowed_in:
+                self.allowed_in = allowed_in
+
+            status.all_packages.add(self.name)
+
+    @staticmethod
+    def get_from_pkgbuild(var):
         raise NotImplementedError('Subclass must implement this method')
 
     @staticmethod
-    def maybe_update_pkgbuild_repo():
+    def is_package_on_github(name, full_key):
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -107,7 +126,7 @@ class Package(PackageMeta):
 
     Attributes:
         (str)
-            name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc: self explanatory (see `man PKGBUILD`)
+            name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc: see `man PKGBUILD`
             version_str: The package's version including pkgrel for displaying on the frontend.
             short_name: Optional name to use on frontend instead of the pkgname.
             path: Absolute path to the package's directory (subdir of antergos-packages directory)
@@ -118,18 +137,18 @@ class Package(PackageMeta):
 
         (bool)
             push_version: Should we automatically update the version and push to Github (for pkgrel bumps)?
-            autosum: Does the package's PKGBUILD download checksums when makepkg is called?
+            auto_sum: Does the package's PKGBUILD download checksums when makepkg is called?
             saved_commit: When making changes to be pushed to github, do we have a saved commit not yet pushed?
             is_iso: Is this a dummy package for building an install iso image?
             is_metapkg: Is this a "metapkg" (don't check/build dependencies).
-            is_monitored: Are we monitoring this package's releases with `RepoMonitor`?
+            is_monitored: Are we monitoring this package's releases with a `Monitor`?
 
         (int)
             pkg_id: ID assigned to the package when it is added to our database for the first time.
 
         (list)
             allowed_in: The repos that the package is allowed to be in (repo names).
-            builds: The IDs of all builds (coompleted & failed) for the package.
+            builds: The IDs of all builds (completed & failed) for the package.
             tl_events: The IDs of all timeline events that include this package.
 
         (set)
@@ -137,26 +156,28 @@ class Package(PackageMeta):
 
     """
 
-    def __init__(self, name, pbpath=None):
+    def __init__(self, name):
         super().__init__(key=name)
 
-        if not pbpath:
-            pbpath = os.path.join('/var/tmp/antergos-packages/', name)
+        self.pkgbuild = self.maybe_fetch_pkgbuild_from_github(name, self.full_key)
 
-        if not os.path.exists(pbpath):
-            self._pbpath = self.determine_pbpath()
-        else:
-            self._pbpath = pbpath
+        if not self.pkgbuild:
+            raise RuntimeError('self.pkgbuild cannot be Falsey!')
 
-        if os.path.isdir(self._pbpath):
-            self._pbpath = os.path.join(self._pbpath, 'PKGBUILD')
+        if 'pkgname=(' in self.pkgbuild or 'pkgbase=(' in self.pkgbuild:
+            self.is_split_package = True
 
-        if not os.path.exists(self._pbpath):
-            raise RuntimeError('pbpath: {0} does not exist!'.format(self._pbpath))
+    def get_split_packages(self):
+        split_pkgs = self.get_from_pkgbuild('pkgname')
+        logger.debug(split_pkgs)
+        for pkg in split_pkgs.split(' '):
+            if pkg != self.name:
+                self.split_packages.append(pkg)
 
-        self.pkgbuild = open(self._pbpath).read()
+        return self.split_packages
 
-    def get_from_pkgbuild(self, var=None):
+    @staticmethod
+    def get_from_pkgbuild(var):
         """
         Get a variable from this package's PKGBUILD (which is stored in antergos-packages gh repo).
 
@@ -267,28 +288,40 @@ class Package(PackageMeta):
             elif self.name == 'cnchi':
                 setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
 
-    def determine_pbpath(self):
-        path = None
-        paths = [os.path.join('/var/tmp/antergos-packages/cinnamon/', self.pkgname),
-                 os.path.join('/var/tmp/antergos-packages/', self.pkgname)]
-        self.maybe_update_pkgbuild_repo()
-        for p in paths:
-            logger.info(p)
-            if os.path.exists(p):
-                ppath = os.path.join(p, 'PKGBUILD')
-                logger.info(ppath)
-                if os.path.exists(ppath):
-                    path = ppath
-                    if p == paths[0] and len(self.allowed_in) == 0:
-                        self.allowed_in.append('main')
-                    break
-        else:
-            msg = 'cant determine pkgbuild path for {0}'.format(self.name)
-            logger.error(msg)
-            if 'dummy-' not in self.name:
-                raise ValueError(msg)
+    @staticmethod
+    def maybe_fetch_pkgbuild_from_github(name, full_key):
+        pbkey = '{0}:{1}'.format(full_key, 'pkgbuild')
 
-        return path
+        if db.exists(pbkey):
+            return db.get(pbkey)
+
+        gh = login(token=status.github_token)
+        repo = gh.repository('antergos', 'antergos-packages')
+        pbfile_contents = repo.file_contents(name + '/PKGBUILD').decoded.decode('utf-8')
+
+        db.setex(pbkey, 300, pbfile_contents)
+
+        return pbfile_contents
+
+    @staticmethod
+    def is_package_on_github(name, full_key):
+        pbkey = '{0}:{1}'.format(full_key, 'pkgbuild')
+        found = False
+
+        if db.exists(pbkey) and db.get(pbkey):
+            found = True
+        else:
+            gh = login(token=status.github_token)
+            repo = gh.repository('antergos', 'antergos-packages')
+
+            try:
+                if repo.file_contents(name + '/PKGBUILD'):
+                    found = True
+            except Exception as err:
+                logger.error(err)
+
+        return found
+
 
     @staticmethod
     def maybe_update_pkgbuild_repo():
@@ -305,8 +338,8 @@ class Package(PackageMeta):
                 try:
                     subprocess.check_call(['/usr/bin/git', 'fetch'], cwd=status.PKGBUILDS_DIR)
                     subprocess.check_call(
-                            ['/usr/bin/git', 'reset', '--hard', 'origin/master'],
-                            cwd=status.PKGBUILDS_DIR
+                        ['/usr/bin/git', 'reset', '--hard', 'origin/master'],
+                        cwd=status.PKGBUILDS_DIR
                     )
                     db.setex('PKGBUILD_REPO_UPDATED', 350, True)
                 except subprocess.CalledProcessError as err:
@@ -459,6 +492,6 @@ def get_pkg_object(name=None, pbpath=None):
     if not path:
         path = os.path.join('/var/tmp/antergos-packages', name, 'PKGBUILD')
 
-    pkg_obj = Package(name=name, pbpath=path)
+    pkg_obj = Package(name=name)
 
     return pkg_obj

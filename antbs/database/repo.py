@@ -78,7 +78,7 @@ class PacmanRepo(RedisHash):
 
         super().__init__(prefix=prefix, key=name)
 
-        self.key_lists.update(
+        self.attrib_lists.update(
             dict(string=['name'],
                  bool=['locked'],
                  int=['pkg_count_alpm', 'pkg_count_fs'],
@@ -86,7 +86,7 @@ class PacmanRepo(RedisHash):
                  set=['pkgs_fs', 'pkgs_alpm'],
                  path=['path']))
 
-        self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
+        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
 
         super().__namespaceinit__()
 
