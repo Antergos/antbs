@@ -321,7 +321,7 @@ class RedisHash(RedisObject):
         prefix (str):     See Args.
         key (str):        See Args.
         full_key (str):   This objects redis key, eg. `namespace:prefix:key`.
-        key_lists (dict): Contains lists of class attributes that are stored in redis
+        attrib_lists (dict): Contains lists of class attributes that are stored in redis
                           organized by their value type.
         all_keys (list):  List of all class attributes that are stored in redis.
 
@@ -335,6 +335,7 @@ class RedisHash(RedisObject):
 
         super().__init__(full_key=id_key)
 
+        self.attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
         self.namespace = namespace
         self.prefix = prefix
         self.key = key

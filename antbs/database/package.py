@@ -36,6 +36,7 @@ from database.server_status import status
 from gevent import sleep
 from github3 import login
 from utils.logging_config import logger
+from utils.pkgbuild import Pkgbuild
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
@@ -62,8 +63,8 @@ class PackageMeta(RedisHash):
                     'pkgver',       'pkgname',        'pkgbuild',       'short_name',
                     'success_rate', 'url',            'version_str'],
 
-            bool=['is_metapkg',   'auto_sum',      'is_split_package', 'is_iso',
-                  'push_version', 'is_monitored', 'saved_commit'],
+            bool=['is_metapkg',   'auto_sum',     'is_split_package', 'is_initialized',
+                  'push_version', 'is_monitored', 'saved_commit',     'is_iso'],
 
             int=['pkg_id'],
 
@@ -76,7 +77,7 @@ class PackageMeta(RedisHash):
         self.all_attribs.append('_build')
         self.__namespaceinit__()
 
-        is_on_github = self.is_package_on_github(key, self.full_key)
+        is_on_github = self.is_package_on_github(key)
 
         if not self or (not self.pkg_id and (key in status.all_packages or is_on_github)):
             # Package is not in the database, so it must be new. Let's initialize it.
@@ -87,32 +88,10 @@ class PackageMeta(RedisHash):
             next_id = self.db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
 
-            allowed_in = self.get_from_pkgbuild('_allowed_in')
-            auto_sum = self.get_from_pkgbuild('_auto_sum')
-
-            if '-x86_64' in self.name or '-i686' in self.name:
-                self.is_iso = True
-
-            if auto_sum:
-                self.auto_sum = True
-
-            if self.get_from_pkgbuild('_is_metapkg') in [True, 'yes']:
-                self.is_metapkg = True
-
-            if self.get_from_pkgbuild('_is_monitored') in [True, 'yes']:
-                self.is_monitored = True
-
-            if allowed_in:
-                self.allowed_in = allowed_in
-
             status.all_packages.add(self.name)
 
     @staticmethod
-    def get_from_pkgbuild(var):
-        raise NotImplementedError('Subclass must implement this method')
-
-    @staticmethod
-    def is_package_on_github(name, full_key):
+    def is_package_on_github(name):
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -129,19 +108,18 @@ class Package(PackageMeta):
             name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc: see `man PKGBUILD`
             version_str: The package's version including pkgrel for displaying on the frontend.
             short_name: Optional name to use on frontend instead of the pkgname.
-            path: Absolute path to the package's directory (subdir of antergos-packages directory)
-            pbpath: Absolute path to the package's PKGBUILD file.
-            build_path: Absolute path to the the package's build directory.
+            pbpath: Absolute path to the package's PKGBUILD file (from most recent build).
+            build_path: Absolute path to the the package's most recent build directory.
             success_rate: The package's rate of successful builds.
             failure_rate: The package's rate of build failures.
 
         (bool)
-            push_version: Should we automatically update the version and push to Github (for pkgrel bumps)?
+            push_version: Should version be automatically push to Github? (for monitored package)
             auto_sum: Does the package's PKGBUILD download checksums when makepkg is called?
-            saved_commit: When making changes to be pushed to github, do we have a saved commit not yet pushed?
+            saved_commit: When pushing to github, do we have any previous commits to be pushed?
             is_iso: Is this a dummy package for building an install iso image?
-            is_metapkg: Is this a "metapkg" (don't check/build dependencies).
-            is_monitored: Are we monitoring this package's releases with a `Monitor`?
+            is_metapkg: Is this a "metapkg" (don't check or download dependencies during build).
+            is_monitored: Are we monitoring this package's releases with a `Monitor` object?
 
         (int)
             pkg_id: ID assigned to the package when it is added to our database for the first time.
@@ -152,32 +130,69 @@ class Package(PackageMeta):
             tl_events: The IDs of all timeline events that include this package.
 
         (set)
-            depends, groups, makedepends
+            depends, groups, makedepends: see `man PKGBUILD`
 
     """
 
-    def __init__(self, name):
+    def __init__(self, name, fetch_pkgbuild=False):
         super().__init__(key=name)
 
-        self.pkgbuild = self.maybe_fetch_pkgbuild_from_github(name, self.full_key)
+        if fetch_pkgbuild or not self.pkgbuild:
+            self.pkgbuild = self.fetch_pkgbuild_from_github(name)
 
         if not self.pkgbuild:
             raise RuntimeError('self.pkgbuild cannot be Falsey!')
 
-        if 'pkgname=(' in self.pkgbuild or 'pkgbase=(' in self.pkgbuild:
-            self.is_split_package = True
+        if not self.is_initialized:
+            self.is_initialized = self.initialize_once()
+
+        self._pkgbuild = None
+
+    def initialize_once(self):
+        allowed_in = self.get_from_pkgbuild('_allowed_in')
+        auto_sum = self.get_from_pkgbuild('_auto_sum')
+        is_metapkg = self.get_from_pkgbuild('_is_metapkg') in ['True', 'yes']
+        is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
+        patterns = ['pkgname=(', 'pkgbase=(']
+        is_split_package = [True for pattern in patterns if pattern in self.pkgbuild]
+
+        if '-x86_64' in self.name or '-i686' in self.name:
+            self.is_iso = True
+
+        if allowed_in:
+            self.allowed_in = allowed_in
+
+        if auto_sum:
+            self.auto_sum = auto_sum
+
+        if is_metapkg:
+            self.is_metapkg = is_metapkg
+
+        if is_monitored:
+            self.is_monitored = is_monitored
+
+        if is_split_package:
+            self.is_split_package = is_split_package
+            split_packages = self.get_split_packages()
+
+            if split_packages:
+                self.split_packages.extend(split_packages)
+
+        return True
 
     def get_split_packages(self):
-        split_pkgs = self.get_from_pkgbuild('pkgname')
-        logger.debug(split_pkgs)
-        for pkg in split_pkgs.split(' '):
-            if pkg != self.name:
-                self.split_packages.append(pkg)
+        split_pkgs_string = self.get_from_pkgbuild('pkgname')
+        split_packages = []
 
-        return self.split_packages
+        logger.debug(split_pkgs_string)
 
-    @staticmethod
-    def get_from_pkgbuild(var):
+        for pkg in split_pkgs_string.split(' '):
+            if pkg and pkg != self.pkgname:
+                split_packages.append(pkg)
+
+        return split_packages
+
+    def get_from_pkgbuild(self, var):
         """
         Get a variable from this package's PKGBUILD (which is stored in antergos-packages gh repo).
 
@@ -185,54 +200,22 @@ class Package(PackageMeta):
         :return: (str) The variable's value after extracted from PKGBUILD.
 
         """
-        if var is None:
-            logger.error('get_from_pkgbuild var is none')
-            raise ValueError
-        if 'dummy-' in self.name:
-            return 'n/a'
 
-        self.maybe_update_pkgbuild_repo()
+        val = ''
 
         if not self.pkgbuild:
-            setattr(self, 'pkgbuild', open(self._pbpath).read())
+            self.pkgbuild = self.fetch_pkgbuild_from_github(self.pkgname)
 
-        dirpath = os.path.dirname(self._pbpath)
+        if not self._pkgbuild:
+            self._pkgbuild = Pkgbuild(self.pkgbuild)
+            self._pkgbuild.parse_contents()
 
-        if var in ['source', 'depends', 'makedepends', 'arch']:
-            cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '[*]}'
+        if var not in self.pkgbuild:
+            logger.error('%s not found in PKGBUILD for %s.', var, self.pkgname)
         else:
-            cmd = 'cd ' + dirpath + '; source ./PKGBUILD; echo ${' + var + '}'
+            val = self._pkgbuild.get(var)
 
-        if var == "pkgver":
-            exclude = ['plymouth']
-            use_container = []
-            git_source = 'git+' in self.pkgbuild or 'git://' in self.pkgbuild
-            if (git_source and self.name not in exclude) or 'cnchi' in self.name:
-                if not self.git_url or 'http' not in self.git_url or not self.git_name:
-                    self.determine_git_repo_info()
-
-                self.prepare_package_source(dirpath=dirpath)
-
-            if 'cnchi-dev' == self.name:
-                cmd = 'mv Antergos*** cnchi; /usr/bin/python cnchi/cnchi/info.py'
-
-            if self.name in use_container:
-                from utils.docker_util import DockerUtils
-                pkgver = DockerUtils().get_pkgver_inside_container(self)
-                return pkgver
-
-        proc = subprocess.Popen(cmd, executable='/bin/bash', shell=True, cwd=dirpath,
-                                stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        out, err = proc.communicate()
-
-        if len(out) > 0:
-            out = out.decode('UTF-8').strip()
-        if len(err) > 0:
-            logger.error('proc.err is %s', err)
-
-        os.unsetenv('srcdir')
-
-        return out
+        return val
 
     def prepare_package_source(self, dirpath=None):
         if not dirpath:
@@ -289,26 +272,18 @@ class Package(PackageMeta):
                 setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
 
     @staticmethod
-    def maybe_fetch_pkgbuild_from_github(name, full_key):
-        pbkey = '{0}:{1}'.format(full_key, 'pkgbuild')
-
-        if db.exists(pbkey):
-            return db.get(pbkey)
-
+    def fetch_pkgbuild_from_github(name):
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
         pbfile_contents = repo.file_contents(name + '/PKGBUILD').decoded.decode('utf-8')
 
-        db.setex(pbkey, 300, pbfile_contents)
-
         return pbfile_contents
 
     @staticmethod
-    def is_package_on_github(name, full_key):
-        pbkey = '{0}:{1}'.format(full_key, 'pkgbuild')
+    def is_package_on_github(name):
         found = False
 
-        if db.exists(pbkey) and db.get(pbkey):
+        if name in status.all_packages:
             found = True
         else:
             gh = login(token=status.github_token)
@@ -484,14 +459,7 @@ class Package(PackageMeta):
             setattr(self, 'groups', self.get_from_pkgbuild('groups'))
 
 
-def get_pkg_object(name=None, pbpath=None):
-    if not name:
-        raise ValueError('name is required to get package object.')
-
-    path = pbpath
-    if not path:
-        path = os.path.join('/var/tmp/antergos-packages', name, 'PKGBUILD')
-
-    pkg_obj = Package(name=name)
+def get_pkg_object(name, fetch_pkgbuild=False):
+    pkg_obj = Package(name=name, fetch_pkgbuild=False)
 
     return pkg_obj

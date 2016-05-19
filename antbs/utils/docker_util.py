@@ -29,8 +29,10 @@
 """ Docker Utilities """
 
 import os
+import re
 import shutil
 import subprocess
+import tempfile
 import time
 
 import docker
@@ -189,6 +191,29 @@ class DockerUtils(metaclass=Singleton):
 
         return repos_hconfig
 
+    def create_unprivileged_host_config(self, pbpath, tmp_dir):
+        script_path = os.path.join(BUILD_DIR, 'get_from_pkgbuild.sh')
+        binds = {
+            pbpath: {
+                'bind': '/PKGBUILD',
+                'ro': True
+            },
+            script_path: {
+                'bind': '/get_from_pkgbuild.sh',
+                'ro': True
+            },
+            tmp_dir: {
+                'bind': '/output',
+                'ro': False
+            }
+        }
+        hconfig = self.doc.create_host_config(
+            binds=binds,
+            mem_limit='1G'
+        )
+
+        return hconfig
+
     def do_image_build_finished(self, result):
         status.docker_image_building = False
         return result
@@ -314,36 +339,50 @@ class DockerUtils(metaclass=Singleton):
         except Exception as err:
             logger.error('Pushing to docker hub failed with error: %s', err)
 
-    def get_pkgver_inside_container(self, pkg_obj):
-        dirpath = os.path.dirname(pkg_obj.pbpath)
-        hconfig = self.create_pkgs_host_config(dirpath, self.result_dir)
-        hconfig.pop('restart_policy', None)
-        build_env = ['_ALEXPKG=False', '_GET_PKGVER_ONLY=True', 'srcdir=/pkg']
+    def get_pkgbuild_variables_and_values(self, pbpath, pkgname):
+        tmp_dir = tempfile.mkdtemp(dir='/tmp')
+        hconfig = self.create_unprivileged_host_config(pbpath, tmp_dir)
+        name = '{0}-PKGBUILD-{1}'.format(pkgname, os.path.basename(tmp_dir))
         try:
-            container = self.doc.create_container("antergos/makepkg",
-                                                  command="/makepkg/build.sh ",
-                                                  volumes=['/var/cache/pacman', '/makepkg',
-                                                           '/antergos', '/pkg', '/root/.gnupg',
-                                                           '/staging', '/result'],
-                                                  environment=build_env, cpuset='0-3',
-                                                  name=pkg_obj.pkgname + '-pkgver',
-                                                  host_config=hconfig)
-            if container.get('Warnings') and container.get('Warnings') != '':
+            container = self.doc.create_container(
+                "antergos/makepkg",
+                command="/get_from_pkgbuild.sh",
+                volumes=['/output'],
+                cpuset='0-3',
+                name=name,
+                host_config=hconfig
+            )
+            if container.get('Warnings', False):
                 logger.error(container.get('Warnings'))
         except Exception as err:
             logger.error('Create container failed. Error Msg: %s' % err)
             raise RuntimeError
 
-        try:
-            self.doc.start(container.get('Id'))
-            result = self.doc.wait(container.get('Id'))
+        container_id = container.get('Id')
 
-            if result == 0:
-                version = [v for v in os.listdir(self.result_dir) if v][0]
-                if version:
-                    self.doc.remove_container(container.get('Id'), v=True)
-                    return version
+        try:
+            self.doc.start(container_id)
+            result = self.doc.wait(container_id)
+
+            if result != 0:
+                return ''
+
+            output = os.listdir(tmp_dir)
+            if output:
+                with open(output.pop()) as output_file:
+                    contents = output_file.read()
+                    matches = re.findall(r'#!.+?(?=\n)', contents, re.MULTILINE)
+
+                    if matches:
+                        logger.error('match found in output!!')
+                        for match in matches:
+                            contents = contents.replace(match, '')
+
+                    self.doc.remove_container(container_id, v=True)
+
+                    return contents
+
         except Exception as err:
-            logger.error('Failed to get pkgver from inside container. err is: %s', err)
+            logger.error('Failed to parse pkgbuild. error was: %s', err)
 
         raise RuntimeError

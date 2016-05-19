@@ -159,7 +159,7 @@ class Transaction(TransactionMeta):
                 if not pbpath:
                     raise RuntimeError('pbpath cannot be None.')
 
-                pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
+                pkg_obj = get_pkg_object(name=pkg)
 
                 for partial in ['i686', 'x86_64']:
                     if partial in pkg:
@@ -255,7 +255,7 @@ class Transaction(TransactionMeta):
             if not pbpath:
                 raise RuntimeError('pbpath cannot be None.')
 
-            pkg_obj = get_pkg_object(name=pkg, pbpath=pbpath)
+            pkg_obj = get_pkg_object(name=pkg)
             version = pkg_obj.get_version()
 
             if not version:
