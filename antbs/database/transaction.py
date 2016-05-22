@@ -417,7 +417,7 @@ class Transaction(TransactionMeta):
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
 
-        tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> started.'
+        tpl = 'Build <a href="/build/{0}">{0}</a> for <a href="{1}">{1}-{2}</a> started.'
         tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, bld_obj.version_str)
 
         get_timeline_object(msg=tlmsg, tl_type=3, ret=False)

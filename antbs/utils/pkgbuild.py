@@ -27,6 +27,7 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from .logging_config import logger
+from datetime import datetime
 
 
 class Pkgbuild:
@@ -159,6 +160,8 @@ class Pkgbuild:
             pkgver = '{0}.{1}'.format(self.values['_pkgver'], self.values['_buildver'])
         elif '_pkgver' in self.values['pkgver']:
             pkgver = self.values['_pkgver']
+        elif 'date' in self.values['pkgver']:
+            pkgver = datetime.now().strftime('%Y.%m.%d')
         else:
             pkgver = self.values['pkgver']
 
