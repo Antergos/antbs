@@ -254,6 +254,7 @@ $(function(){
   $('.nav-tabs').on('shown.bs.tab', function (e) {
     $(".nscroller").nanoScroller();
   });
+
   
 
 });

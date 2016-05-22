@@ -2,89 +2,123 @@
 {% block pagetitle -%}Build Record{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
 {% block subheader %}
-<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
-    <ol class="breadcrumb">
-        <li><a href="/">Home</a></li>
-        <li><a href="#">Build Reports</a></li>
-        <li><a href="/{{ res }}">{{ res|capitalize() }}</a></li>
-        <li class="active">{{ self.pagetitle() }}</li>
-    </ol>
-</div>
+	<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+		<ol class="breadcrumb">
+			<li><a href="/">Home</a></li>
+			<li><a href="#">Build Records</a></li>
+			<li><a href="/{{ result }}">{{ result|capitalize() }}</a></li>
+			<li class="active">{{ self.pagetitle() }}</li>
+		</ol>
+	</div>
 {% endblock subheader %}
 {%- block topcontent -%}
-        <div class="col-md-4">
-            <div id="summary"
-                 class="block no-padding block-color {% if res == "completed" %}success{% else %}danger{% endif %}">
-                <div class="header">
-                    <div class="actions">
-                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
-                    </div>
-                    <h3>{% if res == "completed" %}
-                        <i class="glyphicon glyphicon-thumbs-up"></i>
-                    {% else %}
-                        <i class="glyphicon glyphicon-thumbs-down"></i>
-                    {% endif %}
-                        Build Number: {{ bnum }}</h3>
-                </div>
-                <div class="content no-padding">
-                    <table id="noDt" class="table no-border hover">
-                        <tbody class="no-border-y">
-                        <tr>
-                            <td>Package:</td>
-                            <td>{{ pkg }}</td>
-                        </tr>
-                        <tr>
-                            <td>Version:</td>
-                            <td>{{ ver }}</td>
-                        </tr>
-                        <tr>
-                            <td>Start:</td>
-                            <td>{{ start }}</td>
-                        </tr>
-                        <tr>
-                            <td>Finish:</td>
-                            <td>{{ end }}</td>
-                        </tr>
-                        <tr>
-                            <td>Result:</td>
-                            <td>{{ res }}</td>
-                        </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
- 
+	<div class="col-md-4">
+		<div id="summary"
+			 class="block no-padding block-color {% if result == "completed" %}success{% else %}danger{% endif %}">
+			<div class="header">
+				<div class="actions">
+					<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+					<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+					<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+				</div>
+				<h3>{% if result == "completed" %}
+					<i class="glyphicon glyphicon-thumbs-up"></i>
+				{% else %}
+					<i class="glyphicon glyphicon-thumbs-down"></i>
+				{% endif %}
+					Build Number: {{ bld_obj.bnum }}</h3>
+			</div>
+			<div class="content no-padding">
+				<table id="noDt" class="table no-border hover">
+					<tbody class="no-border-y">
+					<tr>
+						<td>Transaction:</td>
+						<td>{{ bld_obj.tnum }}</td>
+					</tr>
+					<tr>
+						<td>Package:</td>
+						<td><a href="/pkg/{{ bld_obj.pkgname }}">{{ bld_obj.pkgname }}</a></td>
+					</tr>
+					<tr>
+						<td>Version:</td>
+						<td>{{ bld_obj.version_str }}</td>
+					</tr>
+					<tr>
+						<td>Start:</td>
+						<td>{{ bld_obj.start_str }}</td>
+					</tr>
+					<tr>
+						<td>Finish:</td>
+						<td>{{ bld_obj.end_str }}</td>
+					</tr>
+					<tr>
+						<td>Result:</td>
+						<td>{{ result }}</td>
+					</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
 {%- endblock topcontent -%}
 
 {%- block bottomcontent %}
-    <div class="row">
-        <div class="col-md-10">
-            <div id="" class="block block-color">
-                <div class="header">
-                <div class="actions">
-                        <a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-                        <a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-                        <a class="close-down" href="#"><i class="fa fa-times"></i></a>
-                    </div>
-                    <h3>Build Log</h3>
-                </div>
-                <div class="content no-padding">
+	<div class="row">
+		<div class="col-md-10">
+			<div id="" class="block block-color">
+				<div class="header">
+					<div class="actions">
+						<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+						<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+						<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+					</div>
+					<h3>Build Log</h3>
+				</div>
+				<div class="content no-padding">
 
-                    <div id="data" class="no-padding">{{ log|safe() }}</div>
+					<div id="data" class="no-padding">{{ bld_obj.log_str|safe() }}</div>
 
-                </div>
-            </div>
-        </div>
-    </div>
+				</div>
+			</div>
+		</div>
+	</div>
 
 {% endblock bottomcontent -%}
 {% block scripts %}
-    {{ super() }}
-        
-    {# <script type="text/javascript">
+	<style>
+		.nano {
+			background: #bba;
+			width: 1366px;
+			max-width: 100%;
+			height: 340px;
+			max-height: 340px;
+		}
+
+		.nano > .nano-content {
+			padding: 10px;
+			height: 340px;
+		}
+
+		.nano > .nano-pane {
+			background: #888;
+		}
+
+		.nano > .nano-pane > .nano-slider {
+			background: #111;
+		}
+	</style>
+	{{ super() }}
+	<script>
+		$(window).load(function() {
+			$('#data .highlight').addClass('nano');
+		$('.nano pre').addClass('nano-content');
+		$(":not(.dropdown) .nano").nanoScroller();
+		});
+	</script>
+
+
+	{# <script type="text/javascript">
         $(window).load(
                 function () {
         sse = new EventSource('/get_log?num={{ bnum }}');
@@ -106,5 +140,5 @@
         };
     });
 </script>#}
-    {#{% endif -%}#}
+	{#{% endif -%}#}
 {% endblock scripts %}

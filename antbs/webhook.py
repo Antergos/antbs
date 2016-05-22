@@ -325,15 +325,21 @@ class Webhook(WebhookMeta):
                     html.append('<ul class="hook-pkg-list">')
                 for p in the_pkgs:
                     if p:
+                        pkg_link = '<a href="{0}">{0}</a>'.format(p)
+
                         if len(the_pkgs) > 1:
-                            item = '<li>{0}</li>'.format(p)
+                            item = '<li>{0}</li>'.format(pkg_link)
                         else:
-                            item = '<strong>{0}</strong>'.format(p)
+                            item = '<strong>{0}</strong>'.format(pkg_link)
                         html.append(item)
+
                     if p == last_pkg:
                         if self.is_gitlab:
                             source = 'Gitlab'
                             tltype = 2
+                        elif self.is_monitor or self.is_numix:
+                            source = 'Repo Monitor'
+                            tltype = 1
                         else:
                             source = 'Github'
                             tltype = 1

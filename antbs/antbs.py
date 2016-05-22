@@ -626,26 +626,28 @@ def list_builds(build_status=None, page=None, name=None):
 
 @app.route('/build/<int:num>')
 # @cache.memoize(timeout=900, unless=cache_buster)
-def build_info(num):
+def build_info(num=None):
     if not num:
         abort(404)
+
+    bld_obj = None
+
     try:
         bld_obj = get_build_object(bnum=num)
     except Exception:
         abort(404)
 
-    cont = status.container
     if not bld_obj.log_str:
         bld_obj.log_str = 'Unavailable'
-    if cont:
-        container = cont[:20]
+
+    if bld_obj.container:
+        container = bld_obj.container[:20]
     else:
         container = None
-    res = 'completed' if bld_obj.completed else 'failed'
 
-    return render_template("builds/build_info.html", pkg=bld_obj.pkgname, ver=bld_obj.version_str,
-                           res=res, start=bld_obj.start_str, end=bld_obj.end_str,
-                           bnum=bld_obj.bnum, container=container, log=bld_obj.log_str)
+    result = 'completed' if bld_obj.completed else 'failed'
+
+    return render_template("builds/build_info.html", bld_obj=bld_obj, container=container, result=result)
 
 
 @app.route('/browse/<goto>')
