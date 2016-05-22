@@ -108,7 +108,7 @@ class Build(RedisHash):
         if pkg_obj and (not self or not self.bnum):
             self.__keysinit__()
 
-            for key in pkg_obj.all_keys:
+            for key in pkg_obj.all_attribs:
                 if key in self.all_attribs:
                     val = getattr(pkg_obj, key)
                     value = False if 'is_iso' == key and '' == val else val
@@ -140,7 +140,7 @@ class Build(RedisHash):
 
         container = self.container if not upd_repo else self.repo_container
 
-        output = doc.logs(container=container, stream=True)
+        output = doc.logs(container=container, stream=True, follow=True)
         nodup = CustomSet()
         content = []
         live_output_key = 'live:build_output:{0}'.format(self.bnum)

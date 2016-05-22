@@ -144,7 +144,7 @@ class PacmanRepo(RedisHash):
 
         if not status.idle and status.current_status not in excluded:
             building_saved = status.current_status
-        else:
+        elif status.idle:
             status.idle = False
 
         status.current_status = excluded[0]

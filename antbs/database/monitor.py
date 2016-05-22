@@ -108,24 +108,40 @@ class Monitor(RedisHash):
 
         if 'commits' == pkg_obj.monitored_type:
             commits = gh_repo.commits()
+
             try:
                 commit = commits.next()
                 latest = commit.sha
-            except StopIteration:
-                pass
+            except Exception as err:
+                logger.warning(err)
 
         elif 'releases' == pkg_obj.monitored_type:
-            releases = [r for r in gh_repo.releases()]
+            releases = gh_repo.releases()
+
             try:
-                release = releases[0]
+                release = releases.next()
                 latest = release.tag_name
-                latest = latest.replace('v', '')
             except Exception as err:
-                logger.error(err)
+                logger.warning(err)
+
+        elif 'tags' == pkg_obj.monitored_type:
+            tags = gh_repo.releases()
+
+            try:
+                release = tags.next()
+                latest = str(release)
+            except Exception as err:
+                logger.warning(err)
 
         if latest and latest != last_result:
+            if 'commits' != pkg_obj.monitored_type:
+                latest = latest.replace('v', '')
+
             pkg_obj.monitored_last_result = latest
             build_pkgs.append(pkg_obj.name)
+
+            if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:
+                pkg_obj.update_pkgbuild_and_push_github('pkgver', latest)
 
         elif not latest:
             logger.error('latest for %s is Falsey: %s', latest, pkg_obj.name)

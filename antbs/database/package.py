@@ -137,6 +137,8 @@ class Package(PackageMeta):
     def __init__(self, name, fetch_pkgbuild=False):
         super().__init__(key=name)
 
+        self._pkgbuild = None
+
         if fetch_pkgbuild or not self.pkgbuild:
             self.pkgbuild = self.fetch_pkgbuild_from_github(name)
 
@@ -145,8 +147,6 @@ class Package(PackageMeta):
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
-
-        self._pkgbuild = None
 
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
@@ -172,8 +172,9 @@ class Package(PackageMeta):
             self.is_monitored = is_monitored
 
         if is_split_package:
-            self.is_split_package = is_split_package
+            self.is_split_package = True
             split_packages = self.get_split_packages()
+            logger.debug(split_packages)
 
             if split_packages:
                 self.split_packages.extend(split_packages)
@@ -181,16 +182,13 @@ class Package(PackageMeta):
         return True
 
     def get_split_packages(self):
-        split_pkgs_string = self.get_from_pkgbuild('pkgname')
-        split_packages = []
+        split_pkgs = self.get_from_pkgbuild('pkgname')
+        logger.debug(split_pkgs)
 
-        logger.debug(split_pkgs_string)
+        if self.pkgname in split_pkgs:
+            split_pkgs.remove(self.pkgname)
 
-        for pkg in split_pkgs_string.split(' '):
-            if pkg and pkg != self.pkgname:
-                split_packages.append(pkg)
-
-        return split_packages
+        return split_pkgs
 
     def get_from_pkgbuild(self, var):
         """
@@ -273,9 +271,13 @@ class Package(PackageMeta):
 
     @staticmethod
     def fetch_pkgbuild_from_github(name):
+        logger.debug('fetch_pkgbuild_from_github!')
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
         pbfile_contents = repo.file_contents(name + '/PKGBUILD').decoded.decode('utf-8')
+
+        if not pbfile_contents:
+            pbfile_contents = repo.file_contents('cinnamon/' + name + '/PKGBUILD').decoded.decode('utf-8')
 
         return pbfile_contents
 
@@ -297,57 +299,34 @@ class Package(PackageMeta):
 
         return found
 
+    def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
+        can_push = self.push_version or self.is_monitored
 
-    @staticmethod
-    def maybe_update_pkgbuild_repo():
-        if not db.exists('PKGBUILD_REPO_UPDATED') or not os.path.exists(status.PKGBUILDS_DIR):
-            if db.setnx('PKGBUILD_REPO_LOCK', True):
-                db.expire('PKGBUILD_REPO_LOCK', 150)
-
-                if not os.path.exists(status.PKGBUILDS_DIR):
-                    subprocess.check_call(
-                        ['/usr/bin/git', 'clone', GITHUB_REPO],
-                        cwd=os.path.dirname(status.PKGBUILDS_DIR)
-                    )
-
-                try:
-                    subprocess.check_call(['/usr/bin/git', 'fetch'], cwd=status.PKGBUILDS_DIR)
-                    subprocess.check_call(
-                        ['/usr/bin/git', 'reset', '--hard', 'origin/master'],
-                        cwd=status.PKGBUILDS_DIR
-                    )
-                    db.setex('PKGBUILD_REPO_UPDATED', 350, True)
-                except subprocess.CalledProcessError as err:
-                    logger.error(err)
-                    db.delete('PKGBUILD_REPO_UPDATED')
-
-                db.delete('PKGBUILD_REPO_LOCK')
-            else:
-                while not db.exists('PKGBUILD_REPO_UPDATED') and db.exists('PKGBUILD_REPO_LOCK'):
-                    gevent.sleep(2)
-
-    def update_and_push_github(self, var=None, old_val=None, new_val=None):
-        if not (self.push_version and not self.is_monitored) or old_val == new_val:
+        if not can_push or old_val == new_val or new_val in [None, 'None']:
+            logger.error('cant push to github!')
             return
+
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
         pb_file = repo.file_contents(self.name + '/PKGBUILD')
-        pb_contents = pb_file.decoded.decode('utf-8')
 
+        if not pb_file:
+            pb_file = repo.file_contents('cinnamon/' + self.name + '/PKGBUILD')
+
+        pb_contents = pb_file.decoded.decode('utf-8')
         search_str = '{0}={1}'.format(var, old_val)
-        if 'pkgver=None' in pb_contents:
+
+        if 'pkgver' == var and 'pkgver=None' in pb_contents:
             search_str = '{0}={1}'.format(var, 'None')
 
         replace_str = '{0}={1}'.format(var, new_val)
         new_pb_contents = pb_contents.replace(search_str, replace_str)
 
-        with open(self._pbpath, 'w') as pbuild:
-            pbuild.write(new_pb_contents)
-
-        pbuild.close()
-
         if 'pkgver' == var:
             commit_msg = '[ANTBS] | [updpkg] {0} {1}'.format(self.name, new_val)
+            search_str = 'pkgrel={0}'.format(self.pkgrel)
+            replace_str = 'pkgrel={0}'.format('1')
+            new_pb_contents = new_pb_contents.replace(search_str, replace_str)
         else:
             commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
                                                                                     self.name)
@@ -381,9 +360,9 @@ class Package(PackageMeta):
         else:
             changed['pkgver'] = self.monitored_last_result
             setattr(self, 'pkgver', changed['pkgver'])
-            self.update_and_push_github('pkgver', old_vals['pkgver'], changed['pkgver'])
+            self.update_pkgbuild_and_push_github('pkgver', old_vals['pkgver'], changed['pkgver'])
             gevent.sleep(8)
-            self.update_and_push_github('pkgrel', old_vals['pkgrel'], '1')
+            self.update_pkgbuild_and_push_github('pkgrel', old_vals['pkgrel'], '1')
             setattr(self, 'pkgrel', '1')
             changed['pkgrel'] = '1'
 
@@ -421,9 +400,8 @@ class Package(PackageMeta):
         :return:
         """
         depends = []
-        deps = self.get_from_pkgbuild('depends').split()
-        logger.info('deps are %s', deps)
-        mkdeps = self.get_from_pkgbuild('makedepends').split()
+        deps = list(self.get_from_pkgbuild('depends'))
+        mkdeps = list(self.get_from_pkgbuild('makedepends'))
 
         all_deps = deps + mkdeps
         for dep in all_deps:
@@ -460,6 +438,6 @@ class Package(PackageMeta):
 
 
 def get_pkg_object(name, fetch_pkgbuild=False):
-    pkg_obj = Package(name=name, fetch_pkgbuild=False)
+    pkg_obj = Package(name=name, fetch_pkgbuild=fetch_pkgbuild)
 
     return pkg_obj

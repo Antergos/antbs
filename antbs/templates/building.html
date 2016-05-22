@@ -24,13 +24,13 @@
 						<td>Build No.:</td>
 						<td>
 							{% if bld_objs %}
-							<form>
-								<select id="build-number-select" name="build_number" class="form-control">
-									{% for bnum, bld_obj in bld_objs.items() %}
-										<option value="{{ bld_obj.bnum }}"{% if selected.bnum == bld_obj.bnum %}selected{% endif %}>{{ bld_obj.bnum }}</option>
-									{% endfor %}
-								</select>
-							</form>
+								<form>
+									<select id="build-number-select" name="build_number" class="form-control">
+										{% for bnum, bld_obj in bld_objs.items() %}
+											<option value="{{ bld_obj.bnum }}" {% if selected.bnum == bld_obj.bnum %}selected{% endif %}>{{ bld_obj.bnum }}</option>
+										{% endfor %}
+									</select>
+								</form>
 							{% endif %}
 						</td>
 					</tr>
@@ -96,21 +96,34 @@
 	<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/mode-sh.js" type="text/javascript" charset="utf-8"></script>
 	<script src="//cdnjs.cloudflare.com/ajax/libs/ace/1.1.3/theme-monokai.js" type="text/javascript" charset="utf-8"></script>
 	<script type="text/javascript">
-		jQuery(window).load(
-			function () {
-				var editor = ace.edit("data");
-				editor.getSession().setMode("ace/mode/sh");
-				editor.setValue("{% if idle %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
-				editor.setTheme("ace/theme/monokai");
-				editor.setShowPrintMargin(false);
-				editor.getSession().setUseWrapMode(true);
-				editor.setReadOnly(true);
-				editor.setHighlightActiveLine(false);
-				editor.clearSelection();
-				var doc = editor.getSession().getDocument();
-				var sse = new EventSource('/api/get_log/{{ selected.bnum }}');
+		jQuery(window).load(function () {
+			var editor = ace.edit("data");
+			editor.getSession().setMode("ace/mode/sh");
+			editor.setValue("{% if idle %}There are no active builds at this time.{% else %}Loading stream...{% endif %}");
+			editor.setTheme("ace/theme/monokai");
+			editor.setShowPrintMargin(false);
+			editor.getSession().setUseWrapMode(true);
+			editor.setReadOnly(true);
+			editor.setHighlightActiveLine(false);
+			editor.clearSelection();
+			var doc = editor.getSession().getDocument();
+			var current_stream = null;
+
+			function start_new_sse_stream(bnum) {
+				if ('There are no active builds at this time.' !== editor.getValue()) {
+					editor.setValue("Loading stream...");
+					editor.setHighlightActiveLine(false);
+					editor.clearSelection();
+				}
+				if (null !== current_stream) {
+					current_stream.close();
+				}
+
+				var sse = new EventSource('/api/get_log/' + bnum);
+				current_stream = sse;
 				var endOfLog = false,
 					lastMsg = '';
+
 				sse.addEventListener("build_output", function (message) {
 					if (false === endOfLog) {
 						if (message.data.indexOf('ENDOFLOG') >= 0) {
@@ -136,7 +149,14 @@
 						doc.insert({row: pos, column: -1}, '\n' + message.data);
 					}
 				});
+			}
+
+			$('#build-number-select').on('change', function () {
+				var bnum = $(this).val();
+				start_new_sse_stream(bnum);
 			});
+			start_new_sse_stream({{ selected.bnum }});
+		});
 	</script>
 	{#    <script src="/static/js/prism.js"></script>#}
 {% endblock scripts %}

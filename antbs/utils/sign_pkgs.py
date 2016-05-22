@@ -129,31 +129,30 @@ def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
     return True
 
 
-def sign_packages(pkg_obj=None):
+def sign_packages(pkg_obj):
     """
 
     :param pkgname:
     :return:
     """
-    if pkg_obj:
-        db.publish('build-output', 'Signing package..')
-        pkgs2sign = glob.glob(
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % pkg_obj.pkgname)
-        pkgs2sign32 = glob.glob(
-            '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % pkg_obj.pkgname)
-        pkgs2sign = pkgs2sign + pkgs2sign32
+    db.publish('build-output', 'Signing package..')
+    pkgs2sign = glob.glob(
+        '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % pkg_obj.pkgname)
+    pkgs2sign32 = glob.glob(
+        '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % pkg_obj.pkgname)
+    pkgs2sign = pkgs2sign + pkgs2sign32
 
-        if pkg_obj.is_split_package and pkg_obj.split_packages:
-            for split_pkg in pkg_obj.split_packages:
-                pkgs2sign.extend(glob.glob(
-                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % split_pkg))
-                pkgs2sign32 = glob.glob(
-                    '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % split_pkg)
-                pkgs2sign.extend(pkgs2sign32)
+    if pkg_obj.is_split_package and pkg_obj.split_packages:
+        for split_pkg in pkg_obj.split_packages:
+            pkgs2sign.extend(glob.glob(
+                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % split_pkg))
+            pkgs2sign32 = glob.glob(
+                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % split_pkg)
+            pkgs2sign.extend(pkgs2sign32)
 
-        logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
+    logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 
-        if pkgs2sign is not None and pkgs2sign != []:
-            return batch_sign(pkgs2sign)
+    if pkgs2sign is not None and pkgs2sign != []:
+        return batch_sign(pkgs2sign)
 
     return False

@@ -59,13 +59,13 @@ class LoggingConfig(metaclass=Singleton):
             logger = logging.getLogger(logger_name)
             logger.setLevel(logging.ERROR)
 
-        logging.config.dictConfig(self.get_logging_config())
         bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
+        logging.config.dictConfig(self.get_logging_config())
 
         self.logger = logging.getLogger('antbs')
-        bugsnag_handler = BugsnagHandler()
-        bugsnag_handler.setLevel(logging.WARNING)
-        self.logger.addHandler(BugsnagHandler())
+        # bugsnag_handler = BugsnagHandler()
+        # bugsnag_handler.setLevel(logging.WARNING)
+        # self.logger.addHandler(BugsnagHandler())
         self._initialized = True
         logger = None
 
@@ -118,11 +118,16 @@ class LoggingConfig(metaclass=Singleton):
                     'subject': 'AntBS Error Report',
                     'credentials': '["error@build.antergos.org", "U7tGQGoi4spS"]',
                     'formatter': 'email'
+                },
+                'bugsnag': {
+                    'level': 'WARNING',
+                    'class': 'bugsnag.handlers.BugsnagHandler',
+                    'api_key': status.bugsnag_key
                 }
             },
             'loggers': {
-                '': {
-                    'handlers': ['default', 'file', 'redis', 'email'],
+                'antbs': {
+                    'handlers': ['default', 'file', 'redis', 'email', 'bugsnag'],
                     'level': 'DEBUG',
                     'propagate': True
                 }

@@ -160,16 +160,15 @@ def get_live_build_output(bnum):
     keep_alive = 0
     while True:
         message = psub.get_message()
-        if message and (message['data'] == '1' or message['data'] == 1):
+        if message:
             if first_run:
                 message['data'] = db.get(last_line_key)
                 first_run = False
-            else:
-                message['data'] = '...'
 
-            yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
+            if message['data'] not in ['1', 1]:
+                yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
 
-        elif keep_alive > 600:
+        elif keep_alive > 560:
             keep_alive = 0
             yield ':'.encode('UTF-8')
 
@@ -539,17 +538,22 @@ def homepage(tlpage=None):
 
 
 @app.route("/building")
-@app.route("/building/<int:bnum>")
+@app.route("/building/<bnum>")
 def building(bnum=None):
     bld_objs = {}
     selected = None
+
+    if bnum and bnum not in status.now_building:
+        abort(400)
+
     if status.now_building and not status.idle:
         try:
             bld_objs = {b: get_build_object(bnum=b) for b in status.now_building if b}
         except Exception as err:
             logger.error(err)
+            logger.debug(bld_objs)
             abort(500)
-        if not bnum:
+        if not bnum or bnum not in bld_objs:
             bnum = sorted(bld_objs.keys())[0]
 
         selected = dict(bnum=bnum, pkgname=bld_objs[bnum].pkgname,
@@ -703,27 +707,26 @@ def dev_pkg_check(page=None):
 @groups_required(['admin'])
 def build_pkg_now():
     if request.method == 'POST':
+        pkg_obj = None
         pkgname = request.form['pkgname']
         dev = request.form['dev']
-        if not pkgname or pkgname is None or pkgname == '':
-            abort(500)
-        pexists = status.all_packages.ismember(pkgname)
-        if not pexists:
-            try:
-                pkg = get_pkg_object(name=pkgname)
-                if pkg and pkg.pkg_id:
-                    pexists = True
-            except Exception:
-                pass
 
-        if pexists:
+        if not pkgname:
+            abort(500)
+
+        try:
+            pkg_obj = get_pkg_object(pkgname, fetch_pkgbuild=True)
+        except Exception as err:
+            logger.error(err)
+
+        if pkg_obj:
             is_logged_in = user.is_authenticated()
             p, a, rev_pending = get_build_info(1, 'completed', is_logged_in)
             pending = False
-            logger.debug(rev_pending)
+
             for bnum in rev_pending:
                 bld_obj = get_build_object(bnum=bnum)
-                if bld_obj and pkgname == bld_obj.pkgname:
+                if bld_obj and pkg_obj.pkgname == bld_obj.pkgname:
                     pending = True
                     break
 
@@ -731,7 +734,7 @@ def build_pkg_now():
                 flash('Unable to build %s because it is in "pending review" status.' % pkgname,
                       category='error')
             else:
-                if '-x86_64' in pkgname or '-i686' in pkgname:
+                if '-x86_64' in pkg_obj.pkgname or '-i686' in pkg_obj.pkgname:
                     status.iso_flag = True
                     if 'minimal' in pkgname:
                         status.iso_minimal = True
@@ -766,7 +769,6 @@ def get_status():
     if not user.is_authenticated():
         abort(403)
 
-    building = status.current_status
     iso_release = bool(request.args.get('do_iso_release', False))
     reset_queue = bool(request.args.get('reset_build_queue', False))
     rerun_transaction = int(request.args.get('rerun_transaction', 0))
@@ -791,11 +793,11 @@ def get_status():
                         dev, pkg), tl_type='0')
             return json.dumps(message)
 
-    if iso_release:
+    if iso_release and user.is_authenticated():
         transaction_queue.enqueue_call(iso.iso_release_job)
         return json.dumps(message)
 
-    elif reset_queue:
+    elif reset_queue and user.is_authenticated():
         if transaction_queue.count > 0:
             transaction_queue.empty()
         if repo_queue.count > 0:
@@ -813,6 +815,9 @@ def get_status():
         event = get_timeline_object(event_id=rerun_transaction)
         pkgs = event.packages
         if pkgs:
+            _ = {}
+            for pkg in pkgs:
+                _[pkg] = get_pkg_object(pkg, fetch_pkgbuild=True)
             trans_obj = get_trans_object(pkgs, repo_queue=repo_queue)
             status.transaction_queue.rpush(trans_obj.tnum)
             transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
