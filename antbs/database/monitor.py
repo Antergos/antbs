@@ -133,7 +133,7 @@ class Monitor(RedisHash):
             except Exception as err:
                 logger.warning(err)
 
-        if latest and latest != last_result:
+        if latest and latest != last_result and latest != 'v{0}'.format(last_result):
             if 'commits' != pkg_obj.monitored_type:
                 latest = latest.replace('v', '')
 
