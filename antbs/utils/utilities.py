@@ -69,8 +69,12 @@ class PacmanPackageCache(metaclass=Singleton):
 
     def maybe_do_cache_cleanup(self):
         if self.doing_cache_cleanup:
+            waiting = 0
             while self.doing_cache_cleanup:
+                if waiting > 300:
+                    break
                 gevent.sleep(2)
+                waiting += 2
             return
 
         self.doing_cache_cleanup = True

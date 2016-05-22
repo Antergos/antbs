@@ -61,7 +61,7 @@ class PackageMeta(RedisHash):
                     'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
                     'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
                     'pkgver',       'pkgname',        'pkgbuild',       'short_name',
-                    'success_rate', 'url',            'version_str'],
+                    'success_rate', 'url',            'version_str',    'gh_path'],
 
             bool=['is_metapkg',   'auto_sum',     'is_split_package', 'is_initialized',
                   'push_version', 'is_monitored', 'saved_commit',     'is_iso'],
@@ -79,7 +79,7 @@ class PackageMeta(RedisHash):
 
         is_on_github = self.is_package_on_github(key)
 
-        if not self or (not self.pkg_id and (key in status.all_packages or is_on_github)):
+        if not self or (not self.pkg_id and is_on_github):
             # Package is not in the database, so it must be new. Let's initialize it.
             self.__keysinit__()
 
@@ -139,8 +139,11 @@ class Package(PackageMeta):
 
         self._pkgbuild = None
 
+        if not self.gh_path:
+            self.gh_path = self.determine_github_path(name)
+
         if fetch_pkgbuild or not self.pkgbuild:
-            self.pkgbuild = self.fetch_pkgbuild_from_github(name)
+            self.pkgbuild = self.fetch_pkgbuild_from_github(name, self.gh_path)
 
         if not self.pkgbuild:
             raise RuntimeError('self.pkgbuild cannot be Falsey!')
@@ -169,7 +172,19 @@ class Package(PackageMeta):
             self.is_metapkg = is_metapkg
 
         if is_monitored:
-            self.is_monitored = is_monitored
+            service = self.get_from_pkgbuild('_monitored_service')
+            monitored_type = self.get_from_pkgbuild('_monitored_type')
+            project = self.get_from_pkgbuild('_monitored_project')
+            repo = self.get_from_pkgbuild('_monitored_repo')
+
+            config_items = [service, type, project, repo]
+
+            if len([True for item in config_items if item]) == 4:
+                self.is_monitored = is_monitored
+                self.monitored_service = service
+                self.monitored_type = monitored_type
+                self.monitored_project = project
+                self.monitored_repo = repo
 
         if is_split_package:
             self.is_split_package = True
@@ -202,7 +217,7 @@ class Package(PackageMeta):
         val = ''
 
         if not self.pkgbuild:
-            self.pkgbuild = self.fetch_pkgbuild_from_github(self.pkgname)
+            self.pkgbuild = self.fetch_pkgbuild_from_github(self.pkgname, self.gh_path)
 
         if not self._pkgbuild:
             self._pkgbuild = Pkgbuild(self.pkgbuild)
@@ -249,55 +264,49 @@ class Package(PackageMeta):
         except subprocess.CalledProcessError as err:
             logger.error(err.output)
 
-    def determine_git_repo_info(self):
-        if not self.git_url or not self.git_url.endswith('.git'):
-            source = self.get_from_pkgbuild('source')
-            url_match = re.search(r'((https*)|(git:)).+\.git', source)
-            if url_match:
-                logger.info('url_match is: %s', url_match)
-                setattr(self, 'git_url', url_match.group(0))
-            else:
-                setattr(self, 'git_url', '')
+    @staticmethod
+    def determine_github_path(name):
+        gh, repo = Package.get_github_api_client()
+        default = '{0}/PKGBUILD'.format(name)
+        paths = [default, 'cinnamon/{0}'.format(default), 'mate/{0}'.format(default)]
+        gh_path = ''
 
-        if not self.git_name:
-            setattr(self, 'git_name', self.name)
-            if self.name == 'pamac-dev':
-                setattr(self, 'git_name', 'pamac')
-            elif self.name == 'cnchi-dev':
-                setattr(self, 'git_name', 'cnchi-dev')
-                setattr(self, 'git_url', 'http://github.com/lots0logs/cnchi-dev.git')
-            elif self.name == 'cnchi':
-                setattr(self, 'git_url', 'http://github.com/antergos/cnchi.git')
+        for path in paths:
+            try:
+                if repo.file_contents(path):
+                    gh_path = path
+                    break
+            except Exception:
+                continue
+
+        if not gh_path:
+            logger.error('Could not determine gh_path for %s', name)
+
+        return gh_path
+
 
     @staticmethod
-    def fetch_pkgbuild_from_github(name):
-        logger.debug('fetch_pkgbuild_from_github!')
+    def get_github_api_client():
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
-        pbfile_contents = repo.file_contents(name + '/PKGBUILD').decoded.decode('utf-8')
+
+        return gh, repo
+
+    @staticmethod
+    def fetch_pkgbuild_from_github(name, gh_path):
+        logger.debug('fetch_pkgbuild_from_github!')
+        gh, repo = Package.get_github_api_client()
+
+        pbfile_contents = repo.file_contents(gh_path).decoded.decode('utf-8')
 
         if not pbfile_contents:
-            pbfile_contents = repo.file_contents('cinnamon/' + name + '/PKGBUILD').decoded.decode('utf-8')
+            logger.error('fetch pkgbuild failed!')
 
         return pbfile_contents
 
     @staticmethod
     def is_package_on_github(name):
-        found = False
-
-        if name in status.all_packages:
-            found = True
-        else:
-            gh = login(token=status.github_token)
-            repo = gh.repository('antergos', 'antergos-packages')
-
-            try:
-                if repo.file_contents(name + '/PKGBUILD'):
-                    found = True
-            except Exception as err:
-                logger.error(err)
-
-        return found
+        return name in status.all_packages or Package.determine_github_path(name)
 
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored

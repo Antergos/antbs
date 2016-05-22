@@ -186,9 +186,12 @@ class Transaction(TransactionMeta):
                         pkg_obj.success_rate = success
                         pkg_obj.failure_rate = failure
 
+                status.now_building.remove(pkg_obj.bnum)
+
         self.is_running = False
         self.is_finished = True
         status.transactions_running.remove(self.tnum)
+
         remove(self.path)
 
     def setup_transaction_directory(self):
@@ -417,8 +420,9 @@ class Transaction(TransactionMeta):
         bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
         bld_obj.version_str = version_str if version_str else pkg_obj.version_str
 
-        tpl = 'Build <a href="/build/{0}">{0}</a> for <a href="{1}">{1}-{2}</a> started.'
-        tlmsg = tpl.format(bld_obj.bnum, pkg_obj.name, bld_obj.version_str)
+        pkg_link = '<a href="{0}">{0}</a>'.format(pkg_obj.pkgname)
+        tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> started.'
+        tlmsg = tpl.format(bld_obj.bnum, pkg_link, bld_obj.version_str)
 
         get_timeline_object(msg=tlmsg, tl_type=3, ret=False)
 
@@ -533,9 +537,11 @@ class Transaction(TransactionMeta):
         status.failed.rpush(bld_obj.bnum)
         return False
 
-    def build_iso(self, pkg_obj=None):
+    def build_iso(self, pkg_obj):
         # TODO: Rework this, possibly abstract away parts in common with self.build_package()
-
+        own_status = 'Building {0}-{1} with mkarchiso.'.format(pkg_obj.name,
+                                                               self._pkgvers[pkg_obj.name])
+        status.current_status = own_status
         status.iso_building = True
 
         bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
@@ -543,27 +549,27 @@ class Transaction(TransactionMeta):
 
         self.fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])
 
-        flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
+        i686_flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
         minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
 
         if 'i686' in pkg_obj.name:
-            if not os.path.exists(flag):
-                open(flag, 'a').close()
+            if not os.path.exists(i686_flag):
+                open(i686_flag, 'a').close()
         else:
-            if os.path.exists(flag):
-                os.remove(flag)
+            if os.path.exists(i686_flag):
+                os.remove(i686_flag)
 
         if 'minimal' in pkg_obj.name:
-            out_dir = '/out'
             if not os.path.exists(minimal):
                 open(minimal, 'a').close()
         else:
-            out_dir = '/out'
             if os.path.exists(minimal):
                 os.remove(minimal)
 
         in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
         db.set('pkg_count_iso', in_dir_last)
+
+        doc_util.do_docker_clean(pkg_obj.name)
 
         # Create docker host config dict
         hconfig = doc.create_host_config(privileged=True, cap_add=['ALL'],
@@ -580,7 +586,7 @@ class Transaction(TransactionMeta):
                                                  },
                                              '/srv/antergos.info/repo/iso/testing':
                                                  {
-                                                     'bind': out_dir,
+                                                     'bind': '/out',
                                                      'ro': False
                                                  }},
                                          restart_policy={
@@ -593,11 +599,12 @@ class Transaction(TransactionMeta):
             iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
                                                  name=pkg_obj.name, host_config=hconfig,
                                                  cpuset='0-3')
-            if iso_container.get('Warnings', False) and iso_container.get('Warnings') != '':
+            if iso_container.get('Warnings', False):
                 logger.error(iso_container.get('Warnings'))
         except Exception as err:
             logger.error('Create container failed. Error Msg: %s' % err)
             bld_obj.failed = True
+            status.failed.append(bld_obj.bnum)
             return False
 
         bld_obj.container = iso_container.get('Id')
@@ -607,9 +614,7 @@ class Transaction(TransactionMeta):
         try:
             doc.start(bld_obj.container)
             cont = bld_obj.container
-            stream_process = Process(target=self.publish_build_output,
-                                     kwargs=dict(container=cont, bld_obj=bld_obj, is_iso=True,
-                                                 tnum=self.tnum))
+            stream_process = Process(target=bld_obj.publish_build_output)
             stream_process.start()
             result = doc.wait(cont)
             inspect = doc.inspect_container(cont)
@@ -630,6 +635,7 @@ class Transaction(TransactionMeta):
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s', err)
             bld_obj.failed = True
+            status.failed.append(bld_obj.bnum)
             return False
 
         stream_process.join()
