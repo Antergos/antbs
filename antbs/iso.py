@@ -44,7 +44,7 @@ from database.base_objects import db
 from database.server_status import status
 from utils.logging_config import logger
 
-REPO_DIR = '/srv/antergos.info/repo/iso'
+REPO_DIR = status.ISO_DIR
 TESTING_DIR = os.path.join(REPO_DIR, 'testing')
 RELEASE_DIR = os.path.join(REPO_DIR, 'release')
 PASSWORD = status.gpg_password
@@ -54,9 +54,7 @@ API_KEY = db.get('antbs:misc:antergos.com_api_key')
 
 class ISOUtility:
 
-    def __init__(self, pkg_obj=None):
-        if not pkg_obj:
-            raise AttributeError
+    def __init__(self, pkg_obj):
         self.version = pkg_obj.pkgver
         self.pkgname = pkg_obj.pkgname
         self.file_name = (pkg_obj.pkgname.rsplit('-', 1)[-2] + '-' + self.version + '-' +

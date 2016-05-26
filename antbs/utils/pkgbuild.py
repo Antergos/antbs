@@ -154,6 +154,8 @@ class Pkgbuild:
             self. in_array = False
 
     def maybe_fix_pkgver(self):
+        if 'pkgver' not in self.values:
+            self.values['pkgver'] = self.get('pkgver')
         if '$' not in self.values['pkgver']:
             return
 

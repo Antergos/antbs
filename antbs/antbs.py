@@ -65,7 +65,7 @@ from database.build import get_build_object
 from database.package import get_pkg_object
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-from utils.logging_config import logger
+from utils.logging_config import logger, handle_exceptions
 from utils.utilities import copy_or_symlink
 
 
@@ -86,6 +86,7 @@ def initialize_app():
 
     global app
     app = Flask(__name__)
+    handle_exceptions(app)
 
     # Stormpath configuration
     app.config.update({'SECRET_KEY': status.sp_session_key,

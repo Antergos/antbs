@@ -39,6 +39,7 @@ import subprocess
 
 from database.base_objects import db
 from database.server_status import status
+from utils.utilities import remove
 
 from .logging_config import logger
 
@@ -48,37 +49,10 @@ password = status.gpg_password
 gpg_key = status.gpg_key
 
 
-def remove(src):
-    """
-
-    :param src:
-    :return:
-    """
-    if src != str(src):
-        return True
-    if os.path.isdir(src):
-        try:
-            shutil.rmtree(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    elif os.path.isfile(src):
-        try:
-            os.remove(src)
-        except Exception as err:
-            logger.error(err)
-            return True
-    else:
-        return True
-
-
 def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
     """
     Batch sign several files with the key matching the given UID.
 
-    If no passphrase is given then the user is prompted for one.
-
-    The passphrase is returned to avoid further prompts.
     :param paths:
     :param uid:
     :param passphrase:
@@ -136,23 +110,28 @@ def sign_packages(pkg_obj):
     :return:
     """
     db.publish('build-output', 'Signing package..')
-    pkgs2sign = glob.glob(
-        '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % pkg_obj.pkgname)
-    pkgs2sign32 = glob.glob(
-        '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % pkg_obj.pkgname)
+    staging_64 = '{0}/x86_64/{1}***.xz'.format(status.STAGING_64, pkg_obj.pkgname)
+    staging_32 = '{0}/i686/{1}***.xz'.format(status.STAGING_32, pkg_obj.pkgname)
+    pkgs2sign = glob.glob(staging_64)
+    pkgs2sign32 = glob.glob(staging_32)
     pkgs2sign = pkgs2sign + pkgs2sign32
 
     if pkg_obj.is_split_package and pkg_obj.split_packages:
         for split_pkg in pkg_obj.split_packages:
-            pkgs2sign.extend(glob.glob(
-                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/x86_64/%s***.xz' % split_pkg))
-            pkgs2sign32 = glob.glob(
-                '/srv/antergos.info/repo/iso/testing/uefi/antergos-staging/i686/%s***.xz' % split_pkg)
-            pkgs2sign.extend(pkgs2sign32)
+            staging_64 = '{0}/x86_64/{1}***.xz'.format(status.STAGING_64, split_pkg)
+            staging_32 = '{0}/i686/{1}***.xz'.format(status.STAGING_32, split_pkg)
+            pkgs2sign.extend(glob.glob(staging_64))
+            pkgs2sign.extend(glob.glob(staging_32))
 
     logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 
-    if pkgs2sign is not None and pkgs2sign != []:
+    if pkgs2sign:
+        for pkg in pkgs2sign:
+            existing_sig = '{0}.sig'.format(pkg)
+
+            if os.path.exists(existing_sig):
+                remove(existing_sig)
+
         return batch_sign(pkgs2sign)
 
     return False

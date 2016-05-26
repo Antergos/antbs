@@ -29,6 +29,7 @@ import time
 import zipfile
 
 import gevent
+import requests
 from gitlab import Gitlab
 
 from database.base_objects import RedisHash, db
@@ -40,7 +41,7 @@ from utils.pkgbuild import Pkgbuild
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
-GITHUB_REPO = 'http://github.com/antergos/antergos-packages'
+GH_REPO_BASE_URL = 'http://github.com/Antergos/antergos-packages/blob/master/'
 
 
 class PackageMeta(RedisHash):
@@ -77,9 +78,7 @@ class PackageMeta(RedisHash):
         self.all_attribs.append('_build')
         self.__namespaceinit__()
 
-        is_on_github = self.is_package_on_github(key)
-
-        if not self or (not self.pkg_id and is_on_github):
+        if not self or (not self.pkg_id and self.is_package_on_github()):
             # Package is not in the database, so it must be new. Let's initialize it.
             self.__keysinit__()
 
@@ -90,8 +89,7 @@ class PackageMeta(RedisHash):
 
             status.all_packages.add(self.name)
 
-    @staticmethod
-    def is_package_on_github(name):
+    def is_package_on_github(self):
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -139,14 +137,18 @@ class Package(PackageMeta):
 
         self._pkgbuild = None
 
-        if not self.gh_path:
-            self.gh_path = self.determine_github_path(name)
+        if not self.gh_path or '_' == self.gh_path or not isinstance(self.gh_path, str) or self.gh_path in ['True', 'False']:
+            logger.debug('not self.gh_path')
+            self.determine_github_path()
+
+        logger.debug(self.gh_path)
 
         if fetch_pkgbuild or not self.pkgbuild:
-            self.pkgbuild = self.fetch_pkgbuild_from_github(name, self.gh_path)
+            logger.debug('fetch_pkgbuild or not self.pkgbuild!')
+            self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
-            raise RuntimeError('self.pkgbuild cannot be Falsey!')
+            raise RuntimeError(self.pkgbuild)
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
@@ -156,14 +158,16 @@ class Package(PackageMeta):
         auto_sum = self.get_from_pkgbuild('_auto_sum')
         is_metapkg = self.get_from_pkgbuild('_is_metapkg') in ['True', 'yes']
         is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
-        patterns = ['pkgname=(', 'pkgbase=(']
+        patterns = ['pkgname=(', 'pkgbase=']
         is_split_package = [True for pattern in patterns if pattern in self.pkgbuild]
 
         if '-x86_64' in self.name or '-i686' in self.name:
             self.is_iso = True
 
         if allowed_in:
-            self.allowed_in = allowed_in
+            self.allowed_in.extend(allowed_in)
+        else:
+            self.allowed_in.extend(['staging', 'main'])
 
         if auto_sum:
             self.auto_sum = auto_sum
@@ -217,14 +221,14 @@ class Package(PackageMeta):
         val = ''
 
         if not self.pkgbuild:
-            self.pkgbuild = self.fetch_pkgbuild_from_github(self.pkgname, self.gh_path)
+            self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self._pkgbuild:
             self._pkgbuild = Pkgbuild(self.pkgbuild)
             self._pkgbuild.parse_contents()
 
         if var not in self.pkgbuild:
-            logger.error('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
         else:
             val = self._pkgbuild.get(var)
 
@@ -264,25 +268,35 @@ class Package(PackageMeta):
         except subprocess.CalledProcessError as err:
             logger.error(err.output)
 
-    @staticmethod
-    def determine_github_path(name):
-        gh, repo = Package.get_github_api_client()
-        default = '{0}/PKGBUILD'.format(name)
+    def determine_github_path(self):
+        logger.debug('determine_github_path fired!')
+        default = '{0}/PKGBUILD'.format(self.pkgname)
         paths = [default, 'cinnamon/{0}'.format(default), 'mate/{0}'.format(default)]
         gh_path = ''
+        logger.debug(paths)
 
         for path in paths:
+            url = '{0}{1}'.format(GH_REPO_BASE_URL, path)
+            logger.debug(url)
+            req = requests.head(url, allow_redirects=True)
+
             try:
-                if repo.file_contents(path):
-                    gh_path = path
-                    break
-            except Exception:
+                req.raise_for_status()
+                gh_path = path
+            except Exception as err:
+                logger.error('path: %s not found for %s', path, self.pkgname)
+                logger.error(err)
                 continue
 
-        if not gh_path:
-            logger.error('Could not determine gh_path for %s', name)
+            break
 
-        return gh_path
+        logger.debug(gh_path)
+        if not gh_path:
+            logger.error('Could not determine gh_path for %s', self.pkgname)
+            return False
+        else:
+            self.gh_path = gh_path
+            return True
 
 
     @staticmethod
@@ -292,21 +306,25 @@ class Package(PackageMeta):
 
         return gh, repo
 
-    @staticmethod
-    def fetch_pkgbuild_from_github(name, gh_path):
+    def fetch_pkgbuild_from_github(self):
         logger.debug('fetch_pkgbuild_from_github!')
-        gh, repo = Package.get_github_api_client()
+        gh, repo = self.get_github_api_client()
 
-        pbfile_contents = repo.file_contents(gh_path).decoded.decode('utf-8')
+        if not self.gh_path:
+            logger.debug('not self.gh_path!')
+            self.gh_path = self.determine_github_path()
+
+        logger.debug(self.gh_path)
+
+        pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
 
         if not pbfile_contents:
-            logger.error('fetch pkgbuild failed!')
+            logger.error(pbfile_contents)
 
         return pbfile_contents
 
-    @staticmethod
-    def is_package_on_github(name):
-        return name in status.all_packages or Package.determine_github_path(name)
+    def is_package_on_github(self):
+        return self.pkgname in status.all_packages or self.determine_github_path()
 
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored
@@ -355,7 +373,7 @@ class Package(PackageMeta):
         # TODO: This is so ugly. Needs rewrite.
         changed = {'epoch': None, 'pkgrel': None, 'pkgver': None}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
-        version_from_tag = self.is_monitored and 'releases' == self.monitored_type
+        version_from_tag = self.is_monitored and self.monitored_type not in ['releases', 'tags']
         if not version_from_tag:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 new_val = self.get_from_pkgbuild(key)

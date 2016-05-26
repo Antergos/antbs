@@ -53,7 +53,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                            'all_tl_events', 'build_queue', 'transactions_running', 'now_building'],
                      set=['all_packages', 'iso_pkgs', 'repos', 'review_pending'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
-                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR']))
+                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR']))
 
         super().__namespaceinit__()
 

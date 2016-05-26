@@ -411,14 +411,14 @@ class RedisHash(RedisObject):
         key = self.full_key
 
         if attrib in self.attrib_lists['string'] + self.attrib_lists['path']:
-            return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else '_'
+            return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else ''
 
         elif attrib in self.attrib_lists['bool']:
-            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else ''
-            return self.bool_string_helper(val) if '' != val else ''
+            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else 'False'
+            return self.bool_string_helper(val) if '' != val else False
 
         elif attrib in self.attrib_lists['int']:
-            return int(self.db.hget(key, attrib)) if self.db.hexists(key, attrib) else ''
+            return int(self.db.hget(key, attrib)) if self.db.hexists(key, attrib) else 0
 
         elif attrib in self.attrib_lists['list']:
             return RedisList.as_child(self, attrib, str)
@@ -456,7 +456,7 @@ class RedisHash(RedisObject):
                     self.__class__.__name__, attrib, type(value)))
 
         elif attrib in self.attrib_lists['path']:
-            if self.is_pathname_valid(value):
+            if self.is_pathname_valid(value) or '' == value:
                 self.db.hset(key, attrib, value)
             else:
                 raise ValueError('{0}.{1} must be a valid pathname (str), {2} given.'.format(

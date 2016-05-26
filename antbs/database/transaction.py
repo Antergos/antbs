@@ -186,8 +186,6 @@ class Transaction(TransactionMeta):
                         pkg_obj.success_rate = success
                         pkg_obj.failure_rate = failure
 
-                status.now_building.remove(pkg_obj.bnum)
-
         self.is_running = False
         self.is_finished = True
         status.transactions_running.remove(self.tnum)
@@ -209,7 +207,8 @@ class Transaction(TransactionMeta):
             raise RuntimeError(err.output)
 
     def get_package_build_directory(self, pkg):
-        paths = [os.path.join(self.path, 'cinnamon', pkg),
+        paths = [os.path.join(self.path, 'mate', pkg),
+                 os.path.join(self.path, 'cinnamon', pkg),
                  os.path.join(self.path, pkg)]
         pbpath = None
         for p in paths:
@@ -249,6 +248,8 @@ class Transaction(TransactionMeta):
             shutil.move(src, dest)
 
     def process_packages(self):
+        _pkgs = [p for p in self.packages]
+
         for pkg in self.packages:
             if not pkg:
                 continue
@@ -274,9 +275,13 @@ class Transaction(TransactionMeta):
             status.current_status = log_msg
 
             depends = pkg_obj.get_deps()
-            intersect = list(set(depends) & set(self.packages))
+
+            intersect = list(set(depends) & set(_pkgs))
+            logger.debug((depends, intersect))
             if depends and len(intersect) > 0:
                 self._internal_deps.append((pkg, intersect))
+            else:
+                self._internal_deps.append((pkg, []))
 
             self.handle_special_cases(pkg, pkg_obj)
 
@@ -284,7 +289,7 @@ class Transaction(TransactionMeta):
         status.current_status = 'Using package dependencies to determine build order.'
         if self._internal_deps:
             for name in self.determine_build_order(self._internal_deps):
-                if pkg not in self.queue:
+                if name not in self.queue:
                     self.queue.append(name)
 
         for pkg in self.packages:
@@ -398,6 +403,13 @@ class Transaction(TransactionMeta):
                 if not next_emitted:
                     # all entries have unmet deps, one of two things is wrong...
                     logger.error("cyclic or missing dependancy detected: %r", next_pending)
+                    names = [n for n, d in source]
+                    deps = [d for n, d in source]
+                    missing = [m for d in deps for m in d if m not in names]
+                    logger.error(names)
+                    logger.error(deps)
+                    logger.error(missing)
+
                     raise ValueError
                 pending = next_pending
                 emitted = next_emitted
@@ -437,6 +449,7 @@ class Transaction(TransactionMeta):
         own_status = 'Building {0}-{1} with makepkg.'.format(pkg_obj.name,
                                                              self._pkgvers[pkg_obj.name])
         status.current_status = own_status
+        status.idle = False
 
         in_dir_last = len([name for name in os.listdir(self.result_dir)])
         db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 86400, in_dir_last)
@@ -448,7 +461,7 @@ class Transaction(TransactionMeta):
 
         build_env = ['_AUTOSUMS=True'] if pkg_obj.auto_sum else ['_AUTOSUMS=False']
 
-        if '/cinnamon/' in pkg_obj.pbpath:
+        if '/cinnamon/' in pkg_obj.gh_path:
             build_env.append('_ALEXPKG=True')
         else:
             build_env.append('_ALEXPKG=False')
@@ -522,7 +535,7 @@ class Transaction(TransactionMeta):
         status.now_building.remove(bld_obj.bnum)
         if own_status == status.current_status:
             status.current_status = ''
-            if not status.now_building:
+            if not status.now_building and not self.queue:
                 status.idle = True
 
         if not bld_obj.failed:

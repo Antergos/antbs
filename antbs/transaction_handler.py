@@ -67,8 +67,8 @@ def set_server_status(first=True, saved_status=False, is_review=False):
         do_save = status.transactions_running and 'Idle' not in status.current_status
         if not status.idle and do_save:
             saved = status.current_status
-        else:
-            status.idle = False
+
+        status.idle = False
 
         if is_review:
             status.current_status = 'Processing developer review result.'
@@ -80,7 +80,7 @@ def set_server_status(first=True, saved_status=False, is_review=False):
     elif not saved_status and not status.transactions_running:
         status.idle = True
         status.current_status = 'Idle'
-    elif saved_status and not status.idle:
+    elif saved_status and status.transactions_running and not status.idle:
         status.current_status = saved_status
 
     return ret

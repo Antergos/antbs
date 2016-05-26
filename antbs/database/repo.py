@@ -195,7 +195,7 @@ class PacmanRepo(RedisHash):
         if not status.idle:
             if building_saved:
                 status.current_status = building_saved
-            else:
+            elif not status.transactions_running and not status.now_building:
                 status.idle = True
                 status.current_status = 'Idle.'
 

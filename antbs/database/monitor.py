@@ -125,7 +125,7 @@ class Monitor(RedisHash):
                 logger.warning(err)
 
         elif 'tags' == pkg_obj.monitored_type:
-            tags = gh_repo.releases()
+            tags = gh_repo.tags()
 
             try:
                 release = tags.next()
@@ -170,7 +170,7 @@ class Monitor(RedisHash):
     def check_mirror_for_iso(self, version):
         synced = []
         for iso_pkg in status.iso_pkgs:
-            iso_obj = package.get_pkg_object(name=iso_pkg)
+            iso_obj = get_pkg_object(name=iso_pkg)
             req = requests.head(iso_obj.iso_url, allow_redirects=True)
 
             try:
@@ -219,10 +219,8 @@ def get_monitor_object(name):
     Returns:
         Monitor: A fully initiallized `Monitor` object.
 
-    Raises:
-        ValueError: If name argument is not provided.
-
     """
+
     monitor_obj = Monitor(name=name)
 
     return monitor_obj
