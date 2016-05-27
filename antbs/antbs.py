@@ -69,7 +69,7 @@ from utils.logging_config import logger, handle_exceptions
 from utils.utilities import copy_or_symlink
 
 
-app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = None
+app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = monitor = None
 
 
 def url_for_other_page(page):
@@ -102,7 +102,7 @@ def initialize_app():
                        'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
 
     # Create Stormpath Manager object.
-    stormpath_manager = StormpathManager(app)
+    StormpathManager(app)
 
     # Jinja2 configuration
     global url_for_other_page
@@ -135,11 +135,18 @@ initialize_app()
 
 @app.before_request
 def maybe_check_for_remote_commits():
-    monitor = get_monitor_object(name='github')
+    global monitor
+
+    if monitor is None:
+        monitor = get_monitor_object(name='github')
+
     check_expired = monitor.__is_expired__('checked_recently')
 
     if not monitor.checked_recently or check_expired:
         repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
+
+    if '/rq' in request.path and not user.is_authenticated():
+        abort(403)
 
 
 @app.context_processor
