@@ -110,16 +110,15 @@ def sign_packages(pkg_obj):
     :return:
     """
     db.publish('build-output', 'Signing package..')
-    staging_64 = '{0}/x86_64/{1}***.xz'.format(status.STAGING_64, pkg_obj.pkgname)
-    staging_32 = '{0}/i686/{1}***.xz'.format(status.STAGING_32, pkg_obj.pkgname)
+    staging_64 = '{0}/{1}***.xz'.format(status.STAGING_64, pkg_obj.pkgname)
+    staging_32 = '{0}/{1}***.xz'.format(status.STAGING_32, pkg_obj.pkgname)
     pkgs2sign = glob.glob(staging_64)
-    pkgs2sign32 = glob.glob(staging_32)
-    pkgs2sign = pkgs2sign + pkgs2sign32
+    pkgs2sign.extend(glob.glob(staging_32))
 
     if pkg_obj.is_split_package and pkg_obj.split_packages:
         for split_pkg in pkg_obj.split_packages:
-            staging_64 = '{0}/x86_64/{1}***.xz'.format(status.STAGING_64, split_pkg)
-            staging_32 = '{0}/i686/{1}***.xz'.format(status.STAGING_32, split_pkg)
+            staging_64 = '{0}/{1}***.xz'.format(status.STAGING_64, split_pkg)
+            staging_32 = '{0}/{1}***.xz'.format(status.STAGING_32, split_pkg)
             pkgs2sign.extend(glob.glob(staging_64))
             pkgs2sign.extend(glob.glob(staging_32))
 

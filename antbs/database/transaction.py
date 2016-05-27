@@ -461,10 +461,10 @@ class Transaction(TransactionMeta):
 
         build_env = ['_AUTOSUMS=True'] if pkg_obj.auto_sum else ['_AUTOSUMS=False']
 
-        if '/cinnamon/' in pkg_obj.gh_path:
-            build_env.append('_ALEXPKG=True')
-        else:
-            build_env.append('_ALEXPKG=False')
+        #if '/cinnamon/' in pkg_obj.gh_path:
+        #    build_env.append('_ALEXPKG=True')
+        #else:
+        build_env.append('_ALEXPKG=False')
 
         build_dir = self._build_dirpaths[pkg_obj.name]['build_dir']
         _32bit = self._build_dirpaths[pkg_obj.name]['32bit']
