@@ -65,8 +65,10 @@ from database.build import get_build_object
 from database.package import get_pkg_object
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
+from database.repo import get_repo_object
 from utils.logging_config import logger, handle_exceptions
 from utils.utilities import copy_or_symlink
+from views.repo import repo_view
 
 
 app = transaction_queue = repo_queue = webhook_queue = w1 = w2 = w3 = monitor = None
@@ -117,6 +119,9 @@ def initialize_app():
     # Setup rq_dashboard (accessible at '/rq' endpoint)
     app.config.from_object(rq_dashboard.default_settings)
     app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
+
+    # Register our views
+    app.register_blueprint(repo_view, url_prefix='/repo')
 
     # Setup rq (background task queue manager)
     with Connection(db):
@@ -288,44 +293,17 @@ def get_build_info(page=None, build_status=None, logged_in=False, search=None):
     return pkg_list, int(all_pages), rev_pending
 
 
-# @cache.memoize(timeout=900, unless=cache_buster)
-def get_repo_info(repo=None, logged_in=False):
-    if repo is None:
-        abort(500)
-    container = dict(pkgs=[])
+def get_repo_packages_in_group(package_group, repo_name):
+    pkgs = []
+    repo = get_repo_object(repo_name)
 
-    if logged_in:
-        p, a, rev_pending = get_build_info(1, repo, logged_in)
-    else:
-        rev_pending = []
+    for pkg in repo.packages:
+        pkg_obj = get_pkg_object(pkg)
 
-    path_part = os.path.join('/srv/antergos.info/repo', repo, 'x86_64')
-    all_packages = glob.glob('{0}/***.pkg.tar.xz'.format(path_part))
+        if package_group in pkg_obj.groups:
+            pkgs.append(pkg_obj)
 
-    if all_packages:
-        for pkg in all_packages:
-            p = pkg
-            pkg = re.search(r'^(\w|-)+(\D|r3|g4|qt5)(?=-\d(\w|\.|-|_)*)', os.path.basename(pkg))
-            if pkg:
-                pkg = pkg.group(0)
-            else:
-                logger.error(p)
-                continue
-            if 'dummy' in pkg or 'grub-zfs' in pkg:
-                continue
-            pkg_obj = get_pkg_object(pkg)
-            bld_obj = dict(review_status='', review_dev='', review_date='')
-            try:
-                bnum = pkg_obj.builds[0]
-                if bnum:
-                    bld_obj = get_build_object(bnum=bnum)
-            except Exception:
-                continue
-
-            pkg_obj._build = bld_obj if isinstance(bld_obj, dict) else bld_obj.__jsonable__()
-            container["pkgs"].append(pkg_obj.__jsonable__())
-
-    return container, rev_pending
+    return pkgs
 
 
 def redirect_url(default='homepage'):
@@ -856,18 +834,6 @@ def get_and_show_pkg_profile(pkgname=None):
 
     return render_template('package.html', pkg=pkgobj, build_history=build_history,
                            timestamps=timestamps)
-
-
-@app.route('/repo_packages/<repo>')
-# @cache.memoize(timeout=900, unless=cache_buster)
-def repo_packages(repo=None):
-    if not repo or repo not in ['antergos', 'antergos-staging']:
-        abort(404)
-
-    building = status.now_building
-    packages, rev_pending = get_repo_info(repo, user.is_authenticated())
-    return render_template("repos/repo_pkgs.html", building=building, repo_packages=packages,
-                           rev_pending=rev_pending, user=user, name=repo)
 
 
 # @app.route('/slack/overflow', methods=['post'])

@@ -83,7 +83,7 @@ class PacmanRepo(RedisHash):
                  bool=['locked'],
                  int=['pkg_count_alpm', 'pkg_count_fs'],
                  list=[],
-                 set=['pkgs_fs', 'pkgs_alpm'],
+                 set=['pkgs_fs', 'pkgs_alpm', 'packages'],
                  path=['path']))
 
         self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
@@ -98,6 +98,19 @@ class PacmanRepo(RedisHash):
 
         self.sync_with_alpm_db()
         self.sync_with_filesystem()
+        self.setup_packages_manifest()
+
+    def setup_packages_manifest(self):
+        pkgs_fs = set(self.pkgs_fs)
+        pkgs_alpm = set(self.pkgs_alpm)
+        pkgs = list(pkgs_fs & pkgs_alpm)
+
+        for pk in self.packages:
+            if pk not in pkgs:
+                self.packages.remove(pk)
+
+        for pkg in pkgs:
+            self.packages.add(pkg)
 
     def sync_with_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')

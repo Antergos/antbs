@@ -153,6 +153,8 @@ class Package(PackageMeta):
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
 
+        self.sync_database_with_pkgbuild()
+
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
         auto_sum = self.get_from_pkgbuild('_auto_sum')
@@ -461,7 +463,8 @@ class Package(PackageMeta):
         if not self.depends:
             self.get_deps()
         if not self.groups:
-            setattr(self, 'groups', self.get_from_pkgbuild('groups'))
+            for group in self.get_from_pkgbuild('groups'):
+                self.groups.append(group)
 
 
 def get_pkg_object(name, fetch_pkgbuild=False):
