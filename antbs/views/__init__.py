@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 #  -*- coding: utf-8 -*-
 #
-#  __init__.py
+#  views
 #
 #  Copyright © 2016  Antergos
 #
@@ -26,13 +26,28 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from flask import render_template, abort
+from flask import (
+    render_template,
+    abort,
+    Blueprint,
+    request,
+    url_for
+)
 from jinja2 import TemplateNotFound
+from flask.ext.stormpath import user
+import json
+from datetime import datetime, timedelta
+from glob import glob
+import os
 
 from ..database.package import get_pkg_object
 from ..database.repo import get_repo_object
 from ..database.build import get_build_object
-from ..database.server_status import status
+from ..database.server_status import status, get_timeline_object
+from database.transaction import get_trans_object
+from ..database.base_objects import db
+from ..utils.logging_config import logger
+from ..utils.pagination import Pagination
 
 
 def try_render_template(*args, **kwargs):
@@ -86,3 +101,51 @@ def package_in_group(pkg=None, group=None):
         return group in pkg_obj.groups
 
     return False
+
+
+def redirect_url(default='homepage'):
+    return request.args.get('next') or request.referrer or url_for(default)
+
+
+def get_build_history_chart_data(pkg_obj=None):
+    if pkg_obj is None:
+        builds = status.completed + status.failed
+        chart_data = db.get('antbs:misc:charts:home:heatmap') or False
+    else:
+        builds = pkg_obj.builds
+        chart_data = pkg_obj.heat_map
+        if chart_data and '_' != chart_data:
+            chart_data = json.loads(chart_data)
+            all_builds = sum([int(num) for num in
+                              [chart_data[key]['builds'] for key in chart_data]])
+            if len(pkg_obj.builds) > all_builds:
+                chart_data = '{}'
+
+    timestamps = {}
+
+    if not chart_data or chart_data in ['{}', '_']:
+        chart_data = dict()
+        builds = [b for b in builds if b]
+        for bld in builds:
+            bld_obj = get_build_object(bnum=bld)
+            if not bld_obj.end_str:
+                continue
+            dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
+            key = dt.strftime("%s")
+            if not chart_data.get(key, False):
+                chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
+                                       timestamp=key)
+            else:
+                chart_data[key]['builds'] += 1
+
+        if pkg_obj is None:
+            db.setex('antbs:misc:charts:home:heatmap', 10800, json.dumps(chart_data))
+        else:
+            pkg_obj.heatmap = json.dumps(chart_data)
+    elif isinstance(chart_data, str):
+        chart_data = json.loads(chart_data)
+
+    for key in chart_data:
+        timestamps[key] = chart_data[key]['builds']
+
+    return chart_data, timestamps

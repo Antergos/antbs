@@ -26,17 +26,19 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from flask import Blueprint, abort
-from flask.ext.stormpath import user
-
-from . import (
+from views import (
+    Blueprint,
+    abort,
     try_render_template,
     get_paginated,
     get_build_object,
     get_repo_object,
     get_pkg_object,
     package_in_group,
-    status
+    status,
+    user,
+    logger,
+    Pagination
 )
 
 repo_view = Blueprint('repo', __name__)

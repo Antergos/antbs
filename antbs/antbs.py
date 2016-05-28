@@ -238,61 +238,6 @@ def match_pkg_name_build_log(bnum=None, match=None):
         return False
 
 
-# @cache.memoize(timeout=900, unless=cache_buster)
-def get_build_info(page=None, build_status=None, logged_in=False, search=None):
-    """
-    Get paginated list of build objects.
-
-    :param (int) page: Page number.
-    :param (str) build_status: Only include builds of this status (completed, failed, etc).
-    :param (bool) logged_in: Was the request made by a logged-in user?
-    :param (str) search: Filter list to include builds where "search" string is found in pkgname.
-
-    :return (list) pkglist, (int) all_pages, (list) rev_pending:
-
-    """
-    if page is None or build_status is None:
-        abort(500)
-
-    if 'antergos' in build_status:
-        build_status = 'completed'
-
-    pkg_list = []
-    rev_pending = []
-    all_builds = None
-    all_pages = 0
-
-    try:
-        all_builds = getattr(status, build_status)
-    except Exception as err:
-        logger.error('GET_BUILD_INFO - %s', err)
-        abort(500)
-
-    if all_builds:
-        if search is not None:
-            search_all_builds = [x for x in all_builds if
-                                 x is not None and match_pkg_name_build_log(x, search)]
-            all_builds = search_all_builds
-
-        if all_builds:
-            builds, all_pages = get_paginated(all_builds, 10, page, False)
-            for bnum in builds:
-                try:
-                    bld_obj = get_build_object(bnum=bnum)
-                except Exception as err:
-                    logger.error(err)
-                    continue
-
-                pkg_list.append(bld_obj)
-
-            if logged_in:
-                for bld_obj in pkg_list:
-                    if bld_obj.review_status == "pending":
-                        rev_pending.append(bld_obj)
-
-    return pkg_list, int(all_pages), rev_pending
-
-
 def get_repo_packages_in_group(package_group, repo_name):
     pkgs = []
     repo = get_repo_object(repo_name)
@@ -304,10 +249,6 @@ def get_repo_packages_in_group(package_group, repo_name):
             pkgs.append(pkg_obj)
 
     return pkgs
-
-
-def redirect_url(default='homepage'):
-    return request.args.get('next') or request.referrer or url_for(default)
 
 
 def set_pkg_review_result(bnum=False, dev=False, result=False):
@@ -381,64 +322,6 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
     return errmsg
 
 
-# @cache.memoize(timeout=900, unless=cache_buster)
-def get_timeline(tlpage=None):
-    if not tlpage:
-        tlpage = 1
-    timeline = []
-    for event_id in status.all_tl_events[1000:-1]:
-        event = get_timeline_object(event_id=event_id)
-        timeline.append(event)
-    this_page, all_pages = get_paginated(timeline, 6, tlpage, True)
-
-    return this_page, all_pages
-
-
-# @cache.memoize(timeout=900, unless=cache_buster)
-def get_build_history_chart_data(pkg_obj=None):
-    if pkg_obj is None:
-        builds = status.completed + status.failed
-        chart_data = db.get('antbs:misc:charts:home:heatmap') or False
-    else:
-        builds = pkg_obj.builds
-        chart_data = pkg_obj.heat_map
-        if chart_data and '_' != chart_data:
-            chart_data = json.loads(chart_data)
-            all_builds = sum([int(num) for num in
-                              [chart_data[key]['builds'] for key in chart_data]])
-            if len(pkg_obj.builds) > all_builds:
-                chart_data = '{}'
-
-    timestamps = {}
-
-    if not chart_data or chart_data in ['{}', '_']:
-        chart_data = dict()
-        builds = [b for b in builds if b]
-        for bld in builds:
-            bld_obj = get_build_object(bnum=bld)
-            if not bld_obj.end_str:
-                continue
-            dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
-            key = dt.strftime("%s")
-            if not chart_data.get(key, False):
-                chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
-                                       timestamp=key)
-            else:
-                chart_data[key]['builds'] += 1
-
-        if pkg_obj is None:
-            db.setex('antbs:misc:charts:home:heatmap', 10800, json.dumps(chart_data))
-        else:
-            pkg_obj.heatmap = json.dumps(chart_data)
-    elif isinstance(chart_data, str):
-        chart_data = json.loads(chart_data)
-
-    for key in chart_data:
-        timestamps[key] = chart_data[key]['builds']
-
-    return chart_data, timestamps
-
-
 @app.errorhandler(404)
 def page_not_found(e):
     return render_template('error/404.html'), 404
@@ -458,69 +341,7 @@ def flask_error(e):
     return render_template('error/500.html'), 400
 
 
-@app.route("/timeline/<int:tlpage>")
-@app.route("/")
-# @cache.memoize(timeout=900, unless=cache_buster)
-def homepage(tlpage=None):
-    if tlpage is None:
-        tlpage = 1
-    check_stats = ['build_queue', 'completed', 'failed']
-    tl_events, all_pages = get_timeline(tlpage)
 
-    if tlpage > all_pages:
-        abort(404)
-
-    build_history, timestamps = get_build_history_chart_data()
-
-    stats = {}
-    for stat in check_stats:
-        builds = getattr(status, stat)
-        res = len(builds) or '0'
-        if stat != "build_queue":
-            builds = [x for x in builds[1000:-1] if x]
-            within = []
-            for bnum in builds:
-                try:
-                    bld_obj = get_build_object(bnum=bnum)
-                except (ValueError, AttributeError):
-                    continue
-
-                end = ''
-                if bld_obj.end_str:
-                    end = datetime.strptime(bld_obj.end_str, '%m/%d/%Y %I:%M%p')
-                    end = end if (datetime.now() - end) < timedelta(hours=48) else ''
-
-                if end:
-                    within.append(bld_obj.bnum)
-
-            stats[stat] = len(within)
-        else:
-            stats[stat] = res
-
-    main_repo = glob.glob('/srv/antergos.info/repo/antergos/x86_64/*.pkg.tar.xz')
-    staging_repo = glob.glob('/srv/antergos.info/repo/antergos-staging/x86_64/*.pkg.tar.xz')
-
-    for repo in [main_repo, staging_repo]:
-        if repo:
-            filtered = []
-
-            if '-staging' not in repo[0]:
-                repo_name = 'repo_main'
-            else:
-                repo_name = 'repo_staging'
-
-            for file_path in repo:
-                new_fp = os.path.basename(file_path)
-                if 'dummy-package' not in new_fp:
-                    filtered.append(new_fp)
-
-            stats[repo_name] = len(set(filtered))
-        else:
-            stats['repo_staging'] = 0
-
-    return render_template("overview.html", stats=stats, user=user, tl_events=tl_events,
-                           all_pages=all_pages, page=tlpage, build_history=build_history,
-                           timestamps=timestamps)
 
 
 @app.route("/building")
@@ -590,50 +411,6 @@ def scheduled():
                 logger.error(err)
 
     return render_template("builds/scheduled.html")
-
-
-@app.route('/builds/<build_status>/search/<name>')
-@app.route('/builds/<build_status>/search/<name>/<int:page>')
-@app.route('/builds/<build_status>/<int:page>')
-@app.route('/builds/<build_status>')
-def list_builds(build_status=None, page=None, name=None):
-    if not build_status or build_status not in ['completed', 'failed']:
-        abort(404)
-    is_logged_in = user.is_authenticated()
-    if page is None:
-        page = 1
-
-    builds, all_pages, rev_pending = get_build_info(page, build_status, is_logged_in, name)
-    pagination = utils.pagination.Pagination(page, 10, all_pages)
-
-    return render_template('builds/listing.html', builds=builds, all_pages=all_pages,
-                           pagination=pagination, build_status=build_status)
-
-
-@app.route('/build/<int:num>')
-# @cache.memoize(timeout=900, unless=cache_buster)
-def build_info(num=None):
-    if not num:
-        abort(404)
-
-    bld_obj = None
-
-    try:
-        bld_obj = get_build_object(bnum=num)
-    except Exception:
-        abort(404)
-
-    if not bld_obj.log_str:
-        bld_obj.log_str = 'Unavailable'
-
-    if bld_obj.container:
-        container = bld_obj.container[:20]
-    else:
-        container = None
-
-    result = 'completed' if bld_obj.completed else 'failed'
-
-    return render_template("builds/build_info.html", bld_obj=bld_obj, container=container, result=result)
 
 
 @app.route('/browse/<goto>')
