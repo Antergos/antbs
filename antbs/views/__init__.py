@@ -187,7 +187,7 @@ def get_build_queue():
 
     queued = []
     running = [t for t in status.transactions_running if t]
-    waiting = [t for t in status.transactions_queue if t]
+    waiting = [t for t in status.transaction_queue if t]
     all_transactions = running + waiting
 
     for tnum in all_transactions:

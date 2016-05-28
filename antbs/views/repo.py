@@ -26,19 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from views import (
-    abort,
-    Blueprint,
-    get_build_object,
-    get_paginated,
-    get_pkg_object,
-    get_repo_object,
-    logger,
-    package_in_group,
-    status,
-    try_render_template,
-    user
-)
+from views import *
 
 repo_view = Blueprint('repo', __name__)
 
@@ -49,6 +37,7 @@ def get_repo_packages(repo_name=None, group=None, page=1):
 
     pkgs = []
     bld_obj = None
+    all_pages = 0
     repo_obj = get_repo_object(repo_name)
 
     if user.is_authenticated():
@@ -64,7 +53,7 @@ def get_repo_packages(repo_name=None, group=None, page=1):
     else:
         repo_packages = repo_obj.packages
 
-    repo_packages = get_paginated(repo_packages, 25, page)
+    repo_packages, all_pages = get_paginated(repo_packages, 25, page)
 
     for pkg in repo_packages:
         if 'dummy' in pkg or 'grub-zfs' in pkg:
@@ -82,7 +71,7 @@ def get_repo_packages(repo_name=None, group=None, page=1):
         pkg_obj._build = bld_obj
         pkgs.append(pkg_obj)
 
-    return pkgs, rev_pending
+    return pkgs, rev_pending, all_pages
 
 
 ###
@@ -92,15 +81,18 @@ def get_repo_packages(repo_name=None, group=None, page=1):
 ###
 
 @repo_view.route('/<name>/packages/<group>')
+@repo_view.route('/<name>/packages/<page>')
 @repo_view.route('/<name>/packages')
-def repo_packages_listing(name=None, group=None):
+def repo_packages_listing(name=None, group=None, page=1):
     if not name or name not in status.repos or (group and group not in status.package_groups):
         abort(404)
 
-    packages, rev_pending = get_repo_packages(name, group)
+    packages, rev_pending, all_pages = get_repo_packages(name, group, page)
+    pagination = Pagination(page, 10, all_pages)
 
-    return try_render_template("repos/repo_pkgs.html", repo_packages=packages,
-                               rev_pending=rev_pending, name=name)
+    return try_render_template("repos/listing.html", repo_packages=packages,
+                               pagination=pagination, all_pages=all_pages,
+                               rev_pending=rev_pending, name=name, group=group)
 
 
 @repo_view.route('/browse/<goto>')

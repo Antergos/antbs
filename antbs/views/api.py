@@ -26,36 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from views import (
-    abort,
-    Blueprint,
-    copy_or_symlink,
-    datetime,
-    db,
-    flash,
-    get_build_object,
-    get_pkg_object,
-    get_timeline_object,
-    get_trans_object,
-    gevent,
-    glob,
-    groups_required,
-    handle_hook,
-    iso,
-    json,
-    logger,
-    os,
-    process_dev_review,
-    redirect,
-    redirect_url,
-    repo_queue,
-    request,
-    Response,
-    status,
-    transaction_queue,
-    user,
-    Webhook
-)
+from views import *
 
 api_view = Blueprint('api', __name__)
 

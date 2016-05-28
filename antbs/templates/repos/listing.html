@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block pagetitle -%}Repo Packages: {{ name }}{%- endblock pagetitle %}
+{% block stats %}{% endblock stats %}
+
+{% block bottomcontent -%}
+	<div class="col-md-12">
+		<div id="bottom-wrap" class="block-flat">
+			<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
+			<div class="header">
+				<h3>Repo Packages: {{ name }}</h3>
+			</div>
+			<div class="content">
+				{% if not repo_packages %}
+					None
+				{% else %}
+					<div class="col-md-3 pull-right">
+						<div class="form-group">
+							<div class="input-group">
+								<label for="search_input" class="sr-only">Search</label>
+								<input id="search_input" type="text" class="form-control"/>
+								<span class="input-group-btn">
+									<button id="search_btn" class="btn btn-primary" type="button">Search!</button>
+								</span>
+							</div>
+						</div>
+					</div>
+					<table class="table no-border hover">
+						<thead class="no-border">
+						<tr>
+							<th>ID&nbsp;&nbsp;</th>
+							<th>Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+							<th>Version</th>
+							<th>Build</th>
+							<th>Reviewed By</th>
+							<th>Reviewed On</th>
+							{% if user.is_authenticated() %}
+								<th>Manage</th>{% endif %}
+						</tr>
+						</thead>
+						<tbody class="no-border-y">
+						{% for package in repo_packages|sort(attribute='pkgname') %}
+							<tr>
+								<td><a href="#">{{ package.pkg_id }}</a></td>
+								<td><a href="/package/{{ package.pkgname }}">{{ package.pkgname }}</a></td>
+								<td>{{ package.version_str }}</td>
+								<td><a href="/build/{{ package._build.bnum }}">{{ package._build.bnum }}</a></td>
+								<td>{% if '' != package._build.review_dev %}<i class="fa fa-user"></i>
+									{{ package._build.review_dev }}{% else %}-{% endif %}</td>
+								<td>{% if '' != package._build.review_date %}<i class="fa fa-calendar"></i>
+									{{ package._build.review_date }}{% else %}-{% endif %}</td>
+								{% if user.is_authenticated() %}
+									<td>
+
+									</td>
+								{% endif %}
+
+							</tr>
+
+						{% endfor %}
+						</tbody>
+					</table>
+					{% macro render_pagination(pagination) %}
+						<ul class="pagination custom">
+							{% if pagination.has_prev %}
+								<li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
+							{% endif %}
+							{%- for page in pagination.iter_pages() %}
+								{% if page %}
+									{% if page != pagination.page %}
+										<li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
+									{% else %}
+										<li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
+									{% endif %}
+								{% else %}
+									<li><span class=ellipsis>…</span></li>
+								{% endif %}
+							{%- endfor %}
+							{% if pagination.has_next %}
+								<li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
+							{% endif %}
+						</ul>
+					{% endmacro %}
+					{{ render_pagination(pagination) }}
+				{% endif %}
+			</div>
+		</div>
+	</div>
+{%- endblock bottomcontent %}
+
+{% block scripts %}
+	{{ super() }}
+{% endblock scripts %}

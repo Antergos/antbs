@@ -26,15 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from views import (
-    abort,
-    Blueprint,
-    get_build_history_chart_data,
-    get_pkg_object,
-    logger,
-    status,
-    try_render_template,
-)
+from views import *
 
 package_view = Blueprint('package', __name__)
 
