@@ -26,28 +26,58 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+import gevent
+import json
+import os
+
 from flask import (
-    render_template,
     abort,
     Blueprint,
+    flash,
+    redirect,
+    render_template,
     request,
+    Response,
     url_for
 )
-from jinja2 import TemplateNotFound
-from flask.ext.stormpath import user
-import json
+
+from rq import (
+    Connection,
+    Queue,
+    Worker
+)
+
 from datetime import datetime, timedelta
+from flask.ext.stormpath import user, groups_required
 from glob import glob
-import os
+from jinja2 import TemplateNotFound
 
 from ..database.package import get_pkg_object
 from ..database.repo import get_repo_object
 from ..database.build import get_build_object
 from ..database.server_status import status, get_timeline_object
-from database.transaction import get_trans_object
+from ..database.transaction import get_trans_object
 from ..database.base_objects import db
+from ..database.monitor import get_monitor_object, check_repos_for_changes
+
 from ..utils.logging_config import logger
 from ..utils.pagination import Pagination
+from ..utils.utilities import copy_or_symlink
+
+from webhook import Webhook
+from transaction_handler import handle_hook, process_dev_review
+
+import iso
+
+
+# Setup rq (background task queue manager)
+with Connection(db):
+    transaction_queue = Queue('transactions')
+    repo_queue = Queue('update_repo')
+    webhook_queue = Queue('webook')
+    w1 = Worker([transaction_queue])
+    w2 = Worker([repo_queue])
+    w3 = Worker([webhook_queue])
 
 
 def try_render_template(*args, **kwargs):
@@ -149,3 +179,29 @@ def get_build_history_chart_data(pkg_obj=None):
         timestamps[key] = chart_data[key]['builds']
 
     return chart_data, timestamps
+
+
+def get_build_queue():
+    if not status.transactions_running and not status.transaction_queue:
+        return 0
+
+    queued = []
+    running = [t for t in status.transactions_running if t]
+    waiting = [t for t in status.transactions_queue if t]
+    all_transactions = running + waiting
+
+    for tnum in all_transactions:
+        trans_obj = get_trans_object(tnum=tnum)
+
+        if trans_obj.queue:
+            queued.extend(trans_obj.queue)
+
+    return queued
+
+
+from .api import api_view
+from .build import build_view
+from .home import home_view
+from .live import live_view
+from .package import package_view
+from .repo import repo_view

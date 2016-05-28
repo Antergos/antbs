@@ -27,19 +27,17 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from views import (
-    Blueprint,
     abort,
-    try_render_template,
-    get_paginated,
+    Blueprint,
     get_build_object,
-    get_repo_object,
-    get_pkg_object,
-    package_in_group,
-    status,
-    user,
+    get_build_queue,
+    get_paginated,
     logger,
+    match_pkgname_with_build_number,
     Pagination,
-    match_pkgname_with_build_number
+    status,
+    try_render_template,
+    user,
 )
 
 build_view = Blueprint('build', __name__)
@@ -99,6 +97,13 @@ def get_builds_with_status(page=None, build_status=None, search=None):
     return builds_list, int(all_pages), rev_pending
 
 
+###
+##
+#   Views Start Here
+##
+###
+
+
 @build_view.route('/<build_status>/search/<query>')
 @build_view.route('/<build_status>/search/<query>/<int:page>')
 @build_view.route('/<build_status>/<int:page>')
@@ -115,6 +120,11 @@ def builds_with_status(build_status=None, page=None, query=None):
 
     return try_render_template('builds/listing.html', builds=builds, all_pages=all_pages,
                                pagination=pagination, build_status=build_status)
+
+
+@build_view.route('/queue')
+def build_queue():
+    return try_render_template("builds/scheduled.html", queued=get_build_queue())
 
 
 @build_view.route('/build/<int:bnum>')

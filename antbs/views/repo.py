@@ -27,18 +27,17 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from views import (
-    Blueprint,
     abort,
-    try_render_template,
-    get_paginated,
+    Blueprint,
     get_build_object,
-    get_repo_object,
+    get_paginated,
     get_pkg_object,
+    get_repo_object,
+    logger,
     package_in_group,
     status,
-    user,
-    logger,
-    Pagination
+    try_render_template,
+    user
 )
 
 repo_view = Blueprint('repo', __name__)
@@ -86,9 +85,15 @@ def get_repo_packages(repo_name=None, group=None, page=1):
     return pkgs, rev_pending
 
 
-@repo_view.route('/repo/<name>/packages/<group>')
-@repo_view.route('/repo/<name>/packages')
-def get_repo_packages(name=None, group=None):
+###
+##
+#   Views Start Here
+##
+###
+
+@repo_view.route('/<name>/packages/<group>')
+@repo_view.route('/<name>/packages')
+def repo_packages_listing(name=None, group=None):
     if not name or name not in status.repos or (group and group not in status.package_groups):
         abort(404)
 
@@ -96,4 +101,24 @@ def get_repo_packages(name=None, group=None):
 
     return try_render_template("repos/repo_pkgs.html", repo_packages=packages,
                                rev_pending=rev_pending, name=name)
+
+
+@repo_view.route('/browse/<goto>')
+@repo_view.route('/browse')
+def repo_browser(goto=None):
+    building = status.now_building
+    release = False
+    testing = False
+    main = False
+    template = "repo_browser/repo_browser.html"
+    if goto == 'release':
+        release = True
+    elif goto == 'testing':
+        testing = True
+    elif goto == 'main':
+        main = True
+        template = "repo_browser/repo_browser_main.html"
+
+    return try_render_template(template, building=building, release=release, testing=testing,
+                               main=main)
 

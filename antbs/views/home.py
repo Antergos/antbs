@@ -27,23 +27,36 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from views import (
-    Blueprint,
     abort,
-    try_render_template,
-    get_paginated,
-    get_build_object,
-    status,
-    logger,
-    get_build_history_chart_data,
-    get_timeline_object,
-    get_trans_object,
+    Blueprint,
+    check_repos_for_changes,
     datetime,
-    timedelta,
+    get_build_history_chart_data,
+    get_build_object,
+    get_build_queue,
+    get_monitor_object,
+    get_paginated,
+    get_timeline_object,
     glob,
-    os
+    logger,
+    os,
+    repo_queue,
+    status,
+    timedelta,
+    try_render_template
 )
 
 home_view = Blueprint('home', __name__)
+
+
+@home_view.before_request
+def maybe_check_for_remote_commits():
+    monitor = get_monitor_object(name='github')
+
+    check_expired = monitor.__is_expired__('checked_recently')
+
+    if not monitor.checked_recently or check_expired:
+        repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
 
 
 def get_timeline(tlpage=None):
@@ -61,23 +74,11 @@ def get_timeline(tlpage=None):
     return this_page, all_pages
 
 
-def get_build_queue_len():
-    if not status.transactions_running and not status.transaction_queue:
-        return 0
-
-    queued = 0
-    running = [t for t in status.transactions_running if t]
-    waiting = [t for t in status.transactions_queue if t]
-    all_transactions = running + waiting
-
-    for tnum in all_transactions:
-        trans_obj = get_trans_object(tnum=tnum)
-
-        if trans_obj.queue:
-            queued += len(trans_obj.queue)
-
-    return queued
-
+###
+##
+#   Views Start Here
+##
+###
 
 @home_view.route("/timeline/<int:tlpage>")
 @home_view.route("/")
@@ -92,7 +93,7 @@ def homepage(tlpage=None):
         abort(404)
 
     build_history, timestamps = get_build_history_chart_data()
-    stats = {'build_queue': get_build_queue_len()}
+    stats = {'build_queue': len(get_build_queue())}
 
     for stat in check_stats:
         builds = getattr(status, stat)
