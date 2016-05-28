@@ -72,7 +72,7 @@ class PacmanRepo(RedisHash):
 
     """
 
-    def __init__(self, name=None, path='/srv/antergos.info/repo', prefix='repo'):
+    def __init__(self, name=None, path=None, prefix='repo'):
         if not name:
             raise RuntimeError
 
@@ -83,10 +83,8 @@ class PacmanRepo(RedisHash):
                  bool=['locked'],
                  int=['pkg_count_alpm', 'pkg_count_fs'],
                  list=[],
-                 set=['pkgs_fs', 'pkgs_alpm', 'packages'],
+                 set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
                  path=['path']))
-
-        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
 
         super().__namespaceinit__()
 
@@ -101,9 +99,10 @@ class PacmanRepo(RedisHash):
         self.setup_packages_manifest()
 
     def setup_packages_manifest(self):
-        pkgs_fs = set(self.pkgs_fs)
-        pkgs_alpm = set(self.pkgs_alpm)
+        pkgs_fs = set([p.split('|')[0] for p in self.pkgs_fs if p])
+        pkgs_alpm = set([p.split('|')[0] for p in self.pkgs_alpm if p])
         pkgs = list(pkgs_fs & pkgs_alpm)
+        unaccounted_for = [p.split('|')[0] for p in list(pkgs_fs) + list(pkgs_alpm) if p not in pkgs]
 
         for pk in self.packages:
             if pk not in pkgs:
@@ -112,10 +111,16 @@ class PacmanRepo(RedisHash):
         for pkg in pkgs:
             self.packages.add(pkg)
 
+        for pk in self.unaccounted_for:
+            if pk in pkgs:
+                self.unaccounted_for.remove(pk)
+
+        for pak in unaccounted_for:
+            self.unaccounted_for.add(pak)
+
     def sync_with_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')
         pkgs = set(p for p in os.listdir(repodir) if '.pkg.' in p and not p.endswith('.sig'))
-        parsed_pkgs = []
 
         for pkg in pkgs:
             pkg = os.path.basename(pkg)
@@ -124,25 +129,23 @@ class PacmanRepo(RedisHash):
             except ValueError:
                 logger.error("unexpected pkg: " + pkg)
                 continue
-            pkgver = version + '-' + rel
-            parsed_pkgs.append('{0}|{1}'.format(pkg, pkgver))
 
-        self.pkgs_fs = parsed_pkgs
-        self.pkg_count_fs = len(parsed_pkgs)
+            self.pkgs_fs.add('{0}|{1}-{2}'.format(pkg, version, rel))
+
+        self.pkg_count_fs = len(self.pkgs_fs)
 
     def sync_with_alpm_db(self):
         repodir = os.path.join(self.path, 'x86_64')
         dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
-        pkgs = []
 
         with tarfile.open(dbfile, 'r') as pacman_db:
             for pkg in pacman_db.getnames():
                 pkg = pkg.split('/', 1)[0]
                 pkgname, ver, rel = pkg.rsplit('-', 2)
-                pkgs.append('{0}|{1}-{2}'.format(pkgname, ver, rel))
 
-        self.pkgs_alpm = pkgs
-        self.pkg_count_alpm = len(pkgs)
+                self.pkgs_alpm.add('{0}|{1}-{2}'.format(pkgname, ver, rel))
+
+        self.pkg_count_alpm = len(self.pkgs_alpm)
 
     def update_repo(self, bld_obj=False, pkg_obj=False, action=False, review_result=False,
                     result_dir='/tmp/update_repo_redult'):
@@ -226,6 +229,8 @@ class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
 
 
 def get_repo_object(name, path=None):
+    if not path:
+        path = status.REPO_BASE_DIR
     if 'antergos' == name:
         repo = AntergosRepo(name=name, path=path)
     elif 'antergos-staging' == name:

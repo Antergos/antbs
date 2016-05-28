@@ -302,3 +302,22 @@ def live_status_updates():
             status.transaction_queue.rpush(trans_obj.tnum)
             transaction_queue.enqueue_call(handle_hook, timeout=84600)
         return json.dumps(message)
+
+
+@api_view.route('/pkg_review', methods=['POST'])
+@groups_required(['admin'])
+def dev_package_review():
+    payload = json.loads(request.data.decode('utf-8'))
+    bnum = payload['bnum']
+    dev = payload['dev']
+    result = payload['result']
+    if len([x for x in (bnum, dev, result) if x]) == 3:
+        logger.debug('fired!')
+        set_review = set_pkg_review_result(bnum, dev, result)
+        if set_review.get('error'):
+            set_rev_error = set_review.get('msg')
+            message = dict(msg=set_rev_error)
+            return json.dumps(message)
+        else:
+            message = dict(msg='ok')
+            return json.dumps(message)

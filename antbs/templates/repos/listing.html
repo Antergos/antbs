@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block pagetitle -%}Repo Packages: {{ name }}{%- endblock pagetitle %}
+{% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
@@ -8,7 +8,7 @@
 		<div id="bottom-wrap" class="block-flat">
 			<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
 			<div class="header">
-				<h3>Repo Packages: {{ name }}</h3>
+				<h3>{{ name }}</h3>
 			</div>
 			<div class="content">
 				{% if not repo_packages %}
@@ -51,7 +51,20 @@
 									{{ package._build.review_date }}{% else %}-{% endif %}</td>
 								{% if user.is_authenticated() %}
 									<td>
-
+										<div class="btn-group">
+											<button class="btn btn-default btn-xs" type="button">Action</button>
+											<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">
+												<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
+											</button>
+											<ul role="menu" class="dropdown-menu actions repo_actions">
+												<li>
+													<a href="#" id="2" data-bnum="{{ package._build.bnum }}"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a>
+												</li>
+												<li>
+													<a href="#" id="3" data-bnum="{{ package._build.bnum }}"><i class="fa fa-trash" style="color:red;"></i>Remove</a>
+												</li>
+											</ul>
+										</div>
 									</td>
 								{% endif %}
 

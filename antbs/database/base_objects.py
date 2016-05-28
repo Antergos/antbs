@@ -302,6 +302,11 @@ class RedisZSet(RedisObject, set):
         rank = self.db.zrank(self.full_key, super().encode_value(val))
         return True if rank else False
 
+    def sort(self, alpha=True):
+        """ Get list of members sorted alphabetically. """
+        return self.db.sort(self.full_key, alpha=alpha)
+
+
 
 class RedisHash(RedisObject):
     """

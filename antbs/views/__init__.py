@@ -87,14 +87,15 @@ def try_render_template(*args, **kwargs):
         abort(500)
 
 
-def get_paginated(item_list, per_page, page):
+def get_paginated(item_list, per_page, page, reverse=True):
     if len(item_list) < 1:
         return item_list, 0
 
     page -= 1
     items = list(item_list)
 
-    items.reverse()
+    if reverse:
+        items.reverse()
 
     paginated = [items[i:i + per_page] for i in range(0, len(items), per_page)]
     all_pages = len(paginated)

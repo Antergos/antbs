@@ -956,79 +956,45 @@
 										}, 750)
 									}).dataTable({
 										"aoColumns": [
-											{"sType": "num-html"},
-											{"sType": "num-html"},
-											null,
-											null,
-											null,{% if 'repo_packages' in request.path %}
+											{% if '/repo/' in request.path and '/packages' in request.path %}
+												{"sType": "num-html"},
+												{"sType": "num-html"},
+												null,
+												{"sType": "num-html"},
+												null,
+												null
+												{% if user.is_authenticated() %},null{% endif %}
+											{% elif '/builds/completed' in request.path or '/pkg_review' in request.path %}
+												{"sType": "num-html"},
+												{"sType": "num-html"},
 												null,
 												null,
+												null,
+												null,
+												null,
+												null,
+												null
+											{% elif '/issues' in request.path %}
+												{"sType": "num-html"},
+												{"sType": "num-html"},
+												null,
+												null,
+												null,
+												null,
+												null,
+												null,
+												null,
+												null
 											{% endif %}
-											null{% if '/builds/completed' in request.path or '/pkg_review' in request.path %},
-											null,
-											null,
-											null{% endif %}{% if '/issues' in request.path %},
-											null{% endif %}
 										],
 										"aaSorting": [
-											[{% if 'repo_packages' in request.path %}
+											[{% if '/repo/' in request.path and '/packages' in request.path %}
 												1, "asc"{% else %}1, "desc"{% endif %}]
 										]
 
 									});
 								{% endif %}
-								{% if '/repo/' in request.path and '/packages' in request.path %}
-									var pkgs = window.antbs.pkgs,
-										tpl_map = {
-											pkg_id: '<a href="/pkg/@@@">@@@</a>',
-											bnum: '<a href="/build/@@@">@@@</a>',
-											manage: '<div class="btn-group">' +
-											'<button class="btn btn-default btn-xs" type="button">Action</button>' +
-											'<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">' +
-											'<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>' +
-											'</button><ul role="menu" class="dropdown-menu actions repo_actions"><li>' +
-											'<a href="#" id="2" bnum="@@@"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a></li>' +
-											'<li><a href="#" id="3" bnum="@@@"><i class="fa fa-trash" style="color:red;"></i>Remove</a> </li>' +
-											'</ul></div>',
-											date: '<i class="fa fa-calendar"></i> @@@',
-											dev: '<i class="fa fa-user"></i> @@@'
-										};
-									for (var i = 0, l = pkgs.length; i < l; i++) {
-										pkgs[i].pkg_id = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkg_id);
-										pkgs[i].pkgname = tpl_map.pkg_id.replace(/@@@/g, pkgs[i].pkgname);
-										if ('undefined' !== typeof(pkgs[i]._build)) {
-											pkgs[i].manage = tpl_map.manage.replace(/@@@/g, pkgs[i]._build.bnum);
-											pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, pkgs[i]._build.bnum);
-											pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, pkgs[i]._build.review_dev);
-											pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, pkgs[i]._build.review_date);
-										} else {
-											pkgs[i]._build = {};
-											pkgs[i].manage = tpl_map.manage.replace(/@@@/g, '');
-											pkgs[i]._build.bnum = tpl_map.bnum.replace(/@@@/g, '');
-											pkgs[i]._build.review_dev = tpl_map.dev.replace(/@@@/g, '');
-											pkgs[i]._build.review_date = tpl_map.date.replace(/@@@/g, '');
-										}
-									}
-									jQuery('table').dataTable({
-										data: window.antbs.pkgs,
-										"aoColumns": [
-											{"mData": "pkg_id"},
-											{"mData": "pkgname", "sWidth": "270px"},
-											{"mData": "version_str"},
-											{"mData": "_build.bnum"},
-											{"mData": "_build.review_dev"},
-											{"mData": "_build.review_date"}{% if user.is_authenticated() %},
-												{"mData": "manage"}{% endif %}
-										],
-										"aaSorting": [
-											[1, "asc"]
-										],
-										"fnInitComplete": function () {
-											jQuery('.loading').fadeOut();
-										}
 
-									});
-								{% endif %}
 								jQuery('#issuetable').bind('issuesReady', function () {
 									jQuery('#issuetable').on('init.dt', function (e, settings, data) {
 										setTimeout(function () {

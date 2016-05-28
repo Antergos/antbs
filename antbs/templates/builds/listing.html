@@ -169,13 +169,13 @@
 					e.preventDefault();
 					jQuery( this ).addClass( 'clicked' );
 					var data = {
-						bnum: jQuery( this ).attr( 'bnum' ),
+						bnum: jQuery( this ).attr( 'data-bnum' ),
 						result: jQuery( this ).attr( 'id' ),
 						dev: '{{ user.username }}'
 					};
 					jQuery.ajax( {
 						type: 'POST',
-						url: '/pkg_review',
+						url: '/api/ajax/pkg_review',
 						data: JSON.stringify( data, null, '\t' ),
 						contentType: 'application/json;charset=UTF-8',
 						dataType: 'json',

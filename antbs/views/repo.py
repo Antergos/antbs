@@ -49,19 +49,18 @@ def get_repo_packages(repo_name=None, group=None, page=1):
         return pkgs, rev_pending
 
     if group:
-        repo_packages = [p for p in repo_obj.packages if package_in_group(p, group)]
+        repo_packages = [p for p in list(repo_obj.packages.sort()) if package_in_group(p, group)]
     else:
-        repo_packages = repo_obj.packages
+        repo_packages = sorted(list(repo_obj.packages.sort()))
 
-    repo_packages, all_pages = get_paginated(repo_packages, 25, page)
+    repo_packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
 
     for pkg in repo_packages:
         if 'dummy' in pkg or 'grub-zfs' in pkg:
             continue
 
-        pkg_obj = get_pkg_object(pkg)
-
         try:
+            pkg_obj = get_pkg_object(pkg)
             bnum = pkg_obj.builds[0]
             if bnum:
                 bld_obj = get_build_object(bnum=bnum)
