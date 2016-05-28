@@ -153,8 +153,6 @@ class Package(PackageMeta):
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
 
-        self.sync_database_with_pkgbuild()
-
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
         auto_sum = self.get_from_pkgbuild('_auto_sum')
