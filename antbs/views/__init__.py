@@ -52,17 +52,17 @@ from flask.ext.stormpath import user, groups_required
 from glob import glob
 from jinja2 import TemplateNotFound
 
-from ..database.package import get_pkg_object
-from ..database.repo import get_repo_object
-from ..database.build import get_build_object
-from ..database.server_status import status, get_timeline_object
-from ..database.transaction import get_trans_object
-from ..database.base_objects import db
-from ..database.monitor import get_monitor_object, check_repos_for_changes
+from database.package import get_pkg_object
+from database.repo import get_repo_object
+from database.build import get_build_object
+from database.server_status import status, get_timeline_object
+from database.transaction import get_trans_object
+from database.base_objects import db
+from database.monitor import get_monitor_object, check_repos_for_changes
 
-from ..utils.logging_config import logger
-from ..utils.pagination import Pagination
-from ..utils.utilities import copy_or_symlink
+from utils.logging_config import logger
+from utils.pagination import Pagination
+from utils.utilities import copy_or_symlink
 
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
@@ -183,7 +183,7 @@ def get_build_history_chart_data(pkg_obj=None):
 
 def get_build_queue():
     if not status.transactions_running and not status.transaction_queue:
-        return 0
+        return []
 
     queued = []
     running = [t for t in status.transactions_running if t]
@@ -199,9 +199,9 @@ def get_build_queue():
     return queued
 
 
-from .api import api_view
-from .build import build_view
-from .home import home_view
-from .live import live_view
-from .package import package_view
-from .repo import repo_view
+from views.api import api_view
+from views.build import build_view
+from views.home import home_view
+from views.live import live_view
+from views.package import package_view
+from views.repo import repo_view

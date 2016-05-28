@@ -127,7 +127,7 @@ def build_queue():
     return try_render_template("builds/scheduled.html", queued=get_build_queue())
 
 
-@build_view.route('/build/<int:bnum>')
+@build_view.route('/<int:bnum>')
 def build_info(bnum=None):
     if not bnum:
         abort(404)

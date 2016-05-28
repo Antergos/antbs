@@ -44,8 +44,8 @@ live_view = Blueprint('live', __name__)
 ##
 ###
 
-@live_view.route("/building")
-@live_view.route("/building/<bnum>")
+@live_view.route("/")
+@live_view.route("/<bnum>")
 def live_build_output(bnum=None):
     bld_objs = {}
     selected = None

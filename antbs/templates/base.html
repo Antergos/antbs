@@ -553,48 +553,48 @@
 									<li class="parent">
 										<a href="#"><i class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
 										<ul class="sub-menu">
-											<li {% if request.path == "/scheduled" %}class="active"{% endif %}>
-												<a href="/scheduled"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
+											<li {% if request.path == "/builds/queue" %}class="active"{% endif %}>
+												<a href="/builds/queue"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
 											</li>
 											<li {% if request.path == "/builds/completed" or res == "completed" %}class="active"{% endif %}>
 												<a href="/builds/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
 											</li>
 											<li
-												{% if request.path == "/failed" or res == "failed" %} class="active"{% endif %}>
+												{% if request.path == "/builds/failed" or res == "failed" %} class="active"{% endif %}>
 												<a href="/builds/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
 											</li>
 										</ul>
 									</li>
 
-									<li {% if request.path == "/browse" %}class="active"{% endif %}>
-										<a href="/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
+									<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
+										<a href="/repo/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
 										<ul class="sub-menu">
-											<li {% if request.path == "/browse/main" %}class="active"{% endif %}>
-												<a href="/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
+											<li {% if request.path == "/repo/browse/main" %}class="active"{% endif %}>
+												<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
 											</li>
-											<li {% if request.path == "/browse" %}class="active"{% endif %}>
-												<a href="/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
+											<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
+												<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
 											</li>
 										</ul>
 
 									</li>
-									<li {% if request.path == "/repo_packages" %}class="active"{% endif %}>
-										<a href="/repo_packages"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
+									<li {% if request.path == "/repo" %}class="active"{% endif %}>
+										<a href="/repo"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
 										<ul class="sub-menu">
-											<li {% if 'repo_packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
-												<a href="/repo_packages/antergos"><i class="fa   fa-list"></i><span>Main</span></a>
+											<li {% if '/repo/antergos/packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
+												<a href="/repo/antergos/packages"><i class="fa   fa-list"></i><span>Main</span></a>
 											</li>
-											<li {% if 'repo_packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
-												<a href="/repo_packages/antergos-staging"><i class="fa   fa-list"></i><span>Staging</span></a>
+											<li {% if '/repo/antergos-staging/packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
+												<a href="/repo/antergos-staging/packages"><i class="fa   fa-list"></i><span>Staging</span></a>
 											</li>
 										</ul>
 									</li>
-									<li {% if request.path == "/browse/releases" %}class="active"{% endif %}>
-										<a href="/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
+									<li {% if request.path == "/repo/browse/release" %}class="active"{% endif %}>
+										<a href="/repo/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
 									</li>
-									<li {% if request.path == "/browse/testing" %}class="active"{% endif %}>
-										<a href="/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
+									<li {% if request.path == "/repo/browse/testing" %}class="active"{% endif %}>
+										<a href="/repo/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
 									</li>
 									{% if user.is_authenticated() %}
 										<li {% if request.path == "/issues" %}class="active"{% endif %}>
@@ -977,7 +977,7 @@
 
 									});
 								{% endif %}
-								{% if 'repo_packages' in request.path %}
+								{% if '/repo/' in request.path and '/packages' in request.path %}
 									var pkgs = window.antbs.pkgs,
 										tpl_map = {
 											pkg_id: '<a href="/pkg/@@@">@@@</a>',
