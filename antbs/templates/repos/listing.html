@@ -31,6 +31,7 @@
 							<th>ID&nbsp;&nbsp;</th>
 							<th>Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
 							<th>Version</th>
+							<th>Groups</th>
 							<th>Build</th>
 							<th>Reviewed By</th>
 							<th>Reviewed On</th>
@@ -39,11 +40,20 @@
 						</tr>
 						</thead>
 						<tbody class="no-border-y">
-						{% for package in repo_packages|sort(attribute='pkgname') %}
+						{% for package in repo_packages %}
 							<tr>
 								<td><a href="#">{{ package.pkg_id }}</a></td>
 								<td><a href="/package/{{ package.pkgname }}">{{ package.pkgname }}</a></td>
 								<td>{{ package.version_str }}</td>
+								<td>
+									{% if package.groups %}
+										{% for group in package.groups %}
+											<a href="{{ request.path }}/{{ group }}">{{ group }}</a>{% if loop.length > 1 and not loop.last %}, {% endif %}
+										{% endfor %}
+									{% else %}
+										-
+									{% endif %}
+								</td>
 								<td><a href="/build/{{ package._build.bnum }}">{{ package._build.bnum }}</a></td>
 								<td>{% if '' != package._build.review_dev %}<i class="fa fa-user"></i>
 									{{ package._build.review_dev }}{% else %}-{% endif %}</td>

@@ -471,12 +471,13 @@
 						.et-social-icon a, .et-social-icon {
 							font-size: 15px !important;
 						}
-					table.now_building_stats > tbody > tr > td {
-						height: 51px;
-						vertical-align: middle;
-						padding-left: 15px;
-						padding-right: 15px;
-					}
+
+						table.now_building_stats > tbody > tr > td {
+							height: 51px;
+							vertical-align: middle;
+							padding-left: 15px;
+							padding-right: 15px;
+						}
 
 					</style>
 				{%- endblock styles %}
@@ -524,267 +525,269 @@
 				</div>
 			</div>
 			<div id="cl-wrapper">
-			{% block sidebar %}
-				<div class="cl-sidebar">
-					<div class="cl-toggle"><i class="fa fa-bars"></i></div>
-					<div class="cl-navblock">
-						<div class="menu-space">
-							<div class="content">
-								<div class="sidebar-logo">
-									<div class="logo">
-										<a href="/"><img src="/static/images/antergos-everyone.png"/></a>
+				{% block sidebar %}
+					<div class="cl-sidebar">
+						<div class="cl-toggle"><i class="fa fa-bars"></i></div>
+						<div class="cl-navblock">
+							<div class="menu-space">
+								<div class="content">
+									<div class="sidebar-logo">
+										<div class="logo">
+											<a href="/"><img src="/static/images/antergos-everyone.png"/></a>
+										</div>
 									</div>
-								</div>
-								<div class="side-user">
-									<dl style="color:rgba(255, 255, 255, 0.6);">
-										<dt>Antergos Build Server</dt>
-										<dd>Automated repo management application that builds packages and iso
-											images.
-										</dd>
-									</dl>
-								</div>
-								<ul class="cl-vnavigation">
-									<li {% if request.path == "/" %}class="active"{% endif %}>
-										<a href="/"><i class="fa fa-home"></i><span>Overview</span></a>
-									</li>
-									<li {% if request.path == "/building" %}class="active"{% endif %}>
-										<a href="/building"><i class="fa fa-eye"></i><span>Live Build Output</span></a>
-									</li>
-									<li class="parent">
-										<a href="#"><i class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
-										<ul class="sub-menu">
-											<li {% if request.path == "/builds/queue" %}class="active"{% endif %}>
-												<a href="/builds/queue"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
-											</li>
-											<li {% if request.path == "/builds/completed" or res == "completed" %}class="active"{% endif %}>
-												<a href="/builds/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
-											</li>
-											<li
-												{% if request.path == "/builds/failed" or res == "failed" %} class="active"{% endif %}>
-												<a href="/builds/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
-											</li>
-										</ul>
-									</li>
-
-									<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
-										<a href="/repo/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
-										<ul class="sub-menu">
-											<li {% if request.path == "/repo/browse/main" %}class="active"{% endif %}>
-												<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
-											</li>
-											<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
-												<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
-											</li>
-										</ul>
-
-									</li>
-									<li {% if request.path == "/repo" %}class="active"{% endif %}>
-										<a href="/repo"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
-										<ul class="sub-menu">
-											<li {% if '/repo/antergos/packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
-												<a href="/repo/antergos/packages"><i class="fa   fa-list"></i><span>Main</span></a>
-											</li>
-											<li {% if '/repo/antergos-staging/packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
-												<a href="/repo/antergos-staging/packages"><i class="fa   fa-list"></i><span>Staging</span></a>
-											</li>
-										</ul>
-									</li>
-									<li {% if request.path == "/repo/browse/release" %}class="active"{% endif %}>
-										<a href="/repo/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
-
-									</li>
-									<li {% if request.path == "/repo/browse/testing" %}class="active"{% endif %}>
-										<a href="/repo/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
-									</li>
-									{% if user.is_authenticated() %}
-										<li {% if request.path == "/issues" %}class="active"{% endif %}>
-											<a href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
-
+									<div class="side-user">
+										<dl style="color:rgba(255, 255, 255, 0.6);">
+											<dt>Antergos Build Server</dt>
+											<dd>Automated repo management application that builds packages and iso
+												images.
+											</dd>
+										</dl>
+									</div>
+									<ul class="cl-vnavigation">
+										<li {% if request.path == "/" %}class="active"{% endif %}>
+											<a href="/"><i class="fa fa-home"></i><span>Overview</span></a>
 										</li>
-									{% endif %}
-
-
-								</ul>
-							</div>
-						</div>
-					</div>
-					<div class="text-right collapse-button">
-						{% if user.is_authenticated() %}
-							<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
-								<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
-								<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
-							</form>
-						{% endif %}
-						<button id="sidebar-collapse" class="btn btn-default" style="">
-							<i style="color:#fff;" class="fa fa-angle-left"></i>
-						</button>
-					</div>
-				</div>
-			{% endblock sidebar %}
-			<div class="container-fluid" id="pcont">
-
-				{% block topbar %}
-					<!-- TOP BAR -->
-					<div id="head-nav" class="navbar navbar-default">
-						<div class="container-fluid">
-							<div class="navbar-collapse">
-
-								{% if user.is_authenticated() %}
-									<ul class="nav navbar-nav navbar-right user-nav">
-										<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
-											<a href="#"><i class="fa fa-refresh"></i></a>
+										<li {% if request.path == "/building" %}class="active"{% endif %}>
+											<a href="/building"><i class="fa fa-eye"></i><span>Live Build Output</span></a>
 										</li>
-										<li data-toggle="tooltip" title="Do ISO Release" data-placement="left">
-											<a href="#" id="do_iso_release" data-toggle="modal" data-target="#do_iso_release_confirm_modal">
-												<i class="fa fa-ship"></i>
-											</a>
+										<li class="parent">
+											<a href="#"><i class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
+											<ul class="sub-menu">
+												<li {% if request.path == "/builds/queue" %}class="active"{% endif %}>
+													<a href="/builds/queue"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
+												</li>
+												<li {% if request.path == "/builds/completed" or res == "completed" %}class="active"{% endif %}>
+													<a href="/builds/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
+												</li>
+												<li
+													{% if request.path == "/builds/failed" or res == "failed" %} class="active"{% endif %}>
+													<a href="/builds/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
+												</li>
+											</ul>
 										</li>
-										<li class="dropdown profile_menu">
-											<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-												<i class="fa fa-user"></i> {{ user.username }}<b class="caret"></b></a>
-											<ul class="dropdown-menu">
-												<li>
-													<a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a>
+
+										<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
+											<a href="/repo/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
+											<ul class="sub-menu">
+												<li {% if request.path == "/repo/browse/main" %}class="active"{% endif %}>
+													<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
+												</li>
+												<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
+													<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
 												</li>
 											</ul>
 
 										</li>
-									</ul>
+										<li {% if request.path == "/repo" %}class="active"{% endif %}>
+											<a href="/repo"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
+											<ul class="sub-menu">
+												<li {% if '/repo/antergos/packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
+													<a href="/repo/antergos/packages"><i class="fa   fa-list"></i><span>Main</span></a>
+												</li>
+												<li {% if '/repo/antergos-staging/packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
+													<a href="/repo/antergos-staging/packages"><i class="fa   fa-list"></i><span>Staging</span></a>
+												</li>
+											</ul>
+										</li>
+										<li {% if request.path == "/repo/browse/release" %}class="active"{% endif %}>
+											<a href="/repo/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
 
-									<ul class="nav navbar-nav not-nav">
-										<li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}" data-toggle="tooltip" title="Pending Review" data-placement="right">
-											<a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle" data-toggle="dropdown"{% endif %}>
-												<i class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
-												<span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
-											</a>
-											{% if rev_pending|count() > 0 %}
+										</li>
+										<li {% if request.path == "/repo/browse/testing" %}class="active"{% endif %}>
+											<a href="/repo/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
+										</li>
+										{% if user.is_authenticated() %}
+											<li {% if request.path == "/issues" %}class="active"{% endif %}>
+												<a href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
+
+											</li>
+										{% endif %}
+
+
+									</ul>
+								</div>
+							</div>
+						</div>
+						<div class="text-right collapse-button">
+							{% if user.is_authenticated() %}
+								<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
+									<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
+									<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
+								</form>
+							{% endif %}
+							<button id="sidebar-collapse" class="btn btn-default" style="">
+								<i style="color:#fff;" class="fa fa-angle-left"></i>
+							</button>
+						</div>
+					</div>
+				{% endblock sidebar %}
+				<div class="container-fluid" id="pcont">
+
+					{% block topbar %}
+						<!-- TOP BAR -->
+						<div id="head-nav" class="navbar navbar-default">
+							<div class="container-fluid">
+								<div class="navbar-collapse">
+
+									{% if user.is_authenticated() %}
+										<ul class="nav navbar-nav navbar-right user-nav">
+											<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
+												<a href="#"><i class="fa fa-refresh"></i></a>
+											</li>
+											<li data-toggle="tooltip" title="Do ISO Release" data-placement="left">
+												<a href="#" id="do_iso_release" data-toggle="modal" data-target="#do_iso_release_confirm_modal">
+													<i class="fa fa-ship"></i>
+												</a>
+											</li>
+											<li class="dropdown profile_menu">
+												<a href="#" class="dropdown-toggle" data-toggle="dropdown">
+													<i class="fa fa-user"></i> {{ user.username }}<b class="caret"></b></a>
 												<ul class="dropdown-menu">
 													<li>
-														<div class="nano" style="width:280px;">
-															<div class="nano-content content">
+														<a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a>
+													</li>
+												</ul>
+
+											</li>
+										</ul>
+
+										<ul class="nav navbar-nav not-nav">
+											<li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}" data-toggle="tooltip" title="Pending Review" data-placement="right">
+												<a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle" data-toggle="dropdown"{% endif %}>
+													<i class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
+													<span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
+												</a>
+												{% if rev_pending|count() > 0 %}
+													<ul class="dropdown-menu">
+														<li>
+															<div class="nano" style="width:280px;">
+																<div class="nano-content content">
+																	<ul>
+
+																		{% for build in rev_pending|sort(attribute='bnum') %}
+																			<li>
+																				<a href="/pkg_review"><i class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
+																					{{ build.version_str }}
+																					<span class="date">{{ build.end_str }}</span></a>
+																			</li>
+
+																		{% endfor %}
+
+
+																	</ul>
+																</div>
+															</div>
+															<ul class="foot">
+																<li><a href="/pkg_review">View All </a></li>
+															</ul>
+														</li>
+													</ul>
+												{% endif %}
+											</li>
+											<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
+												<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+											</li>
+											<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+												<pre id="status_bar_pre">Idle</pre>
+											</li>
+										</ul>
+										<!-- Do ISO Release Modal -->
+										<div class="modal fade colored-header prusia" id="do_iso_release_confirm_modal" tabindex="-1" role="dialog">
+											<div class="modal-dialog">
+												<div class="modal-content">
+													<div class="modal-header">
+														<h3>Do ISO Release</h3>
+														<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+													</div>
+													<div class="modal-body">
+														<div class="text-center">
+															<div class="i-circle primary"><i class="fa fa-check"></i>
+															</div>
+															<h4>Are you sure you want to do this?</h4>
+
+															<p>The following is required in order for this to be successful:</p>
+
+															<div style="margin:0 auto; max-width: 340px; text-align:left;">
 																<ul>
-
-																	{% for build in rev_pending|sort(attribute='bnum') %}
-																		<li>
-																			<a href="/pkg_review"><i class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
-																				{{ build.version_str }}
-																				<span class="date">{{ build.end_str }}</span></a>
-																		</li>
-
-																	{% endfor %}
-
-
+																	<li>All four ISO images exist in the iso testing
+																		directory.
+																	</li>
+																	<li>All images have the same version (date) in filename.
+																	</li>
 																</ul>
 															</div>
 														</div>
-														<ul class="foot">
-															<li><a href="/pkg_review">View All </a></li>
-														</ul>
-													</li>
-												</ul>
-											{% endif %}
-										</li>
-										<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
-											<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-										</li>
-										<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-											<pre id="status_bar_pre">Idle</pre>
-										</li>
-									</ul>
-									<!-- Do ISO Release Modal -->
-									<div class="modal fade colored-header prusia" id="do_iso_release_confirm_modal" tabindex="-1" role="dialog">
-										<div class="modal-dialog">
-											<div class="modal-content">
-												<div class="modal-header">
-													<h3>Do ISO Release</h3>
-													<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-												</div>
-												<div class="modal-body">
-													<div class="text-center">
-														<div class="i-circle primary"><i class="fa fa-check"></i></div>
-														<h4>Are you sure you want to do this?</h4>
-
-														<p>The following is required in order for this to be successful:</p>
-
-														<div style="margin:0 auto; max-width: 340px; text-align:left;">
-															<ul>
-																<li>All four ISO images exist in the iso testing
-																	directory.
-																</li>
-																<li>All images have the same version (date) in filename.
-																</li>
-															</ul>
-														</div>
+													</div>
+													<div class="modal-footer">
+														<button type="button" class="btn btn-default btn-flat" data-dismiss="modal">
+															Cancel
+														</button>
+														<button type="button" id="do_iso_release_confirm" class="btn btn-primary btn-flat" data-dismiss="modal">
+															Proceed
+														</button>
 													</div>
 												</div>
-												<div class="modal-footer">
-													<button type="button" class="btn btn-default btn-flat" data-dismiss="modal">
-														Cancel
-													</button>
-													<button type="button" id="do_iso_release_confirm" class="btn btn-primary btn-flat" data-dismiss="modal">
-														Proceed
-													</button>
-												</div>
+												<!-- /.modal-content -->
 											</div>
-											<!-- /.modal-content -->
-										</div>
-									</div><!-- /.modal-dialog -->
+										</div><!-- /.modal-dialog -->
 
-								{% else %}
-									<ul class="nav navbar-nav navbar-right user-nav">
-										<li class="dropdown profile_menu">
-											<a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
-										</li>
-									</ul>
-									<ul class="nav navbar-nav not-nav">
-										<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
-											<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-										</li>
-										<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-											<pre id="status_bar_pre">Idle</pre>
-										</li>
-									</ul>
-								{% endif %}
+									{% else %}
+										<ul class="nav navbar-nav navbar-right user-nav">
+											<li class="dropdown profile_menu">
+												<a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
+											</li>
+										</ul>
+										<ul class="nav navbar-nav not-nav">
+											<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
+												<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+											</li>
+											<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+												<pre id="status_bar_pre">Idle</pre>
+											</li>
+										</ul>
+									{% endif %}
+								</div>
 							</div>
 						</div>
-					</div>
 
-				{%- endblock topbar %}
-					<!-- Main -->
-				{% block maincontainer %}
-					<div id="main" class="cl-mcont">
-						{% block subheader %}
-							{% if request.path != "/" %}
-								<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
-									<ol class="breadcrumb">
-										<li><a href="/">Home</a></li>
+					{%- endblock topbar %}
+						<!-- Main -->
+					{% block maincontainer %}
+						<div id="main" class="cl-mcont">
+							{% block subheader %}
+								{% if request.path != "/" %}
+									<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
+										<ol class="breadcrumb">
+											<li><a href="/">Home</a></li>
 
-										<li class="active">{{ self.pagetitle() }}</li>
-									</ol>
-								</div>
-							{% endif %}
-						{% endblock subheader %}
+											<li class="active">{{ self.pagetitle() }}</li>
+										</ol>
+									</div>
+								{% endif %}
+							{% endblock subheader %}
 
-						<!-- upper section -->
-						<div class="row">
-							{% block topcontent -%}
-
-
-							{%- endblock topcontent %}
-						</div>
-						<div class="row">
-							{% block bottomcontent -%}
+							<!-- upper section -->
+							<div class="row">
+								{% block topcontent -%}
 
 
-							{%- endblock bottomcontent %}
-						</div>
-						<!--/row-->
+								{%- endblock topcontent %}
+							</div>
+							<div class="row">
+								{% block bottomcontent -%}
 
-						<!-- /upper section -->
 
-					</div><!--/container-->
-				{% endblock maincontainer %}
-			</div> <!-- /Main -->
+								{%- endblock bottomcontent %}
+							</div>
+							<!--/row-->
+
+							<!-- /upper section -->
+
+						</div><!--/container-->
+					{% endblock maincontainer %}
+				</div> <!-- /Main -->
+			</div>
 
 
 
@@ -822,15 +825,10 @@
 					})(jQuery);
 				</script>
 
-				   <!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
+				<!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
 
 				<script type="text/javascript" src="/static/js/jquery.ui/jquery-ui.js"></script>
 				<script type="text/javascript" src="/static/js/jquery.nanoscroller/jquery.nanoscroller.min.js"></script>
-
-
-				   <!-- Bootstrap core JavaScript
-				   ================================================== -->
-				   <!-- Placed at the end of the document so the pages load faster -->
 				<script src="/static/js/bootstrap/dist/js/bootstrap.min.js"></script>
 				<script type="text/javascript" src="/static/js/jquery.gritter/js/jquery.gritter.js"></script>
 				<script type="text/javascript" src="/static/js/behaviour/core.js"></script>
@@ -930,10 +928,9 @@
 					jQuery(window).load(function () {
 							jQuery('[data-toggle="tooltip"]').tooltip();
 
-							jQuery('.loading').fadeIn();
-							if (jQuery('table').length && !jQuery('#noDt').length) {
-
-								{% if 'repo_packages' not in request.path %}
+							{% if '/' != request.path %}
+								jQuery('.loading').fadeIn();
+								if (jQuery('table').length && !jQuery('#noDt').length) {
 									jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
 										var x = a.replace(/<.*?>/g, "");
 										var y = b.replace(/<.*?>/g, "");
@@ -957,75 +954,59 @@
 									}).dataTable({
 										"aoColumns": [
 											{% if '/repo/' in request.path and '/packages' in request.path %}
-												{"sType": "num-html"},
-												{"sType": "num-html"},
-												null,
-												{"sType": "num-html"},
-												null,
-												null
-												{% if user.is_authenticated() %},null{% endif %}
-											{% elif '/builds/completed' in request.path or '/pkg_review' in request.path %}
-												{"sType": "num-html"},
-												{"sType": "num-html"},
-												null,
-												null,
-												null,
-												null,
-												null,
-												null,
-												null
+												{"sType": "num-html"}, {"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null{% if user.is_authenticated() %},null{% endif %}
+
+											{% elif '/builds/' in request.path or '/pkg_review' in request.path %}
+												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null
+
 											{% elif '/issues' in request.path %}
-												{"sType": "num-html"},
-												{"sType": "num-html"},
-												null,
-												null,
-												null,
-												null,
-												null,
-												null,
-												null,
-												null
+												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null, null
+
 											{% endif %}
 										],
 										"aaSorting": [
-											[{% if '/repo/' in request.path and '/packages' in request.path %}
-												1, "asc"{% else %}1, "desc"{% endif %}]
-										]
-
-									});
-								{% endif %}
-
-								jQuery('#issuetable').bind('issuesReady', function () {
-									jQuery('#issuetable').on('init.dt', function (e, settings, data) {
-										setTimeout(function () {
-											jQuery('.loading').fadeOut();
-										}, 750)
-									}).dataTable({
-										"aoColumns": [
-											{"sType": "num-html"},
-											null,
-											null,
-											null,
-											null{% if '/builds/completed' in request.path or '/pkg_review' in request.path %},
-											null,
-											null,
-											null{% endif %}{% if '/issues' in request.path %},
-											null{% endif %}
-										],
-										"aaSorting": [
-											[0, "desc"]
+											[
+												{% if '/repo/' in request.path and '/packages' in request.path %}
+													1, "asc"
+												{% else %}
+													1, "desc"
+												{% endif %}
+											]
 										]
 
 									});
 
-								});
-								{% if 'repo_packages' not in request.path %}if (!jQuery('#issuetable').length) {
-									jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
-								}{% endif %}
-							}
+									jQuery('#issuetable').bind('issuesReady', function () {
+										jQuery('#issuetable').on('init.dt', function (e, settings, data) {
+											setTimeout(function () {
+												jQuery('.loading').fadeOut();
+											}, 750)
+										}).dataTable({
+											"aoColumns": [
+												{"sType": "num-html"},
+												null,
+												null,
+												null,
+												null{% if '/builds/completed' in request.path or '/pkg_review' in request.path %},
+												null,
+												null,
+												null{% endif %}{% if '/issues' in request.path %},
+												null{% endif %}
+											],
+											"aaSorting": [
+												[0, "desc"]
+											]
+
+										});
+
+									});
+									if (!jQuery('#issuetable').length) {
+										jQuery('#DataTables_Table_0_paginate').replaceWith(jQuery('ul.pagination.custom'));
+									}
+								}
+							{% endif %}
 						}
 					)
-
 
 				</script>
 			{%- endblock scripts %}

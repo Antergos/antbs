@@ -293,19 +293,20 @@ class RedisZSet(RedisObject, set):
             vals.append(val)
         self.db.zadd(self.full_key, *vals)
 
+    def append(self, val):
+        self.add(val)
+
     def remove(self, val):
         """ Remove a member from the set. """
         self.db.zrem(self.full_key, super().encode_value(val))
 
     def ismember(self, val):
         """ Check if value is a member of set. """
-        rank = self.db.zrank(self.full_key, super().encode_value(val))
-        return True if rank else False
+        return self.db.zrank(self.full_key, super().encode_value(val))
 
     def sort(self, alpha=True):
         """ Get list of members sorted alphabetically. """
         return self.db.sort(self.full_key, alpha=alpha)
-
 
 
 class RedisHash(RedisObject):

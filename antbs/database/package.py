@@ -75,21 +75,21 @@ class PackageMeta(RedisHash):
             set=['depends', 'groups', 'makedepends']
         ))
 
-        self.all_attribs.append('_build')
         self.__namespaceinit__()
 
-        if not self or (not self.pkg_id and self.is_package_on_github()):
+        if (not self or not self.pkg_id) and self.is_package_on_github(name=key):
             # Package is not in the database, so it must be new. Let's initialize it.
             self.__keysinit__()
 
-            self.pkgname = self.name = key
+            self.pkgname = key
+            self.name = key
 
             next_id = self.db.incr('antbs:misc:pkgid:next')
             self.pkg_id = next_id
 
             status.all_packages.add(self.name)
 
-    def is_package_on_github(self):
+    def is_package_on_github(self, name=None):
         raise NotImplementedError('Subclass must implement this method')
 
 
@@ -137,14 +137,10 @@ class Package(PackageMeta):
 
         self._pkgbuild = None
 
-        if not self.gh_path or '_' == self.gh_path or not isinstance(self.gh_path, str) or self.gh_path in ['True', 'False']:
-            logger.debug('not self.gh_path')
+        if not self.gh_path:
             self.determine_github_path()
 
-        logger.debug(self.gh_path)
-
         if fetch_pkgbuild or not self.pkgbuild:
-            logger.debug('fetch_pkgbuild or not self.pkgbuild!')
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
@@ -152,6 +148,7 @@ class Package(PackageMeta):
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
+        self.sync_database_with_pkgbuild()
 
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
@@ -269,15 +266,13 @@ class Package(PackageMeta):
             logger.error(err.output)
 
     def determine_github_path(self):
-        logger.debug('determine_github_path fired!')
-        default = '{0}/PKGBUILD'.format(self.pkgname)
-        paths = [default, 'cinnamon/{0}'.format(default), 'mate/{0}'.format(default)]
+        paths = ['cinnamon/{0}'.format(self.pkgname),
+                 'mate/{0}'.format(self.pkgname),
+                 self.pkgname]
         gh_path = ''
-        logger.debug(paths)
 
         for path in paths:
             url = '{0}{1}'.format(GH_REPO_BASE_URL, path)
-            logger.debug(url)
             req = requests.head(url, allow_redirects=True)
 
             try:
@@ -290,7 +285,6 @@ class Package(PackageMeta):
 
             break
 
-        logger.debug(gh_path)
         if not gh_path:
             logger.error('Could not determine gh_path for %s', self.pkgname)
             return False
@@ -309,12 +303,27 @@ class Package(PackageMeta):
     def fetch_pkgbuild_from_github(self):
         logger.debug('fetch_pkgbuild_from_github!')
         gh, repo = self.get_github_api_client()
+        pbpath = None
+        target_path = None
 
-        if not self.gh_path:
+        if not self.gh_path or not isinstance(self.gh_path, str) or True:
             logger.debug('not self.gh_path!')
-            self.gh_path = self.determine_github_path()
+            self.determine_github_path()
 
-        logger.debug(self.gh_path)
+        if 'PKGBUILD' not in self.gh_path:
+            gh_path = repo.file_contents(self.gh_path)
+
+            if 'directory' == gh_path['type']:
+                pbpath = '{0}/PKGBUILD'.format(self.gh_path)
+            elif 'symlink' == gh_path['type']:
+                pbpath = os.path.join(
+                    self.gh_path.rsplit('/', 1)[0],
+                    gh_path['target'],
+                    'PKGBUILD'
+                )
+            self.gh_path = pbpath
+
+        logger.debug(pbpath)
 
         pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
 
@@ -323,8 +332,9 @@ class Package(PackageMeta):
 
         return pbfile_contents
 
-    def is_package_on_github(self):
-        return self.pkgname in status.all_packages or self.determine_github_path()
+    def is_package_on_github(self, name=None):
+        pname = name or self.pkgname
+        return pname in status.all_packages or self.determine_github_path()
 
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored
@@ -460,9 +470,9 @@ class Package(PackageMeta):
             setattr(self, 'url', self.get_from_pkgbuild('url'))
         if not self.depends:
             self.get_deps()
-        if not self.groups:
+        if not self.groups or len(self.groups) < 1:
             for group in self.get_from_pkgbuild('groups'):
-                self.groups.append(group)
+                self.groups.add(group)
 
 
 def get_pkg_object(name, fetch_pkgbuild=False):

@@ -61,13 +61,13 @@
 											</button>
 											<ul role="menu" class="dropdown-menu set_result">
 												<li>
-													<a href="#" id="passed" bnum="{{ build.bnum }}"><i class="fa fa-check" style="color:green;"></i>Pass</a>
+													<a href="#" id="passed" data-bnum="{{ build.bnum }}"><i class="fa fa-check" style="color:green;"></i>Pass</a>
 												</li>
 												<li>
-													<a href="#" id="failed" bnum="{{ build.bnum }}"><i class="fa fa-exclamation" style="color:red;"></i>Fail</a>
+													<a href="#" id="failed" data-bnum="{{ build.bnum }}"><i class="fa fa-exclamation" style="color:red;"></i>Fail</a>
 												</li>
 												<li style="font-style: italic;">
-													<a href="#" id="skip" bnum="{{ build.bnum }}"><i class="fa fa-eye-slash" style="color:#777777;"></i>Skip</a>
+													<a href="#" id="skip" data-bnum="{{ build.bnum }}"><i class="fa fa-eye-slash" style="color:#777777;"></i>Skip</a>
 												</li>
 											</ul>
 										</div>

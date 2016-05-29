@@ -265,7 +265,7 @@ class Webhook(WebhookMeta):
         self.full_name = self.payload['repository']['full_name']
         self.repo = self.payload['repository']['name']
         self.pusher = self.payload['pusher']['name']
-        self.commits = self.payload['commits']
+        self.commits = [c for c in self.payload['commits'] if '__NOBUILD__' not in c['message']]
 
         if self.repo == 'numix-icon-theme':
             rate_limit = True

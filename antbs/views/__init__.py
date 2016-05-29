@@ -91,6 +91,8 @@ def get_paginated(item_list, per_page, page, reverse=True):
     if len(item_list) < 1:
         return item_list, 0
 
+    page = int(page)
+
     page -= 1
     items = list(item_list)
 

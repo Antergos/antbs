@@ -80,7 +80,7 @@ def initialize_app():
                        'STORMPATH_ENABLE_USERNAME': True,
                        'STORMPATH_REQUIRE_USERNAME': True,
                        'STORMPATH_ENABLE_REGISTRATION': False,
-                       'STORMPATH_REDIRECT_URL': '/pkg_review',
+                       'STORMPATH_REDIRECT_URL': '/builds/completed',
                        'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
                        'STORMPATH_COOKIE_DURATION': timedelta(days=14),
                        'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
@@ -104,8 +104,8 @@ def initialize_app():
 
     # Register our views
     app.register_blueprint(views.api_view, url_prefix='/api')
-    app.register_blueprint(views.build_view, url_prefix='/build')
     app.register_blueprint(views.build_view, url_prefix='/builds')
+    app.register_blueprint(views.build_view, url_prefix='/build')
     app.register_blueprint(views.home_view, url_prefix='/')
     app.register_blueprint(views.live_view, url_prefix='/building')
     app.register_blueprint(views.package_view, url_prefix='/package')

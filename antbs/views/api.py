@@ -304,7 +304,7 @@ def live_status_updates():
         return json.dumps(message)
 
 
-@api_view.route('/pkg_review', methods=['POST'])
+@api_view.route('/ajax/pkg_review', methods=['POST'])
 @groups_required(['admin'])
 def dev_package_review():
     payload = json.loads(request.data.decode('utf-8'))

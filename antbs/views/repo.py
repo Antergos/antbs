@@ -31,8 +31,8 @@ from views import *
 repo_view = Blueprint('repo', __name__)
 
 
-def get_repo_packages(repo_name=None, group=None, page=1):
-    if repo_name is None:
+def get_repo_packages(repo_name=None, group=None, page=None):
+    if repo_name is None or page is None:
         abort(500)
 
     pkgs = []
@@ -46,21 +46,27 @@ def get_repo_packages(repo_name=None, group=None, page=1):
         rev_pending = []
 
     if not repo_obj.packages:
+        logger.error('repo is empty!')
         return pkgs, rev_pending
 
     if group:
         repo_packages = [p for p in list(repo_obj.packages.sort()) if package_in_group(p, group)]
     else:
-        repo_packages = sorted(list(repo_obj.packages.sort()))
+        repo_packages = [p for p in list(repo_obj.packages.sort())]
 
-    repo_packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
+    packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
 
-    for pkg in repo_packages:
+    for pkg in packages:
         if 'dummy' in pkg or 'grub-zfs' in pkg:
             continue
 
         try:
             pkg_obj = get_pkg_object(pkg)
+        except Exception as err:
+            logger.error(err)
+            continue
+
+        try:
             bnum = pkg_obj.builds[0]
             if bnum:
                 bld_obj = get_build_object(bnum=bnum)
@@ -80,11 +86,14 @@ def get_repo_packages(repo_name=None, group=None, page=1):
 ###
 
 @repo_view.route('/<name>/packages/<group>')
-@repo_view.route('/<name>/packages/<page>')
+@repo_view.route('/<name>/packages/<int:page>')
 @repo_view.route('/<name>/packages')
-def repo_packages_listing(name=None, group=None, page=1):
+def repo_packages_listing(name=None, group=None, page=None):
     if not name or name not in status.repos or (group and group not in status.package_groups):
         abort(404)
+
+    if page is None:
+        page = 1
 
     packages, rev_pending, all_pages = get_repo_packages(name, group, page)
     pagination = Pagination(page, 10, all_pages)
