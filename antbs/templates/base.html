@@ -956,8 +956,11 @@
 											{% if '/repo/' in request.path and '/packages' in request.path %}
 												{"sType": "num-html"}, {"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null{% if user.is_authenticated() %},null{% endif %}
 
-											{% elif '/builds/' in request.path or '/pkg_review' in request.path %}
+											{% elif '/builds/' in request.path and '/completed' in request.path %}
 												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null
+
+											{% elif '/builds/' in request.path %}
+												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null
 
 											{% elif '/issues' in request.path %}
 												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null, null

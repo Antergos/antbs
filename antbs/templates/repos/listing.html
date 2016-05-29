@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set link = '/repo/' + name + '/packages' %}
 
 {% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
 {% block stats %}{% endblock stats %}
@@ -48,7 +49,7 @@
 								<td>
 									{% if package.groups %}
 										{% for group in package.groups %}
-											<a href="{{ request.path }}/{{ group }}">{{ group }}</a>{% if loop.length > 1 and not loop.last %}, {% endif %}
+											<a href="{{ link }}/{{ group }}">{{ group }}</a>{% if loop.length > 1 and not loop.last %}, {% endif %}
 										{% endfor %}
 									{% else %}
 										-

@@ -36,6 +36,7 @@ from database.base_objects import RedisHash, db
 from database.server_status import status
 from gevent import sleep
 from github3 import login
+from github3.exceptions import UnprocessableResponseBody
 from utils.logging_config import logger
 from utils.pkgbuild import Pkgbuild
 
@@ -148,7 +149,9 @@ class Package(PackageMeta):
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
-        self.sync_database_with_pkgbuild()
+
+        if fetch_pkgbuild:
+            self.sync_database_with_pkgbuild()
 
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
@@ -313,7 +316,7 @@ class Package(PackageMeta):
         if 'PKGBUILD' not in self.gh_path:
             gh_path = repo.file_contents(self.gh_path)
 
-            if 'directory' == gh_path['type']:
+            if isinstance(gh_path, UnprocessableResponseBody):
                 pbpath = '{0}/PKGBUILD'.format(self.gh_path)
             elif 'symlink' == gh_path['type']:
                 pbpath = os.path.join(
@@ -321,6 +324,7 @@ class Package(PackageMeta):
                     gh_path['target'],
                     'PKGBUILD'
                 )
+
             self.gh_path = pbpath
 
         logger.debug(pbpath)
@@ -387,6 +391,9 @@ class Package(PackageMeta):
         if not version_from_tag:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 new_val = self.get_from_pkgbuild(key)
+
+                if not new_val:
+                    logger.error('unable to get %s from pkgbuild for %s', key, self.pkgname)
 
                 if new_val != old_vals[key]:
                     changed[key] = new_val
@@ -455,6 +462,17 @@ class Package(PackageMeta):
 
         return depends
 
+    def sync_groups(self):
+        from_db = set(self.groups)
+        from_pbuild = set(self.get_from_pkgbuild('groups'))
+        to_remove = from_db - from_pbuild
+        to_add = from_pbuild - from_db
+
+        for grp in to_remove:
+            self.groups.remove(grp)
+        for new_grp in to_add:
+            self.groups.add(new_grp)
+
     def sync_database_with_pkgbuild(self):
         if not self.pkgname:
             setattr(self, 'pkgname', self.name)
@@ -468,11 +486,9 @@ class Package(PackageMeta):
             setattr(self, 'description', self.pkgdesc)
         if not self.url:
             setattr(self, 'url', self.get_from_pkgbuild('url'))
-        if not self.depends:
-            self.get_deps()
-        if not self.groups or len(self.groups) < 1:
-            for group in self.get_from_pkgbuild('groups'):
-                self.groups.add(group)
+
+        self.get_deps()
+        self.sync_groups()
 
 
 def get_pkg_object(name, fetch_pkgbuild=False):
