@@ -38,12 +38,12 @@ import shutil
 
 import requests
 
-import database
 import transaction_handler as builder
-from database import get_trans_object
+from database import package
 from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.server_status import get_timeline_object, status
+from database.transaction import get_trans_object
 from rq import Connection, Queue, Worker
 from utils.logging_config import logger
 
@@ -350,7 +350,7 @@ class Webhook(WebhookMeta):
                         tl_event = get_timeline_object(msg=tpl.format(source, the_pkgs_str),
                                                        tl_type=tltype,
                                                        packages=the_pkgs)
-                        p_obj = database.get_pkg_object(name=p, fetch_pkgbuild=True)
+                        p_obj = package.get_pkg_object(name=p, fetch_pkgbuild=True)
                         p_obj.tl_events.append(tl_event.event_id)
 
                 trans_obj = get_trans_object(packages=the_pkgs)

@@ -32,16 +32,17 @@
 import os
 import sys
 
-from database import (
-    get_build_object,
-    get_repo_object,
-    get_trans_object
-)
+# Ignore PyImportSortBear as this statement affects imports later
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
 
 import utils.docker_util as docker_utils
 from database.base_objects import db
 from database.server_status import status
+from database.transaction import get_trans_object
+from database.build import get_build_object
+from database.repo import get_repo_object
 from rq import Connection, Queue, Worker
+from rq import get_current_job
 from utils.logging_config import logger
 
 

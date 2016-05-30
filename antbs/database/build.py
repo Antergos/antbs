@@ -26,17 +26,17 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from datetime import datetime
-
 import gevent
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
 
 from database.base_objects import RedisHash
-from utils.docker_util import DockerUtils
 from utils.logging_config import logger
+from utils.docker_util import DockerUtils
 from utils.utilities import CustomSet
+from datetime import datetime
+
 
 doc = DockerUtils().doc
 
@@ -182,3 +182,28 @@ class Build(RedisHash):
                                      HtmlFormatter(style='monokai',
                                                    linenos='inline',
                                                    prestyles="background:#272822;color:#fff;"))
+
+
+def get_build_object(pkg_obj=None, bnum=None, tnum=None):
+    """
+    Gets an existing build or creates a new one.
+
+    Args:
+        pkg_obj (Package): Create a new build for this package.
+        bnum (int): Get an existing build identified by `bnum`.
+
+    Returns:
+        Build: A fully initiallized `Build`.
+
+    Raises:
+        ValueError: If both `pkg_obj` and `bnum` are Falsey or Truthy.
+
+    """
+    if not any([pkg_obj, bnum]):
+        raise ValueError('At least one of [pkg_obj, bnum] required.')
+    elif all([pkg_obj, bnum]):
+        raise ValueError('Only one of [pkg_obj, bnum] can be given, not both.')
+
+    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum, tnum=tnum)
+
+    return bld_obj

@@ -30,12 +30,15 @@ import time
 from multiprocessing import Process
 
 import utils.docker_util as docker_util
-from database import get_pkg_object, get_build_object, get_repo_object
 from utils.logging_config import logger
 from utils.sign_pkgs import sign_packages
-from utils.utilities import PacmanPackageCache, remove
+from utils.utilities import CustomSet, PacmanPackageCache, remove
+
 from .base_objects import RedisHash, db
+from .build import get_build_object
+from .package import get_pkg_object
 from .server_status import get_timeline_object, status
+from .repo import get_repo_object
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -674,3 +677,28 @@ class Transaction(TransactionMeta):
             return True
 
         return False
+
+
+def get_trans_object(packages=None, tnum=None, repo_queue=None):
+    """
+    Gets an existing transaction or creates a new one.
+
+    Args:
+        packages (list): Create a new transaction with these packages.
+        tnum (int): Get an existing transaction identified by `tnum`.
+
+    Returns:
+        Transaction: A fully initiallized `Transaction` object.
+
+    Raises:
+        ValueError: If both `packages` and `tnum` are Falsey or Truthy.
+
+    """
+    if not any([packages, tnum]):
+        raise ValueError('At least one of [packages, tnum] required.')
+    elif all([packages, tnum]):
+        raise ValueError('Only one of [packages, tnum] can be given, not both.')
+
+    trans_obj = Transaction(packages=packages, tnum=tnum, repo_queue=repo_queue)
+
+    return trans_obj
