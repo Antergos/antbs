@@ -25,18 +25,17 @@ import os
 import re
 import shutil
 import subprocess
-import time
 import zipfile
 
 import gevent
 import requests
-from gitlab import Gitlab
-
-from database.base_objects import RedisHash, db
-from database.server_status import status
-from gevent import sleep
 from github3 import login
 from github3.exceptions import UnprocessableResponseBody
+from gitlab import Gitlab
+
+from database.base_objects import RedisHash
+from database.server_status import status
+from database import get_trans_object
 from utils.logging_config import logger
 from utils.pkgbuild import Pkgbuild
 
@@ -223,14 +222,22 @@ class Package(PackageMeta):
         if not self.pkgbuild:
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
+        if var not in self.pkgbuild:
+            logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            return val
+
         if not self._pkgbuild:
             self._pkgbuild = Pkgbuild(self.pkgbuild)
             self._pkgbuild.parse_contents()
 
-        if var not in self.pkgbuild:
+        if var not in self._pkgbuild.values:
             logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            return val
+
+        if self._pkgbuild.values[var]:
+            val = self._pkgbuild.values[var]
         else:
-            val = self._pkgbuild.get(var)
+            val = self._pkgbuild.get_value(var) or ''
 
         return val
 
@@ -340,19 +347,37 @@ class Package(PackageMeta):
         pname = name or self.pkgname
         return pname in status.all_packages or self.determine_github_path()
 
+    def get_current_transaction_object(self):
+        if not status.transactions_running and not status.transaction_queue:
+            return ''
+
+        all_trans = status.transactions_running + status.transaction_queue
+        trans_objects = [get_trans_object(t) for t in all_trans if t]
+        trans_objects = [t for t in trans_objects for p in t.packages if p == self.pkgname]
+
+        if trans_objects:
+            return trans_objects[0]
+        else:
+            return None
+
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
-        can_push = self.push_version or self.is_monitored
+        trans_obj = self.get_current_transaction_object()
+        is_monitor = trans_obj and 'Monitor' in trans_obj.initiated_by
+        can_push = self.push_version or (self.is_monitored and is_monitor)
 
         if not can_push or old_val == new_val or new_val in [None, 'None']:
             logger.error('cant push to github!')
             return
 
-        gh = login(token=status.github_token)
-        repo = gh.repository('antergos', 'antergos-packages')
-        pb_file = repo.file_contents(self.name + '/PKGBUILD')
+        gh, repo = self.get_github_api_client()
+
+        if not self.gh_path:
+            self.determine_github_path()
+
+        pb_file = repo.file_contents(self.gh_path + '/PKGBUILD')
 
         if not pb_file:
-            pb_file = repo.file_contents('cinnamon/' + self.name + '/PKGBUILD')
+            logger.error('push to github failed!')
 
         pb_contents = pb_file.decoded.decode('utf-8')
         search_str = '{0}={1}'.format(var, old_val)
@@ -387,7 +412,7 @@ class Package(PackageMeta):
         # TODO: This is so ugly. Needs rewrite.
         changed = {'epoch': None, 'pkgrel': None, 'pkgver': None}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
-        version_from_tag = self.is_monitored and self.monitored_type not in ['releases', 'tags']
+        version_from_tag = self.is_monitored and self.monitored_type in ['releases', 'tags']
         if not version_from_tag:
             for key in ['pkgver', 'pkgrel', 'epoch']:
                 new_val = self.get_from_pkgbuild(key)
@@ -489,9 +514,3 @@ class Package(PackageMeta):
 
         self.get_deps()
         self.sync_groups()
-
-
-def get_pkg_object(name, fetch_pkgbuild=False):
-    pkg_obj = Package(name=name, fetch_pkgbuild=fetch_pkgbuild)
-
-    return pkg_obj

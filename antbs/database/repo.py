@@ -29,14 +29,13 @@
 
 import os
 import tarfile
-import gevent
 from multiprocessing import Process
 
+import utils.docker_util as docker_util
 from database.base_objects import RedisHash
 from database.server_status import status
 from utils.logging_config import logger
 from utils.utilities import Singleton, remove
-import utils.docker_util as docker_util
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
@@ -226,16 +225,3 @@ class AntergosRepo(PacmanRepo, metaclass=Singleton):
 class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
     def __init__(self, name='antergos-staging', *args, **kwargs):
         super().__init__(name=name, *args, **kwargs)
-
-
-def get_repo_object(name, path=None):
-    if not path:
-        path = status.REPO_BASE_DIR
-    if 'antergos' == name:
-        repo = AntergosRepo(name=name, path=path)
-    elif 'antergos-staging' == name:
-        repo = AntergosStagingRepo(name=name, path=path)
-    else:
-        raise TypeError('name must be one of [antergos, antergos-staging]')
-
-    return repo

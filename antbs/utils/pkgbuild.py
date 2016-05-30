@@ -64,8 +64,8 @@ class Pkgbuild:
         self.current_key = ''
         self.current_value = ''
 
-    def get(self, key):
-        if key in self.values:
+    def get_value(self, key):
+        if key in self.values and self.values[key] and 'None' not in self.values[key]:
             return self.values[key]
 
         self.current_key = key
@@ -133,7 +133,7 @@ class Pkgbuild:
 
     def process_string_value(self):
         val = self.current_value.strip("'\"")
-        self.values[self.current_key] = val
+        self.values[self.current_key] = val or ''
 
     def process_list_value(self):
         self.in_array_check()
@@ -144,7 +144,7 @@ class Pkgbuild:
             self.array_values.extend(vals)
 
         if not self.in_array:
-            self.values[self.current_key] = self.array_values
+            self.values[self.current_key] = self.array_values or []
             self.array_values = []
 
     def in_array_check(self):
@@ -155,8 +155,10 @@ class Pkgbuild:
 
     def maybe_fix_pkgver(self):
         if 'pkgver' not in self.values:
-            self.values['pkgver'] = self.get('pkgver')
+            self.values['pkgver'] = self.get_value('pkgver')
+            logger.debug(self.values['pkgver'])
         if '$' not in self.values['pkgver']:
+            logger.debug(self.values['pkgver'])
             return
 
         if '_buildver' in self.values['pkgver']:

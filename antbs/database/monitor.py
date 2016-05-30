@@ -39,12 +39,11 @@ from gitlab import Gitlab
 
 import iso
 import webhook
-from database import package
+from database import get_pkg_object, get_monitor_object
 from database.base_objects import RedisHash
 from database.server_status import status
-from database.package import get_pkg_object
-from utils.utilities import quiet_down_noisy_loggers
 from utils.logging_config import logger
+from utils.utilities import quiet_down_noisy_loggers
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
@@ -209,24 +208,6 @@ class Monitor(RedisHash):
         wh.process_changes()
 
 
-def get_monitor_object(name):
-    """
-    Gets an existing repo monitor or creates a new one.
-
-    Args:
-        name (str): Name of 3rd-party provider/service (eg. Github).
-
-    Returns:
-        Monitor: A fully initiallized `Monitor` object.
-
-    """
-
-    monitor_obj = Monitor(name=name)
-
-    return monitor_obj
-
-
 def check_repos_for_changes(name):
     monitor_obj = get_monitor_object(name)
     monitor_obj.check_repos_for_changes()
-

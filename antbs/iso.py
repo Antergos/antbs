@@ -38,8 +38,8 @@ import subprocess
 import requests
 from requests_toolbelt.adapters.source import SourceAddressAdapter
 
+import database
 import utils.sign_pkgs as sign
-from database import package
 from database.base_objects import db
 from database.server_status import status
 from utils.logging_config import logger
@@ -230,7 +230,7 @@ def iso_release_job():
 
     for name in iso_names:
         try:
-            pkg_obj = package.get_pkg_object(name=name)
+            pkg_obj = database.get_pkg_object(name=name)
             iso = ISOUtility(pkg_obj=pkg_obj)
 
             iso.prep_release()
