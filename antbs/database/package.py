@@ -289,9 +289,8 @@ class Package(PackageMeta):
             try:
                 req.raise_for_status()
                 gh_path = path
-            except Exception as err:
-                logger.error('path: %s not found for %s', path, self.pkgname)
-                logger.error(err)
+            except Exception:
+                logger.info('path: %s not found for %s', path, self.pkgname)
                 continue
 
             break
@@ -317,7 +316,7 @@ class Package(PackageMeta):
         pbpath = None
         target_path = None
 
-        if not self.gh_path or not isinstance(self.gh_path, str) or True:
+        if not self.gh_path or not isinstance(self.gh_path, str):
             logger.debug('not self.gh_path!')
             self.determine_github_path()
 
