@@ -27,6 +27,7 @@ import shutil
 import subprocess
 import time
 import zipfile
+from glob import glob
 
 import gevent
 import requests
@@ -256,13 +257,17 @@ class Package(PackageMeta):
             with open(zpath, 'wb') as fd:
                 fd.write(source)
             return
-        if 'cnchi-dev' == self.name:
+        if 'cnchi' == self.name:
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
             repo = gh.repository('antergos', 'cnchi')
             repo.archive('zipball', zpath, ref='master')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
+            cnchi_dir = glob('{0}/Antergos-Cnchi-*'.format(dirpath))
+            logger.debug(cnchi_dir)
+            new_dir = os.path.join(dirpath, 'cnchi')
+            shutil.move(cnchi_dir[0], new_dir)
             return
 
         os.putenv('srcdir', dirpath)
@@ -400,13 +405,13 @@ class Package(PackageMeta):
                 new_val = self.get_from_pkgbuild(key)
 
                 if not new_val:
-                    logger.error('unable to get %s from pkgbuild for %s', key, self.pkgname)
+                    logger.info('unable to get %s from pkgbuild for %s', key, self.pkgname)
 
-                if new_val != old_vals[key]:
+                if new_val and (new_val != old_vals[key] or new_val not in self.version_str):
                     changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if not any([True for x in changed if changed[x] is not None]):
+            if not any([True for x in changed if changed[x] not in [None, 'None']]):
                 return self.version_str
         else:
             changed['pkgver'] = self.monitored_last_result
@@ -462,40 +467,43 @@ class Package(PackageMeta):
 
             depends.append(dep)
 
-            if dep in deps:
-                self.depends.add(dep)
-            elif dep in mkdeps:
-                self.makedepends.add(dep)
-
         return depends
 
-    def sync_groups(self):
-        from_db = set(self.groups)
-        from_pbuild = set(self.get_from_pkgbuild('groups'))
+    def sync_pkgbuild_array_by_key(self, key_name):
+        attrib = getattr(self, key_name)
+        from_pbuild = set(self.get_from_pkgbuild(key_name))
+
+        if 'pkgname' == key_name and self.is_split_package:
+            attrib = getattr(self, 'split_packages')
+
+        elif key_name in ['depends', 'makedepends']:
+            from_pbuild = set(self.get_deps())
+
+        from_db = set(attrib)
         to_remove = from_db - from_pbuild
         to_add = from_pbuild - from_db
 
-        for grp in to_remove:
-            self.groups.remove(grp)
-        for new_grp in to_add:
-            self.groups.add(new_grp)
+        for old_val in to_remove:
+            attrib.remove(old_val)
+        for new_val in to_add:
+            attrib.append(new_val)
 
     def sync_database_with_pkgbuild(self):
-        if not self.pkgname:
-            setattr(self, 'pkgname', self.name)
-        if not self.pkg_id:
-            next_id = self.db.incr('antbs:misc:pkgid:next')
-            setattr(self, 'pkg_id', next_id)
         if not self.pkgver:
-            self.get_from_pkgbuild('pkgver')
-        if not self.pkgdesc or not self.description:
-            setattr(self, 'pkgdesc', self.get_from_pkgbuild('pkgdesc'))
-            setattr(self, 'description', self.pkgdesc)
-        if not self.url:
-            setattr(self, 'url', self.get_from_pkgbuild('url'))
+            self.pkgver = self.get_from_pkgbuild('pkgver')
 
-        self.get_deps()
-        self.sync_groups()
+        if not self.pkgdesc or not self.description:
+            self.pkgdesc = self.get_from_pkgbuild('pkgdesc')
+            self.description = self.pkgdesc
+
+        if not self.url:
+            self.url = self.get_from_pkgbuild('url')
+
+        if self.is_split_package:
+            self.sync_pkgbuild_array_by_key('pkgname')
+
+        self.sync_pkgbuild_array_by_key('depends')
+        self.sync_pkgbuild_array_by_key('groups')
 
 
 def get_pkg_object(name, fetch_pkgbuild=False):

@@ -127,7 +127,7 @@ class DockerUtils(metaclass=Singleton):
                 },
             '/srv/antergos.info/repo/antergos':
                 {
-                    'bind': '/antergos',
+                    'bind': '/main',
                     'ro': False
                 },
             pkgbuild_dir:

@@ -238,6 +238,7 @@ class Transaction(TransactionMeta):
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             logger.info(status.current_status)
             cnchi_dir = self.get_package_build_directory(pkg)
+            pkg_obj.prepare_package_source(cnchi_dir)
             self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)

@@ -89,9 +89,9 @@ setup_environment() {
 		export PACKAGER="Antergos Build Server <dev@antergos.com>"
 		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
 		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
-		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
-		sed -i 's|Include = /etc/pacman.d/antergos-mirrorlist|Server = file:///$repo/$arch\n|g' /etc/pacman.conf
-
+		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
+		sed -i '1s%^%[antergos]\nSigLevel = PackageRequired\nServer = file:///main/$arch\n%' /etc/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = file:///staging/$arch\n%' /etc/pacman.conf
 	else
 
 		export PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"
@@ -106,7 +106,7 @@ setup_environment() {
 	sed -i 's|CheckSpace||g' /etc/pacman.conf
 	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
 	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
-	echo "www-data:x:33:git,faidoc,karasu,phabd,www-data" >> /etc/group
+	echo "www-data:x:33:git,www-data" >> /etc/group
 
 	git config --global user.name "Antergos Build Server"
 	git config --global user.email "admin@antergos.org"
@@ -226,7 +226,7 @@ setup_32bit_env() {
 		rm -rf /32build/root
 	fi
 
-	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf -c /var/cache/pacman_i686/pkg /32build/root base-devel wget sudo git reflector
+	mkarchroot -C /32bit/pacman.conf -M /32bit/makepkg.conf -c /var/cache/pacman_i686 /32build/root base-devel wget sudo git reflector
 	mkdir /32build/root/pkg
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
@@ -246,9 +246,9 @@ setup_32bit_env() {
 	chmod 755 /32build/root/etc/sudoers.d
 	chmod 700 /32build/root/usr/lib/sudo
 	chmod 600 /32build/root/usr/lib/sudo/*.so
-	sed -i 's|file:\/\/\/\$repo/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
+	sed -i 's|file:\/\/\/main/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
 	sed -i 's|file:\/\/\/staging/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
-	mount -o bind /var/cache/pacman_i686 /32build/root/var/cache/pacman
+	# mount -o bind /var/cache/pacman_i686 /32build/root/var/cache/pacman
 	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 	arch-chroot /32build/root reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 
