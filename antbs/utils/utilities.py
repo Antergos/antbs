@@ -137,24 +137,60 @@ def remove(src):
         try:
             shutil.rmtree(src)
         except Exception as err:
-            pass
+            logging.error(err)
 
     elif os.path.isfile(src):
         try:
             os.remove(src)
         except Exception as err:
-            pass
+            logging.error(err)
 
 
 def copy_or_symlink(src, dst):
+    """
+    Copies the file at `src` to `dst`. If `src` is a symlink the link will be
+    followed to get the file that will be copied. If `dst` is a symlink then it will
+    be removed.
+
+    Args:
+        src (str): The path to the file that will be copied.
+        dst (str): The path to where the src file should be copied to.
+
+    """
+
     if os.path.islink(src):
         linkto = os.readlink(src)
         os.symlink(linkto, dst)
     else:
         try:
-            shutil.copy(src, dst)
-        except Exception:
-            pass
+            shutil.copyfile(src, dst)
+        except shutil.SameFileError:
+            if os.path.islink(dst):
+                os.unlink(dst)
+                shutil.copyfile(src, dst)
+        except Exception as err:
+            logging.error(err)
+
+
+def symlink(src, dst):
+    """
+    Creates a symbolic link at `dst` to the file at `src`. If `src` is a symlink the
+    link will be followed to get the actual file that will be linked at `dst`. If `dst`
+    is a symlink then it will be removed.
+
+    Args:
+        src (str): The path to the file that will be linked.
+        dst (str): The path at which the link to the file at `src` should be created.
+
+    """
+
+    if os.path.islink(src):
+        src = os.readlink(src)
+
+    if os.path.islink(dst):
+        os.unlink(dst)
+
+    os.symlink(src, dst)
 
 
 def quiet_down_noisy_loggers():

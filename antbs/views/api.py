@@ -89,8 +89,7 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         bld_obj = get_build_object(bnum=bnum)
         pkg_obj = get_pkg_object(name=bld_obj.pkgname)
         if pkg_obj and bld_obj:
-            allowed = pkg_obj.allowed_in
-            if 'main' not in allowed and result == 'passed':
+            if 'main' not in pkg_obj.allowed_in and result == 'passed':
                 msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
                 errmsg.update(error=True, msg=msg)
                 return errmsg
@@ -116,28 +115,37 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
                 pkg_files.extend(glob(glob_string_64, recursive=True))
                 pkg_files.extend(glob(glob_string_32, recursive=True))
 
-        if pkg_files or True:
-            for f in pkg_files_64:
-                logger.debug('f in pkg_files_64 fired!')
-                if result == 'passed':
-                    copy_or_symlink(f, status.MAIN_64)
-                    copy_or_symlink(f, '/tmp')
-                if result != 'skip':
-                    os.remove(f)
-            for f in pkg_files_32:
-                if result == 'passed':
-                    copy_or_symlink(f, status.MAIN_32)
-                    copy_or_symlink(f, '/tmp')
-                if result != 'skip':
-                    os.remove(f)
-            if result and result != 'skip':
-                repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
-                errmsg = dict(error=False, msg=None)
-
-        else:
-            logger.error('While moving to main, no packages were found to move.')
+        if not pkg_files or not result:
             err = 'While moving to main, no packages were found to move.'
-            errmsg = dict(error=True, msg=err)
+            logger.error(err)
+            return dict(error=True, msg=err)
+
+        for f in pkg_files_64:
+            if result == 'passed':
+                copy_or_symlink(f, status.MAIN_64)
+                copy_or_symlink(f, '/tmp')
+
+                if '-any.pkg' in f:
+                    fname = os.path.basename(f)
+                    linkto = os.path.join(status.MAIN_64, fname)
+                    link_from = os.path.join(status.MAIN_32, fname)
+
+                    symlink(linkto, link_from)
+
+            if result != 'skip':
+                remove(f)
+
+        for f in pkg_files_32:
+            if result == 'passed' and '-any.pkg' not in f:
+                copy_or_symlink(f, status.MAIN_32)
+                copy_or_symlink(f, '/tmp')
+
+            if result != 'skip':
+                remove(f)
+
+        if result != 'skip':
+            repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
+            errmsg = dict(error=False, msg=None)
 
     except (OSError, Exception) as err:
         logger.error('Error while moving to main: %s', err)

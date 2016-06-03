@@ -129,10 +129,10 @@ in_array() {
 
 
 run_update_repo() {
-
+	local repo_dir="${1}"
 	print2log "UPDATING ${1} REPO";
 
-	for arc in i686 x86_64; do
+	for arc in x86_64 i686; do
 		cd "/${repo_dir}/${arc}"
 		repo-add -R "${repo}.db.tar.gz" ./${PKGNAME}**.xz
 	done && touch "/result/${PKGNAME}" && return 0;
@@ -142,8 +142,7 @@ run_update_repo() {
 }
 
 
-run_remove_pkg() {
-
+remove_pkg() {
 	local repo_dir=staging
 	local repo=antergos-staging
 	print2log "REMOVING ${1} FROM STAGING REPO";
@@ -157,29 +156,17 @@ run_remove_pkg() {
 
 }
 
-try_install_deps() {
+symlink_any() {
+	cd "/${repo_dir}/x86_64"
 
-	print2log 'TRY BUILD FAILED. TRYING TO INSTALL MISSING DEPS'
-	cd /staging
-
-	for dep in ${pkg_deps[*]}; do
-		print2log "INSTALLING ${dep} AS DEP";
-		yaourt -Sa --noconfirm --nocolor --noprogressbar --needed "${dep}" 2>&1;
-	done && return 0;
-
-	return 1
-}
-
-copy_any() {
-
-	for file in "/${repo_dir}/x86_64/${PKGNAME}"*-any.**.xz; do
-		if [[ -f ${file} ]]; then
-			cp "${file}" /staging/i686/
+	for file in "${PKGNAME}"**-any.**.xz; do
+		fname="$(basename ${file})"
+		if [[ -f "${file}" ]]; then
+			ln -sfr "${fname}" ../i686/"${fname}"
 		fi
 	done && return 0;
 
 	return 1;
-
 }
 
 check_pkg_sums() {
@@ -278,14 +265,14 @@ try_build() {
 
 		{ build_32bit_pkg 2>&1 && rm -f /staging/i686/"${PKGNAME}"-i***.sig && return 0; } ||
 
-		{ cd /staging/x86_64 && run_remove_pkg "${PKGNAME}" && return 1; }
+		{ cd /staging/x86_64 && remove_pkg "${PKGNAME}" && return 1; }
 
 	else
 
 		cd /pkg
 		print2log 'UPDATING SOURCE CHECKSUMS';
 		check_pkg_sums &&
-		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 && copy_any && return 0; } || return 1
+		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 && symlink_any && return 0; } || return 1
 
 	fi
 
@@ -352,13 +339,13 @@ if [[ $? = 0 ]]; then
 
 	if [[ ${repo_dir} = "main" ]] && [[ "${RESULT}" = "passed" ]]; then
 
-		{ run_update_repo "${repo}" && run_remove_pkg && print2log "${update_success}"; } ||
+		{ run_update_repo "${repo}" && remove_pkg && print2log "${update_success}"; } ||
 
 		{ print2log "${update_error}" && exit 1; }
 
 	elif [[ ${repo_dir} = "main" ]] && [[ "${RESULT}" = "failed" ]]; then
 
-		{ run_remove_pkg "${PKGNAME}" && print2log "${update_success}"; } ||
+		{ remove_pkg "${PKGNAME}" && print2log "${update_success}"; } ||
 
 		{ print2log "${update_error}" && exit 1; }
 

@@ -62,7 +62,7 @@ from database.monitor import get_monitor_object, check_repos_for_changes
 
 from utils.logging_config import logger
 from utils.pagination import Pagination
-from utils.utilities import copy_or_symlink
+from utils.utilities import copy_or_symlink, symlink, remove
 
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review

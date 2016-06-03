@@ -94,9 +94,10 @@ class PacmanRepo(RedisHash):
             self.path = os.path.join(path, name)
             status.repos.add(name)
 
-        self.sync_with_alpm_db()
-        self.sync_with_filesystem()
+        self.save_repo_state_alpm()
+        self.save_repo_state_filesystem()
         self.setup_packages_manifest()
+        self.get_repo_packages_unaccounted_for()
 
     def setup_packages_manifest(self):
         pkgs_fs = set([p.split('|')[0] for p in self.pkgs_fs if p])
@@ -118,7 +119,43 @@ class PacmanRepo(RedisHash):
         for pak in unaccounted_for:
             self.unaccounted_for.add(pak)
 
-    def sync_with_filesystem(self):
+    def _get_pkgnames(self, location):
+        return [p.split('|')[0] for p in location if p]
+
+    def get_pkgnames_filesystem(self):
+        return self._get_pkgnames(self.pkgs_fs)
+
+    def get_pkgnames_alpm(self):
+        return self._get_pkgnames(self.pkgs_alpm)
+
+    def _get_pkgver(self, pkgname, location):
+        pkgs = self._get_pkgnames(location)
+
+        if pkgname not in location:
+            return ''
+
+        pkgver = [p.split('|')[1] for p in location if p and pkgname == p]
+
+        logger.debug(pkgver)
+
+        return pkgver[0] or ''
+
+    def get_pkgver_alpm(self, pkgname):
+        return self._get_pkgver(pkgname, self.pkgs_alpm)
+
+    def get_pkgver_filesystem(self, pkgname):
+        return self._get_pkgver(pkgname, self.pkgs_fs)
+
+    def _has_package(self, pkgname, location):
+        return pkgname in self._get_pkgnames(location)
+
+    def has_package_filesystem(self, pkgname):
+        return self._has_package(pkgname, self.pkgs_fs)
+
+    def has_package_alpm(self, pkgname):
+        return self._has_package(pkgname, self.pkgs_alpm)
+
+    def save_repo_state_filesystem(self):
         repodir = os.path.join(self.path, 'x86_64')
         pkgs = set(p for p in os.listdir(repodir) if '.pkg.' in p and not p.endswith('.sig'))
 
@@ -134,7 +171,7 @@ class PacmanRepo(RedisHash):
 
         self.pkg_count_fs = len(self.pkgs_fs)
 
-    def sync_with_alpm_db(self):
+    def save_repo_state_alpm(self):
         repodir = os.path.join(self.path, 'x86_64')
         dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
 
@@ -147,38 +184,58 @@ class PacmanRepo(RedisHash):
 
         self.pkg_count_alpm = len(self.pkgs_alpm)
 
+    def get_repo_packages_unaccounted_for(self):
+        unaccounted_for = []
+
+        if self.unaccounted_for:
+            for pkg in self.unaccounted_for:
+                _pkg = dict(pkgname=pkg, fs=None, alpm=None)
+
+                if self.has_package_filesystem(pkg):
+                    _pkg['fs'] = self.get_pkgver_filesystem(pkg)
+
+                if self.has_package_alpm(pkg):
+                    _pkg['alpm'] = self.get_pkgver_alpm(pkg)
+
+                unaccounted_for.append(_pkg)
+
+        return unaccounted_for
+
     def update_repo(self, bld_obj=False, pkg_obj=False, action=False, review_result=False,
-                    result_dir='/tmp/update_repo_redult'):
+                    result_dir='/tmp/update_repo_result'):
 
         if not any([bld_obj, review_result]):
             raise ValueError('at least one of [bld_obj, is_review] required.')
 
         repodir = 'staging' if 'staging' in self.name else 'main'
+        trans_running = status.transactions_running or status.transaction_queue
         building_saved = False
-        excluded = ['Updating {0} repo database.'.format(self.name),
+        excluded = ['Updating antergos repo database.',
+                    'Updating antergos-staging repo database.',
                     'Processing developer review result.']
 
-        if not status.idle and status.current_status not in excluded:
+        if not status.idle and trans_running and status.current_status not in excluded:
             building_saved = status.current_status
         elif status.idle:
             status.idle = False
 
-        status.current_status = excluded[0]
+        status.current_status = excluded[0] if 'main' == repodir else excluded[1]
 
         if os.path.exists(result_dir):
             remove(result_dir)
+
         os.mkdir(result_dir, 0o777)
 
-        pkgname = bld_obj.pkgname
-
         command = "/makepkg/build.sh"
-        pkgenv = ["_PKGNAME={0}".format(pkgname),
+        pkgenv = ["_PKGNAME={0}".format(bld_obj.pkgname),
+                  "_PKGVER={0}".format(bld_obj.pkgver),
                   "_RESULT={0}".format(review_result),
                   "_UPDREPO=True",
                   "_REPO={0}".format(self.name),
                   "_REPO_DIR={0}".format(repodir)]
 
         doc_util.do_docker_clean("update_repo")
+
         hconfig = doc_util.get_host_config('repo_update', result_dir)
         volumes = ['/makepkg', '/root/.gnupg', '/main', '/result', '/staging']
 
