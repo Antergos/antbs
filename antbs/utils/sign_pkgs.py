@@ -125,6 +125,7 @@ def sign_packages(pkg_obj):
     logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 
     if pkgs2sign:
+        pkgs2sign = [p for p in pkgs2sign if '-any.' not in p]
         for pkg in pkgs2sign:
             existing_sig = '{0}.sig'.format(pkg)
 

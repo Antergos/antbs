@@ -31,6 +31,12 @@ from views import *
 build_view = Blueprint('build', __name__)
 
 
+###
+##
+#   Utility Functions For This View
+##
+###
+
 def get_builds_with_status(page=None, build_status=None, search=None):
     """
     Get paginated list of build objects.
@@ -90,7 +96,6 @@ def get_builds_with_status(page=None, build_status=None, search=None):
 #   Views Start Here
 ##
 ###
-
 
 @build_view.route('/<build_status>/search/<query>')
 @build_view.route('/<build_status>/search/<query>/<int:page>')

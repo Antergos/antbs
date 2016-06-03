@@ -33,6 +33,12 @@ package_view = Blueprint('package', __name__)
 
 ###
 ##
+#   Utility Functions For This View
+##
+###
+
+###
+##
 #   Views Start Here
 ##
 ###

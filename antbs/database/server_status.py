@@ -51,7 +51,8 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                      int=['building_num'],
                      list=['completed', 'failed', 'transaction_queue', 'pending_review',
                            'all_tl_events', 'build_queue', 'transactions_running', 'now_building'],
-                     set=['all_packages', 'iso_pkgs', 'repos', 'review_pending', 'package_groups'],
+                     set=['all_packages', 'iso_pkgs', 'repos', 'review_pending', 'package_groups',
+                          'mirrors'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
                            'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
                            'REPO_BASE_DIR']))

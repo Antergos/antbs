@@ -31,6 +31,12 @@ from views import *
 api_view = Blueprint('api', __name__)
 
 
+###
+##
+#   Utility Functions For This View
+##
+###
+
 def get_live_build_output(bnum):
     psub = db.pubsub()
     psub.subscribe('live:build_output:{0}'.format(bnum))

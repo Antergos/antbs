@@ -106,7 +106,7 @@ def initialize_app():
     app.register_blueprint(views.api_view, url_prefix='/api')
     app.register_blueprint(views.build_view, url_prefix='/builds')
     app.register_blueprint(views.build_view, url_prefix='/build')
-    app.register_blueprint(views.home_view, url_prefix='/')
+    app.register_blueprint(views.home_view)
     app.register_blueprint(views.live_view, url_prefix='/building')
     app.register_blueprint(views.package_view, url_prefix='/package')
     app.register_blueprint(views.repo_view, url_prefix='/repo')

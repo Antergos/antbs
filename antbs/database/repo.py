@@ -3,7 +3,7 @@
 #
 #  repo.py
 #
-#  Copyright © 2015 Antergos
+#  Copyright © 2015-2016 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
@@ -31,6 +31,8 @@ import os
 import tarfile
 import gevent
 from multiprocessing import Process
+
+import re
 
 from database.base_objects import RedisHash
 from database.server_status import status
@@ -119,6 +121,10 @@ class PacmanRepo(RedisHash):
         for pak in unaccounted_for:
             self.unaccounted_for.add(pak)
 
+    def _pkgname_matches(self, pkgname, match_in):
+        pattern = r'{}\|'.format(pkgname)
+        return re.match(pattern, match_in)
+
     def _get_pkgnames(self, location):
         return [p.split('|')[0] for p in location if p]
 
@@ -131,10 +137,10 @@ class PacmanRepo(RedisHash):
     def _get_pkgver(self, pkgname, location):
         pkgs = self._get_pkgnames(location)
 
-        if pkgname not in location:
+        if pkgname not in pkgs:
             return ''
 
-        pkgver = [p.split('|')[1] for p in location if p and pkgname == p]
+        pkgver = [p.split('|')[1] for p in location if p and self._pkgname_matches(pkgname, p)]
 
         logger.debug(pkgver)
 

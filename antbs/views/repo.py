@@ -31,6 +31,12 @@ from views import *
 repo_view = Blueprint('repo', __name__)
 
 
+###
+##
+#   Utility Functions For This View
+##
+###
+
 def get_repo_packages(repo_name=None, group=None, page=None):
     if repo_name is None or page is None:
         abort(500)

@@ -33,6 +33,12 @@ live_view = Blueprint('live', __name__)
 
 ###
 ##
+#   Utility Functions For This View
+##
+###
+
+###
+##
 #   Views Start Here
 ##
 ###

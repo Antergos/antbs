@@ -129,12 +129,11 @@ in_array() {
 
 
 run_update_repo() {
-	local repo_dir="${1}"
 	print2log "UPDATING ${1} REPO";
 
 	for arc in x86_64 i686; do
 		cd "/${repo_dir}/${arc}"
-		repo-add -R "${repo}.db.tar.gz" ./${PKGNAME}**.xz
+		repo-add -R "${repo}.db.tar.gz" ${PKGNAME}*${_PKGVER}*.xz
 	done && touch "/result/${PKGNAME}" && return 0;
 
 	return 1
@@ -157,13 +156,15 @@ remove_pkg() {
 }
 
 symlink_any() {
-	cd "/${repo_dir}/x86_64"
+	cd "/${repo_dir}/i686"
 
 	for file in "${PKGNAME}"**-any.**.xz; do
 		fname="$(basename ${file})"
+
 		if [[ -f "${file}" ]]; then
-			ln -sfr "${fname}" ../i686/"${fname}"
+			ln -sfr ../x86_64/"${fname}" "${fname}"
 		fi
+
 	done && return 0;
 
 	return 1;
