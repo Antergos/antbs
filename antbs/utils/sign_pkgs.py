@@ -45,21 +45,16 @@ from .logging_config import logger
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'
+PKG_EXT = '.pkg.tar.xz'
 password = status.gpg_password
 gpg_key = status.gpg_key
 
 
 def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
-    """
-    Batch sign several files with the key matching the given UID.
-
-    :param paths:
-    :param uid:
-    :param passphrase:
-    """
     if not isinstance(paths, list):
         logger.error('paths must be a list')
         return False
+
     for path in paths:
         db.publish('build-output', 'Creating detached signature for %s' % path)
         logger.info('[SIGN PKG] Creating detached signature for %s' % path)
@@ -100,27 +95,29 @@ def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
                 remove(p + '.sig')
             return False
 
-    return True
+    return paths
 
 
-def sign_packages(pkg_obj):
-    """
+def get_filepaths_for_generated_pkgs(generated_pkgs):
+    filepaths64 = [
+        os.path.join(status.STAGING_64, p.format('{}{}', p, PKG_EXT))
+        for p in generated_pkgs
+        if 'i686' not in p
+    ]
+    filepaths32 = [
+        os.path.join(status.STAGING_32, p.format('{}{}', p, PKG_EXT))
+        for p in generated_pkgs
+        if 'i686' in p
+    ]
 
-    :param pkgname:
-    :return:
-    """
-    db.publish('build-output', 'Signing package..')
-    staging_64 = '{0}/{1}***.xz'.format(status.STAGING_64, pkg_obj.pkgname)
-    staging_32 = '{0}/{1}***.xz'.format(status.STAGING_32, pkg_obj.pkgname)
-    pkgs2sign = glob.glob(staging_64)
-    pkgs2sign.extend([p for p in glob.glob(staging_32) if '-any.' not in p])
+    return filepaths64 + filepaths32
 
-    if pkg_obj.is_split_package and pkg_obj.split_packages:
-        for split_pkg in pkg_obj.split_packages:
-            staging_64 = '{0}/{1}***.xz'.format(status.STAGING_64, split_pkg)
-            staging_32 = '{0}/{1}***.xz'.format(status.STAGING_32, split_pkg)
-            pkgs2sign.extend(glob.glob(staging_64))
-            pkgs2sign.extend(glob.glob(staging_32))
+
+def sign_packages(pkg_obj, generated_pkgs, bnum=None):
+    pkgs2sign = get_filepaths_for_generated_pkgs(generated_pkgs)
+    bnum = bnum if bnum else ''
+
+    db.publish('live:build_output:{0}'.format(bnum), 'Signing packages..')
 
     logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 

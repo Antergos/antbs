@@ -77,7 +77,7 @@ class TransactionMeta(RedisHash):
             bool=['is_running', 'is_finished'],
             int=['tnum'],
             list=['queue'],
-            set=['packages', 'builds', 'completed', 'failed'],
+            set=['packages', 'builds', 'completed', 'failed', 'generated_pkgs'],
             path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
         ))
 
@@ -445,6 +445,12 @@ class Transaction(TransactionMeta):
 
         return bld_obj
 
+    def get_and_save_generated_packages(self, pkg_obj):
+        generated_pkgs = pkg_obj._pkgbuild.get_generates(self.result_dir)
+
+        for gen_pkg in generated_pkgs:
+            self.generated_pkgs.add(gen_pkg)
+
     def build_package(self, pkg_obj):
         self.building = pkg_obj.name
         own_status = 'Building {0}-{1} with makepkg.'.format(pkg_obj.name,
@@ -510,13 +516,15 @@ class Transaction(TransactionMeta):
 
         stream_process.join()
 
-        packages_signed = False
+        _signed_packages = False
+
         if bld_obj.completed:
             logger.debug('bld_obj.completed!')
-            if sign_packages(pkg_obj):
-                packages_signed = True
+            self.get_and_save_generated_packages(pkg_obj)
 
-        if packages_signed:
+            _signed_packages = sign_packages(pkg_obj, self.generated_pkgs)
+
+        if _signed_packages:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
             tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=4)

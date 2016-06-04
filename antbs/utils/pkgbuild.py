@@ -26,6 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from .logging_config import logger
 from datetime import datetime
 
@@ -185,10 +186,12 @@ class Pkgbuild:
         else:
             yield ' = '
 
+    @staticmethod
+    def get_generates(result_dir):
+        generates = os.listdir(os.path.join(result_dir, 'generates'))
 
+        with open(generates.pop()) as output:
+            contents = output.readlines()
+            pkgs = [p.strip() for p in contents if p]
 
-
-
-
-
-
+        return pkgs

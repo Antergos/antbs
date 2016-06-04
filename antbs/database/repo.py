@@ -265,7 +265,8 @@ class PacmanRepo(RedisHash):
             if int(result) != 0:
                 logger.error('update repo failed. exit status is: %s', result)
             else:
-                doc.remove_container(container, v=True)
+                # doc.remove_container(container, v=True)
+                pass
 
         except Exception as err:
             result = 1
