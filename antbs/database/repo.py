@@ -207,11 +207,8 @@ class PacmanRepo(RedisHash):
 
         return unaccounted_for
 
-    def update_repo(self, bld_obj=False, pkg_obj=False, action=False, review_result=False,
-                    result_dir='/tmp/update_repo_result'):
-
-        if not any([bld_obj, review_result]):
-            raise ValueError('at least one of [bld_obj, is_review] required.')
+    def update_repo(self, review_result=False,
+                    result_dir='/tmp/update_repo_result', pkgs2_add_rm=None):
 
         repodir = 'staging' if 'staging' in self.name else 'main'
         trans_running = status.transactions_running or status.transaction_queue
@@ -232,13 +229,16 @@ class PacmanRepo(RedisHash):
 
         os.mkdir(result_dir, 0o777)
 
-        command = "/makepkg/build.sh"
-        pkgenv = ["_PKGNAME={0}".format(bld_obj.pkgname),
-                  "_PKGVER={0}".format(bld_obj.pkgver),
-                  "_RESULT={0}".format(review_result),
-                  "_UPDREPO=True",
-                  "_REPO={0}".format(self.name),
-                  "_REPO_DIR={0}".format(repodir)]
+        command = ['/makepkg/build.sh']
+        if pkgs2_add_rm:
+            command.extend(pkgs2_add_rm)
+
+        pkgenv = ['_PKGNAME={0}'.format(bld_obj.pkgname),
+                  '_PKGVER={0}'.format(bld_obj.pkgver),
+                  '_RESULT={0}'.format(review_result),
+                  '_UPDREPO=True',
+                  '_REPO={0}'.format(self.name),
+                  '_REPO_DIR={0}'.format(repodir)]
 
         doc_util.do_docker_clean("update_repo")
 

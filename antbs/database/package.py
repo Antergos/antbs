@@ -64,7 +64,7 @@ class PackageMeta(RedisHash):
                     'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
                     'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
                     'pkgver',       'pkgname',        'pkgbuild',       'short_name',
-                    'success_rate', 'url',            'version_str',    'gh_path'],
+                    'success_rate', 'url',            'version_str',    'gh_path', 'filename_str'],
 
             bool=['is_metapkg',   'auto_sum',     'is_split_package', 'is_initialized',
                   'push_version', 'is_monitored', 'saved_commit',     'is_iso'],

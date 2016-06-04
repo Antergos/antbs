@@ -94,30 +94,36 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
     try:
         bld_obj = get_build_object(bnum=bnum)
         pkg_obj = get_pkg_object(name=bld_obj.pkgname)
-        if pkg_obj and bld_obj:
-            if 'main' not in pkg_obj.allowed_in and result == 'passed':
-                msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-                errmsg.update(error=True, msg=msg)
-                return errmsg
-            else:
-                bld_obj.review_dev = dev
-                bld_obj.review_date = dt
-                bld_obj.review_status = result
+
+        if not pkg_obj and not bld_obj:
+            err = 'Cant move packages to main repo without pkg_obj and bld_obj!.'
+            logger.error(err)
+            return dict(error=True, msg=err)
+
+        if 'main' not in pkg_obj.allowed_in and result == 'passed':
+            msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
+            errmsg.update(error=True, msg=msg)
+            return errmsg
+        else:
+            bld_obj.review_dev = dev
+            bld_obj.review_date = dt
+            bld_obj.review_status = result
 
         if result == 'skip':
             errmsg = dict(error=False, msg=None)
             return errmsg
 
-        glob_string_64 = '{0}/**/{1}-***'.format(status.STAGING_64, pkg_obj.pkgname)
-        glob_string_32 = '{0}/**/{1}-***'.format(status.STAGING_32, pkg_obj.pkgname)
+        glob_string_64 = '{0}/**/{1}**'.format(status.STAGING_64, pkg_obj.filename_str)
+        glob_string_32 = '{0}/**/{1}**'.format(status.STAGING_32, pkg_obj.filename_str)
         pkg_files_64 = glob(glob_string_64, recursive=True)
         pkg_files_32 = glob(glob_string_32, recursive=True)
         pkg_files = pkg_files_64 + pkg_files_32
 
         if pkg_obj.is_split_package and pkg_obj.split_packages:
             for split_pkg in pkg_obj.split_packages:
-                glob_string_64 = '{0}/**/{1}-***'.format(status.STAGING_64, split_pkg)
-                glob_string_32 = '{0}/**/{1}-***'.format(status.STAGING_32, split_pkg)
+                fname = pkg_obj.filename_str.replace(pkg_obj.pkgname, split_pkg)
+                glob_string_64 = '{0}/**/{1}**'.format(status.STAGING_64, fname)
+                glob_string_32 = '{0}/**/{1}**'.format(status.STAGING_32, fname)
                 pkg_files.extend(glob(glob_string_64, recursive=True))
                 pkg_files.extend(glob(glob_string_32, recursive=True))
 

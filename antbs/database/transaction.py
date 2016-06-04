@@ -186,6 +186,16 @@ class Transaction(TransactionMeta):
                         pkg_obj.success_rate = success
                         pkg_obj.failure_rate = failure
 
+        if self.completed:
+            for pkg in self.completed:
+                pkg_obj = get_pkg_object(pkg)
+                fnames = [p for p in self.generated_pkgs if p.rsplit('-', 2)[0] == pkg]
+                fname = ''.join(fnames)
+                pkg_obj.filename_str = fname or ''
+
+            pkgs2add = [p for p in self.generated_pkgs if p.rsplit('-', 2)[0] in self.completed]
+            self._staging_repo.update_repo(pkgs2_add_rm=pkgs2add)
+
         self.is_running = False
         self.is_finished = True
         status.transactions_running.remove(self.tnum)
@@ -530,7 +540,6 @@ class Transaction(TransactionMeta):
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
             status.completed.rpush(bld_obj.bnum)
             bld_obj.review_status = 'pending'
-            self._staging_repo.update_repo(bld_obj=bld_obj)
         else:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
             tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
@@ -543,8 +552,7 @@ class Transaction(TransactionMeta):
         self.building = ''
         status.now_building.remove(bld_obj.bnum)
         if own_status == status.current_status:
-            status.current_status = ''
-            if not status.now_building and not self.queue:
+            if not status.now_building and not self.queue and not status.transaction_queue:
                 status.idle = True
 
         if not bld_obj.failed:
