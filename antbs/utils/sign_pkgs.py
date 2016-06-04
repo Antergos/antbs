@@ -113,7 +113,7 @@ def sign_packages(pkg_obj):
     staging_64 = '{0}/{1}***.xz'.format(status.STAGING_64, pkg_obj.pkgname)
     staging_32 = '{0}/{1}***.xz'.format(status.STAGING_32, pkg_obj.pkgname)
     pkgs2sign = glob.glob(staging_64)
-    pkgs2sign.extend(glob.glob(staging_32))
+    pkgs2sign.extend([p for p in glob.glob(staging_32) if '-any.' not in p])
 
     if pkg_obj.is_split_package and pkg_obj.split_packages:
         for split_pkg in pkg_obj.split_packages:
@@ -125,7 +125,6 @@ def sign_packages(pkg_obj):
     logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
 
     if pkgs2sign:
-        pkgs2sign = [p for p in pkgs2sign if '-any.' not in p]
         for pkg in pkgs2sign:
             existing_sig = '{0}.sig'.format(pkg)
 
