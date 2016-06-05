@@ -37,6 +37,7 @@ import os
 import shutil
 
 import requests
+import gevent
 
 import transaction_handler as builder
 from database import package
@@ -318,6 +319,9 @@ class Webhook(WebhookMeta):
                             has_pkgs = True
 
             if has_pkgs:
+                # Allow github's server's time to make the pushed commits available via their API
+                gevent.sleep(10)
+
                 the_pkgs = list(set(no_dups))
                 last_pkg = the_pkgs[-1]
                 html = []

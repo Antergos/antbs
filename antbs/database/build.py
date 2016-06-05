@@ -43,7 +43,8 @@ from utils.utilities import CustomSet, remove
 from utils.sign_pkgs import sign_packages
 
 
-doc = DockerUtils().doc
+doc_util = DockerUtils()
+doc = doc_util.doc
 
 
 class Build(RedisHash):
@@ -97,16 +98,17 @@ class Build(RedisHash):
 
         super().__init__(prefix=prefix, key=the_bnum)
 
-        self.attrib_lists.update(
-                dict(string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
-                             'start_str', 'end_str', 'version_str', 'container', 'review_status',
-                             'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
-                             'repo_container', 'live_output_key', 'last_line_key'],
-                     bool=['failed', 'completed', 'is_iso'],
-                     int=[],
-                     list=['log'],
-                     set=['generated_pkgs'],
-                     path=['build_dir', 'result_dir', '_32build', '_32bit']))
+        self.attrib_lists.update(dict(
+            string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
+                    'start_str', 'end_str', 'version_str', 'container', 'review_status',
+                    'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
+                    'repo_container', 'live_output_key', 'last_line_key'],
+            bool=['failed', 'completed', 'is_iso'],
+            int=[],
+            list=['log'],
+            set=['generated_pkgs'],
+            path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
+        ))
 
         self.__namespaceinit__()
 
@@ -207,7 +209,7 @@ class Build(RedisHash):
         if self.is_iso:
             result = self._build_iso()
         else:
-            result = self._build_package(pkgver)
+            result = self._build_package()
 
         return result
 
@@ -224,7 +226,11 @@ class Build(RedisHash):
         """
 
         self.start_str = self.datetime_to_string(datetime.now())
-        self.version_str = version_str if version_str else self._pkg_obj.version_str
+
+        if version_str:
+            self.version_str = version_str
+        else:
+            self.version_str = self._pkg_obj.version_str
 
         pkg_link = '<a href="{0}">{0}</a>'.format(self._pkg_obj.pkgname)
 
@@ -240,7 +246,7 @@ class Build(RedisHash):
     def save_build_results(self, result):
         if result is True:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
-            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.name, self.version_str)
+            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.pkgname, self.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
 
             self.review_status = 'pending'
@@ -251,7 +257,7 @@ class Build(RedisHash):
 
         else:
             tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
-            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.name, self.version_str)
+            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.pkgname, self.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=5)
 
             self.failed = True
@@ -272,15 +278,15 @@ class Build(RedisHash):
             if gen_pkg:
                 self.generated_pkgs.add(gen_pkg)
 
-    def _build_package(self, pkgver):
-        self.building = self._pkg_obj.name
+    def _build_package(self):
+        self.building = self._pkg_obj.pkgname
         own_status = (
-            'Building {0}-{1} with makepkg.'.format(self._pkg_obj.name, pkgver)
+            'Building {0}-{1} with makepkg.'.format(self.building, self._pkg_obj.version_str)
         )
         status.current_status = own_status
         status.idle = False
 
-        doc.do_docker_clean(self._pkg_obj.name)
+        doc_util.do_docker_clean(self._pkg_obj.pkgname)
 
         build_env = ['_AUTOSUMS=True'] if self._pkg_obj.auto_sum else ['_AUTOSUMS=False']
 
@@ -289,8 +295,8 @@ class Build(RedisHash):
         # else:
         build_env.append('_ALEXPKG=False')
 
-        hconfig = doc.get_host_config('packages', self.build_dir, self.result_dir, self.cache,
-                                      self.cache_i686, self._32build, self._32bit)
+        hconfig = doc_util.get_host_config('packages', self.build_dir, self.result_dir, self.cache,
+                                           self.cache_i686, self._32build, self._32bit)
         container = {}
         try:
             container = doc.create_container("antergos/makepkg",
@@ -300,7 +306,7 @@ class Build(RedisHash):
                                                       '/32build', '/result',
                                                       '/var/cache/pacman_i686'],
                                              environment=build_env, cpuset='0-3',
-                                             name=self._pkg_obj.name, host_config=hconfig)
+                                             name=self._pkg_obj.pkgname, host_config=hconfig)
             if container.get('Warnings', False):
                 logger.error(container.get('Warnings'))
 
@@ -322,10 +328,10 @@ class Build(RedisHash):
             if int(result) != 0:
                 self.failed = True
                 tpl = 'Container %s exited with a non-zero return code. Return code was %s'
-                logger.error(tpl, self._pkg_obj.name, result)
+                logger.error(tpl, self._pkg_obj.pkgname, result)
             else:
                 self.completed = True
-                logger.info('Container %s exited. Return code was %s', self._pkg_obj.name, result)
+                logger.info('Container %s exited. Return code was %s', self._pkg_obj.pkgname, result)
 
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s', err)
@@ -363,38 +369,37 @@ class Build(RedisHash):
         self.save_build_results(False)
         return False
 
-    def _build_iso(self, pkgver):
+    def _build_iso(self):
         # TODO: Rework this, possibly abstract away parts in common with self.build_package()
-        own_status = 'Building {0}-{1} with mkarchiso.'.format(self._pkg_obj.name, pkgver)
+        own_status = 'Building {0}-{1} with mkarchiso.'.format(self._pkg_obj.pkgname,
+                                                               self._pkg_obj.pkgver)
         status.current_status = own_status
         status.iso_building = True
 
-        bld_obj = self.process_and_save_build_metadata(pkgver)
+        bld_obj = self.process_and_save_build_metadata(self._pkg_obj.pkgver)
 
         i686_flag = os.path.join(status.REPO_BASE_DIR, 'iso/testing/.ISO32')
         minimal = os.path.join(status.REPO_BASE_DIR, 'iso/testing/.MINIMAL')
 
-        if 'i686' in self._pkg_obj.name:
+        if 'i686' in self._pkg_obj.pkgname:
             if not os.path.exists(i686_flag):
                 open(i686_flag, 'a').close()
         else:
             if os.path.exists(i686_flag):
                 os.remove(i686_flag)
 
-        if 'minimal' in self._pkg_obj.name:
+        if 'minimal' in self._pkg_obj.pkgname:
             if not os.path.exists(minimal):
                 open(minimal, 'a').close()
         else:
             if os.path.exists(minimal):
                 os.remove(minimal)
 
-        doc.do_docker_clean(self._pkg_obj.name)
+        doc_util.do_docker_clean(self._pkg_obj.pkgname)
 
         in_dir_last = len(
             [name for name in os.listdir(os.path.join(status.REPO_BASE_DIR, 'iso/testing'))]
         )
-
-        doc.do_docker_clean(self._pkg_obj.name)
 
         # Create docker host config dict
         hconfig = doc.create_host_config(
@@ -429,7 +434,7 @@ class Build(RedisHash):
 
         try:
             iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
-                                                 name=self._pkg_obj.name, host_config=hconfig,
+                                                 name=self._pkg_obj.pkgname, host_config=hconfig,
                                                  cpuset='0-3')
             if iso_container.get('Warnings', False):
                 logger.error(iso_container.get('Warnings'))
@@ -467,7 +472,7 @@ class Build(RedisHash):
             if inspect['State'].get('ExitCode', 1) == 1:
                 logger.error(
                     '[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
-                    self._pkg_obj.name,
+                    self._pkg_obj.pkgname,
                     result
                 )
                 self.save_build_results(False)
@@ -476,7 +481,7 @@ class Build(RedisHash):
             else:
                 logger.info(
                     '[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
-                    self._pkg_obj.name,
+                    self._pkg_obj.pkgname,
                     result
                 )
 
@@ -489,7 +494,7 @@ class Build(RedisHash):
 
         if not bld_obj.failed:
             remove('/opt/archlinux-mkarchiso/antergos-iso')
-            doc.do_docker_clean(self._pkg_obj.name)
+            doc_util.do_docker_clean(self._pkg_obj.pkgname)
 
         in_dir = len(
             [name for name in os.listdir(os.path.join(status.REPO_BASE_DIR, 'iso/testing'))]

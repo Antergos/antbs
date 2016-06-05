@@ -45,7 +45,7 @@ from .utilities import Singleton
 doc_user = status.docker_user
 doc_pass = status.docker_password
 
-SRC_DIR = '/opt/antbs/antbs'
+SRC_DIR = status.APP_DIR
 DOC_DIR = os.path.join(SRC_DIR, 'build/docker')
 BUILD_DIR = os.path.join(SRC_DIR, 'build')
 

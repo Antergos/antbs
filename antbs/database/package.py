@@ -143,8 +143,6 @@ class Package(PackageMeta):
             self.determine_github_path()
 
         if fetch_pkgbuild or not self.pkgbuild:
-            # Allow github's server's time to make the pushed commits available via their API
-            gevent.sleep(10)
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
@@ -338,13 +336,13 @@ class Package(PackageMeta):
             elif 'symlink' == gh_path.type:
                 pbpath = os.path.join(
                     self.gh_path.rsplit('/', 1)[0],
-                    gh_path['target'],
+                    gh_path.target,
                     'PKGBUILD'
                 )
 
             self.gh_path = pbpath
 
-        logger.debug(pbpath)
+            logger.debug(pbpath)
 
         pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
 
@@ -400,37 +398,38 @@ class Package(PackageMeta):
             logger.error('commit failed')
             return False
 
-    def get_version(self):
-        # TODO: This is so ugly. Needs rewrite.
-        changed = {'epoch': None, 'pkgrel': None, 'pkgver': None}
+    def get_version_str(self):
+        changed = {'epoch': False, 'pkgrel': False, 'pkgver': False}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
         version_from_tag = self.is_monitored and self.monitored_type in ['releases', 'tags']
+
         if not version_from_tag:
-            for key in ['pkgver', 'pkgrel', 'epoch']:
+            for key in changed:
                 new_val = self.get_from_pkgbuild(key)
 
-                if not new_val:
+                if not new_val or 'None' in new_val:
                     logger.info('unable to get %s from pkgbuild for %s', key, self.pkgname)
 
-                if new_val and (new_val != old_vals[key] or new_val not in self.version_str):
-                    changed[key] = new_val if 'None' != new_val else None
+                elif new_val and (new_val != old_vals[key] or new_val not in self.version_str):
+                    changed[key] = new_val
                     setattr(self, key, new_val)
 
-            if not any([True for k, v in changed.items() if v not in [None, 'None']]):
-                logger.error(changed)
-                logger.error(old_vals)
-                logger.error(self.version_str)
-                return self.version_str
+            has_changes = [True for k in changed if changed[k] is not False]
+            if not has_changes:
+                return self.version_str if 'None' not in self.version_str else self.pkgver
         else:
             changed['pkgver'] = self.monitored_last_result
+
             setattr(self, 'pkgver', changed['pkgver'])
             self.update_pkgbuild_and_push_github('pkgver', old_vals['pkgver'], changed['pkgver'])
-            gevent.sleep(8)
-            self.update_pkgbuild_and_push_github('pkgrel', old_vals['pkgrel'], '1')
+
+            gevent.sleep(5)
+
             setattr(self, 'pkgrel', '1')
+            self.update_pkgbuild_and_push_github('pkgrel', old_vals['pkgrel'], '1')
             changed['pkgrel'] = '1'
 
-        version = changed.get('pkgver', self.pkgver)
+        version = changed['pkgver'] or self.pkgver
 
         if version and 'None' in version:
             raise RuntimeError('None in version!')
@@ -447,10 +446,10 @@ class Package(PackageMeta):
         else:
             version = '{0}-{1}'.format(version, '1')
 
-        if version and len(version) > 2:
+        if version and len(version) > 2 and 'None' not in version:
             setattr(self, 'version_str', version)
         else:
-            version = self.version_str
+            version = self.version_str if 'None' not in self.version_str else self.pkgver
 
         if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
             if not self.db.exists('CNCHI-DEV-OVERRIDE'):

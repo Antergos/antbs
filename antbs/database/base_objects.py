@@ -62,7 +62,12 @@ class RedisObject:
 
     def __eq__(self, other):
         """ Tests if two redis objects are equal (they have the same full_key). """
-        return self.full_key == other.full_key
+        res = False
+
+        if isinstance(other, RedisObject):
+            res = self.full_key == other.full_key
+
+        return res
 
     def __str__(self):
         """ Return this object's full_key as a string. This can be extended by subclasses. """

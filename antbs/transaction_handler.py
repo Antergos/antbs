@@ -102,8 +102,7 @@ def handle_hook():
 
     if status.transaction_queue:
         tnum = status.transaction_queue.lpop()
-        transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue,
-                                       transaction_queue=transaction_queue)
+        transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue)
         transaction.start()
 
     set_server_status(first=False, saved_status=saved_status)

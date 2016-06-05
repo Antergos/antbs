@@ -141,6 +141,18 @@ class PacmanRepo(RedisHash):
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
 
+    def get_pkgs_info_from_pkg_fnames(self, pkg_fnames):
+        pkgs_info = {}
+
+        for pkg_fname in pkg_fnames:
+            pkgname, _pkgver, _arch = pkg_fname.rsplit('-', 2)
+            pkgver = '{}-{}'.format(_pkgver, _arch.partition('.')[0])
+            arch = _arch.partition('.')[-1]
+
+            pkgs_info[pkgname] = {'pkg_fname': pkg_fname, 'pkgver': pkgver, 'arch': arch}
+
+        return pkgs_info
+
     def _get_pkgver(self, pkgname, location):
         pkgs = self._get_pkgnames(location)
 
@@ -149,9 +161,7 @@ class PacmanRepo(RedisHash):
 
         pkgver = [p.split('|')[1] for p in location if p and self._pkgname_matches(pkgname, p)]
 
-        logger.debug(pkgver)
-
-        return pkgver[0] or ''
+        return pkgver[0] if pkgver else ''
 
     def get_pkgver_alpm(self, pkgname):
         return self._get_pkgver(pkgname, self.pkgs_alpm)
@@ -218,19 +228,50 @@ class PacmanRepo(RedisHash):
 
     def _do_update_repo(self, pkg_fnames, is_review=False, review_result=None):
         pkg_fnames = list(pkg_fnames)
+        action = 'add'
 
         self.sync_repo_packages_data()
 
         for pkg_fname in pkg_fnames:
             if pkg_fname and not is_review:
-                self._add_or_remove_package_alpm_database(pkg_fname, 'add')
+                self._add_or_remove_package_alpm_database(pkg_fname, action)
 
             elif pkg_fname and is_review and review_result is not None:
                 action = 'add' if 'passed' == review_result else 'remove'
 
                 self._add_or_remove_package_alpm_database(pkg_fname, action)
 
-        self._post_update_sanity_check(pkg_fnames)
+        self._post_update_sanity_check(pkg_fnames, action)
+
+    def _post_update_sanity_check(self, pkg_fnames, action):
+        pkgs_info = self.get_pkgs_info_from_pkg_fnames(pkg_fnames)
+        all_okay = []
+
+        self.sync_repo_packages_data()
+
+        for pkgname, pkg_info in pkgs_info:
+            has_pkg_alpm = self.has_package_alpm(pkgname)
+            has_pkg_fs = self.has_package_filesystem(pkgname)
+
+            if 'add' == action:
+                pkgver_alpm_match = self.get_pkgver_alpm(pkgname) == pkg_info['pkgver']
+                pkgver_fs_match = self.get_pkgver_filesystem(pkgname) == pkg_info['pkgver']
+
+                if all([has_pkg_alpm, pkgver_alpm_match, has_pkg_fs, pkgver_fs_match]):
+                    all_okay.append(True)
+                else:
+                    all_okay.append(False)
+
+            elif 'remove' == action:
+                if not any([has_pkg_alpm, has_pkg_fs]):
+                    all_okay.append(True)
+                else:
+                    all_okay.append(False)
+
+            if not all(all_okay):
+                logger.error(
+                    'Post repo update sanity check failed! {}'.format(all_okay)
+                )
 
     def _handle_pkg_review_passed(pkg_fname):
         raise NotImplementedError()
@@ -240,11 +281,13 @@ class PacmanRepo(RedisHash):
         success = False
 
         try:
-            res = subprocess.check_output(cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+            res = subprocess.check_output(
+                cmd, stderr=subprocess.STDOUT, universal_newlines=True, cwd=cwd
+            )
             success = True
         except subprocess.CalledProcessError as err:
-            logger.error(err)
-            res = err
+            logger.error((err.output, err.stderr))
+            res = err.output
 
         return success, res
 

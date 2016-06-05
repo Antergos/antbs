@@ -55,7 +55,7 @@ class TransactionMeta(RedisHash):
     """
 
     def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', namespace='antbs',
-                 prefix='trans', repo_queue=None, transaction_queue=None):
+                 prefix='trans', repo_queue=None):
         if not packages and not tnum:
             raise ValueError('At least one of [packages, tnum] required.')
         elif packages and tnum:
@@ -79,7 +79,6 @@ class TransactionMeta(RedisHash):
         self.__namespaceinit__()
 
         self._repo_queue = repo_queue
-        self._transaction_queue = transaction_queue
         self._internal_deps = []
         self._build_dirpaths = {}
         self._pkgvers = {}
@@ -152,7 +151,6 @@ class Transaction(TransactionMeta):
         PacmanPackageCache().maybe_do_cache_cleanup()
 
         if self.queue:
-            self._maybe_split_into_two_transactions()
             while self.queue:
                 pkg = self.queue.lpop()
                 pbpath = self.get_package_build_directory(pkg)
@@ -204,26 +202,6 @@ class Transaction(TransactionMeta):
         status.transactions_running.remove(self.tnum)
 
         remove(self.path)
-
-    def _maybe_split_into_two_transactions(self):
-        if len(self.queue) > 8:
-            # part1 = self.queue[:len(self.queue) // 2]
-            # part2 = self.queue[len(self.queue) // 2:]
-            no_internal_deps = [p[0] for p in self._internal_deps if not p[1]]
-            logger.debug(no_internal_deps)
-
-            if no_internal_deps:
-                for pkg in no_internal_deps:
-                    self.queue.remove(pkg)
-
-                other_transaction = Transaction(
-                    no_internal_deps,
-                    self._repo_queue,
-                    self._transaction_queue
-                )
-
-                status.transaction_queue.append(other_transaction.tnum)
-                self._transaction_queue.enqueue_call('transaction_handler.handle_hook')
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix='{0}_'.format(str(self.tnum)), dir=self.base_path)
@@ -303,7 +281,7 @@ class Transaction(TransactionMeta):
                 raise RuntimeError('pbpath cannot be None.')
 
             pkg_obj = get_pkg_object(name=pkg)
-            version = pkg_obj.get_version()
+            version = pkg_obj.get_version_str()
 
             if not version:
                 self.packages.remove(pkg)
@@ -459,7 +437,7 @@ class Transaction(TransactionMeta):
             logger.error(err)
 
 
-def get_trans_object(packages=None, tnum=None, repo_queue=None, transaction_queue=None):
+def get_trans_object(packages=None, tnum=None, repo_queue=None):
     """
     Gets an existing transaction or creates a new one.
 
@@ -479,7 +457,6 @@ def get_trans_object(packages=None, tnum=None, repo_queue=None, transaction_queu
     elif all([packages, tnum]):
         raise ValueError('Only one of [packages, tnum] can be given, not both.')
 
-    trans_obj = Transaction(packages=packages, tnum=tnum, repo_queue=repo_queue,
-                            transaction_queue=transaction_queue)
+    trans_obj = Transaction(packages=packages, tnum=tnum, repo_queue=repo_queue)
 
     return trans_obj

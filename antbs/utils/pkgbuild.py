@@ -134,7 +134,7 @@ class Pkgbuild:
 
     def process_string_value(self):
         val = self.current_value.strip("'\"")
-        self.values[self.current_key] = val or ''
+        self.values[self.current_key] = val if 'None' not in val else ''
 
     def process_list_value(self):
         self.in_array_check()
@@ -156,7 +156,7 @@ class Pkgbuild:
 
     def maybe_fix_pkgver(self):
         if 'pkgver' not in self.values:
-            self.values['pkgver'] = self.get_value('pkgver')
+            self.get_value('pkgver')
             logger.debug(self.values['pkgver'])
         if '$' not in self.values['pkgver']:
             logger.debug(self.values['pkgver'])
@@ -169,7 +169,7 @@ class Pkgbuild:
         elif 'date' in self.values['pkgver']:
             pkgver = datetime.now().strftime('%Y.%m.%d')
         else:
-            pkgver = self.values['pkgver']
+            pkgver = self.values['pkgver'] if 'None' not in self.values['pkgver'] else ''
 
         self.values['pkgver'] = pkgver
 

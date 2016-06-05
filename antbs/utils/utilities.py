@@ -73,11 +73,12 @@ class PacmanPackageCache(metaclass=Singleton):
             while self.doing_cache_cleanup:
                 if waiting > 300:
                     break
-                gevent.sleep(2)
-                waiting += 2
+                gevent.sleep(5)
+                waiting += 5
             return
 
         self.doing_cache_cleanup = True
+
         for cache_dir in self.all_caches:
             if not os.path.exists(cache_dir):
                 os.mkdir(cache_dir, mode=0o777)
@@ -88,13 +89,14 @@ class PacmanPackageCache(metaclass=Singleton):
                         try:
                             pkg, version, rel, suffix = pkg_file.rsplit('-', 3)
                         except ValueError:
+                            logging.error('value error for %s', pkg_file)
                             continue
                         # Use globbing to check for multiple versions of the package.
-                        all_versions = glob.glob('{0}/{1}**.xz'.format(cache_dir, pkg))
+                        all_versions = glob.glob('{0}/{1}***.xz'.format(cache_dir, pkg))
                         if pkg in already_checked:
                             # We've already handled all versions of this package.
                             continue
-                        elif len(all_versions) <= 1:
+                        elif len(all_versions) < 2:
                             # There is only one version of the package in this cache dir, keep it.
                             already_checked.append(pkg)
                             continue
@@ -102,6 +104,8 @@ class PacmanPackageCache(metaclass=Singleton):
                             # There are multiple versions of the package. Determine the latest.
                             newest = max(glob.iglob('{0}/{1}**.xz'.format(cache_dir, pkg)),
                                          key=os.path.getctime)
+                            logging.debug(newest)
+                            logging.debug(all_versions)
                             for package_file in all_versions:
                                 if package_file != newest:
                                     # This file is not the newest. Remove it.
