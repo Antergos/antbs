@@ -143,6 +143,8 @@ class Package(PackageMeta):
             self.determine_github_path()
 
         if fetch_pkgbuild or not self.pkgbuild:
+            # Allow github's server's time to make the pushed commits available via their API
+            gevent.sleep(10)
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
@@ -333,7 +335,7 @@ class Package(PackageMeta):
 
             if isinstance(gh_path, UnprocessableResponseBody):
                 pbpath = '{0}/PKGBUILD'.format(self.gh_path)
-            elif 'symlink' == gh_path['type']:
+            elif 'symlink' == gh_path.type:
                 pbpath = os.path.join(
                     self.gh_path.rsplit('/', 1)[0],
                     gh_path['target'],
@@ -500,6 +502,9 @@ class Package(PackageMeta):
     def sync_database_with_pkgbuild(self):
         if not self.pkgver:
             self.pkgver = self.get_from_pkgbuild('pkgver')
+
+        if 'None' in self.version_str:
+            self.version_str = self.pkgver
 
         if not self.pkgdesc or not self.description:
             self.pkgdesc = self.get_from_pkgbuild('pkgdesc')

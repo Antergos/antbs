@@ -188,14 +188,16 @@ class PacmanRepo(RedisHash):
         repodir = os.path.join(self.path, 'x86_64')
         dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
 
-        with tarfile.open(dbfile, 'r') as pacman_db:
-            for pkg in pacman_db.getnames():
-                pkg = pkg.split('/', 1)[0]
-                pkgname, ver, rel = pkg.rsplit('-', 2)
+        try:
+            with tarfile.open(dbfile, 'r') as pacman_db:
+                for pkg in pacman_db.getnames():
+                    pkg = pkg.split('/', 1)[0]
+                    pkgname, ver, rel = pkg.rsplit('-', 2)
 
-                self.pkgs_alpm.add('{0}|{1}-{2}'.format(pkgname, ver, rel))
-
-        self.pkg_count_alpm = len(self.pkgs_alpm)
+                    self.pkgs_alpm.add('{0}|{1}-{2}'.format(pkgname, ver, rel))
+                    self.pkg_count_alpm = len(self.pkgs_alpm)
+        except Exception as err:
+            logger.error(err)
 
     def get_repo_packages_unaccounted_for(self):
         unaccounted_for = []

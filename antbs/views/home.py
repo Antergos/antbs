@@ -29,6 +29,8 @@
 from views import *
 
 home_view = Blueprint('home', __name__)
+main_repo = get_repo_object('antergos')
+staging_repo = get_repo_object('antergos-staging')
 
 
 ###
@@ -62,6 +64,13 @@ def get_timeline(tlpage=None):
     return this_page, all_pages
 
 
+def get_number_of_packages_in_repo(repo_name):
+    global main_repo, staging_repo
+
+    return len(main_repo.packages) if 'antergos' == repo_name else len(staging_repo.packages)
+
+
+
 ###
 ##
 #   Views Start Here
@@ -81,11 +90,15 @@ def homepage(tlpage=None):
         abort(404)
 
     build_history, timestamps = get_build_history_chart_data()
-    stats = {'build_queue': len(get_build_queue())}
+    stats = {
+        'build_queue': len(get_build_queue()),
+        'repo_main': get_number_of_packages_in_repo('antergos'),
+        'repo_staging': get_number_of_packages_in_repo('antergos-staging')
+    }
 
     for stat in check_stats:
         builds = getattr(status, stat)
-        res = len(builds) or 0
+        res = len(builds) or '0'
         builds = [x for x in builds[1000:-1] if x]
         within = []
         for bnum in builds:
@@ -103,29 +116,6 @@ def homepage(tlpage=None):
                 within.append(bld_obj.bnum)
 
         stats[stat] = len(within)
-
-    main_tpl = '{0}/*.pkg.tar.xz'.format(status.MAIN_64)
-    staging_tpl = '{0}/*.pkg.tar.xz'.format(status.STAGING_64)
-    main_repo = glob(main_tpl)
-    staging_repo = glob(staging_tpl)
-
-    for repo in [main_repo, staging_repo]:
-        if not repo:
-            continue
-
-        filtered = []
-
-        if '-staging' not in repo[0]:
-            repo_name = 'repo_main'
-        else:
-            repo_name = 'repo_staging'
-
-        for file_path in repo:
-            fname = os.path.basename(file_path)
-            if 'dummy-package' not in fname:
-                filtered.append(fname)
-
-        stats[repo_name] = len(set(filtered))
 
     return try_render_template("overview.html", stats=stats, tl_events=tl_events,
                                all_pages=all_pages, page=tlpage, build_history=build_history,
