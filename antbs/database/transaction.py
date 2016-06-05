@@ -20,24 +20,19 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-
-import datetime
 import os
 import shutil
 import subprocess
 import tempfile
-import time
-from multiprocessing import Process
 
 import utils.docker_util as docker_util
 from utils.logging_config import logger
-from utils.sign_pkgs import sign_packages
-from utils.utilities import CustomSet, PacmanPackageCache, remove
+from utils.utilities import PacmanPackageCache, remove
 
-from .base_objects import RedisHash, db
+from .base_objects import RedisHash
 from .build import get_build_object
 from .package import get_pkg_object
-from .server_status import get_timeline_object, status
+from .server_status import status
 from .repo import get_repo_object
 
 doc_util = docker_util.DockerUtils()
@@ -142,49 +137,64 @@ class Transaction(TransactionMeta):
             raise AttributeError('_repo_queue is required to start a transaction.')
 
         status.current_status = 'Initializing build transaction.'
-        status.transactions_running.append(self.tnum)
         self.is_running = True
+
+        status.transactions_running.append(self.tnum)
         self.setup_transaction_directory()
+
         status.current_status = 'Processing packages.'
+
         self.process_packages()
+
         status.current_status = 'Cleaning pacman package cache.'
+
         PacmanPackageCache().maybe_do_cache_cleanup()
 
         if self.queue:
             while self.queue:
                 pkg = self.queue.lpop()
-                is_iso = False
                 pbpath = self.get_package_build_directory(pkg)
 
                 if not pbpath:
                     raise RuntimeError('pbpath cannot be None.')
 
                 pkg_obj = get_pkg_object(name=pkg)
+                bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum)
 
-                for partial in ['i686', 'x86_64']:
-                    if partial in pkg:
-                        is_iso = True
-                        pkg_obj.is_iso = True
-                        break
-
-                if is_iso:
-                    result = self.build_iso(pkg_obj)
+                if pkg_obj.is_iso:
+                    self.fetch_and_compile_translations(
+                        translations_for=["cnchi_updater", "antergos-gfxboot"]
+                    )
+                    result = bld_obj.start(pkg_obj)
                 else:
-                    result = self.build_package(pkg_obj)
+                    bld_obj = self.setup_package_build_directory(bld_obj, pbpath)
+                    result = bld_obj.start(pkg_obj)
 
                 if result in [True, False]:
                     blds = pkg_obj.builds
                     total = len(blds)
+
                     if total > 0:
                         success = len([x for x in blds if x in status.completed])
                         failure = len([x for x in blds if x in status.failed])
+
                         if success > 0:
                             success = 100 * success / total
+
                         if failure > 0:
                             failure = 100 * failure / total
 
                         pkg_obj.success_rate = success
                         pkg_obj.failure_rate = failure
+
+                    if result is True:
+                        if not pkg_obj.is_iso:
+                            self._staging_repo.update_repo(bld_obj.generated_pkgs)
+
+                        self.completed.append(bld_obj.bnum)
+
+                    elif result is False:
+                        self.failed.append(bld_obj.bnum)
 
         self.is_running = False
         self.is_finished = True
@@ -220,18 +230,26 @@ class Transaction(TransactionMeta):
 
         return pbpath
 
-    def setup_package_build_directory(self, pkg):
-        build_dir = self.get_package_build_directory(pkg)
-        self._build_dirpaths[pkg].update({
+    def setup_package_build_directory(self, bld_obj, build_dir):
+
+        self._build_dirpaths[bld_obj.pkgname].update({
             'build_dir': build_dir,
             '32bit': os.path.join(build_dir, '32bit'),
             '32build': os.path.join(build_dir, '32build'),
-            'result': os.path.join(self.result_dir, pkg)
+            'result': os.path.join(self.result_dir, bld_obj.pkgname)
         })
-        for bdir, path in self._build_dirpaths[pkg].items():
+
+        for bdir, path in self._build_dirpaths[bld_obj.pkgname].items():
             logger.debug(path)
             if not os.path.exists(path):
                 os.mkdir(path, mode=0o777)
+
+        bld_obj.build_dir = self._build_dirpaths[bld_obj.pkgname]['build_dir']
+        bld_obj._32bit = self._build_dirpaths[bld_obj.pkgname]['32bit']
+        bld_obj._32build = self._build_dirpaths[bld_obj.pkgname]['32build']
+        bld_obj.result_dir = self._build_dirpaths[bld_obj.pkgname]['result']
+
+        return bld_obj
 
     def handle_special_cases(self, pkg, pkg_obj):
         if 'cnchi' in pkg:
@@ -287,7 +305,6 @@ class Transaction(TransactionMeta):
 
             self.handle_special_cases(pkg, pkg_obj)
 
-        pkg = None
         status.current_status = 'Using package dependencies to determine build order.'
         if self._internal_deps:
             for name in self.determine_build_order(self._internal_deps):
@@ -417,48 +434,6 @@ class Transaction(TransactionMeta):
                 emitted = next_emitted
         except ValueError as err:
             logger.error(err)
-
-    def process_and_save_build_metadata(self, pkg_obj, version_str=None):
-        """
-        Creates a new build for a package, initializes the build data, and returns a build object.
-
-        Args:
-            pkg_obj (Package): Package object for the package being built.
-
-        Returns:
-            Build: A build object.
-
-        """
-
-        bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum)
-        bld_obj.start_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-        bld_obj.version_str = version_str if version_str else pkg_obj.version_str
-
-        pkg_link = '<a href="{0}">{0}</a>'.format(pkg_obj.pkgname)
-        tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> started.'
-        tlmsg = tpl.format(bld_obj.bnum, pkg_link, bld_obj.version_str)
-
-        get_timeline_object(msg=tlmsg, tl_type=3, ret=False)
-
-        pkg_obj.builds.append(bld_obj.bnum)
-        self.builds.add(bld_obj.bnum)
-        status.now_building.append(bld_obj.bnum)
-
-        return bld_obj
-
-    def get_and_save_generated_packages(self, pkg_obj, result_dir):
-        try:
-            generated_pkgs = pkg_obj._pkgbuild.get_generates(result_dir)
-        except AttributeError:
-            pkg_obj.setup_pkgbuild_parser()
-            generated_pkgs = pkg_obj._pkgbuild.get_generates(result_dir)
-
-        for gen_pkg in generated_pkgs:
-            self.generated_pkgs.add(gen_pkg)
-
-
-
-
 
 
 def get_trans_object(packages=None, tnum=None, repo_queue=None):

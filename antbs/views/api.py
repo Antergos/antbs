@@ -109,7 +109,7 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
             bld_obj.review_date = dt
             bld_obj.review_status = result
 
-        if result == 'skip':
+        if result == 'skip' or 'mate' in pkg_obj.groups:
             errmsg = dict(error=False, msg=None)
             return errmsg
 
