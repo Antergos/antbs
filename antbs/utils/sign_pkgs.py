@@ -3,7 +3,7 @@
 #
 # sign_pkgs.py
 #
-# Copyright © 2014-2015 Antergos
+# Copyright © 2014-2016 Antergos
 #
 # The code in this module was originally written by Xyne (Arch Linux TU)
 # and was modified to suit the needs of this application.
@@ -50,17 +50,22 @@ password = status.gpg_password
 gpg_key = status.gpg_key
 
 
-def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
+def batch_sign(paths, bnum='', uid=gpg_key, passphrase=password, is_iso=False):
     if not isinstance(paths, list):
         logger.error('paths must be a list')
         return False
 
     for path in paths:
-        db.publish('build-output', 'Creating detached signature for %s' % path)
         logger.info('[SIGN PKG] Creating detached signature for %s' % path)
+        db.publish(
+            'live:build_output:{0}'.format(bnum),
+            'Creating detached signature for %s' % path
+        )
+
         # Verify existing signatures. This fails if the sig is invalid or
         # non-existent. Either way a new one will be needed.
         cmd = [GPG_BIN, '--verify', path + SIG_EXT]
+
         with open(os.devnull, 'w') as f:
             p = subprocess.Popen(cmd, stdout=f, stderr=f)
             e = p.wait()
@@ -68,44 +73,63 @@ def batch_sign(paths, uid=gpg_key, passphrase=password, is_iso=False):
                 continue
 
         sigpath = path + '.sig'
+
         try:
             os.remove(sigpath)
         except OSError:
             pass
 
-        db.publish('build-output', 'Signing %s' % path)
-        logger.info('[SIGN PKG] Signing %s' % path)
         if not passphrase:
             return False
+
         cmd = [GPG_BIN, '-sbu', 'Antergos', '--batch', '--passphrase-fd', '0', path]
-        p = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+
         out, err = p.communicate(passphrase.encode('UTF-8'))
+
         if len(out) > 0:
-            db.publish('build-output', 'GPG OUTPUT is: {0}'.format(out.decode('UTF-8')))
             logger.info('GPG OUTPUT is: {0}'.format(out.decode('UTF-8')))
+            db.publish(
+                'live:build_output:{0}'.format(bnum),
+                'GPG OUTPUT is: {0}'.format(out.decode('UTF-8'))
+            )
+
         if len(err) > 0:
             db.publish(
-                'build-output', 'Signing FAILED for {0}. Error output: {1}'.format(path, err.decode('UTF-8')))
-            logger.error('[SIGN PKG] Signing FAILED for {0}. Error output: {1}'.format(
-                path, err.decode('UTF-8')))
+                'live:build_output:{0}'.format(bnum),
+                'Signing FAILED for {0}. Error output: {1}'.format(path, err.decode('UTF-8'))
+            )
+            logger.error(
+                '[SIGN PKG] Signing FAILED for {0}. Error output: {1}'.format(
+                    path,
+                    err.decode('UTF-8')
+                )
+            )
+
             paths = [p for p in paths if not os.path.isdir(p) and not is_iso]
+
             for p in paths:
                 remove(p)
                 remove(p + '.sig')
+
             return False
 
-    return paths
+    return True
 
 
 def get_filepaths_for_generated_pkgs(generated_pkgs):
     filepaths64 = [
-        os.path.join(status.STAGING_64, p.format('{}{}', p, PKG_EXT))
+        os.path.join(status.STAGING_64, '{}{}'.format(p, PKG_EXT))
         for p in generated_pkgs
         if 'i686' not in p
     ]
     filepaths32 = [
-        os.path.join(status.STAGING_32, p.format('{}{}', p, PKG_EXT))
+        os.path.join(status.STAGING_32, '{}{}'.format(p, PKG_EXT))
         for p in generated_pkgs
         if 'i686' in p
     ]
@@ -113,9 +137,8 @@ def get_filepaths_for_generated_pkgs(generated_pkgs):
     return filepaths64 + filepaths32
 
 
-def sign_packages(pkg_obj, generated_pkgs, bnum=None):
+def sign_packages(pkg_obj, generated_pkgs, bnum=''):
     pkgs2sign = get_filepaths_for_generated_pkgs(generated_pkgs)
-    bnum = bnum if bnum else ''
 
     db.publish('live:build_output:{0}'.format(bnum), 'Signing packages..')
 
@@ -128,6 +151,6 @@ def sign_packages(pkg_obj, generated_pkgs, bnum=None):
             if os.path.exists(existing_sig):
                 remove(existing_sig)
 
-        return batch_sign(pkgs2sign)
+        return batch_sign(pkgs2sign, bnum)
 
     return False

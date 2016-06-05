@@ -188,9 +188,9 @@ class Pkgbuild:
 
     @staticmethod
     def get_generates(result_dir):
-        generates = os.listdir(os.path.join(result_dir, 'generates'))
+        generates = os.path.join(result_dir, 'generates')
 
-        with open(generates.pop()) as output:
+        with open(generates, 'r') as output:
             contents = output.readlines()
             pkgs = [p.strip() for p in contents if p]
 

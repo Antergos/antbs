@@ -210,6 +210,10 @@ class Package(PackageMeta):
 
         return split_pkgs
 
+    def setup_pkgbuild_parser(self):
+        self._pkgbuild = Pkgbuild(self.pkgbuild)
+        self._pkgbuild.parse_contents()
+
     def get_from_pkgbuild(self, var):
         """
         Get a variable from this package's PKGBUILD (which is stored in antergos-packages gh repo).
@@ -229,8 +233,7 @@ class Package(PackageMeta):
             return val
 
         if not self._pkgbuild:
-            self._pkgbuild = Pkgbuild(self.pkgbuild)
-            self._pkgbuild.parse_contents()
+            self.setup_pkgbuild_parser()
 
         if var not in self._pkgbuild.values:
             logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
@@ -316,7 +319,7 @@ class Package(PackageMeta):
         return gh, repo
 
     def fetch_pkgbuild_from_github(self):
-        logger.debug('fetch_pkgbuild_from_github!')
+        logger.debug('fetch_pkgbuild_from_github! %s', self.pkgname)
         gh, repo = self.get_github_api_client()
         pbpath = None
         target_path = None
@@ -408,10 +411,13 @@ class Package(PackageMeta):
                     logger.info('unable to get %s from pkgbuild for %s', key, self.pkgname)
 
                 if new_val and (new_val != old_vals[key] or new_val not in self.version_str):
-                    changed[key] = new_val
+                    changed[key] = new_val if 'None' != new_val else None
                     setattr(self, key, new_val)
 
-            if not any([True for x in changed if changed[x] not in [None, 'None']]):
+            if not any([True for k, v in changed.items() if v not in [None, 'None']]):
+                logger.error(changed)
+                logger.error(old_vals)
+                logger.error(self.version_str)
                 return self.version_str
         else:
             changed['pkgver'] = self.monitored_last_result
@@ -423,6 +429,9 @@ class Package(PackageMeta):
             changed['pkgrel'] = '1'
 
         version = changed.get('pkgver', self.pkgver)
+
+        if version and 'None' in version:
+            raise RuntimeError('None in version!')
 
         if changed['epoch']:
             version = '{0}:{1}'.format(changed['epoch'], version)

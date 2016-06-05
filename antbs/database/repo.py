@@ -31,6 +31,7 @@ import os
 import tarfile
 import gevent
 from multiprocessing import Process
+import subprocess
 
 import re
 
@@ -42,6 +43,9 @@ import utils.docker_util as docker_util
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
+PKG_EXT = '.pkg.tar.xz'
+SIG_EXT = '.sig'
+SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
 
 
 class PacmanRepo(RedisHash):
@@ -96,6 +100,9 @@ class PacmanRepo(RedisHash):
             self.path = os.path.join(path, name)
             status.repos.add(name)
 
+        self.sync_repo_packages_data()
+
+    def sync_repo_packages_data(self):
         self.save_repo_state_alpm()
         self.save_repo_state_filesystem()
         self.setup_packages_manifest()
@@ -207,10 +214,77 @@ class PacmanRepo(RedisHash):
 
         return unaccounted_for
 
-    def update_repo(self, review_result=False,
-                    result_dir='/tmp/update_repo_result', pkgs2_add_rm=None):
+    def _do_update_repo(self, pkg_fnames, is_review=False, review_result=None):
+        pkg_fnames = list(pkg_fnames)
 
-        repodir = 'staging' if 'staging' in self.name else 'main'
+        self.sync_repo_packages_data()
+
+        for pkg_fname in pkg_fnames:
+            if pkg_fname and not is_review:
+                self._add_or_remove_package_alpm_database(pkg_fname, 'add')
+
+            elif pkg_fname and is_review and review_result is not None:
+                action = 'add' if 'passed' == review_result else 'remove'
+
+                self._add_or_remove_package_alpm_database(pkg_fname, action)
+
+        self._post_update_sanity_check(pkg_fnames)
+
+    def _handle_pkg_review_passed(pkg_fname):
+        raise NotImplementedError()
+
+    def _try_run_command(self, cmd, cwd):
+        res = None
+        success = False
+
+        try:
+            res = subprocess.check_output(cmd, stderr=subprocess.STDOUT, universal_newlines=True)
+            success = True
+        except subprocess.CalledProcessError as err:
+            logger.error(err)
+            res = err
+
+        return success, res
+
+    def _add_or_remove_package_alpm_database(self, pkg_fname, action):
+        package_file = '{}{}'.format(pkg_fname, PKG_EXT)
+        arch = 'x86_64' if 'i686' not in pkg_fname else 'i686'
+        cwd = os.path.join(self.path, arch)
+        action = 'repo-{}'.format(action)
+        cmd = [os.path.join(SCRIPTS_DIR, action)]
+
+        if 'add' == action:
+            cmd.append('-R')
+
+        cmd.extend([
+            '{}.db.tar.gz'.format(self.name),
+            package_file
+        ])
+
+        success, res = self._try_run_command(cmd, cwd)
+        lock_not_aquired = 'Failed to acquire lockfile'
+        waiting = 0
+
+        if not success and lock_not_aquired in res:
+            logger.warning(res)
+            while not success and lock_not_aquired in res:
+                waiting += 10
+                gevent.sleep(10)
+                success, res = self._try_run_command(cmd, cwd)
+
+                if waiting > 300:
+                    logger.error('repo-add script timed out!')
+                    break
+
+        if not success:
+            logger.error(
+                '%s package command on alpm database failed for %s! Output was: %s',
+                action,
+                pkg_fname,
+                res
+            )
+
+    def update_repo(self, pkg_fnames, is_review=False, review_result=None):
         trans_running = status.transactions_running or status.transaction_queue
         building_saved = False
         excluded = ['Updating antergos repo database.',
@@ -222,64 +296,19 @@ class PacmanRepo(RedisHash):
         elif status.idle:
             status.idle = False
 
-        status.current_status = excluded[0] if 'main' == repodir else excluded[1]
+        msg = excluded[0] if 'antergos' == self.name else excluded[1]
+        status.current_status = msg
 
-        if os.path.exists(result_dir):
-            remove(result_dir)
+        self._do_update_repo(pkg_fnames, is_review, review_result)
 
-        os.mkdir(result_dir, 0o777)
+        trans_running = status.transactions_running or status.transaction_queue
 
-        command = ['/makepkg/build.sh']
-        if pkgs2_add_rm:
-            command.extend(pkgs2_add_rm)
+        if building_saved and not status.idle and status.current_status == msg:
+            status.current_status = building_saved
 
-        pkgenv = ['_PKGNAME={0}'.format(bld_obj.pkgname),
-                  '_PKGVER={0}'.format(bld_obj.pkgver),
-                  '_RESULT={0}'.format(review_result),
-                  '_UPDREPO=True',
-                  '_REPO={0}'.format(self.name),
-                  '_REPO_DIR={0}'.format(repodir)]
-
-        doc_util.do_docker_clean("update_repo")
-
-        hconfig = doc_util.get_host_config('repo_update', result_dir)
-        volumes = ['/makepkg', '/root/.gnupg', '/main', '/result', '/staging']
-
-        try:
-            container = doc.create_container("antergos/makepkg", command=command,
-                                             name="update_repo", environment=pkgenv,
-                                             volumes=volumes, host_config=hconfig)
-
-            cont = container.get('Id')
-            bld_obj.repo_container = cont
-            doc.start(cont)
-            if not review_result:
-                stream_process = Process(target=bld_obj.publish_build_output,
-                                         kwargs=dict(upd_repo=True))
-                stream_process.start()
-
-            result = doc.wait(cont)
-            if not review_result:
-                stream_process.join()
-
-            if int(result) != 0:
-                logger.error('update repo failed. exit status is: %s', result)
-            else:
-                # doc.remove_container(container, v=True)
-                pass
-
-        except Exception as err:
-            result = 1
-            logger.error('Start container failed. Error Msg: %s' % err)
-
-        if not status.idle:
-            if building_saved:
-                status.current_status = building_saved
-            elif not status.transactions_running and not status.now_building:
-                status.idle = True
-                status.current_status = 'Idle.'
-
-        return result == 0
+        elif status.idle and not trans_running and not status.now_building:
+            status.idle = True
+            status.current_status = 'Idle.'
 
 
 class AntergosRepo(PacmanRepo, metaclass=Singleton):

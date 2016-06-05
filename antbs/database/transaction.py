@@ -186,16 +186,6 @@ class Transaction(TransactionMeta):
                         pkg_obj.success_rate = success
                         pkg_obj.failure_rate = failure
 
-        if self.completed:
-            for pkg in self.completed:
-                pkg_obj = get_pkg_object(pkg)
-                fnames = [p for p in self.generated_pkgs if p.rsplit('-', 2)[0] == pkg]
-                fname = ''.join(fnames)
-                pkg_obj.filename_str = fname or ''
-
-            pkgs2add = [p for p in self.generated_pkgs if p.rsplit('-', 2)[0] in self.completed]
-            self._staging_repo.update_repo(pkgs2_add_rm=pkgs2add)
-
         self.is_running = False
         self.is_finished = True
         status.transactions_running.remove(self.tnum)
@@ -235,10 +225,11 @@ class Transaction(TransactionMeta):
         self._build_dirpaths[pkg].update({
             'build_dir': build_dir,
             '32bit': os.path.join(build_dir, '32bit'),
-            '32build': os.path.join(build_dir, '32build')
+            '32build': os.path.join(build_dir, '32build'),
+            'result': os.path.join(self.result_dir, pkg)
         })
         for bdir, path in self._build_dirpaths[pkg].items():
-            logger.debug(bdir)
+            logger.debug(path)
             if not os.path.exists(path):
                 os.mkdir(path, mode=0o777)
 
@@ -413,7 +404,7 @@ class Transaction(TransactionMeta):
 
                 if not next_emitted:
                     # all entries have unmet deps, one of two things is wrong...
-                    logger.error("cyclic or missing dependancy detected: %r", next_pending)
+                    logger.error('cyclic or missing dependancy detected: %r', next_pending)
                     names = [n for n, d in source]
                     deps = [d for n, d in source]
                     missing = [m for d in deps for m in d if m not in names]
@@ -455,245 +446,19 @@ class Transaction(TransactionMeta):
 
         return bld_obj
 
-    def get_and_save_generated_packages(self, pkg_obj):
-        generated_pkgs = pkg_obj._pkgbuild.get_generates(self.result_dir)
+    def get_and_save_generated_packages(self, pkg_obj, result_dir):
+        try:
+            generated_pkgs = pkg_obj._pkgbuild.get_generates(result_dir)
+        except AttributeError:
+            pkg_obj.setup_pkgbuild_parser()
+            generated_pkgs = pkg_obj._pkgbuild.get_generates(result_dir)
 
         for gen_pkg in generated_pkgs:
             self.generated_pkgs.add(gen_pkg)
 
-    def build_package(self, pkg_obj):
-        self.building = pkg_obj.name
-        own_status = 'Building {0}-{1} with makepkg.'.format(pkg_obj.name,
-                                                             self._pkgvers[pkg_obj.name])
-        status.current_status = own_status
-        status.idle = False
 
-        in_dir_last = len([name for name in os.listdir(self.result_dir)])
-        db.setex('antbs:misc:pkg_count:{0}'.format(self.tnum), 86400, in_dir_last)
 
-        bld_obj = self.process_and_save_build_metadata(pkg_obj, self._pkgvers[pkg_obj.name])
 
-        doc_util.do_docker_clean(pkg_obj.name)
-        self.setup_package_build_directory(pkg_obj.name)
-
-        build_env = ['_AUTOSUMS=True'] if pkg_obj.auto_sum else ['_AUTOSUMS=False']
-
-        #if '/cinnamon/' in pkg_obj.gh_path:
-        #    build_env.append('_ALEXPKG=True')
-        #else:
-        build_env.append('_ALEXPKG=False')
-
-        build_dir = self._build_dirpaths[pkg_obj.name]['build_dir']
-        _32bit = self._build_dirpaths[pkg_obj.name]['32bit']
-        _32build = self._build_dirpaths[pkg_obj.name]['32build']
-        hconfig = doc_util.get_host_config('packages', build_dir, self.result_dir, self.cache,
-                                           self.cache_i686, _32build, _32bit)
-        container = {}
-        try:
-            container = doc.create_container("antergos/makepkg",
-                                             command='/makepkg/build.sh',
-                                             volumes=['/var/cache/pacman', '/makepkg', '/antergos',
-                                                      '/pkg', '/root/.gnupg', '/staging', '/32bit',
-                                                      '/32build', '/result',
-                                                      '/var/cache/pacman_i686'],
-                                             environment=build_env, cpuset='0-3',
-                                             name=pkg_obj.name, host_config=hconfig)
-            if container.get('Warnings', False):
-                logger.error(container.get('Warnings'))
-        except Exception as err:
-            logger.error('Create container failed. Error Msg: %s', err)
-            bld_obj.failed = True
-
-        container_id = container.get('Id', '')
-        bld_obj.container = container_id
-        status.container = container_id
-        stream_process = Process(target=bld_obj.publish_build_output, kwargs=dict(upd_repo=False))
-
-        try:
-            doc.start(container_id)
-            stream_process.start()
-            result = doc.wait(container_id)
-            if int(result) != 0:
-                bld_obj.failed = True
-                tpl = 'Container %s exited with a non-zero return code. Return code was %s'
-                logger.error(tpl, pkg_obj.name, result)
-            else:
-                bld_obj.completed = True
-                logger.info('Container %s exited. Return code was %s', pkg_obj.name, result)
-        except Exception as err:
-            bld_obj.failed = True
-            logger.error('Start container failed. Error Msg: %s', err)
-
-        stream_process.join()
-
-        _signed_packages = False
-
-        if bld_obj.completed:
-            logger.debug('bld_obj.completed!')
-            self.get_and_save_generated_packages(pkg_obj)
-
-            _signed_packages = sign_packages(pkg_obj, self.generated_pkgs)
-
-        if _signed_packages:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
-            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
-            _ = get_timeline_object(msg=tlmsg, tl_type=4)
-            status.completed.rpush(bld_obj.bnum)
-            bld_obj.review_status = 'pending'
-        else:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
-            tlmsg = tpl.format(str(bld_obj.bnum), pkg_obj.name, bld_obj.version_str)
-            _ = get_timeline_object(msg=tlmsg, tl_type=5)
-            bld_obj.failed = True
-            bld_obj.completed = False
-
-        bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-
-        self.building = ''
-        status.now_building.remove(bld_obj.bnum)
-        if own_status == status.current_status:
-            if not status.now_building and not self.queue and not status.transaction_queue:
-                status.idle = True
-
-        if not bld_obj.failed:
-            last_build = pkg_obj.builds[-2] if pkg_obj.builds else None
-            if last_build:
-                last_bld_obj = get_build_object(bnum=last_build)
-                if 'pending' == last_bld_obj.review_status and last_bld_obj.bnum != bld_obj.bnum:
-                    last_bld_obj.review_status = 'skip'
-
-            return True
-
-        status.failed.rpush(bld_obj.bnum)
-        return False
-
-    def build_iso(self, pkg_obj):
-        # TODO: Rework this, possibly abstract away parts in common with self.build_package()
-        own_status = 'Building {0}-{1} with mkarchiso.'.format(pkg_obj.name,
-                                                               self._pkgvers[pkg_obj.name])
-        status.current_status = own_status
-        status.iso_building = True
-
-        bld_obj = self.process_and_save_build_metadata(pkg_obj=pkg_obj)
-        build_id = bld_obj.bnum
-
-        self.fetch_and_compile_translations(translations_for=["cnchi_updater", "antergos-gfxboot"])
-
-        i686_flag = '/srv/antergos.info/repo/iso/testing/.ISO32'
-        minimal = '/srv/antergos.info/repo/iso/testing/.MINIMAL'
-
-        if 'i686' in pkg_obj.name:
-            if not os.path.exists(i686_flag):
-                open(i686_flag, 'a').close()
-        else:
-            if os.path.exists(i686_flag):
-                os.remove(i686_flag)
-
-        if 'minimal' in pkg_obj.name:
-            if not os.path.exists(minimal):
-                open(minimal, 'a').close()
-        else:
-            if os.path.exists(minimal):
-                os.remove(minimal)
-
-        in_dir_last = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
-        db.set('pkg_count_iso', in_dir_last)
-
-        doc_util.do_docker_clean(pkg_obj.name)
-
-        # Create docker host config dict
-        hconfig = doc.create_host_config(privileged=True, cap_add=['ALL'],
-                                         binds={
-                                             '/opt/archlinux-mkarchiso':
-                                                 {
-                                                     'bind': '/start',
-                                                     'ro': False
-                                                 },
-                                             '/run/dbus':
-                                                 {
-                                                     'bind': '/var/run/dbus',
-                                                     'ro': False
-                                                 },
-                                             '/srv/antergos.info/repo/iso/testing':
-                                                 {
-                                                     'bind': '/out',
-                                                     'ro': False
-                                                 }},
-                                         restart_policy={
-                                             "MaximumRetryCount": 2,
-                                             "Name": "on-failure"},
-                                         mem_limit='2G',
-                                         memswap_limit='-1')
-        iso_container = {}
-        try:
-            iso_container = doc.create_container("antergos/mkarchiso", command='/start/run.sh',
-                                                 name=pkg_obj.name, host_config=hconfig,
-                                                 cpuset='0-3')
-            if iso_container.get('Warnings', False):
-                logger.error(iso_container.get('Warnings'))
-        except Exception as err:
-            logger.error('Create container failed. Error Msg: %s' % err)
-            bld_obj.failed = True
-            status.failed.append(bld_obj.bnum)
-            return False
-
-        bld_obj.container = iso_container.get('Id')
-        status.container = bld_obj.container
-        open('/opt/archlinux-mkarchiso/first-run', 'a').close()
-
-        try:
-            doc.start(bld_obj.container)
-            cont = bld_obj.container
-            stream_process = Process(target=bld_obj.publish_build_output)
-            stream_process.start()
-            result = doc.wait(cont)
-            inspect = doc.inspect_container(cont)
-            if result != 0:
-                if inspect['State'].get('Restarting', '') or inspect.get('RestartCount', 0) != 2:
-                    while inspect['State'].get('Restarting', '') or inspect.get('RestartCount', 0) != 2:
-                        time.sleep(5)
-                        inspect = doc.inspect_container(cont)
-
-            if inspect['State'].get('ExitCode', 1) == 1:
-                bld_obj.failed = True
-                logger.error('[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
-                             pkg_obj.name, result)
-            else:
-                bld_obj.completed = True
-                logger.info('[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
-                            pkg_obj.name, result)
-        except Exception as err:
-            logger.error('Start container failed. Error Msg: %s', err)
-            bld_obj.failed = True
-            status.failed.append(bld_obj.bnum)
-            return False
-
-        stream_process.join()
-        in_dir = len([name for name in os.listdir('/srv/antergos.info/repo/iso/testing')])
-        last_count = int(db.get('pkg_count_iso'))
-
-        if in_dir > last_count:
-            bld_obj.completed = True
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> was successful.'
-            tlmsg = tpl.format(build_id, pkg_obj.name)
-            _ = get_timeline_object(msg=tlmsg, tl_type=4)
-            status.completed.rpush(bld_obj.bnum)
-        else:
-            bld_obj.failed = True
-            bld_obj.completed = False
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}</strong> failed.'
-            tlmsg = tpl.format(build_id, pkg_obj.name)
-            _ = get_timeline_object(msg=tlmsg, tl_type=5)
-            status.failed.rpush(build_id)
-
-        bld_obj.end_str = datetime.datetime.now().strftime("%m/%d/%Y %I:%M%p")
-
-        if not bld_obj.failed:
-            remove('/opt/archlinux-mkarchiso/antergos-iso')
-            doc_util.do_docker_clean(pkg_obj.name)
-            return True
-
-        return False
 
 
 def get_trans_object(packages=None, tnum=None, repo_queue=None):

@@ -145,7 +145,7 @@ class DockerUtils(metaclass=Singleton):
             binds[_32bit] = {'bind': '/32bit', 'ro': False}
             binds[_32build] = {'bind': '/32build', 'ro': False}
 
-        binds[result_dir] = {'bind': '/result_dir', 'ro': False}
+        binds[result_dir] = {'bind': '/result', 'ro': False}
 
         pkgs_hconfig = self.doc.create_host_config(binds=binds,
                                                    restart_policy={"MaximumRetryCount": 2,
