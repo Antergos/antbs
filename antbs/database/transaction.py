@@ -25,6 +25,8 @@ import shutil
 import subprocess
 import tempfile
 
+from rq import get_current_job
+
 import utils.docker_util as docker_util
 from utils.logging_config import logger
 from utils.utilities import PacmanPackageCache, remove
@@ -150,6 +152,13 @@ class Transaction(TransactionMeta):
 
         PacmanPackageCache().maybe_do_cache_cleanup()
 
+        # Store this transaction's number and packages on the RQ job object.
+        # We do this so that our custom exception handler can access the data
+        # if an exception is raised while running this transaction.
+        current_job = get_current_job()
+        current_job.meta.update(dict(tnum=self.tnum, packages=self.packages))
+        current_job.save()
+
         if self.queue:
             while self.queue:
                 pkg = self.queue.lpop()
@@ -192,7 +201,7 @@ class Transaction(TransactionMeta):
                             self._staging_repo.update_repo(bld_obj.generated_pkgs)
 
                         self.completed.append(bld_obj.bnum)
-                        doc_util.do_docker_clean(self._pkg_obj.name)
+                        doc_util.do_docker_clean(pkg_obj.name)
 
                     elif result is False:
                         self.failed.append(bld_obj.bnum)

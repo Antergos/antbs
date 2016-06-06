@@ -31,6 +31,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 import gevent
+from rq import get_current_job
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
@@ -242,6 +243,10 @@ class Build(RedisHash):
 
         self._pkg_obj.builds.append(self.bnum)
         status.now_building.append(self.bnum)
+
+        current_job = get_current_job()
+        current_job.meta['building_num'] = self.bnum
+        current_job.save()
 
     def save_build_results(self, result):
         if result is True:

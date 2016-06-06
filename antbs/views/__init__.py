@@ -62,7 +62,13 @@ from database.monitor import get_monitor_object, check_repos_for_changes
 
 from utils.logging_config import logger
 from utils.pagination import Pagination
-from utils.utilities import copy_or_symlink, symlink, remove
+
+from utils.utilities import (
+    copy_or_symlink,
+    symlink,
+    remove,
+    RQWorkerCustomExceptionHandler
+)
 
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
@@ -71,13 +77,15 @@ import iso
 
 
 # Setup rq (background task queue manager)
+exc_handler = RQWorkerCustomExceptionHandler(status, logger)
+
 with Connection(db):
     transaction_queue = Queue('transactions')
     repo_queue = Queue('update_repo')
     webhook_queue = Queue('webook')
-    w1 = Worker([transaction_queue])
+    w1 = Worker([transaction_queue], exception_handlers=[exc_handler.handle_worker_exception])
     w2 = Worker([repo_queue])
-    w3 = Worker([webhook_queue])
+    w3 = Worker([webhook_queue], exception_handlers=[exc_handler.handle_worker_exception])
 
 
 def try_render_template(*args, **kwargs):

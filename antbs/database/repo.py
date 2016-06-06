@@ -249,7 +249,7 @@ class PacmanRepo(RedisHash):
 
         self.sync_repo_packages_data()
 
-        for pkgname, pkg_info in pkgs_info:
+        for pkgname, pkg_info in pkgs_info.items():
             has_pkg_alpm = self.has_package_alpm(pkgname)
             has_pkg_fs = self.has_package_filesystem(pkgname)
 

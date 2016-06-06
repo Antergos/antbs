@@ -32,6 +32,7 @@ import glob
 import logging
 import os
 import shutil
+
 import gevent
 
 
@@ -120,6 +121,37 @@ class CustomSet(set):
         added = item not in self
         super().add(item)
         return added
+
+
+class RQWorkerCustomExceptionHandler:
+    status = None
+    logger = None
+
+    def __init__(self, status, logger):
+        if self.status is None:
+            self.status = status
+        if self.logger is None:
+            self.logger = logger
+
+    def handle_worker_exception(self, job, exc_type, exc_value, traceback):
+        tnum = job.meta.get('tnum', 0)
+        packages = job.meta.get('packages', [])
+        bnum = job.meta.get('building_num', 0)
+
+        running = self.status.transactions_running and tnum in self.status.transactions_running
+        building = self.status.now_building and bnum in self.status.now_building
+
+        self.logger.exception('%s | %s | %s | %s', job, exc_type, exc_value, traceback)
+
+        if running:
+            self.status.transactions_running.remove(tnum)
+
+        if building:
+            self.status.now_building.remove(bnum)
+
+        if not self.status.transactions_running and not self.status.now_building:
+            self.status.idle = True
+            self.status.current_status = ''
 
 
 def truncate_middle(s, n):
