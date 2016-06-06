@@ -32,24 +32,22 @@
 import os
 import sys
 
-# Ignore PyImportSortBear as this statement affects imports later
-# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.path.pardir)))
+from rq import (
+    Connection,
+    Queue,
+    Worker,
+    get_current_job
+)
 
 import utils.docker_util as docker_utils
+
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
 from database.build import get_build_object
 from database.repo import get_repo_object
-from rq import Connection, Queue, Worker
-from rq import get_current_job
 from utils.logging_config import logger
 
-
-SRC_DIR = os.path.dirname(__file__) or '.'
-BASE_DIR = os.path.split(os.path.abspath(SRC_DIR))[0]
-DOC_DIR = os.path.join(BASE_DIR, 'build')
-REPO_DIR = "/opt/antergos-packages"
 doc_utils = docker_utils.DockerUtils()
 doc = doc_utils.doc
 
@@ -103,6 +101,14 @@ def handle_hook():
     if status.transaction_queue:
         tnum = status.transaction_queue.lpop()
         transaction = get_trans_object(tnum=tnum, repo_queue=repo_queue)
+
+        # Store this transaction's number and packages on the RQ job object.
+        # We do this so that our custom exception handler can access the data
+        # if an exception is raised while running this transaction.
+        current_job = get_current_job()
+        current_job.meta.update(dict(tnum=transaction.tnum, packages=transaction.packages))
+        current_job.save()
+
         transaction.start()
 
     set_server_status(first=False, saved_status=saved_status)
