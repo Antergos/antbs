@@ -105,9 +105,10 @@ def handle_hook():
         # Store this transaction's number and packages on the RQ job object.
         # We do this so that our custom exception handler can access the data
         # if an exception is raised while running this transaction.
-        current_job = get_current_job()
-        current_job.meta.update(dict(tnum=transaction.tnum, packages=transaction.packages))
-        current_job.save()
+        with Connection(db):
+            current_job = get_current_job()
+            current_job.meta.update(dict(tnum=transaction.tnum, packages=transaction.packages))
+            current_job.save()
 
         transaction.start()
 
@@ -128,6 +129,6 @@ def process_dev_review(bnum):
 
     bld_obj = get_build_object(bnum=bnum)
     repo_obj = get_repo_object('antergos')
-    repo_obj.update_repo(bld_obj=bld_obj, review_result=bld_obj.review_status)
+    repo_obj.update_repo()
 
     set_server_status(False, saved_status)

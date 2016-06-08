@@ -53,7 +53,7 @@
 
 						{% for build in completed|sort(attribute='bnum') %}
 							{% if build.review_stat == "pending" %}
-								{% if user.is_authenticated() %}
+								{% if current_user.is_authenticated %}
 
 									<tr>
 										<td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>

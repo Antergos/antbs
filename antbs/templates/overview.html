@@ -79,7 +79,7 @@
 								{{ event|attr('message')|safe() }}
 								<p style="margin-top:10px;padding-bottom: 0px;">
 									<small>{{ event|attr('time_str') }}</small>
-									{% if user.is_authenticated() and event|attr('packages')|count() > 0 %}
+									{% if current_user.is_authenticated and event|attr('packages')|count() > 0 %}
 										<a href="#" class="rerun-transaction" data-tlevent="{{ event|attr('event_id') }}"><i class="fa fa-repeat" style="margin-left:5px;color:#F4275C;" data-toggle="tooltip" title="Rerun This Transaction"></i></a>
 									{% endif %}
 								</p>
@@ -217,7 +217,7 @@
 			$( '.tlwrap [data-toggle]' ).tooltip();
 		}
 		$( document ).ready( tlhandler );
-		{% if user.is_authenticated() %}
+		{% if current_user.is_authenticated %}
 			function rerun_trans_handler() {
 				jQuery( '.tlwrap' ).on( 'click', '.rerun-transaction', function( e ) {
 					e.preventDefault();

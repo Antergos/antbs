@@ -32,7 +32,7 @@
                     {% for build in failed|sort(attribute='bnum') %}
                         <tr>
                             <td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>
-                            {% if user.is_authenticated() %}<td><a href="/pkg/{{ build.pkgname }}">{{ build.pkgname }}</a></td>{% else %}
+                            {% if current_user.is_authenticated %}<td><a href="/pkg/{{ build.pkgname }}">{{ build.pkgname }}</a></td>{% else %}
                             <td>{{ build.pkgname }}</td>{% endif %}
                             <td>{{ build.version_str }}</td>
                             <td>{{ build.start_str }}</td>

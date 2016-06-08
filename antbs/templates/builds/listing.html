@@ -43,7 +43,7 @@
 						</thead>
 						<tbody class="no-border-y">
 						{% for build in builds|sort(attribute='bnum') %}
-							{% if user.is_authenticated() %}
+							{% if current_user.is_authenticated %}
 								<tr>
 									<td><a href="/transaction/{{ build.tnum }}">{{ build.tnum }}</a></td>
 									<td><a href="/build/{{ build.bnum }}">{{ build.bnum }}</a></td>
@@ -162,7 +162,7 @@
 				jQuery( '#search_btn' ).trigger( 'click' );
 			}
 		} );
-		{% if user.is_authenticated() %}
+		{% if current_user.is_authenticated %}
 			jQuery( document ).ready( function() {
 
 				jQuery( '.set_result' ).on( 'click', 'a', function( e ) {

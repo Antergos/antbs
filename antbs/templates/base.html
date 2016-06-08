@@ -597,7 +597,7 @@
 										<li {% if request.path == "/repo/browse/testing" %}class="active"{% endif %}>
 											<a href="/repo/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
 										</li>
-										{% if user.is_authenticated() %}
+										{% if current_user.is_authenticated %}
 											<li {% if request.path == "/issues" %}class="active"{% endif %}>
 												<a href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
 
@@ -610,7 +610,7 @@
 							</div>
 						</div>
 						<div class="text-right collapse-button">
-							{% if user.is_authenticated() %}
+							{% if current_user.is_authenticated %}
 								<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
 									<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
 									<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
@@ -630,7 +630,7 @@
 							<div class="container-fluid">
 								<div class="navbar-collapse">
 
-									{% if user.is_authenticated() %}
+									{% if current_user.is_authenticated %}
 										<ul class="nav navbar-nav navbar-right user-nav">
 											<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
 												<a href="#"><i class="fa fa-refresh"></i></a>
@@ -840,7 +840,7 @@
 					//sets up numeric sorting of links
 					jQuery(document).ready(function () {
 
-						{% if user.is_authenticated() and 'repo_pkgs' in request.path %}
+						{% if current_user.is_authenticated and 'repo_pkgs' in request.path %}
 							$('.content').on('click', '.repo_actions a', function (e) {
 								e.preventDefault();
 								jQuery(this).addClass('clicked');
@@ -954,7 +954,7 @@
 									}).dataTable({
 										"aoColumns": [
 											{% if '/repo/' in request.path and '/packages' in request.path %}
-												{"sType": "num-html"}, {"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null{% if user.is_authenticated() %},null{% endif %}
+												{"sType": "num-html"}, {"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null{% if current_user.is_authenticated %},null{% endif %}
 
 											{% elif '/builds/' in request.path and '/completed' in request.path %}
 												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null

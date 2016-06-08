@@ -265,7 +265,7 @@ def live_status_updates():
         return Response(get_live_status_updates(), direct_passthrough=True,
                         mimetype='text/event-stream', headers=headers)
 
-    if not user.is_authenticated():
+    if not current_user.is_authenticated:
         abort(403)
 
     iso_release = bool(request.args.get('do_iso_release', False))
@@ -293,11 +293,11 @@ def live_status_updates():
     #                     dev, pkg), tl_type='0')
     #         return json.dumps(message)
 
-    if iso_release and user.is_authenticated():
+    if iso_release and current_user.is_authenticated:
         transaction_queue.enqueue_call(iso.iso_release_job)
         return json.dumps(message)
 
-    elif reset_queue and user.is_authenticated():
+    elif reset_queue and current_user.is_authenticated:
         if transaction_queue.count > 0:
             transaction_queue.empty()
         if repo_queue.count > 0:
@@ -311,7 +311,7 @@ def live_status_updates():
         status.current_status = 'Idle.'
         return json.dumps(message)
 
-    elif rerun_transaction and user.is_authenticated():
+    elif rerun_transaction and current_user.is_authenticated:
         event = get_timeline_object(event_id=rerun_transaction)
         pkgs = event.packages
         if pkgs:

@@ -7,3 +7,4 @@ repo*.sh
 *expect*.conf
 *.log
 *.orig
+utils/slack_bot.py

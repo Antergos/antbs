@@ -36,7 +36,7 @@
 							<th>Build</th>
 							<th>Reviewed By</th>
 							<th>Reviewed On</th>
-							{% if user.is_authenticated() %}
+							{% if current_user.is_authenticated %}
 								<th>Manage</th>{% endif %}
 						</tr>
 						</thead>
@@ -60,7 +60,7 @@
 									{{ package._build.review_dev }}{% else %}-{% endif %}</td>
 								<td>{% if '' != package._build.review_date %}<i class="fa fa-calendar"></i>
 									{{ package._build.review_date }}{% else %}-{% endif %}</td>
-								{% if user.is_authenticated() %}
+								{% if current_user.is_authenticated %}
 									<td>
 										<div class="btn-group">
 											<button class="btn btn-default btn-xs" type="button">Action</button>

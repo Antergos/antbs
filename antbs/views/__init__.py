@@ -48,7 +48,7 @@ from rq import (
 )
 
 from datetime import datetime, timedelta
-from flask.ext.stormpath import user, groups_required
+from flask_stormpath import current_user, groups_required
 from glob import glob
 from jinja2 import TemplateNotFound
 

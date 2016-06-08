@@ -67,8 +67,7 @@ def get_timeline(tlpage=None):
 def get_number_of_packages_in_repo(repo_name):
     global main_repo, staging_repo
 
-    return len(main_repo.packages) if 'antergos' == repo_name else len(staging_repo.packages)
-
+    return len(main_repo.pkgs_alpm) if 'antergos' == repo_name else len(staging_repo.pkgs_alpm)
 
 
 ###

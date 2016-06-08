@@ -252,6 +252,9 @@ class RedisList(RedisObject, list):
     def remove(self, val):
         self.db.lrem(self.full_key, 0, val)
 
+    def remove_range(self, start, stop):
+        self.db.ltrim(self.full_key, start, stop)
+
 
 class RedisZSet(RedisObject, set):
     """
@@ -312,6 +315,10 @@ class RedisZSet(RedisObject, set):
     def sort(self, alpha=True):
         """ Get list of members sorted alphabetically. """
         return self.db.sort(self.full_key, alpha=alpha)
+
+    def remove_range(self, start, stop):
+        """ Remove all members at indexes from start to stop """
+        return self.db.zremrangebyrank(self.full_key, start, stop)
 
 
 class RedisHash(RedisObject):

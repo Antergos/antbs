@@ -83,7 +83,7 @@ def get_builds_with_status(page=None, build_status=None, search=None):
 
             builds_list.append(bld_obj)
 
-        if user.is_authenticated():
+        if current_user.is_authenticated:
             for bld_obj in builds_list:
                 if 'pending' == bld_obj.review_status:
                     rev_pending.append(bld_obj)

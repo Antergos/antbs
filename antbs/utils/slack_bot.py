@@ -29,78 +29,125 @@
 
 """ Bot utilities for Slack """
 
-from database.base_objects import db
-from github3 import login
-from stackexchange import DESC, Site, Sort, StackOverflow
+import gevent
+from rq import Connection, Worker, Queue
+from slackclient import SlackClient
+# from github3 import login
 
+from database.base_objects import db, RedisHash
 from .logging_config import logger
 
-se_key = db.get('SLACK:API-KEY')
-gh_user = db.get('ANTBS_GITHUB_TOKEN')
 
-so = Site(StackOverflow, se_key)
-gh = login(token=gh_user)
-
-MAX_QUESTIONS = 5
+ET_SLACK_IDENTIFIER = db.get('slack:misc:identifiers:et')
+#gh_user = db.get('ANTBS_GITHUB_TOKEN')
+#gh = login(token=gh_user)
 
 
-def get_response_string(q):
-    """
+class DispatcherBotMessage(RedisHash):
+    def __init__(self, msg_id=None):
+        if msg_id is None:
+            msg_id = db.incr('slack:misc:next:msg_id')
 
-    :param q:
-    :return:
-    """
-    q_data = q.json
+        super().__init__(namespace='slack', prefix='bot:dispatcher:message', key=msg_id)
 
-    check = ' :white_check_mark:' if q.json['is_answered'] else ''
-    return "|%d|%s <%s|%s> (%d answers)" % (q_data['score'], check, q.url,
-                                            q.title, q_data['answer_count'])
+        self.attrib_lists.update(dict(
+            string=['from_user', 'content'],
+            bool=['delivered'],
+            int=['msg_id'],
+            list=[],
+            set=['to_users', 'to_channels' ],
+            path=[]
+        ))
+
+        self.__namespaceinit__()
+
+        if not self or not self.msg_id:
+            self.__keysinit__()
+            self.msg_id = msg_id
 
 
-def overflow(command=None, text=None):
-    """
+class DispatcherBot(RedisHash):
+    _slack = None
 
-    :param command:
-    :param text:
-    :return:
-    """
-    if command is None or text is None:
-        return False
+    def __init__(self, name='dispatcher'):
+        super().__init__(namespace='slack', prefix='bot', key=name)
 
-    if '/overflow' == command:
+        self.attrib_lists.update(dict(
+            string=['api_key', 'name'],
+            bool=[],
+            int=[],
+            list=[],
+            set=['watching_events', 'watching_users', 'messages'],
+            path=[]
+        ))
 
-        try:
-            qs = so.search(intitle=text, sort=Sort.Votes, order=DESC)
-        except UnicodeEncodeError:
-            return dict(msg='Only English language is supported. %s is not valid input.' % text,
-                        content_type='text/plain; charset=utf-8')
+        self.__namespaceinit__()
 
-        resp_qs = ['Stack Overflow Top Questions for "%s"\n' % text]
-        resp_qs.extend(map(get_response_string, qs[:MAX_QUESTIONS]))
+        if not self or not self.name:
+            self.__keysinit__()
+            self.name = name
 
-        if len(resp_qs) is 1:
-            resp_qs.append(('No questions found. Please try a broader search or '
-                            'search directly on '
-                            '<https://stackoverflow.com|StackOverflow>.'))
+        if self._slack is None:
+            self._slack = SlackClient(ET_SLACK_IDENTIFIER)
 
-        res = dict(msg='\n'.join(resp_qs), content_type='text/plain; charset=utf-8')
+        if not self.watching_events:
+            self.watching_events.extend(['presence_change', 'message'])
 
-    elif '/todo' == command:
+    def start(self):
+        if self._slack.rtm_connect():
+            while True:
+                events = self._slack.rtm_read()
 
-        repo = gh.repository('lots0logs', 'compi')
-        res = repo.issues(labels='feature', state='open')
-        issues = []
-        for i in res:
-            issue_str = ':slack: <%s|%s>' % (i.html_url, i.title)
-            issues.append(issue_str)
+                if events:
+                    self.handle_events(events)
 
-        logger.info(issues)
+                gevent.sleep(2)
 
-        resp_qs = []
-        resp_qs.extend(issues)
-        resp_qs.reverse()
-        resp_qs.insert(0, '*Feature Roadmap For Compi*\n')
+        else:
+            logger.error('Connection Failed!')
 
-        res = dict(msg='\n'.join(resp_qs), content_type='text/plain; charset=utf-8')
+    def handle_events(self, events):
+        events = [e for e in events if e['type'] in self.watching_events]
 
-    return res
+        for event in events:
+            method = '_{}_handler'.format(event['type'])
+            handler = getattr(self, method)
+
+            try:
+                handler(event)
+            except Exception as err:
+                logger.exception(err)
+
+    def _presence_change_handler(self, event):
+        if 'active' != event['presence']:
+            return
+
+        if not self.watching_users or event['user'] not in self.watching_users:
+            return
+        elif not self.messages:
+            return
+
+        for msg_id in self.messages:
+            msg = DispatcherBotMessage(msg_id)
+
+            if msg.delivered or not msg.to_users or event['user'] not in msg.to_users:
+                continue
+
+            channel = self._slack.api_call('im.open', user=event['user'])
+
+            if self._slack.rtm_send_message(channel, msg.content):
+                msg.to_users.remove(event['user'])
+                self.watching_users.remove(event['user'])
+
+            if not msg.to_users:
+                msg.delivered = True
+
+
+
+
+
+
+
+
+
+

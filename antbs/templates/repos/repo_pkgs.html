@@ -31,7 +31,7 @@
 							<th>Build</th>
 							<th>Reviewed By</th>
 							<th>Reviewed On</th>
-							{% if user.is_authenticated() %}
+							{% if current_user.is_authenticated %}
 								<th>Manage</th>{% endif %}
 						</tr>
 						</thead>
@@ -47,7 +47,7 @@
 	</div>
 
 {%- endblock bottomcontent %}
-{% if user.is_authenticated() %}
+{% if current_user.is_authenticated %}
 	{% block scripts %}
 		{{ super() }}
 	{% endblock scripts %}

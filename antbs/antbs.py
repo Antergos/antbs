@@ -42,7 +42,7 @@ from flask import (
     Flask, abort, render_template, request, url_for
 )
 
-from flask.ext.stormpath import StormpathManager, user
+from flask_stormpath import StormpathManager, current_user
 from werkzeug.contrib.fixers import ProxyFix
 
 import rq_dashboard
@@ -69,7 +69,7 @@ def initialize_app():
     """
 
     global app
-    app = Flask(__name__)
+    app = Flask('antbs')
     handle_exceptions(app)
 
     # Stormpath configuration
@@ -118,7 +118,7 @@ initialize_app()
 
 @app.before_request
 def rq_dashboard_requires_auth():
-    if '/rq' in request.path and not user.is_authenticated():
+    if '/rq' in request.path and not current_user.is_authenticated:
         abort(403)
 
 
@@ -129,7 +129,8 @@ def inject_global_template_variables():
         current_status=status.current_status,
         now_building=status.now_building,
         rev_pending=status.pending_review,
-        user=user
+        user=current_user,
+        current_user=current_user
     )
 
 

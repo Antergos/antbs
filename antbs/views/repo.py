@@ -46,7 +46,7 @@ def get_repo_packages(repo_name=None, group=None, page=None):
     all_pages = 0
     repo_obj = get_repo_object(repo_name)
 
-    if user.is_authenticated():
+    if current_user.is_authenticated:
         rev_pending = []
     else:
         rev_pending = []

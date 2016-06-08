@@ -32,8 +32,10 @@ import glob
 import logging
 import os
 import shutil
+import subprocess
 
 import gevent
+from redis.exceptions import LockError
 
 
 class Singleton(type):
@@ -154,6 +156,20 @@ class RQWorkerCustomExceptionHandler:
             self.status.current_status = ''
 
 
+class MyLock:
+    def __init__(self, redis_client, key):
+        self.lock = redis_client.lock(key, blocking_timeout=300)
+
+    def __enter__(self):
+        if self.lock.acquire():
+            return self
+        else:
+            raise LockError('Cannot release an unlocked lock')
+
+    def __exit__(self, type, value, tb):
+        self.lock.release()
+
+
 def truncate_middle(s, n):
     if len(s) <= n:
         # string is already short-enough
@@ -237,3 +253,33 @@ def quiet_down_noisy_loggers():
     for logger_name in noisy_loggers:
         noisy_logger = logging.getLogger(logger_name)
         noisy_logger.setLevel(logging.ERROR)
+
+
+def try_run_command(cmd, cwd):
+    """
+    Tries to run command and then returns the result (success/fail)
+    and any output that is captured.
+
+    Args:
+        cmd (list): Command to run as a list. See `subprocess` docs for details.
+        cwd (str): Set the current working directory to use when running command.
+
+    Returns:
+        success (bool): Whether or not the command returned successfully (exit 0)
+        res (str): The output that was captured.
+
+    """
+
+    res = None
+    success = False
+
+    try:
+        res = subprocess.check_output(
+            cmd, stderr=subprocess.STDOUT, universal_newlines=True, cwd=cwd
+        )
+        success = True
+    except subprocess.CalledProcessError as err:
+        logging.exception((err.output, err.stderr))
+        res = err.output
+
+    return success, res

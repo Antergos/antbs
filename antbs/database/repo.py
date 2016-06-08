@@ -29,23 +29,26 @@
 
 import os
 import tarfile
-import gevent
-from multiprocessing import Process
-import subprocess
+from io import TextIOWrapper
+from pkg_resources import parse_version
 
-import re
+import gevent
+from redis.lock import Lock
 
 from database.base_objects import RedisHash
 from database.server_status import status
 from utils.logging_config import logger
-from utils.utilities import Singleton, remove
+from utils.utilities import Singleton, remove, try_run_command, MyLock
 import utils.docker_util as docker_util
 
 doc_util = docker_util.DockerUtils()
 doc = doc_util.doc
 PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'
+DB_EXT = '.db.tar.gz'
 SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
+
+main_repo = staging_repo = None
 
 
 class PacmanRepo(RedisHash):
@@ -78,19 +81,16 @@ class PacmanRepo(RedisHash):
 
     """
 
-    def __init__(self, name=None, path=None, prefix='repo'):
-        if not name:
-            raise RuntimeError
-
+    def __init__(self, name, path=None, prefix='repo'):
         super().__init__(prefix=prefix, key=name)
 
         self.attrib_lists.update(
-            dict(string=['name'],
+            dict(string=['name', 'alpm_db'],
                  bool=['locked'],
                  int=['pkg_count_alpm', 'pkg_count_fs'],
-                 list=[],
+                 list=['pkgnames'],
                  set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
-                 path=['path']))
+                 path=['path', 'path64', 'path32', 'alpm_db_path64', 'alpm_db_path32']))
 
         super().__namespaceinit__()
 
@@ -100,37 +100,36 @@ class PacmanRepo(RedisHash):
             self.path = os.path.join(path, name)
             status.repos.add(name)
 
-        self.sync_repo_packages_data()
+        _lock_name = '{}:_lock'.format(self.full_key)
+        self._lock = MyLock(self.db, _lock_name)
 
     def sync_repo_packages_data(self):
-        self.save_repo_state_alpm()
-        self.save_repo_state_filesystem()
-        self.setup_packages_manifest()
-        self.get_repo_packages_unaccounted_for()
+        with self._lock:
+            self.locked = True
 
-    def setup_packages_manifest(self):
-        pkgs_fs = set([p.split('|')[0] for p in self.pkgs_fs if p])
-        pkgs_alpm = set([p.split('|')[0] for p in self.pkgs_alpm if p])
-        pkgs = list(pkgs_fs & pkgs_alpm)
-        unaccounted_for = [p.split('|')[0] for p in list(pkgs_fs) + list(pkgs_alpm) if p not in pkgs]
+            self._determine_current_repo_state_alpm()
+            self._determine_current_repo_state_fs()
+            self._process_current_repo_states()
 
-        for pk in self.packages:
-            if pk not in pkgs:
-                self.packages.remove(pk)
+        self.locked = False
 
-        for pkg in pkgs:
+    def _process_current_repo_states(self):
+        pkgs_fs = set(self.pkgs_fs)
+        pkgs_alpm = set(self.pkgs_alpm)
+        accounted_for = list(pkgs_fs & pkgs_alpm)
+        unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs)
+
+        self.packages.remove_range(0, -1)
+        self.unaccounted_for.remove_range(0, -1)
+        self.pkgnames.remove_range(0, -1)
+
+        for pkg in accounted_for:
             self.packages.add(pkg)
 
-        for pk in self.unaccounted_for:
-            if pk in pkgs:
-                self.unaccounted_for.remove(pk)
+        for pkg in unaccounted_for:
+            self.unaccounted_for.add(pkg)
 
-        for pak in unaccounted_for:
-            self.unaccounted_for.add(pak)
-
-    def _pkgname_matches(self, pkgname, match_in):
-        pattern = r'{}\|'.format(pkgname)
-        return re.match(pattern, match_in)
+        self.pkgnames.extend(self._get_pkgnames(accounted_for))
 
     def _get_pkgnames(self, location):
         return [p.split('|')[0] for p in location if p]
@@ -141,33 +140,29 @@ class PacmanRepo(RedisHash):
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
 
-    def get_pkgs_info_from_pkg_fnames(self, pkg_fnames):
-        pkgs_info = {}
-
-        for pkg_fname in pkg_fnames:
-            pkgname, _pkgver, _arch = pkg_fname.rsplit('-', 2)
-            pkgver = '{}-{}'.format(_pkgver, _arch.partition('.')[0])
-            arch = _arch.partition('.')[-1]
-
-            pkgs_info[pkgname] = {'pkg_fname': pkg_fname, 'pkgver': pkgver, 'arch': arch}
-
-        return pkgs_info
-
-    def _get_pkgver(self, pkgname, location):
+    def _get_pkgvers(self, pkgname, location):
         pkgs = self._get_pkgnames(location)
 
         if pkgname not in pkgs:
-            return ''
+            return []
 
-        pkgver = [p.split('|')[1] for p in location if p and self._pkgname_matches(pkgname, p)]
+        pkgvers = [p.split('|')[1] for p in location if p and p.split('|')[0] == pkgname]
 
-        return pkgver[0] if pkgver else ''
+        return pkgvers
 
     def get_pkgver_alpm(self, pkgname):
-        return self._get_pkgver(pkgname, self.pkgs_alpm)
+        pkgver = ''
+        pkgvers = self._get_pkgvers(pkgname, self.pkgs_alpm)
 
-    def get_pkgver_filesystem(self, pkgname):
-        return self._get_pkgver(pkgname, self.pkgs_fs)
+        if pkgvers and len(pkgvers) == 1:
+            pkgver = pkgvers[0]
+        elif pkgvers and len(pkgvers) != 1:
+            logger.error(pkgvers)
+
+        return pkgver
+
+    def get_pkgvers_filesystem(self, pkgname):
+        return self._get_pkgvers(pkgname, self.pkgs_fs)
 
     def _has_package(self, pkgname, location):
         return pkgname in self._get_pkgnames(location)
@@ -178,118 +173,124 @@ class PacmanRepo(RedisHash):
     def has_package_alpm(self, pkgname):
         return self._has_package(pkgname, self.pkgs_alpm)
 
-    def save_repo_state_filesystem(self):
-        repodir = os.path.join(self.path, 'x86_64')
-        pkgs = set(p for p in os.listdir(repodir) if '.pkg.' in p and not p.endswith('.sig'))
+    def _determine_current_repo_state_fs(self):
+        pkgs = set(p for p in os.listdir(self.path64) if '.pkg.' in p and not p.endswith('.sig'))
 
-        for pkg in pkgs:
-            pkg = os.path.basename(pkg)
+        self.pkgs_fs.remove_range(0, -1)
+
+        for pkg_file_name in pkgs:
+            pkg_file_name = pkg_file_name.replace('.pkg', '-pkg')
+
             try:
-                pkg, version, rel, suffix = pkg.rsplit('-', 3)
+                pkg, version, rel, arch, suffix = pkg_file_name.rsplit('-', 4)
             except ValueError:
-                logger.error("unexpected pkg: " + pkg)
+                logger.error("unexpected pkg: " + pkg_file_name)
                 continue
 
-            self.pkgs_fs.add('{0}|{1}-{2}'.format(pkg, version, rel))
+            self.pkgs_fs.add('{0}|{1}-{2}|{3}'.format(pkg, version, rel, arch))
 
         self.pkg_count_fs = len(self.pkgs_fs)
 
-    def save_repo_state_alpm(self):
-        repodir = os.path.join(self.path, 'x86_64')
-        dbfile = os.path.join(repodir, '%s.db.tar.gz' % self.name)
+    def _determine_current_repo_state_alpm(self):
+        self.pkgs_alpm.remove_range(0, -1)
 
         try:
-            with tarfile.open(dbfile, 'r') as pacman_db:
-                for pkg in pacman_db.getnames():
-                    pkg = pkg.split('/', 1)[0]
-                    pkgname, ver, rel = pkg.rsplit('-', 2)
+            with tarfile.open(self.alpm_db_path64, 'r') as alpm_db:
+                pkg_info_files = [p for p in alpm_db.getmembers() if '/desc' in p.name]
 
-                    self.pkgs_alpm.add('{0}|{1}-{2}'.format(pkgname, ver, rel))
-                    self.pkg_count_alpm = len(self.pkgs_alpm)
+                for pkg_info_file in pkg_info_files:
+                    pkg_info_bytes = alpm_db.extractfile(pkg_info_file)
+                    pkg_file_name = TextIOWrapper(pkg_info_bytes).readlines()[1].strip()
+                    pkg_file_name = pkg_file_name.replace('.pkg', '-pkg')
+
+                    pkgname, ver, rel, arch, suffix = pkg_file_name.rsplit('-', 4)
+
+                    self.pkgs_alpm.add('{0}|{1}-{2}|{3}'.format(pkgname, ver, rel, arch))
+
+            self.pkg_count_alpm = len(self.pkgs_alpm)
+
         except Exception as err:
             logger.error(err)
 
-    def get_repo_packages_unaccounted_for(self):
-        unaccounted_for = []
+    def _get_packages_unaccounted_for_info(self):
+        unaccounted_for = {}
 
-        if self.unaccounted_for:
-            for pkg in self.unaccounted_for:
-                _pkg = dict(pkgname=pkg, fs=None, alpm=None)
+        for pkg in self.unaccounted_for:
+            pkgname = pkg.rsplit('|')[0]
+            unaccounted_for[pkgname] = dict(fs=[], alpm=[])
 
-                if self.has_package_filesystem(pkg):
-                    _pkg['fs'] = self.get_pkgver_filesystem(pkg)
+            if self.has_package_filesystem(pkgname):
+                unaccounted_for[pkgname]['fs'].extend(self.get_pkgvers_filesystem(pkgname))
 
-                if self.has_package_alpm(pkg):
-                    _pkg['alpm'] = self.get_pkgver_alpm(pkg)
-
-                unaccounted_for.append(_pkg)
+            if self.has_package_alpm(pkgname):
+                unaccounted_for[pkgname]['alpm'].append(self.get_pkgver_alpm(pkgname))
 
         return unaccounted_for
 
-    def _do_update_repo(self, pkg_fnames, is_review=False, review_result=None):
-        pkg_fnames = list(pkg_fnames)
-        action = 'add'
+    @staticmethod
+    def _pkgver_is_greater_than(pkgver, compare_to):
+        return parse_version(pkgver) > parse_version(compare_to)
 
-        self.sync_repo_packages_data()
+    def _compare_pkgvers(self, pkgvers):
+        if len(pkgvers) == 1:
+            return pkgvers
+        elif not pkgvers:
+            raise ValueError('pkgvers cannot be empty.')
 
-        for pkg_fname in pkg_fnames:
-            if pkg_fname and not is_review:
-                self._add_or_remove_package_alpm_database(pkg_fname, action)
+        _pkgvers = pkgvers
+        compare_to = _pkgvers.pop()
 
-            elif pkg_fname and is_review and review_result is not None:
-                action = 'add' if 'passed' == review_result else 'remove'
+        while len(_pkgvers) > 1:
+            last_count = len(_pkgvers)
+            cmp_result = [v for v in _pkgvers if self._pkgver_is_greater_than(v, compare_to)]
+            this_count = len(cmp_result)
 
-                self._add_or_remove_package_alpm_database(pkg_fname, action)
+            if this_count == 0:
+                _pkgvers = [compare_to]
+            elif this_count == 1:
+                _pkgvers = cmp_result
+            elif this_count == last_count:
+                compare_to = cmp_result.pop()
+                _pkgvers = cmp_result
 
-        self._post_update_sanity_check(pkg_fnames, action)
+        return _pkgvers
 
-    def _post_update_sanity_check(self, pkg_fnames, action):
-        pkgs_info = self.get_pkgs_info_from_pkg_fnames(pkg_fnames)
-        all_okay = []
+    def _process_repo_packages_unaccounted_for(self):
+        unaccounted_for = self._get_packages_unaccounted_for_info()
+        logger.debug(unaccounted_for)
+        add_to_db = []
+        rm_from_db = []
+        rm_from_fs = []
 
-        self.sync_repo_packages_data()
+        for pkgname, versions in unaccounted_for:
+            if not versions['fs'] and not versions['alpm']:
+                logger.error('nothing to compare')
+                continue
 
-        for pkgname, pkg_info in pkgs_info.items():
-            has_pkg_alpm = self.has_package_alpm(pkgname)
-            has_pkg_fs = self.has_package_filesystem(pkgname)
+            if versions['fs'] and not versions['alpm']:
+                latest = ''
+                latest_fs = self._compare_pkgvers(versions['fs'])
+                in_db_now = self.get_pkgver_alpm(pkgname)
 
-            if 'add' == action:
-                pkgver_alpm_match = self.get_pkgver_alpm(pkgname) == pkg_info['pkgver']
-                pkgver_fs_match = self.get_pkgver_filesystem(pkgname) == pkg_info['pkgver']
+                if latest_fs and in_db_now:
+                    latest = self._compare_pkgvers([latest_fs[0], in_db_now])
+                elif latest_fs and not in_db_now:
+                    latest = latest_fs
 
-                if all([has_pkg_alpm, pkgver_alpm_match, has_pkg_fs, pkgver_fs_match]):
-                    all_okay.append(True)
-                else:
-                    all_okay.append(False)
+                if latest[0] != in_db_now:
+                    add_to_db.append((pkgname, latest[0]))
 
-            elif 'remove' == action:
-                if not any([has_pkg_alpm, has_pkg_fs]):
-                    all_okay.append(True)
-                else:
-                    all_okay.append(False)
+                for pkgver in versions['fs']:
+                    if pkgver != latest[0]:
+                        rm_from_fs.append((pkgname, pkgver))
 
-            if not all(all_okay):
-                logger.error(
-                    'Post repo update sanity check failed! {}'.format(all_okay)
-                )
+            elif versions['alpm'] and not versions['fs']:
+                for pkgver in versions['alpm']:
+                    rm_from_db.append((pkgname, pkgver))
 
-    def _handle_pkg_review_passed(pkg_fname):
-        raise NotImplementedError()
-
-    def _try_run_command(self, cmd, cwd):
-        res = None
-        success = False
-
-        try:
-            res = subprocess.check_output(
-                cmd, stderr=subprocess.STDOUT, universal_newlines=True, cwd=cwd
-            )
-            success = True
-        except subprocess.CalledProcessError as err:
-            logger.error((err.output, err.stderr))
-            res = err.output
-
-        return success, res
+        logger.error(
+            [('add_to_db', add_to_db), ('rm_from_db', rm_from_db), ('rm_from_fs', rm_from_fs)]
+        )
 
     def _add_or_remove_package_alpm_database(self, pkg_fname, action):
         package_file = '{}{}'.format(pkg_fname, PKG_EXT)
@@ -306,7 +307,7 @@ class PacmanRepo(RedisHash):
             package_file
         ])
 
-        success, res = self._try_run_command(cmd, cwd)
+        success, res = try_run_command(cmd, cwd)
         lock_not_aquired = 'Failed to acquire lockfile'
         waiting = 0
 
@@ -315,7 +316,7 @@ class PacmanRepo(RedisHash):
             while not success and lock_not_aquired in res:
                 waiting += 10
                 gevent.sleep(10)
-                success, res = self._try_run_command(cmd, cwd)
+                success, res = try_run_command(cmd, cwd)
 
                 if waiting > 300:
                     logger.error('repo-add script timed out!')
@@ -329,7 +330,19 @@ class PacmanRepo(RedisHash):
                 res
             )
 
-    def update_repo(self, pkg_fnames, is_review=False, review_result=None):
+    def _update_repo(self):
+        self.sync_repo_packages_data()
+
+        if self.pkgs_alpm != self.pkgs_fs:
+            with self._lock:
+                self.locked = True
+                self._process_repo_packages_unaccounted_for()
+
+            self.locked = False
+
+        self._post_update_sanity_check(pkg_fnames, action)
+
+    def update_repo(self):
         trans_running = status.transactions_running or status.transaction_queue
         building_saved = False
         excluded = ['Updating antergos repo database.',
@@ -344,7 +357,7 @@ class PacmanRepo(RedisHash):
         msg = excluded[0] if 'antergos' == self.name else excluded[1]
         status.current_status = msg
 
-        self._do_update_repo(pkg_fnames, is_review, review_result)
+        self._update_repo()
 
         trans_running = status.transactions_running or status.transaction_queue
 
@@ -367,13 +380,21 @@ class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
 
 
 def get_repo_object(name, path=None):
-    if not path:
-        path = status.REPO_BASE_DIR
+    global main_repo, staging_repo
+
+    path = path if path else status.REPO_BASE_DIR
+
+    if main_repo is None:
+        main_repo = AntergosRepo(path=path)
+        main_repo.sync_repo_packages_data()
+
+    if staging_repo is None:
+        staging_repo = AntergosStagingRepo(path=path)
+        staging_repo.sync_repo_packages_data()
+
     if 'antergos' == name:
-        repo = AntergosRepo(name=name, path=path)
+        return main_repo
     elif 'antergos-staging' == name:
-        repo = AntergosStagingRepo(name=name, path=path)
+        return staging_repo
     else:
         raise TypeError('name must be one of [antergos, antergos-staging]')
-
-    return repo

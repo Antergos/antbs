@@ -31,7 +31,7 @@ from datetime import datetime
 from multiprocessing import Process
 
 import gevent
-from rq import get_current_job
+from rq import Connection, get_current_job
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
@@ -196,7 +196,7 @@ class Build(RedisHash):
                                  HtmlFormatter(style='monokai', linenos='inline',
                                                prestyles="background:#272822;color:#fff;"))
 
-    def start(self, pkgver, pkg_obj=None):
+    def start(self, pkg_obj=None):
         if not self._pkg_obj and not pkg_obj:
             raise RuntimeError('Cannot start build without `pkg_obj`')
 
@@ -205,7 +205,7 @@ class Build(RedisHash):
         elif not self._pkg_obj:
             self._pkg_obj = pkg_obj
 
-        self.process_and_save_build_metadata(pkgver)
+        self.process_and_save_build_metadata(self._pkg_obj.pkgver)
         
         if self.is_iso:
             result = self._build_iso()
@@ -244,9 +244,10 @@ class Build(RedisHash):
         self._pkg_obj.builds.append(self.bnum)
         status.now_building.append(self.bnum)
 
-        current_job = get_current_job()
-        current_job.meta['building_num'] = self.bnum
-        current_job.save()
+        with Connection(self.db):
+            current_job = get_current_job()
+            current_job.meta['building_num'] = self.bnum
+            current_job.save()
 
     def save_build_results(self, result):
         if result is True:

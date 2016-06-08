@@ -189,7 +189,7 @@ class Transaction(TransactionMeta):
 
                     if result is True:
                         if not pkg_obj.is_iso:
-                            self._staging_repo.update_repo(bld_obj.generated_pkgs)
+                            self._staging_repo.update_repo()
 
                         self.completed.append(bld_obj.bnum)
                         doc_util.do_docker_clean(pkg_obj.name)
@@ -241,7 +241,6 @@ class Transaction(TransactionMeta):
         })
 
         for bdir, path in self._build_dirpaths[bld_obj.pkgname].items():
-            logger.debug(path)
             if not os.path.exists(path):
                 os.mkdir(path, mode=0o777)
 
