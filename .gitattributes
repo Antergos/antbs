@@ -1,8 +1,8 @@
-antbs/static/*** linguist-vendored
-antbs/templates/building.html linguist-vendored
-antbs/templates/issues.html linguist-vendored
-antbs/templates/overview.html linguist-vendored
-antbs/templates/builds/***.html linguist-vendored
-antbs/templates/package.html linguist-vendored
-antbs/templates/repo/***.html linguist-vendored
-antbs/templates/scheduled.html linguist-vendored
+antbs/antbs/static/*** linguist-vendored
+antbs/antbs/templates/building.html linguist-vendored
+antbs/antbs/templates/issues.html linguist-vendored
+antbs/antbs/templates/overview.html linguist-vendored
+antbs/antbs/templates/builds/***.html linguist-vendored
+antbs/antbs/templates/package.html linguist-vendored
+antbs/antbs/templates/repo/***.html linguist-vendored
+antbs/antbs/templates/scheduled.html linguist-vendored
