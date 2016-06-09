@@ -117,7 +117,8 @@ def builds_with_status(build_status=None, page=None, query=None):
 
 @build_view.route('/queue')
 def build_queue():
-    return try_render_template("builds/scheduled.html", queued=get_build_queue())
+    return try_render_template("builds/scheduled.html",
+                               queued=get_build_queue(status, get_trans_object))
 
 
 @build_view.route('/<int:bnum>')

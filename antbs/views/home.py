@@ -89,7 +89,7 @@ def homepage(tlpage=None):
 
     build_history, timestamps = get_build_history_chart_data()
     stats = {
-        'build_queue': len(get_build_queue()),
+        'build_queue': len(get_build_queue(status, get_trans_object)),
         'repo_main': get_number_of_packages_in_repo('antergos'),
         'repo_staging': get_number_of_packages_in_repo('antergos-staging')
     }

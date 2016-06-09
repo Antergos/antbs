@@ -67,7 +67,8 @@ from utils.utilities import (
     copy_or_symlink,
     symlink,
     remove,
-    RQWorkerCustomExceptionHandler
+    RQWorkerCustomExceptionHandler,
+    get_build_queue
 )
 
 from webhook import Webhook
@@ -190,24 +191,6 @@ def get_build_history_chart_data(pkg_obj=None):
         timestamps[key] = chart_data[key]['builds']
 
     return chart_data, timestamps
-
-
-def get_build_queue():
-    if not status.transactions_running and not status.transaction_queue:
-        return []
-
-    queued = []
-    running = [t for t in status.transactions_running if t]
-    waiting = [t for t in status.transaction_queue if t]
-    all_transactions = running + waiting
-
-    for tnum in all_transactions:
-        trans_obj = get_trans_object(tnum=tnum)
-
-        if trans_obj.queue:
-            queued.extend(trans_obj.queue)
-
-    return queued
 
 
 from views.api import api_view

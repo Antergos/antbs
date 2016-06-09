@@ -286,3 +286,21 @@ def try_run_command(cmd, cwd):
         res = err.output
 
     return success, res
+
+
+def get_build_queue(status_obj, get_transaction):
+    if not status_obj.transactions_running and not status_obj.transaction_queue:
+        return []
+
+    queued = []
+    running = [t for t in status_obj.transactions_running if t]
+    waiting = [t for t in status_obj.transaction_queue if t]
+    all_transactions = running + waiting
+
+    for tnum in all_transactions:
+        trans_obj = get_transaction(tnum=tnum)
+
+        if trans_obj.queue:
+            queued.extend(trans_obj.queue)
+
+    return queued

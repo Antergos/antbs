@@ -152,23 +152,24 @@ class Webhook(WebhookMeta):
             self.is_monitor = True
 
         self.request = request
-        self.building = status.now_building
 
         if self.is_monitor or self.is_from_authorized_sender():
+            cnchi_result = self.request.args.get('result', None)
 
             if self.is_manual:
                 self.process_manual()
 
-            elif self.is_cnchi and self.request.args.get('result', None) is None:
+            elif self.is_cnchi and cnchi_result is None:
                 self.process_cnchi_start()
 
-            elif self.is_cnchi and self.request.args.get('result', None) is not None:
+            elif self.is_cnchi and cnchi_result is not None:
                 install_id = self.request.args.get('install_id', None)
-                result = self.request.args.get('result', None)
 
-                if install_id is not None and result is not None:
-                    logger.debug('Cnchi install_id {0} result is {1}'.format(install_id, result))
-                    result = AntergosInstallation.bool_string_helper(result)
+                if install_id is not None:
+                    logger.debug(
+                        'Cnchi install_id {0} result is {1}'.format(install_id, cnchi_result)
+                    )
+                    result = AntergosInstallation.bool_string_helper(cnchi_result)
                     self.process_cnchi_end(install_id, result)
 
             if self.is_github:
@@ -195,7 +196,7 @@ class Webhook(WebhookMeta):
         cnchi_version = self.request.headers.get('X-Cnchi-Installer', False)
 
         if manual_flag and manual_flag > 0:
-            if self.request.args.get('token') == db.get('ANTBS_MANUAL_TOKEN'):
+            if self.request.args.get('token', '') == db.get('ANTBS_MANUAL_TOKEN'):
                 self.is_manual = True
                 self.is_authorized = True
                 self.manual_trans_index = manual_flag
@@ -204,7 +205,7 @@ class Webhook(WebhookMeta):
             self.is_cnchi = cnchi_version
             self.is_authorized = True
 
-        elif '' != gitlab and 'Push Hook' == gitlab:
+        elif gitlab and 'Push Hook' == gitlab:
             self.is_gitlab = True
             self.is_authorized = True
             self.changes = [['numix-icon-theme-square']]
@@ -249,7 +250,9 @@ class Webhook(WebhookMeta):
     def process_github(self):
         if self.is_manual:
             return
+
         self.payload = json.loads(self.request.data.decode('UTF-8'))
+
         # Save payload in the database temporarily in case we need it later.
         dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
         key = 'antbs:github:payloads:{0}'.format(dt)
