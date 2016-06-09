@@ -68,7 +68,8 @@ from utils.utilities import (
     symlink,
     remove,
     RQWorkerCustomExceptionHandler,
-    get_build_queue
+    get_build_queue,
+    all_file_paths_exist
 )
 
 from webhook import Webhook

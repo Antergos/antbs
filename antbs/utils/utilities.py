@@ -304,3 +304,7 @@ def get_build_queue(status_obj, get_transaction):
             queued.extend(trans_obj.queue)
 
     return queued
+
+
+def all_file_paths_exist(paths):
+    return not any(True for p in paths if not os.path.exists(p))

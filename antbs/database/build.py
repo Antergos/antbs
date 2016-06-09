@@ -46,6 +46,8 @@ from utils.sign_pkgs import sign_packages
 
 doc_util = DockerUtils()
 doc = doc_util.doc
+PKG_EXT = '.pkg.tar.xz'
+SIG_EXT = '.sig'
 
 
 class Build(RedisHash):
@@ -106,7 +108,7 @@ class Build(RedisHash):
                     'repo_container', 'live_output_key', 'last_line_key'],
             bool=['failed', 'completed', 'is_iso'],
             int=[],
-            list=['log'],
+            list=['log', 'generated_files'],
             set=['generated_pkgs'],
             path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
         ))
@@ -273,7 +275,7 @@ class Build(RedisHash):
 
         self.end_str = self.datetime_to_string(datetime.now())
 
-    def get_and_save_generated_file_names(self):
+    def get_save_pkgbuild_generates(self):
         try:
             generated_pkgs = self._pkg_obj._pkgbuild.get_generates(self.result_dir)
         except Exception:
@@ -283,6 +285,24 @@ class Build(RedisHash):
         for gen_pkg in generated_pkgs:
             if gen_pkg:
                 self.generated_pkgs.add(gen_pkg)
+
+    def get_save_generated_files_paths(self):
+        generated_files = [
+            os.path.join(self.result_dir, f)
+            for f in os.listdir(self.result_dir)
+            if f.endswith(PKG_EXT)
+        ]
+
+        self.generated_files.extend(generated_files)
+
+    def get_save_generated_signatures_paths(self):
+        generated_files = [
+            os.path.join(self.result_dir, f)
+            for f in os.listdir(self.result_dir)
+            if f.endswith(PKG_EXT + SIG_EXT)
+        ]
+
+        self.generated_files.extend(generated_files)
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname
@@ -305,14 +325,18 @@ class Build(RedisHash):
                                            self.cache_i686, self._32build, self._32bit)
         container = {}
         try:
-            container = doc.create_container("antergos/makepkg",
-                                             command='/makepkg/build.sh',
-                                             volumes=['/var/cache/pacman', '/makepkg', '/antergos',
-                                                      '/pkg', '/root/.gnupg', '/staging', '/32bit',
-                                                      '/32build', '/result',
-                                                      '/var/cache/pacman_i686'],
-                                             environment=build_env, cpuset='0-3',
-                                             name=self._pkg_obj.pkgname, host_config=hconfig)
+            container = doc.create_container(
+                'antergos/makepkg',
+                command='/makepkg/build.sh',
+                volumes=['/var/cache/pacman', '/makepkg', '/antergos',
+                         '/pkg', '/root/.gnupg', '/staging', '/32bit',
+                         '/32build', '/result',
+                         '/var/cache/pacman_i686'],
+                environment=build_env,
+                cpuset='0-3',
+                name=self._pkg_obj.pkgname,
+                host_config=hconfig
+            )
             if container.get('Warnings', False):
                 logger.error(container.get('Warnings'))
 
@@ -347,9 +371,10 @@ class Build(RedisHash):
         stream_process.join()
 
         if not self.failed:
-            self.get_and_save_generated_file_names()
+            # self.get_save_pkgbuild_generates()
+            self.get_save_generated_files_paths()
 
-            _signed_packages = sign_packages(self._pkg_obj, self.generated_pkgs, self.bnum)
+            _signed_packages = sign_packages(self._pkg_obj, self.generated_files, self.bnum)
 
             if not _signed_packages:
                 logger.error('Failed to sign packages!')
@@ -370,6 +395,7 @@ class Build(RedisHash):
                         last_bld_obj.review_status = 'skip'
 
             self.save_build_results(True)
+            self.get_save_generated_signatures_paths()
             return True
 
         self.save_build_results(False)

@@ -100,62 +100,55 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
             logger.error(err)
             return dict(error=True, msg=err)
 
-        if 'main' not in pkg_obj.allowed_in and result == 'passed':
+        if result == 'passed' and 'main' not in pkg_obj.allowed_in:
             msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-            errmsg.update(error=True, msg=msg)
-            return errmsg
+            return dict(error=True, msg=msg)
         else:
             bld_obj.review_dev = dev
             bld_obj.review_date = dt
             bld_obj.review_status = result
 
-        if result == 'skip' or 'mate' in pkg_obj.groups:
-            errmsg = dict(error=False, msg=None)
-            return errmsg
+        if result == 'skip':
+            return dict(error=False, msg=None)
 
-        glob_string_64 = '{0}/**/{1}**'.format(status.STAGING_64, pkg_obj.filename_str)
-        glob_string_32 = '{0}/**/{1}**'.format(status.STAGING_32, pkg_obj.filename_str)
-        pkg_files_64 = glob(glob_string_64, recursive=True)
-        pkg_files_32 = glob(glob_string_32, recursive=True)
-        pkg_files = pkg_files_64 + pkg_files_32
+        file_count = len(bld_obj.generated_files)
+        files_exist = bld_obj.generated_files and all_file_paths_exist(bld_obj.generated_files)
 
-        if pkg_obj.is_split_package and pkg_obj.split_packages:
-            for split_pkg in pkg_obj.split_packages:
-                fname = pkg_obj.filename_str.replace(pkg_obj.pkgname, split_pkg)
-                glob_string_64 = '{0}/**/{1}**'.format(status.STAGING_64, fname)
-                glob_string_32 = '{0}/**/{1}**'.format(status.STAGING_32, fname)
-                pkg_files.extend(glob(glob_string_64, recursive=True))
-                pkg_files.extend(glob(glob_string_32, recursive=True))
-
-        if not pkg_files or not result:
-            err = 'While moving to main, no packages were found to move.'
+        if not result or not files_exist or not (file_count % 2 == 0):
+            err = 'While moving to main, invalid number of files found.'
             logger.error(err)
             return dict(error=True, msg=err)
 
-        for f in pkg_files_64:
-            if result == 'passed':
-                copy_or_symlink(f, status.MAIN_64)
-                copy_or_symlink(f, '/tmp')
+        for pkg_file in bld_obj.generated_files:
+            if 'i686' in pkg_file:
+                continue
 
-                if '-any.pkg' in f:
-                    fname = os.path.basename(f)
+            if 'passed' == result:
+                copy_or_symlink(pkg_file, status.MAIN_64)
+                copy_or_symlink(pkg_file, '/tmp')
+
+                if '-any.pkg' in pkg_file:
+                    fname = os.path.basename(pkg_file)
                     linkto = os.path.join(status.MAIN_64, fname)
                     link_from = os.path.join(status.MAIN_32, fname)
 
                     symlink(linkto, link_from)
 
-            if result != 'skip':
-                remove(f)
+            if 'skip' != result:
+                remove(pkg_file)
 
-        for f in pkg_files_32:
-            if result == 'passed' and '-any.pkg' not in f:
-                copy_or_symlink(f, status.MAIN_32)
-                copy_or_symlink(f, '/tmp')
+        for pkg_file in bld_obj.generated_files:
+            if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
+                continue
 
-            if result != 'skip':
-                remove(f)
+            if 'passed' == result:
+                copy_or_symlink(pkg_file, status.MAIN_32)
+                copy_or_symlink(pkg_file, '/tmp')
 
-        if result != 'skip':
+            if 'skip' != result:
+                remove(pkg_file)
+
+        if 'skip' != result:
             repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
             errmsg = dict(error=False, msg=None)
 

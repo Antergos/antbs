@@ -122,35 +122,19 @@ def batch_sign(paths, bnum='', uid=gpg_key, passphrase=password, is_iso=False):
     return True
 
 
-def get_filepaths_for_generated_pkgs(generated_pkgs):
-    filepaths64 = [
-        os.path.join(status.STAGING_64, '{}{}'.format(p, PKG_EXT))
-        for p in generated_pkgs
-        if 'i686' not in p
-    ]
-    filepaths32 = [
-        os.path.join(status.STAGING_32, '{}{}'.format(p, PKG_EXT))
-        for p in generated_pkgs
-        if 'i686' in p
-    ]
-
-    return filepaths64 + filepaths32
-
-
 def sign_packages(pkg_obj, generated_pkgs, bnum=''):
-    pkgs2sign = get_filepaths_for_generated_pkgs(generated_pkgs)
 
     db.publish('live:build_output:{0}'.format(bnum), 'Signing packages..')
 
-    logger.info('[PKGS TO SIGN] %s' % pkgs2sign)
+    logger.info('[PKGS TO SIGN] %s' % generated_pkgs)
 
-    if pkgs2sign:
-        for pkg in pkgs2sign:
+    if generated_pkgs:
+        for pkg in generated_pkgs:
             existing_sig = '{0}.sig'.format(pkg)
 
             if os.path.exists(existing_sig):
                 remove(existing_sig)
 
-        return batch_sign(pkgs2sign, bnum)
+        return batch_sign(generated_pkgs, bnum)
 
     return False
