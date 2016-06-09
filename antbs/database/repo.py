@@ -38,7 +38,7 @@ from redis.lock import Lock
 from database.base_objects import RedisHash
 from database.server_status import status
 from utils.logging_config import logger
-from utils.utilities import Singleton, remove, try_run_command, MyLock
+from utils.utilities import Singleton, remove, try_run_command
 import utils.docker_util as docker_util
 
 doc_util = docker_util.DockerUtils()
@@ -47,8 +47,6 @@ PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'
 DB_EXT = '.db.tar.gz'
 SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
-
-main_repo = staging_repo = None
 
 
 class PacmanRepo(RedisHash):
@@ -100,22 +98,36 @@ class PacmanRepo(RedisHash):
             self.path = os.path.join(path, name)
             status.repos.add(name)
 
-        _lock_name = '{}:_lock'.format(self.full_key)
-        self._lock = MyLock(self.db, _lock_name)
+        self._lock_name = '{}:_lock'.format(self.full_key)
+        #self._lock = Lock(self.db, _lock_name, blocking=False, thread_local=False)
+        self.locked = False
 
     def sync_repo_packages_data(self):
-        with self._lock:
+
+        if not self.locked and self.db.setnx(self._lock_name, True):
             self.locked = True
+            self.db.expire(self._lock_name, 300)
 
             self._determine_current_repo_state_alpm()
             self._determine_current_repo_state_fs()
             self._process_current_repo_states()
+            self._process_repo_packages_unaccounted_for()
 
-        self.locked = False
+            self.db.delete(self._lock_name)
+            self.locked = False
+
+        else:
+            logger.debug('repo is locked! waiting for lock to be released...')
+            gevent.sleep(1)
+
+            while self.locked:
+                gevent.sleep(5)
+
+            logger.debug('lock has been released!')
 
     def _process_current_repo_states(self):
-        pkgs_fs = set(self.pkgs_fs)
-        pkgs_alpm = set(self.pkgs_alpm)
+        pkgs_fs = set(list(self.pkgs_fs))
+        pkgs_alpm = set(list(self.pkgs_alpm))
         accounted_for = list(pkgs_fs & pkgs_alpm)
         unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs)
 
@@ -130,6 +142,8 @@ class PacmanRepo(RedisHash):
             self.unaccounted_for.add(pkg)
 
         self.pkgnames.extend(self._get_pkgnames(accounted_for))
+
+        logger.debug([self.name, unaccounted_for])
 
     def _get_pkgnames(self, location):
         return [p.split('|')[0] for p in location if p]
@@ -215,6 +229,8 @@ class PacmanRepo(RedisHash):
     def _get_packages_unaccounted_for_info(self):
         unaccounted_for = {}
 
+        logger.debug([self.name, list(self.unaccounted_for)])
+
         for pkg in self.unaccounted_for:
             pkgname = pkg.rsplit('|')[0]
             unaccounted_for[pkgname] = dict(fs=[], alpm=[])
@@ -224,6 +240,8 @@ class PacmanRepo(RedisHash):
 
             if self.has_package_alpm(pkgname):
                 unaccounted_for[pkgname]['alpm'].append(self.get_pkgver_alpm(pkgname))
+
+        logger.debug([self.name, unaccounted_for])
 
         return unaccounted_for
 
@@ -257,12 +275,14 @@ class PacmanRepo(RedisHash):
 
     def _process_repo_packages_unaccounted_for(self):
         unaccounted_for = self._get_packages_unaccounted_for_info()
-        logger.debug(unaccounted_for)
         add_to_db = []
         rm_from_db = []
         rm_from_fs = []
 
-        for pkgname, versions in unaccounted_for:
+        if not unaccounted_for:
+            return
+
+        for pkgname, versions in unaccounted_for.items():
             if not versions['fs'] and not versions['alpm']:
                 logger.error('nothing to compare')
                 continue
@@ -288,8 +308,8 @@ class PacmanRepo(RedisHash):
                 for pkgver in versions['alpm']:
                     rm_from_db.append((pkgname, pkgver))
 
-        logger.error(
-            [('add_to_db', add_to_db), ('rm_from_db', rm_from_db), ('rm_from_fs', rm_from_fs)]
+        logger.debug(
+            [self.name, ('add_to_db', add_to_db), ('rm_from_db', rm_from_db), ('rm_from_fs', rm_from_fs)]
         )
 
     def _add_or_remove_package_alpm_database(self, pkg_fname, action):
@@ -380,21 +400,11 @@ class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
 
 
 def get_repo_object(name, path=None):
-    global main_repo, staging_repo
-
     path = path if path else status.REPO_BASE_DIR
 
-    if main_repo is None:
-        main_repo = AntergosRepo(path=path)
-        main_repo.sync_repo_packages_data()
-
-    if staging_repo is None:
-        staging_repo = AntergosStagingRepo(path=path)
-        staging_repo.sync_repo_packages_data()
-
     if 'antergos' == name:
-        return main_repo
+        return AntergosRepo(path=path)
     elif 'antergos-staging' == name:
-        return staging_repo
+        return AntergosStagingRepo(path=path)
     else:
         raise TypeError('name must be one of [antergos, antergos-staging]')

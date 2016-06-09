@@ -158,16 +158,19 @@ class RQWorkerCustomExceptionHandler:
 
 class MyLock:
     def __init__(self, redis_client, key):
-        self.lock = redis_client.lock(key, blocking_timeout=300)
+        self.lock = redis_client.lock(key, blocking_timeout=300, thread_local=False)
+        self.locked = False
 
     def __enter__(self):
-        if self.lock.acquire():
+        if self.lock.acquire(blocking=True):
+            self.locked = True
             return self
         else:
             raise LockError('Cannot release an unlocked lock')
 
     def __exit__(self, type, value, tb):
-        self.lock.release()
+        if self.locked:
+            self.lock.release()
 
 
 def truncate_middle(s, n):

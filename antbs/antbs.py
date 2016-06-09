@@ -47,13 +47,11 @@ from werkzeug.contrib.fixers import ProxyFix
 
 import rq_dashboard
 
-from database.server_status import status
 from utils.logging_config import logger, handle_exceptions
+from database.server_status import status
+from database.repo import get_repo_object
 
 import views
-
-
-app = None
 
 
 def url_for_other_page(page):
@@ -68,8 +66,8 @@ def initialize_app():
 
     """
 
-    global app
     app = Flask('antbs')
+
     handle_exceptions(app)
 
     # Stormpath configuration
@@ -111,9 +109,20 @@ def initialize_app():
     app.register_blueprint(views.package_view, url_prefix='/package')
     app.register_blueprint(views.repo_view, url_prefix='/repo')
 
+    return app
+
 
 # Make `app` available to gunicorn
-initialize_app()
+app = initialize_app()
+
+
+@app.before_first_request
+def initialize_repo_objects():
+    main_repo = get_repo_object('antergos')
+    staging_repo = get_repo_object('antergos-staging')
+
+    main_repo.sync_repo_packages_data()
+    staging_repo.sync_repo_packages_data()
 
 
 @app.before_request

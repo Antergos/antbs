@@ -51,14 +51,14 @@ def get_repo_packages(repo_name=None, group=None, page=None):
     else:
         rev_pending = []
 
-    if not repo_obj.packages:
+    if not repo_obj.pkgnames:
         logger.error('repo is empty!')
         return pkgs, rev_pending
 
     if group:
-        repo_packages = [p for p in list(repo_obj.packages.sort()) if package_in_group(p, group)]
+        repo_packages = [p for p in list(repo_obj.pkgnames.sort()) if package_in_group(p, group)]
     else:
-        repo_packages = [p for p in list(repo_obj.packages.sort())]
+        repo_packages = [p for p in list(repo_obj.pkgnames.sort())]
 
     packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
 

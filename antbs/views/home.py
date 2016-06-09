@@ -29,8 +29,6 @@
 from views import *
 
 home_view = Blueprint('home', __name__)
-main_repo = get_repo_object('antergos')
-staging_repo = get_repo_object('antergos-staging')
 
 
 ###
@@ -65,7 +63,8 @@ def get_timeline(tlpage=None):
 
 
 def get_number_of_packages_in_repo(repo_name):
-    global main_repo, staging_repo
+    main_repo = get_repo_object('antergos')
+    staging_repo = get_repo_object('antergos-staging')
 
     return len(main_repo.pkgs_alpm) if 'antergos' == repo_name else len(staging_repo.pkgs_alpm)
 
