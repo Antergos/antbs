@@ -87,7 +87,6 @@ def initialize_app():
     StormpathManager(app)
 
     # Jinja2 configuration
-    global url_for_other_page
     app.jinja_options = Flask.jinja_options.copy()
     app.jinja_options['lstrip_blocks'] = True
     app.jinja_options['trim_blocks'] = True
@@ -114,15 +113,6 @@ def initialize_app():
 
 # Make `app` available to gunicorn
 app = initialize_app()
-
-
-@app.before_first_request
-def initialize_repo_objects():
-    main_repo = get_repo_object('antergos')
-    staging_repo = get_repo_object('antergos-staging')
-
-    main_repo.sync_repo_packages_data()
-    staging_repo.sync_repo_packages_data()
 
 
 @app.before_request

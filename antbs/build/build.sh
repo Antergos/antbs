@@ -46,6 +46,37 @@ _2log() {
 }
 
 
+prepare_makepkg_and_pacman_configs() {
+	local _32bit
+	_32bit=$1
+
+	[[ -z "${_32bit}" ]] && {
+		cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
+		sed -i 's|unknown|x86_64|g' /etc/makepkg.conf
+	}
+
+	if [[ "${_ALEXPKG}" = "False" ]]; then
+		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
+		export PACKAGER="Antergos Build Server <dev@antergos.com>"
+		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
+		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
+		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
+		sed -i '1s%^%[antergos]\nSigLevel = PackageRequired\nServer = file:///main/$arch\n%' /etc/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = file:///staging/$arch\n%' /etc/pacman.conf
+
+	else
+		export PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"
+		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /etc/makepkg.conf
+		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
+		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
+		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
+	fi
+
+	sed -i 's|CheckSpace||g' /etc/pacman.conf
+	echo 'PKGDEST=/result' >> /etc/makepkg.conf
+
+}
+
 setup_environment() {
 	export update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
 	export update_success='STAGING REPO UPDATE COMPLETE'
@@ -64,45 +95,15 @@ setup_environment() {
 		chmod -R a+rw /pkg
 		cd /pkg
 
-	elif [[ "True" != "${_UPDREPO}" && -z "${_GET_GENERATES}" ]]; then
+	else
 		_2log 'ERROR WHILE SETTING UP ENVIRONMENT (BUILD FAILED)'
 		exit 1;
 	fi
 
-	if [[ "${_GET_PKGVER_ONLY}" = "True" ]]; then
-		if [[ $(type pkgver) = "function" ]]; then
-			touch "/result/$(pkgver)" && exit 0
-		else
-			touch "/result/${pkgver}" && exit 0
-		fi
-		exit 1
-	fi
+	prepare_makepkg_and_pacman_configs
 
-	cp /usr/share/devtools/makepkg-x86_64.conf /etc/makepkg.conf
-	sed -i 's|unknown|x86_64|g' /etc/makepkg.conf
-
-	if [[ "${_ALEXPKG}" = "False" ]]; then
-		echo "GPGKEY=24B445614FAC071891EDCE49CDBD406AA1AA7A1D" >> /etc/makepkg.conf
-		export PACKAGER="Antergos Build Server <dev@antergos.com>"
-		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Antergos Build Server <dev@antergos.com>"|g' /etc/makepkg.conf
-		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
-		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
-		sed -i '1s%^%[antergos]\nSigLevel = PackageRequired\nServer = file:///main/$arch\n%' /etc/pacman.conf
-		sed -i '1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = file:///staging/$arch\n%' /etc/pacman.conf
-
-	else
-		export PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"
-		sed -i 's|#PACKAGER="John Doe <john@doe.com>"|PACKAGER="Alexandre Filgueira <alexfilgueira@cinnarch.com>"|g' /etc/makepkg.conf
-		sed -i '/\[antergos/,+1 d' /etc/pacman.conf
-		sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
-		sed -i '1s%^%[antergos-staging]\nSigLevel = Never\nServer = file:///staging/$arch\n%' /etc/pacman.conf
-		#sed -i '/\[antergos-staging/,+1 d' /etc/pacman.conf
-	fi
-
-	sed -i 's|CheckSpace||g' /etc/pacman.conf
-	echo 'BUILDDIR=/var/tmp' >> /etc/makepkg.conf
-	echo "www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin" >> /etc/passwd
-	echo "www-data:x:33:git,www-data" >> /etc/group
+	echo 'www-data:x:33:33:www-data:/var/www:/usr/sbin/nologin' >> /etc/passwd
+	echo 'www-data:x:33:git,www-data' >> /etc/group
 
 	git config --global user.name "Antergos Build Server"
 	git config --global user.email "admin@antergos.org"
@@ -156,60 +157,60 @@ create_pkgbuild_generates_array() {
 }
 
 
-update_repo() {
-	_2log "UPDATING ${1} REPO";
-	create_pkg_filenames_array
+#update_repo() {
+#	_2log "UPDATING ${1} REPO";
+#	create_pkg_filenames_array
+#
+#	for arc in x86_64 i686; do
+#		cd "/${repo_dir}/${arc}"
+#
+#		for pkg2_add_rm in "${_filenames[@]}"; do
+#			repo-add -R "${repo}.db.tar.gz" "${pkg2_add_rm}" && touch "/result/${pkg2_add_rm}"
+#		done
+#
+#	done && return 0;
+#
+#	return 1
+#}
 
-	for arc in x86_64 i686; do
-		cd "/${repo_dir}/${arc}"
 
-		for pkg2_add_rm in "${_filenames[@]}"; do
-			repo-add -R "${repo}.db.tar.gz" "${pkg2_add_rm}" && touch "/result/${pkg2_add_rm}"
-		done
+#remove_pkg() {
+#	local repo_dir=staging
+#	local repo=antergos-staging
+#
+#	create_pkgnames_array
+#	_2log "REMOVING ${_pkgnames[*]} FROM STAGING REPO"
+#
+#	for arc in i686 x86_64; do
+#		cd "/${repo_dir}/${arc}"
+#
+#		for pkg2_rm in "${_pkgnames[@]}"; do
+#			repo-remove "${repo}.db.tar.gz" "${pkg2_rm}"
+#		done
+#
+#	done && return 0
+#
+#	return 1
+#}
 
-	done && return 0;
-
-	return 1
-}
-
-
-remove_pkg() {
-	local repo_dir=staging
-	local repo=antergos-staging
-
-	create_pkgnames_array
-	_2log "REMOVING ${_pkgnames[*]} FROM STAGING REPO"
-
-	for arc in i686 x86_64; do
-		cd "/${repo_dir}/${arc}"
-
-		for pkg2_rm in "${_pkgnames[@]}"; do
-			repo-remove "${repo}.db.tar.gz" "${pkg2_rm}"
-		done
-
-	done && return 0
-
-	return 1
-}
-
-symlink_any() {
-	local _file
-
-	cd "/${repo_dir}/x86_64"
-	create_pkg_filenames_array
-
-	for _file in "${_filenames[@]}"; do
-		[[ "${_file}" != **'-any.'** ]] && continue
-
-		if [[ -f ./"${_file}" ]]; then
-			_2log 'Creating symlinks for "any" package'
-			ln -sfr ./"${_file}" ../i686/"${_file}"
-		fi
-
-	done && return 0;
-
-	return 1;
-}
+#symlink_any() {
+#	local _file
+#
+#	cd "/${repo_dir}/x86_64"
+#	create_pkg_filenames_array
+#
+#	for _file in "${_filenames[@]}"; do
+#		[[ "${_file}" != **'-any.'** ]] && continue
+#
+#		if [[ -f ./"${_file}" ]]; then
+#			_2log 'Creating symlinks for "any" package'
+#			ln -sfr ./"${_file}" ../i686/"${_file}"
+#		fi
+#
+#	done && return 0;
+#
+#	return 1;
+#}
 
 
 check_pkg_sums() {
@@ -229,9 +230,7 @@ check_pkg_sums() {
 
 setup_32bit_env() {
 	chmod -R 777 /32build
-	chmod -R a+rw /staging/i686
 	cp /usr/share/devtools/makepkg-i686.conf /32bit/makepkg.conf
-	echo 'BUILDDIR=/var/tmp' >> /32bit/makepkg.conf
 	cp /etc/pacman.conf /32bit
 	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
 	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
@@ -290,7 +289,7 @@ build_32bit_pkg() {
 			'/32build/root' \
 			'/usr/bin/bash' \
 			-c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -m -f -L ${DEPS} --noconfirm --needed" 2>&1 \
-		&& cp /32build/root/pkg/*-i686.pkg.* /staging/i686 \
+		&& cp /32build/root/pkg/*-i686.pkg.* /result \
 		&& return 0; } || return 1
 }
 
@@ -310,16 +309,15 @@ try_build() {
 
 		{ build_32bit_pkg 2>&1 && return 0; } \
 	||
-		{ cd /staging/x86_64 && remove_pkg && return 1; }
+		{ cd /result && rm **.pkg.** && return 1; }
 
 	else
 		cd /pkg && _2log 'UPDATING SOURCE CHECKSUMS';
 
 		check_pkg_sums &&
 		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 \
-			&& symlink_any \
 			&& _output_pkgbuild_generates \
-			&& return 0; } || return 1
+			&& return 0; } || { cd /result && rm **.pkg.** && return 1; }
 	fi
 }
 
@@ -336,14 +334,11 @@ export_update_repo_env_vars() {
 }
 
 
-build_package_or_prepare_to_update_repo() {
-	[[ "True" = "${_UPDREPO}" ]] && { export_update_repo_env_vars && return 0; }
-
+build_package() {
 	_2log 'SYNCING REPO DATABASES'
 	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
 	pacman -Syyu --noconfirm
-	echo "PKGDEST=/staging/x86_64" >> /etc/makepkg.conf
-	chmod -R a+rw /staging/x86_64 && chmod 777 /tmp /var /var/tmp
+	chmod -R a+rw /result && chmod 777 /tmp /var /var/tmp
 
 	export repo=antergos-staging
 	export repo_dir=staging
@@ -365,33 +360,33 @@ build_package_or_prepare_to_update_repo() {
 }
 
 
-exit_with_failed_status() {
-	_2log "${update_error}" && exit 1;
-}
-
-
-maybe_run_update_repo() {
-	if [[ "${_UPDREPO}" != "True" ]]; then
-		_2log 'Cannot update repo during build!'
-		return 1
-	fi
-
-	if [[ "${repo_dir}" = 'main' && "${RESULT}" = 'passed' ]]; then
-
-		{ update_repo "${repo}" && remove_pkg && _2log "${update_success}"; } || exit_with_failed_status
-
-	elif [[ "${repo_dir}" = 'main' && "${RESULT}" = 'failed' ]]; then
-
-		{ remove_pkg && _2log "${update_success}"; } || exit_with_failed_status
-
-	elif [[ "${repo_dir}" != 'main' ]]; then
-
-		{ update_repo "${repo}" && _2log "${update_success}"; } || exit_with_failed_status
-
-	else
-		_2log 'BUILD FAILED' && exit 1
-	fi
-}
+#exit_with_failed_status() {
+#	_2log "${update_error}" && exit 1;
+#}
+#
+#
+#maybe_run_update_repo() {
+#	if [[ "${_UPDREPO}" != "True" ]]; then
+#		_2log 'Cannot update repo during build!'
+#		return 1
+#	fi
+#
+#	if [[ "${repo_dir}" = 'main' && "${RESULT}" = 'passed' ]]; then
+#
+#		{ update_repo "${repo}" && remove_pkg && _2log "${update_success}"; } || exit_with_failed_status
+#
+#	elif [[ "${repo_dir}" = 'main' && "${RESULT}" = 'failed' ]]; then
+#
+#		{ remove_pkg && _2log "${update_success}"; } || exit_with_failed_status
+#
+#	elif [[ "${repo_dir}" != 'main' ]]; then
+#
+#		{ update_repo "${repo}" && _2log "${update_success}"; } || exit_with_failed_status
+#
+#	else
+#		_2log 'BUILD FAILED' && exit 1
+#	fi
+#}
 
 
 ###
@@ -409,6 +404,5 @@ if [[ -n "${_GET_GENERATES}" ]]; then
 	exit 0
 fi
 
-{ build_package_or_prepare_to_update_repo && maybe_run_update_repo; } || _2log 'BUILD FAILED' && exit 1
+build_package || { _2log 'BUILD FAILED' && exit 1; }
 
-chown -R 33:33 /"${repo_dir}" && exit 0
