@@ -44,7 +44,7 @@ def get_repo_packages(repo_name=None, group=None, page=None):
     pkgs = []
     bld_obj = None
     all_pages = 0
-    repo_obj = get_repo_object(repo_name)
+    repo_obj = get_repo_object(repo_name, 'x86_64')
 
     if current_user.is_authenticated:
         rev_pending = []

@@ -216,7 +216,7 @@ def build_pkg_now():
             if name not in status.all_packages and name in status.groups:
                 pkgnames.extend(get_group_packages(names))
             else:
-                pkgnames.extend([names])
+                pkgnames.extend([name])
 
         if pkgnames:
             if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
@@ -229,7 +229,7 @@ def build_pkg_now():
             if 'cnchi-dev' == pkgnames[0]:
                 db.set('CNCHI-DEV-OVERRIDE', True)
 
-            trans = get_trans_object(packages=[pkgnames], repo_queue=repo_queue)
+            trans = get_trans_object(packages=pkgnames, repo_queue=repo_queue)
             status.transaction_queue.rpush(trans.tnum)
             transaction_queue.enqueue_call(handle_hook, timeout=84600)
             get_timeline_object(

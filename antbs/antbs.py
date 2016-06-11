@@ -49,7 +49,6 @@ import rq_dashboard
 
 from utils.logging_config import logger, handle_exceptions
 from database.server_status import status
-from database.repo import get_repo_object
 
 import views
 

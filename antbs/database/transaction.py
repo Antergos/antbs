@@ -90,8 +90,10 @@ class TransactionMeta(RedisHash):
         self._internal_deps = []
         self._build_dirpaths = {}
         self._pkgvers = {}
-        self._main_repo = get_repo_object('antergos')
-        self._staging_repo = get_repo_object('antergos-staging')
+        self._main_repo = get_repo_object('antergos', 'x86_64')
+        self._staging_repo = get_repo_object('antergos-staging', 'x86_64')
+        self._main_repo32 = get_repo_object('antergos', 'i686')
+        self._staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
         if not self or not self.tnum:
             self.__keysinit__()
