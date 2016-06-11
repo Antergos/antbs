@@ -292,8 +292,11 @@ class Build(RedisHash):
             for f in os.listdir(self.result_dir)
             if f.endswith(PKG_EXT)
         ]
+        logger.debug(generated_files)
 
         self.generated_files.extend(generated_files)
+
+        return generated_files
 
     def get_save_generated_signatures_paths(self):
         generated_files = [
@@ -303,6 +306,8 @@ class Build(RedisHash):
         ]
 
         self.generated_files.extend(generated_files)
+
+        return generated_files
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname
@@ -372,18 +377,14 @@ class Build(RedisHash):
 
         if not self.failed:
             # self.get_save_pkgbuild_generates()
-            self.get_save_generated_files_paths()
+            generated_files = self.get_save_generated_files_paths()
 
-            _signed_packages = sign_packages(self._pkg_obj, self.generated_files, self.bnum)
+            _signed_packages = sign_packages(generated_files, self.bnum)
 
             if not _signed_packages:
                 logger.error('Failed to sign packages!')
                 self.save_build_results(False)
                 return False
-
-            if self.completed:
-                fnames = [p for p in self.generated_pkgs if p]
-                self._pkg_obj.filename_str = fnames[0]
 
             if self._pkg_obj.builds and len(self._pkg_obj.builds) > 1:
                 last_build = self._pkg_obj.builds[-2]

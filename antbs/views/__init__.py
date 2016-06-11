@@ -146,6 +146,10 @@ def package_in_group(pkg=None, group=None):
     return False
 
 
+def get_group_packages(group):
+    return [p for p in status.all_packages if package_in_group(p, group)]
+
+
 def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
 

@@ -38,7 +38,14 @@ from redis.lock import Lock
 from database.base_objects import RedisHash
 from database.server_status import status
 from utils.logging_config import logger
-from utils.utilities import Singleton, remove, try_run_command
+
+from utils.utilities import (
+    Singleton,
+    remove,
+    try_run_command,
+    recursive_chown
+)
+
 import utils.docker_util as docker_util
 
 doc_util = docker_util.DockerUtils()
@@ -111,7 +118,6 @@ class PacmanRepo(RedisHash):
             self._determine_current_repo_state_alpm()
             self._determine_current_repo_state_fs()
             self._process_current_repo_states()
-            self._process_repo_packages_unaccounted_for()
 
             self.db.delete(self._lock_name)
             self.locked = False
@@ -233,10 +239,11 @@ class PacmanRepo(RedisHash):
 
         for pkg in self.unaccounted_for:
             pkgname = pkg.rsplit('|')[0]
-            unaccounted_for[pkgname] = dict(fs=[], alpm=[])
+            unaccounted_for[pkgname] = dict(fs=[], alpm=[], filename='')
 
             if self.has_package_filesystem(pkgname):
                 unaccounted_for[pkgname]['fs'].extend(self.get_pkgvers_filesystem(pkgname))
+                unaccounted_for[pkgname]['filename'] = pkgname.replace('|', '-')
 
             if self.has_package_alpm(pkgname):
                 unaccounted_for[pkgname]['alpm'].append(self.get_pkgver_alpm(pkgname))
@@ -298,19 +305,26 @@ class PacmanRepo(RedisHash):
                     latest = latest_fs
 
                 if latest[0] != in_db_now:
-                    add_to_db.append((pkgname, latest[0]))
+                    fname = [p for p in self.unaccounted_for if pkgname in p and latest[0] in p]
+                    fname = fname[0].replace('|', '-')
+                    add_to_db.append(fname)
 
                 for pkgver in versions['fs']:
                     if pkgver != latest[0]:
-                        rm_from_fs.append((pkgname, pkgver))
+                        fname = [p for p in self.unaccounted_for
+                                 if pkgname in p and latest[0] in p]
+                        fname = fname[0].replace('|', '-')
+                        rm_from_fs.append('{}{}'.format(fname, PKG_EXT))
 
             elif versions['alpm'] and not versions['fs']:
                 for pkgver in versions['alpm']:
-                    rm_from_db.append((pkgname, pkgver))
+                    rm_from_db.append(pkgname)
 
         logger.debug(
             [self.name, ('add_to_db', add_to_db), ('rm_from_db', rm_from_db), ('rm_from_fs', rm_from_fs)]
         )
+
+        return add_to_db, rm_from_db, rm_from_fs
 
     def _add_or_remove_package_alpm_database(self, pkg_fname, action):
         package_file = '{}{}'.format(pkg_fname, PKG_EXT)
@@ -350,17 +364,62 @@ class PacmanRepo(RedisHash):
                 res
             )
 
-    def _update_repo(self):
+    def _remove_package_from_filesystem(self, pkg_file):
+        sig = '{}{}'.format(pkg_file, SIG_EXT)
+
+        for file_name in [pkg_file, sig]:
+            remove(file_name)
+
+    def _take_action_on_packages_unaccounted_for(self, add_to_db, rm_from_db, rm_from_fs):
+        fix_perms = False
+
+        if add_to_db:
+            fix_perms = True
+
+            for pkg in add_to_db:
+                self._add_or_remove_package_alpm_database(pkg, 'add')
+
+        if rm_from_db:
+            fix_perms = True
+
+            for pkg in rm_from_db:
+                self._add_or_remove_package_alpm_database(pkg, 'remove')
+
+        if rm_from_fs:
+            fix_perms = True
+
+            for pkg in rm_from_fs:
+                self._remove_package_from_filesystem(pkg)
+
+        if fix_perms:
+            recursive_chown(self.path, 33, 33)
+
+    def _update_repo(self, recursing=0):
         self.sync_repo_packages_data()
 
-        if self.pkgs_alpm != self.pkgs_fs:
-            with self._lock:
+        if self.pkg_count_alpm != self.pkg_count_fs:
+            if not self.locked and self.db.setnx(self._lock_name, True):
                 self.locked = True
-                self._process_repo_packages_unaccounted_for()
+                self.db.expire(self._lock_name, 300)
 
-            self.locked = False
+                add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_unaccounted_for()
 
-        self._post_update_sanity_check(pkg_fnames, action)
+                self._take_action_on_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
+
+                self.db.delete(self._lock_name)
+                self.locked = False
+
+            else:
+                logger.debug('repo is locked! waiting for lock to be released...')
+                gevent.sleep(1)
+
+                while self.locked:
+                    gevent.sleep(5)
+
+                logger.debug('lock has been released!')
+
+                if recursing < 4:
+                    self._update_repo(recursing + 1)
 
     def update_repo(self):
         trans_running = status.transactions_running or status.transaction_queue

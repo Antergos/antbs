@@ -308,3 +308,11 @@ def get_build_queue(status_obj, get_transaction):
 
 def all_file_paths_exist(paths):
     return not any(True for p in paths if not os.path.exists(p))
+
+
+def recursive_chown(path, uid, gid):
+    for root, dirs, files in os.walk(path):
+        for item in dirs:
+            os.chown(os.path.join(root, item), uid, gid)
+        for item in files:
+            os.chown(os.path.join(root, item), uid, gid)

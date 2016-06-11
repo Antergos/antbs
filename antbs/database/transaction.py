@@ -27,7 +27,14 @@ import tempfile
 
 import utils.docker_util as docker_util
 from utils.logging_config import logger
-from utils.utilities import PacmanPackageCache, remove
+
+from utils.utilities import (
+    PacmanPackageCache,
+    remove,
+    all_file_paths_exist,
+    copy_or_symlink,
+    symlink
+)
 
 from .base_objects import RedisHash
 from .build import get_build_object
@@ -153,10 +160,10 @@ class Transaction(TransactionMeta):
         if self.queue:
             while self.queue:
                 pkg = self.queue.lpop()
-                pbpath = self.get_package_build_directory(pkg)
+                build_dir = self.get_build_directory(pkg)
 
-                if not pbpath:
-                    raise RuntimeError('pbpath cannot be None.')
+                if not build_dir:
+                    raise RuntimeError('build_dir cannot be None.')
 
                 pkg_obj = get_pkg_object(name=pkg)
                 bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum)
@@ -167,7 +174,7 @@ class Transaction(TransactionMeta):
                     )
                     result = bld_obj.start(pkg_obj)
                 else:
-                    bld_obj = self.setup_package_build_directory(bld_obj, pbpath)
+                    bld_obj = self.setup_build_directory(bld_obj, build_dir)
                     result = bld_obj.start(pkg_obj)
 
                 if result in [True, False]:
@@ -189,6 +196,7 @@ class Transaction(TransactionMeta):
 
                     if result is True:
                         if not pkg_obj.is_iso:
+                            self.move_files_to_staging_repo(bld_obj)
                             self._staging_repo.update_repo()
 
                         self.completed.append(bld_obj.bnum)
@@ -217,7 +225,7 @@ class Transaction(TransactionMeta):
         except subprocess.CalledProcessError as err:
             raise RuntimeError(err.output)
 
-    def get_package_build_directory(self, pkg):
+    def get_build_directory(self, pkg):
         paths = [os.path.join(self.path, 'mate', pkg),
                  os.path.join(self.path, 'cinnamon', pkg),
                  os.path.join(self.path, pkg)]
@@ -231,7 +239,7 @@ class Transaction(TransactionMeta):
 
         return pbpath
 
-    def setup_package_build_directory(self, bld_obj, build_dir):
+    def setup_build_directory(self, bld_obj, build_dir):
 
         self._build_dirpaths[bld_obj.pkgname].update({
             'build_dir': build_dir,
@@ -256,7 +264,7 @@ class Transaction(TransactionMeta):
             logger.info('cnchi package detected.')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             logger.info(status.current_status)
-            cnchi_dir = self.get_package_build_directory(pkg)
+            cnchi_dir = self.get_build_directory(pkg)
             pkg_obj.prepare_package_source(cnchi_dir)
             self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             remove(os.path.join(cnchi_dir, 'cnchi/.git'))
@@ -267,6 +275,42 @@ class Transaction(TransactionMeta):
             dest = os.path.join(self.path, pkg)
             shutil.move(src, dest)
 
+    def move_files_to_staging_repo(self, bld_obj):
+        file_count = len(bld_obj.generated_files)
+        files_exist = bld_obj.generated_files and all_file_paths_exist(bld_obj.generated_files)
+
+        if not files_exist or not (file_count % 2 == 0):
+            logger.error(
+                'Unable to move files to staging repo! files_exist is: %s file_count is: %s',
+                files_exist,
+                file_count
+            )
+
+        for pkg_file in bld_obj.generated_files:
+            if 'i686' in pkg_file:
+                continue
+
+            copy_or_symlink(pkg_file, status.STAGING_64)
+            copy_or_symlink(pkg_file, '/tmp')
+
+            if '-any.pkg' in pkg_file:
+                fname = os.path.basename(pkg_file)
+                linkto = os.path.join(status.STAGING_64, fname)
+                link_from = os.path.join(status.STAGING_32, fname)
+
+                symlink(linkto, link_from)
+
+            remove(pkg_file)
+
+        for pkg_file in bld_obj.generated_files:
+            if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
+                continue
+
+            copy_or_symlink(pkg_file, status.STAGING_32)
+            copy_or_symlink(pkg_file, '/tmp')
+
+            remove(pkg_file)
+
     def process_packages(self):
         _pkgs = [p for p in self.packages]
 
@@ -274,7 +318,7 @@ class Transaction(TransactionMeta):
             if not pkg:
                 continue
 
-            pbpath = self.get_package_build_directory(pkg)
+            pbpath = self.get_build_directory(pkg)
 
             if not pbpath:
                 raise RuntimeError('pbpath cannot be None.')
@@ -329,7 +373,7 @@ class Transaction(TransactionMeta):
         else:
             name = pkg_obj.name or pkg_obj.pkgname
 
-        pbdir = self.get_package_build_directory(name)
+        pbdir = self.get_build_directory(name)
         dest_dir = os.path.join(pbdir, 'cnchi/po')
         logger.debug(pbdir)
         logger.debug(dest_dir)

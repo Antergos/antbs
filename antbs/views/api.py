@@ -199,48 +199,42 @@ def get_build_log_stream(bnum=None):
 @groups_required(['admin'])
 def build_pkg_now():
     if request.method == 'POST':
-        pkg_obj = None
-        pkgname = request.form['pkgname']
+        pkgnames = request.form['pkgname']
         dev = request.form['dev']
+        names = []
 
-        if not pkgname:
+        if not pkgnames:
             abort(500)
+        elif ',' in pkgnames:
+            names = pkgnames.split(',')
+        else:
+            names = [pkgnames]
 
-        try:
-            pkg_obj = get_pkg_object(pkgname, fetch_pkgbuild=True)
-        except Exception as err:
-            logger.error(err)
+        pkgnames = []
 
-        if pkg_obj:
-            rev_pending = []
-            pending = False
-
-            for bnum in rev_pending:
-                bld_obj = get_build_object(bnum=bnum)
-                if bld_obj and pkg_obj.pkgname == bld_obj.pkgname:
-                    pending = True
-                    break
-
-            if pending:
-                flash('Unable to build %s because it is in "pending review" status.' % pkgname,
-                      category='error')
+        for name in names:
+            if name not in status.all_packages and name in status.groups:
+                pkgnames.extend(get_group_packages(names))
             else:
-                if '-x86_64' in pkg_obj.pkgname or '-i686' in pkg_obj.pkgname:
-                    status.iso_flag = True
-                    if 'minimal' in pkgname:
-                        status.iso_minimal = True
-                    else:
-                        status.iso_minimal = False
+                pkgnames.extend([names])
 
-                if 'cnchi-dev' == pkgname:
-                    db.set('CNCHI-DEV-OVERRIDE', True)
+        if pkgnames:
+            if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
+                status.iso_flag = True
+                if 'minimal' in pkgnames[0]:
+                    status.iso_minimal = True
+                else:
+                    status.iso_minimal = False
 
-                trans = get_trans_object(packages=[pkgname], repo_queue=repo_queue)
-                status.transaction_queue.rpush(trans.tnum)
-                transaction_queue.enqueue_call(handle_hook, timeout=84600)
-                get_timeline_object(
-                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-                        dev, pkgname), tl_type='0')
+            if 'cnchi-dev' == pkgnames[0]:
+                db.set('CNCHI-DEV-OVERRIDE', True)
+
+            trans = get_trans_object(packages=[pkgnames], repo_queue=repo_queue)
+            status.transaction_queue.rpush(trans.tnum)
+            transaction_queue.enqueue_call(handle_hook, timeout=84600)
+            get_timeline_object(
+                msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
+                    dev, pkgnames), tl_type='0')
         else:
             flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
 

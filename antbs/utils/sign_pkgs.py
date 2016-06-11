@@ -122,7 +122,7 @@ def batch_sign(paths, bnum='', uid=gpg_key, passphrase=password, is_iso=False):
     return True
 
 
-def sign_packages(pkg_obj, generated_pkgs, bnum=''):
+def sign_packages(generated_pkgs, bnum=''):
 
     db.publish('live:build_output:{0}'.format(bnum), 'Signing packages..')
 
