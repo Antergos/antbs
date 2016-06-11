@@ -201,7 +201,7 @@ def remove(src):
             logging.error(err)
 
 
-def copy_or_symlink(src, dst):
+def copy_or_symlink(src, dst, logger=None):
     """
     Copies the file at `src` to `dst`. If `src` is a symlink the link will be
     followed to get the file that will be copied. If `dst` is a symlink then it will
@@ -213,18 +213,21 @@ def copy_or_symlink(src, dst):
 
     """
 
+    if logger:
+        logger.debug([type(src), type(dst)])
+        logger.debug([src, dst])
     if os.path.islink(src):
         linkto = os.readlink(src)
         os.symlink(linkto, dst)
     else:
         try:
-            shutil.copyfile(src, dst)
+            shutil.copy(src, dst)
         except shutil.SameFileError:
             if os.path.islink(dst):
                 os.unlink(dst)
-                shutil.copyfile(src, dst)
+                shutil.copy(src, dst)
         except Exception as err:
-            logging.error(err)
+            logger.error(err)
 
 
 def symlink(src, dst):
