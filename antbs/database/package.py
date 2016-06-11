@@ -177,19 +177,7 @@ class Package(PackageMeta):
             self.is_metapkg = is_metapkg
 
         if is_monitored:
-            service = self.get_from_pkgbuild('_monitored_service')
-            monitored_type = self.get_from_pkgbuild('_monitored_type')
-            project = self.get_from_pkgbuild('_monitored_project')
-            repo = self.get_from_pkgbuild('_monitored_repo')
-
-            config_items = [service, type, project, repo]
-
-            if len([True for item in config_items if item]) == 4:
-                self.is_monitored = is_monitored
-                self.monitored_service = service
-                self.monitored_type = monitored_type
-                self.monitored_project = project
-                self.monitored_repo = repo
+            self.sync_repo_monitor_config()
 
         if is_split_package:
             self.is_split_package = True
@@ -497,6 +485,29 @@ class Package(PackageMeta):
             attrib.remove(old_val)
         for new_val in to_add:
             attrib.append(new_val)
+
+    def sync_repo_monitor_config(self):
+        is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
+
+        if not is_monitored:
+            self.is_monitored = False
+            self.db.zrem(status.MONITOR_PKGS_KEY, self.pkgname)
+            return
+
+        service = self.get_from_pkgbuild('_monitored_service')
+        monitored_type = self.get_from_pkgbuild('_monitored_type')
+        project = self.get_from_pkgbuild('_monitored_project')
+        repo = self.get_from_pkgbuild('_monitored_repo')
+
+        config_items = [service, monitored_type, project, repo]
+
+        if len([True for item in config_items if item]) == 4:
+            self.is_monitored = True
+            self.monitored_service = service
+            self.monitored_type = monitored_type
+            self.monitored_project = project
+            self.monitored_repo = repo
+            self.db.zadd(status.MONITOR_PKGS_KEY, self.pkgname)
 
     def sync_database_with_pkgbuild(self):
         if not self.pkgver:

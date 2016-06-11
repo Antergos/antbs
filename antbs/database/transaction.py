@@ -178,6 +178,7 @@ class Transaction(TransactionMeta):
                     bld_obj = self.setup_build_directory(bld_obj, build_dir)
                     result = bld_obj.start(pkg_obj)
 
+                logger.debug(result)
                 if result in [True, False]:
                     blds = pkg_obj.builds
                     total = len(blds)
@@ -289,16 +290,18 @@ class Transaction(TransactionMeta):
             )
 
         for pkg_file in bld_obj.generated_files:
+            logger.debug(pkg_file)
             if 'i686' in pkg_file:
                 continue
 
-            copy_or_symlink(pkg_file, status.STAGING_64)
-            copy_or_symlink(pkg_file, '/tmp')
+            copy_or_symlink(pkg_file, status.STAGING_64, logger)
+            copy_or_symlink(pkg_file, '/tmp', logger)
 
             if '-any.pkg' in pkg_file:
                 fname = os.path.basename(pkg_file)
                 linkto = os.path.join(status.STAGING_64, fname)
                 link_from = os.path.join(status.STAGING_32, fname)
+                logger.debug([link_from, linkto])
 
                 symlink(linkto, link_from)
 
@@ -308,8 +311,8 @@ class Transaction(TransactionMeta):
             if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
                 continue
 
-            copy_or_symlink(pkg_file, status.STAGING_32)
-            copy_or_symlink(pkg_file, '/tmp')
+            copy_or_symlink(pkg_file, status.STAGING_32, logger)
+            copy_or_symlink(pkg_file, '/tmp', logger)
 
             remove(pkg_file)
 
