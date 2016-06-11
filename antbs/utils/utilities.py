@@ -261,7 +261,7 @@ def quiet_down_noisy_loggers():
         noisy_logger.setLevel(logging.ERROR)
 
 
-def try_run_command(cmd, cwd):
+def try_run_command(cmd, cwd, logger=None):
     """
     Tries to run command and then returns the result (success/fail)
     and any output that is captured.
@@ -285,7 +285,10 @@ def try_run_command(cmd, cwd):
         )
         success = True
     except subprocess.CalledProcessError as err:
-        logging.exception((err.output, err.stderr))
+        if logger is not None:
+            logger.exception((err.output, err.stderr))
+        else:
+            logging.exception((err.output, err.stderr))
         res = err.output
 
     return success, res

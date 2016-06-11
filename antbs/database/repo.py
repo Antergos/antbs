@@ -136,8 +136,7 @@ class PacmanRepo(RedisHash):
     def has_package_alpm(self, pkgname):
         return self._has_package(pkgname, self.pkgs_alpm)
 
-    def sync_repo_packages_data(self):
-
+    def sync_repo_packages_data(self, release_lock_after=True):
         if not self.locked and self.db.setnx(self._lock_name, True):
             self.locked = True
             self.db.expire(self._lock_name, 300)
@@ -146,8 +145,9 @@ class PacmanRepo(RedisHash):
             self._determine_current_repo_state_fs()
             self._process_current_repo_states()
 
-            self.db.delete(self._lock_name)
-            self.locked = False
+            if release_lock_after:
+                self.db.delete(self._lock_name)
+                self.locked = False
 
         else:
             logger.debug('repo is locked! waiting for lock to be released...')
@@ -184,15 +184,16 @@ class PacmanRepo(RedisHash):
             status.idle = True
             status.current_status = 'Idle.'
 
-    def _add_or_remove_package_alpm_database(self, pkg_fname, action):
-        package_file = '{}{}'.format(pkg_fname, PKG_EXT)
+    def _add_or_remove_package_alpm_database(self, action, pkgname=None, pkg_fname=None):
         action = 'repo-{}'.format(action)
         cmd = [os.path.join(SCRIPTS_DIR, action)]
+        pkg_or_file = pkgname if 'remove' in action else pkg_fname
 
-        if 'add' == action:
+        if 'add' in action:
             cmd.append('-R')
 
-        cmd.extend([self.alpm_db, package_file])
+        cmd.extend([self.alpm_db, pkg_or_file])
+        logger.debug(cmd)
 
         success, res = try_run_command(cmd, self.path)
         lock_not_aquired = 'Failed to acquire lockfile'
@@ -211,7 +212,7 @@ class PacmanRepo(RedisHash):
 
         if not success:
             logger.error(
-                '%s package command on alpm database failed for %s! Output was: %s',
+                '%s command on alpm database failed for %s! Output was: %s',
                 action,
                 pkg_fname,
                 res
@@ -287,20 +288,21 @@ class PacmanRepo(RedisHash):
 
         for pkg in self.unaccounted_for:
             pkgname = pkg.rsplit('|')[0]
-            unaccounted_for[pkgname] = dict(fs=[], alpm=[], filename='')
+            unaccounted_for[pkgname] = dict(fs=[], alpm=[], filenames=[])
 
             if self.has_package_filesystem(pkgname):
-                unaccounted_for[pkgname]['fs'].extend(self.get_pkgvers_filesystem(pkgname))
-                unaccounted_for[pkgname]['filename'] = pkgname.replace('|', '-')
+                pkgvers = self.get_pkgvers_filesystem(pkgname)
+
+                unaccounted_for[pkgname]['fs'].extend(pkgvers)
+                unaccounted_for[pkgname]['filenames'].extend((pkgvers, pkg.replace('|', '-')))
 
             if self.has_package_alpm(pkgname):
                 unaccounted_for[pkgname]['alpm'].append(self.get_pkgver_alpm(pkgname))
 
-        logger.debug([self.name, unaccounted_for])
-
         return unaccounted_for
 
-    def _get_pkgnames(self, location):
+    @staticmethod
+    def _get_pkgnames(location):
         return [p.split('|')[0] for p in location if p]
 
     def _get_pkgvers(self, pkgname, location):
@@ -354,35 +356,37 @@ class PacmanRepo(RedisHash):
                 logger.error('nothing to compare')
                 continue
 
-            if versions['fs'] and not versions['alpm']:
+            if versions['fs']:
                 latest = ''
                 latest_fs = self._compare_pkgvers(versions['fs'])
                 in_db_now = self.get_pkgver_alpm(pkgname)
 
                 if latest_fs and in_db_now:
                     latest = self._compare_pkgvers([latest_fs[0], in_db_now])
+                    latest = latest[0]
                 elif latest_fs and not in_db_now:
-                    latest = latest_fs
+                    latest = latest_fs[0]
+                elif in_db_now:
+                    latest = in_db_now
 
-                if latest[0] != in_db_now:
-                    fname = [p for p in self.unaccounted_for if pkgname in p and latest[0] in p]
-                    fname = fname[0].replace('|', '-')
-                    add_to_db.append(fname)
+                if latest != in_db_now:
+                    fname = [f for f in versions['filenames'] if latest in f]
 
-                for pkgver in versions['fs']:
-                    if pkgver != latest[0]:
-                        fname = [p for p in self.unaccounted_for
-                                 if pkgname in p and latest[0] in p]
-                        fname = fname[0].replace('|', '-')
-                        rm_from_fs.append('{}{}'.format(fname, PKG_EXT))
+                    add_to_db.append(fname[0])
+
+                filenames = [f for f in versions['filenames'] if latest not in f]
+
+                for fname in filenames:
+                    rm_from_fs.append(fname)
 
             elif versions['alpm'] and not versions['fs']:
-                for pkgver in versions['alpm']:
-                    rm_from_db.append(pkgname)
+                rm_from_db.append(pkgname)
 
-        logger.debug(
-            [self.name, ('add_to_db', add_to_db), ('rm_from_db', rm_from_db), ('rm_from_fs', rm_from_fs)]
-        )
+        logger.debug([
+            self.name, ('add_to_db', add_to_db),
+            ('rm_from_db', rm_from_db),
+            ('rm_from_fs', rm_from_fs)
+        ])
 
         return add_to_db, rm_from_db, rm_from_fs
 
@@ -400,13 +404,13 @@ class PacmanRepo(RedisHash):
             fix_perms = True
 
             for pkg in add_to_db:
-                self._add_or_remove_package_alpm_database(pkg, 'add')
+                self._add_or_remove_package_alpm_database('add', pkg_fname=pkg)
 
         if rm_from_db:
             fix_perms = True
 
             for pkg in rm_from_db:
-                self._add_or_remove_package_alpm_database(pkg, 'remove')
+                self._add_or_remove_package_alpm_database('remove', pkgname=pkg)
 
         if rm_from_fs:
             fix_perms = True
@@ -417,52 +421,42 @@ class PacmanRepo(RedisHash):
         if fix_perms:
             recursive_chown(self.path, 33, 33)
 
-    def _update_repo(self, recursing=0):
-        self.sync_repo_packages_data()
+    def _update_repo(self):
+        self.sync_repo_packages_data(release_lock_after=False)
 
         if self.pkg_count_alpm != self.pkg_count_fs:
-            if not self.locked and self.db.setnx(self._lock_name, True):
-                self.locked = True
+            if self.locked and self.db.exists(self._lock_name):
                 self.db.expire(self._lock_name, 300)
 
                 add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_unaccounted_for()
 
                 self._take_action_on_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
 
-                self.db.delete(self._lock_name)
-                self.locked = False
-
             else:
-                logger.debug('repo is locked! waiting for lock to be released...')
-                gevent.sleep(1)
+                logger.debug('Repo lock was released. Cannot continue!!')
 
-                while self.locked:
-                    gevent.sleep(5)
-
-                logger.debug('lock has been released!')
-
-                if recursing < 4:
-                    self._update_repo(recursing + 1)
+        self.db.delete(self._lock_name)
+        self.locked = False
 
 
 class AntergosRepo(PacmanRepo, metaclass=Singleton):
     def __init__(self, name='antergos', *args, **kwargs):
-        super().__init__(name=name, db_key=name, *args, **kwargs)
+        super().__init__(name, name, *args, **kwargs)
 
 
 class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
     def __init__(self, name='antergos-staging', *args, **kwargs):
-        super().__init__(name=name, db_key=name, *args, **kwargs)
+        super().__init__(name, name, *args, **kwargs)
 
 
 class AntergosRepo32(PacmanRepo, metaclass=Singleton):
     def __init__(self, name='antergos', *args, **kwargs):
-        super().__init__(name=name, db_key='antergos32', *args, **kwargs)
+        super().__init__(name, 'antergos32', *args, **kwargs)
 
 
 class AntergosStagingRepo32(PacmanRepo, metaclass=Singleton):
     def __init__(self, name='antergos-staging', *args, **kwargs):
-        super().__init__(name=name, db_key='antergos-staging32', *args, **kwargs)
+        super().__init__(name, 'antergos-staging32', *args, **kwargs)
 
 
 def get_repo_object(name, arch, path=None):
@@ -471,6 +465,6 @@ def get_repo_object(name, arch, path=None):
     if 'antergos' == name:
         return AntergosRepo(path=path) if 'i686' != arch else AntergosRepo32(path=path)
     elif 'antergos-staging' == name:
-        return AntergosStagingRepo(path=path) if 'i686' != arch else AntergosStagingRepo32(path)
+        return AntergosStagingRepo(path=path) if 'i686' != arch else AntergosStagingRepo32(path=path)
     else:
         raise TypeError('name must be one of [antergos, antergos-staging]')

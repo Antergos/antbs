@@ -203,12 +203,15 @@ class Transaction(TransactionMeta):
                             gevent.sleep(2)
                             self.move_files_to_staging_repo(bld_obj)
                             self._staging_repo.update_repo()
+                            self._staging_repo32.update_repo()
 
                         self.completed.append(bld_obj.bnum)
                         doc_util.do_docker_clean(pkg_obj.name)
 
                     elif result is False:
                         self.failed.append(bld_obj.bnum)
+
+                status.now_building.remove(bld_obj.bnum)
 
         self.is_running = False
         self.is_finished = True
