@@ -24,6 +24,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import gevent
 
 import utils.docker_util as docker_util
 from utils.logging_config import logger
@@ -196,6 +197,7 @@ class Transaction(TransactionMeta):
 
                     if result is True:
                         if not pkg_obj.is_iso:
+                            gevent.sleep(2)
                             self.move_files_to_staging_repo(bld_obj)
                             self._staging_repo.update_repo()
 

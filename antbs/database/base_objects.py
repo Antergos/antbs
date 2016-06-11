@@ -195,17 +195,14 @@ class RedisList(RedisObject, list):
             for item in items:
                 self.append(item)
 
-    def __str__(self):
-        """ Return this object as a string """
-        return str([x for x in self.__iter__()])
+    def __add__(self, other_list):
+        """ Combine elements from this list (self) and other_list into a new list. """
+        return [x for x in self.__iter__()] + [x for x in other_list.__iter__()]
 
-    def __setitem__(self, index, val):
-        """ Update an item by index. """
-        self.db.lset(self.full_key, index, super().encode_value(val))
-
-    def __len__(self):
-        """ Return the size of the list. """
-        return self.db.llen(self.full_key)
+    def __contains__(self, item):
+        """ Check if item is in this list. """
+        items = self.db.lrange(self.full_key, 0, -1)
+        return item in items
 
     def __delitem__(self, index):
         """ Delete an item from this list by index. """
@@ -217,43 +214,52 @@ class RedisList(RedisObject, list):
         for el in self.db.lrange(self.full_key, 0, -1):
             yield super().decode_value(self.item_type, el)
 
-    def __contains__(self, item):
-        """ Check if item is in this list. """
-        items = self.db.lrange(self.full_key, 0, -1)
-        return item in items
+    def __len__(self):
+        """ Return the size of the list. """
+        return self.db.llen(self.full_key)
 
-    def __add__(self, other_list):
-        """ Combine elements from this list (self) and other_list into a new list. """
-        return [x for x in self.__iter__()] + [x for x in other_list.__iter__()]
+    def __setitem__(self, index, val):
+        """ Update an item by index. """
+        self.db.lset(self.full_key, index, super().encode_value(val))
+
+    def __str__(self):
+        """ Return this object as a string """
+        return str([x for x in self.__iter__()])
+
+    def append(self, val):
+        """ Append value to the end of this list """
+        self.rpush(val)
+
+    def extend(self, iterable):
+        """ Append values in iterable to the end of this list """
+        for item in iterable:
+            self.append(item)
 
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
         return super().decode_value(self.item_type, self.db.lpop(self.full_key))
 
-    def rpop(self):
-        """ Remove a value from the right (high) end of the list. """
-        return super().decode_value(self.item_type, self.db.rpop(self.full_key))
-
     def lpush(self, val):
         """ Add an item to the left (low) end of the list. """
         self.db.lpush(self.full_key, super().encode_value(val))
-
-    def rpush(self, val):
-        """ Add an item to the right (high) end of the list. """
-        self.db.rpush(self.full_key, super().encode_value(val))
-
-    def append(self, val):
-        self.rpush(val)
-
-    def reverse(self):
-        cp = list(self.db.lrange(self.full_key, 0, -1))
-        return cp.reverse()
 
     def remove(self, val):
         self.db.lrem(self.full_key, 0, val)
 
     def remove_range(self, start, stop):
         self.db.ltrim(self.full_key, start, stop)
+
+    def reverse(self):
+        cp = list(self.db.lrange(self.full_key, 0, -1))
+        return cp.reverse()
+
+    def rpop(self):
+        """ Remove a value from the right (high) end of the list. """
+        return super().decode_value(self.item_type, self.db.rpop(self.full_key))
+
+    def rpush(self, val):
+        """ Add an item to the right (high) end of the list. """
+        self.db.rpush(self.full_key, super().encode_value(val))
 
 
 class RedisZSet(RedisObject, set):
