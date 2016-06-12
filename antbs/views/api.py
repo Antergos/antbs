@@ -131,8 +131,8 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
                 copy_or_symlink(pkg_file, '/tmp', logger)
 
                 if '-any.pkg' in pkg_file:
-                    linkto = fname
-                    link_from = os.path.join(status.MAIN_32, fname)
+                    linkto = os.path.basename(pkg_file)
+                    link_from = os.path.join(status.MAIN_32, linkto)
                     link_from = os.path.relpath(link_from, start=status.MAIN_64)
                     logger.debug([link_from, linkto])
 
