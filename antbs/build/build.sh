@@ -309,7 +309,7 @@ try_build() {
 
 		{ build_32bit_pkg 2>&1 && return 0; } \
 	||
-		{ cd /result && rm **.pkg.** && return 1; }
+		{ cd /result && rm **.pkg.**; return 1; }
 
 	else
 		cd /pkg && _2log 'UPDATING SOURCE CHECKSUMS';
@@ -317,7 +317,7 @@ try_build() {
 		check_pkg_sums &&
 		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 \
 			&& _output_pkgbuild_generates \
-			&& return 0; } || { cd /result && rm **.pkg.** && return 1; }
+			&& return 0; } || { cd /result && rm **.pkg.**; return 1; }
 	fi
 }
 

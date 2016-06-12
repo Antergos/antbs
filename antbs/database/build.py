@@ -108,7 +108,7 @@ class Build(RedisHash):
                     'repo_container', 'live_output_key', 'last_line_key'],
             bool=['failed', 'completed', 'is_iso'],
             int=[],
-            list=['log', 'generated_files'],
+            list=['log', 'generated_files', 'staging_files'],
             set=['generated_pkgs'],
             path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
         ))

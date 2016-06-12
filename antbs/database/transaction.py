@@ -295,12 +295,15 @@ class Transaction(TransactionMeta):
             )
 
         for pkg_file in bld_obj.generated_files:
-            logger.debug(pkg_file)
             if 'i686' in pkg_file:
                 continue
 
+            fname = os.path.basename(pkg_file)
+            staging_file = os.path.join(status.STAGING_64, fname)
+
             copy_or_symlink(pkg_file, status.STAGING_64, logger)
             copy_or_symlink(pkg_file, '/tmp', logger)
+            bld_obj.staging_files.append(staging_file)
 
             if '-any.pkg' in pkg_file:
                 fname = os.path.basename(pkg_file)
@@ -316,8 +319,12 @@ class Transaction(TransactionMeta):
             if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
                 continue
 
+            fname = os.path.basename(pkg_file)
+            staging_file = os.path.join(status.STAGING_32, fname)
+
             copy_or_symlink(pkg_file, status.STAGING_32, logger)
             copy_or_symlink(pkg_file, '/tmp', logger)
+            bld_obj.staging_files.append(staging_file)
 
             remove(pkg_file)
 

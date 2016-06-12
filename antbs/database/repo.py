@@ -156,7 +156,12 @@ class PacmanRepo(RedisHash):
             while self.locked:
                 gevent.sleep(5)
 
-            logger.debug('lock has been released!')
+            if release_lock_after:
+                logger.debug('lock has been released!')
+            else:
+                if self.db.setnx(self._lock_name, True):
+                    self.db.expire(self._lock_name, 300)
+                    self.locked = True
 
     def update_repo(self):
         trans_running = status.transactions_running or status.transaction_queue
@@ -287,17 +292,15 @@ class PacmanRepo(RedisHash):
         logger.debug([self.name, list(self.unaccounted_for)])
 
         for pkg in self.unaccounted_for:
-            pkgname = pkg.rsplit('|')[0]
-            unaccounted_for[pkgname] = dict(fs=[], alpm=[], filenames=[])
+            pkgname, pkgver, arch = self._split_pkg_info_string(pkg)
+            unaccounted_for[pkgname] = dict(fs=[], alpm=[])
+            fname = '{}{}'.format(pkg.replace('|', '-'), PKG_EXT)
 
             if self.has_package_filesystem(pkgname):
-                pkgvers = self.get_pkgvers_filesystem(pkgname)
+                unaccounted_for[pkgname]['fs'].append((pkg, fname))
 
-                unaccounted_for[pkgname]['fs'].extend(pkgvers)
-                unaccounted_for[pkgname]['filenames'].extend((pkgvers, pkg.replace('|', '-')))
-
-            if self.has_package_alpm(pkgname):
-                unaccounted_for[pkgname]['alpm'].append(self.get_pkgver_alpm(pkgname))
+            if self.has_package_alpm(pkgname) and pkgver == self.get_pkgver_alpm(pkgname):
+                unaccounted_for[pkgname]['alpm'].append((pkg, fname))
 
         return unaccounted_for
 
@@ -351,14 +354,17 @@ class PacmanRepo(RedisHash):
         if not unaccounted_for:
             return
 
-        for pkgname, versions in unaccounted_for.items():
-            if not versions['fs'] and not versions['alpm']:
+        logger.debug(unaccounted_for)
+
+        for pkgname, locations in unaccounted_for.items():
+            if not locations['fs'] and not locations['alpm']:
                 logger.error('nothing to compare')
                 continue
 
-            if versions['fs']:
+            if locations['fs']:
+                versions = [p_info[0].split('|')[1] for p_info in locations['fs']]
                 latest = ''
-                latest_fs = self._compare_pkgvers(versions['fs'])
+                latest_fs = self._compare_pkgvers(versions)
                 in_db_now = self.get_pkgver_alpm(pkgname)
 
                 if latest_fs and in_db_now:
@@ -370,16 +376,16 @@ class PacmanRepo(RedisHash):
                     latest = in_db_now
 
                 if latest != in_db_now:
-                    fname = [f for f in versions['filenames'] if latest in f]
+                    fname = [f[1] for f in locations['fs'] if latest in f[1]]
 
                     add_to_db.append(fname[0])
 
-                filenames = [f for f in versions['filenames'] if latest not in f]
+                filenames = [f[1] for f in locations['fs'] if latest not in f[1]]
 
                 for fname in filenames:
                     rm_from_fs.append(fname)
 
-            elif versions['alpm'] and not versions['fs']:
+            elif locations['alpm'] and not locations['fs']:
                 rm_from_db.append(pkgname)
 
         logger.debug([
@@ -396,6 +402,10 @@ class PacmanRepo(RedisHash):
 
         for file_name in [pkg_file, sig]:
             remove(file_name)
+
+    @staticmethod
+    def _split_pkg_info_string(pkg_info_string):
+        return pkg_info_string.split('|')
 
     def _take_action_on_packages_unaccounted_for(self, add_to_db, rm_from_db, rm_from_fs):
         fix_perms = False

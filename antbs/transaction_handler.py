@@ -128,10 +128,14 @@ def process_dev_review(bnum):
     saved_status = set_server_status(True, is_review=True)
 
     bld_obj = get_build_object(bnum=bnum)
-    repo_obj = get_repo_object('antergos', 'x86_64')
-    repo_obj32 = get_repo_object('antergos', 'i686')
+    main_repo = get_repo_object('antergos', 'x86_64')
+    main_repo32 = get_repo_object('antergos', 'i686')
+    staging_repo = get_repo_object('antergos-staging', 'x86_64')
+    staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
-    repo_obj.update_repo()
-    repo_obj32.update_repo()
+    main_repo.update_repo()
+    main_repo32.update_repo()
+    staging_repo.update_repo()
+    staging_repo32.update_repo()
 
     set_server_status(False, saved_status)

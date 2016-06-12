@@ -111,21 +111,41 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         if result == 'skip':
             return dict(error=False, msg=None)
 
-        file_count = len(bld_obj.generated_files)
-        files_exist = bld_obj.generated_files and all_file_paths_exist(bld_obj.generated_files)
+        file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
+        fnames = []
+
+        # TODO: Remove this (its a patch for packages built before staging_files were implemented)
+        if bld_obj.generated_files and not bld_obj.staging_files:
+            fnames = [os.path.basename(p) for p in bld_obj.generated_files if '/' in p]
+
+            if fnames:
+                fnames = [
+                    os.path.join(status.STAGING_64, f)
+                    for f in fnames
+                    if os.path.exists(os.path.join(status.STAGING_64, f))
+                ]
+                fnames.extend([
+                    os.path.join(status.STAGING_32, f)
+                    for f in fnames
+                    if os.path.exists(os.path.join(status.STAGING_32, f)) and '-any.' not in f
+                ])
+                for fname in fnames:
+                    bld_obj.staging_files.append(fname)
+
+        files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
 
         if not result or not files_exist or not (file_count % 2 == 0):
             err = 'While moving to main, invalid number of files found.'
             logger.error(err)
             return dict(error=True, msg=err)
 
-        for pkg_file in bld_obj.generated_files:
+        for pkg_file in bld_obj.staging_files:
             if 'i686' in pkg_file:
                 continue
 
             if 'passed' == result:
-                copy_or_symlink(pkg_file, status.MAIN_64)
-                copy_or_symlink(pkg_file, '/tmp')
+                copy_or_symlink(pkg_file, status.MAIN_64, logger)
+                copy_or_symlink(pkg_file, '/tmp', logger)
 
                 if '-any.pkg' in pkg_file:
                     fname = os.path.basename(pkg_file)
@@ -137,13 +157,13 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
             if 'skip' != result:
                 remove(pkg_file)
 
-        for pkg_file in bld_obj.generated_files:
+        for pkg_file in bld_obj.staging_files:
             if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
                 continue
 
             if 'passed' == result:
-                copy_or_symlink(pkg_file, status.MAIN_32)
-                copy_or_symlink(pkg_file, '/tmp')
+                copy_or_symlink(pkg_file, status.MAIN_32, logger)
+                copy_or_symlink(pkg_file, '/tmp', logger)
 
             if 'skip' != result:
                 remove(pkg_file)
@@ -234,7 +254,7 @@ def build_pkg_now():
             transaction_queue.enqueue_call(handle_hook, timeout=84600)
             get_timeline_object(
                 msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-                    dev, pkgnames), tl_type='0')
+                    dev, ' '.join(pkgnames)), tl_type='0')
         else:
             flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
 
