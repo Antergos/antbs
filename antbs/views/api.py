@@ -115,24 +115,6 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
         fnames = []
 
-        # TODO: Remove this (its a patch for packages built before staging_files were implemented)
-        if bld_obj.generated_files and not bld_obj.staging_files:
-            fnames = [os.path.basename(p) for p in bld_obj.generated_files if '/' in p]
-
-            if fnames:
-                fnames = [
-                    os.path.join(status.STAGING_64, f)
-                    for f in fnames
-                    if os.path.exists(os.path.join(status.STAGING_64, f))
-                ]
-                fnames.extend([
-                    os.path.join(status.STAGING_32, f)
-                    for f in fnames
-                    if os.path.exists(os.path.join(status.STAGING_32, f)) and '-any.' not in f
-                ])
-                for fname in fnames:
-                    bld_obj.staging_files.append(fname)
-
         files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
 
         if not result or not files_exist or not (file_count % 2 == 0):
