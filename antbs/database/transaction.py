@@ -307,11 +307,12 @@ class Transaction(TransactionMeta):
 
             if '-any.pkg' in pkg_file:
                 fname = os.path.basename(pkg_file)
-                linkto = os.path.join(status.STAGING_64, fname)
+                linkto = fname
                 link_from = os.path.join(status.STAGING_32, fname)
+                link_from = os.path.relpath(link_from, start=status.STAGING_64)
                 logger.debug([link_from, linkto])
 
-                symlink(linkto, link_from)
+                symlink(linkto, link_from, relative_to=os.open(status.STAGING_64, os.O_DIRECTORY))
 
             remove(pkg_file)
 

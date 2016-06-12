@@ -230,7 +230,7 @@ def copy_or_symlink(src, dst, logger=None):
             logger.error(err)
 
 
-def symlink(src, dst):
+def symlink(src, dst, relative_to=None):
     """
     Creates a symbolic link at `dst` to the file at `src`. If `src` is a symlink the
     link will be followed to get the actual file that will be linked at `dst`. If `dst`
@@ -248,7 +248,7 @@ def symlink(src, dst):
     if os.path.islink(dst):
         os.unlink(dst)
 
-    os.symlink(src, dst)
+    os.symlink(src, dst, dir_fd=relative_to)
 
 
 def quiet_down_noisy_loggers():

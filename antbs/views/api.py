@@ -101,12 +101,13 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
             return dict(error=True, msg=err)
 
         if result == 'passed' and 'main' not in pkg_obj.allowed_in:
-            msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-            return dict(error=True, msg=msg)
-        else:
-            bld_obj.review_dev = dev
-            bld_obj.review_date = dt
-            bld_obj.review_status = result
+            #msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
+            #return dict(error=True, msg=msg)
+            pkg_obj.allowed_in.append('main')
+
+        bld_obj.review_dev = dev
+        bld_obj.review_date = dt
+        bld_obj.review_status = result
 
         if result == 'skip':
             return dict(error=False, msg=None)
@@ -148,11 +149,13 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
                 copy_or_symlink(pkg_file, '/tmp', logger)
 
                 if '-any.pkg' in pkg_file:
-                    fname = os.path.basename(pkg_file)
-                    linkto = os.path.join(status.MAIN_64, fname)
+                    linkto = fname
                     link_from = os.path.join(status.MAIN_32, fname)
+                    link_from = os.path.relpath(link_from, start=status.MAIN_64)
+                    logger.debug([link_from, linkto])
 
-                    symlink(linkto, link_from)
+                    symlink(linkto, link_from,
+                            relative_to=os.open(status.MAIN_64, os.O_DIRECTORY))
 
             if 'skip' != result:
                 remove(pkg_file)
