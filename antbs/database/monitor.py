@@ -82,6 +82,8 @@ class Monitor(RedisHash):
         build_pkgs = []
         quiet_down_noisy_loggers()
 
+        logger.info('Checking github repos for changes...')
+
         for pkg in self.packages:
             pkg_obj = get_pkg_object(name=pkg)
 
@@ -91,6 +93,7 @@ class Monitor(RedisHash):
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
 
         build_pkgs = [p for p in build_pkgs if p]
+
         if len(build_pkgs) > 0:
             self.add_to_build_queue(build_pkgs)
 

@@ -347,7 +347,7 @@ class Package(PackageMeta):
         can_push = self.push_version or self.is_monitored
 
         if not can_push or old_val == new_val or new_val in [None, 'None']:
-            logger.error('cant push to github!')
+            logger.error('cant push to github! %s', self.pkgname)
             return
 
         gh = login(token=status.github_token)

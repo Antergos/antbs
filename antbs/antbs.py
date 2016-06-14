@@ -49,6 +49,7 @@ import rq_dashboard
 
 from utils.logging_config import logger, handle_exceptions
 from database.server_status import status
+from database.monitor import get_monitor_object, check_repos_for_changes
 
 import views
 
@@ -118,6 +119,14 @@ app = initialize_app()
 def rq_dashboard_requires_auth():
     if '/rq' in request.path and not current_user.is_authenticated:
         abort(403)
+
+
+@app.before_request
+def maybe_check_monitored_repos():
+    monitor_obj = get_monitor_object('github')
+
+    if not monitor_obj.checked_recently:
+        views.repo_queue.enqueue_call(check_repos_for_changes('github'))
 
 
 @app.context_processor

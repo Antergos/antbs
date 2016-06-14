@@ -127,15 +127,14 @@ def handle_hook():
 def process_dev_review(bnum):
     saved_status = set_server_status(True, is_review=True)
 
-    bld_obj = get_build_object(bnum=bnum)
     main_repo = get_repo_object('antergos', 'x86_64')
     main_repo32 = get_repo_object('antergos', 'i686')
     staging_repo = get_repo_object('antergos-staging', 'x86_64')
     staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
-    main_repo.update_repo()
-    main_repo32.update_repo()
-    staging_repo.update_repo()
-    staging_repo32.update_repo()
+    repos = [main_repo, main_repo32, staging_repo, staging_repo32]
+
+    for antergos_repo in repos:
+        antergos_repo.update_repo()
 
     set_server_status(False, saved_status)

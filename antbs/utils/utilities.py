@@ -213,8 +213,10 @@ def copy_or_symlink(src, dst, logger=None):
 
     """
 
+    os.setegid(33)
+    os.seteuid(33)
+
     if logger:
-        logger.debug([type(src), type(dst)])
         logger.debug([src, dst])
     if os.path.islink(src):
         linkto = os.readlink(src)
@@ -229,6 +231,9 @@ def copy_or_symlink(src, dst, logger=None):
         except Exception as err:
             logger.error(err)
 
+    os.setegid(0)
+    os.seteuid(0)
+
 
 def symlink(src, dst, relative_to=None):
     """
@@ -242,13 +247,22 @@ def symlink(src, dst, relative_to=None):
 
     """
 
+    os.setegid(33)
+    os.seteuid(33)
+
+    if relative_to:
+        os.chdir(relative_to)
+
     if os.path.islink(src):
-        src = os.readlink(src)
+        src = os.readlink(src) if not relative_to else os.path.relpath(os.readlink(src))
 
     if os.path.islink(dst):
         os.unlink(dst)
 
-    os.symlink(src, dst, dir_fd=relative_to)
+    os.symlink(src, dst)
+
+    os.setegid(0)
+    os.seteuid(0)
 
 
 def quiet_down_noisy_loggers():
@@ -279,6 +293,9 @@ def try_run_command(cmd, cwd, logger=None):
     res = None
     success = False
 
+    os.setegid(33)
+    os.seteuid(33)
+
     try:
         res = subprocess.check_output(
             cmd, stderr=subprocess.STDOUT, universal_newlines=True, cwd=cwd
@@ -290,6 +307,9 @@ def try_run_command(cmd, cwd, logger=None):
         else:
             logging.exception((err.output, err.stderr))
         res = err.output
+
+    os.setegid(0)
+    os.seteuid(0)
 
     return success, res
 
@@ -317,7 +337,7 @@ def all_file_paths_exist(paths):
 
 
 def recursive_chown(path, uid, gid):
-    for root, dirs, files in os.walk(path):
+    for root, dirs, files in os.walk(path, followlinks=True):
         for item in dirs:
             os.chown(os.path.join(root, item), uid, gid)
         for item in files:

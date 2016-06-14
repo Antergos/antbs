@@ -34,7 +34,7 @@ from utils.utilities import (
     remove,
     all_file_paths_exist,
     copy_or_symlink,
-    symlink
+    try_run_command
 )
 
 from .base_objects import RedisHash
@@ -221,6 +221,7 @@ class Transaction(TransactionMeta):
 
     def setup_transaction_directory(self):
         path = tempfile.mkdtemp(prefix='{0}_'.format(str(self.tnum)), dir=self.base_path)
+        os.chmod(path, 0o777)
         self.result_dir = os.path.join(path, 'result')
         self.upd_repo_result = os.path.join(path, 'upd_result')
         self.path = os.path.join(path, 'antergos-packages')
@@ -302,19 +303,19 @@ class Transaction(TransactionMeta):
             staging_file = os.path.join(status.STAGING_64, fname)
 
             copy_or_symlink(pkg_file, status.STAGING_64, logger)
-            copy_or_symlink(pkg_file, '/tmp', logger)
             bld_obj.staging_files.append(staging_file)
 
             if '-any.pkg' in pkg_file:
-                fname = os.path.basename(pkg_file)
-                linkto = fname
-                link_from = os.path.join(status.STAGING_32, fname)
-                link_from = os.path.relpath(link_from, start=status.STAGING_64)
-                logger.debug([link_from, linkto])
+                src = os.path.basename(pkg_file)
+                dst = '../i686/{}'.format(fname)
 
-                symlink(linkto, link_from, relative_to=os.open(status.STAGING_64, os.O_DIRECTORY))
-
-            remove(pkg_file)
+                success, res = try_run_command(
+                    ['/bin/ln', '-srf', src, dst],
+                    cwd=status.STAGING_64,
+                    logger=logger
+                )
+                if not success:
+                    logger.error(res)
 
         for pkg_file in bld_obj.generated_files:
             if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
@@ -324,10 +325,7 @@ class Transaction(TransactionMeta):
             staging_file = os.path.join(status.STAGING_32, fname)
 
             copy_or_symlink(pkg_file, status.STAGING_32, logger)
-            copy_or_symlink(pkg_file, '/tmp', logger)
             bld_obj.staging_files.append(staging_file)
-
-            remove(pkg_file)
 
     def process_packages(self):
         _pkgs = [p for p in self.packages]

@@ -408,28 +408,17 @@ class PacmanRepo(RedisHash):
         return pkg_info_string.split('|')
 
     def _take_action_on_packages_unaccounted_for(self, add_to_db, rm_from_db, rm_from_fs):
-        fix_perms = False
-
         if add_to_db:
-            fix_perms = True
-
             for pkg in add_to_db:
                 self._add_or_remove_package_alpm_database('add', pkg_fname=pkg)
 
         if rm_from_db:
-            fix_perms = True
-
             for pkg in rm_from_db:
                 self._add_or_remove_package_alpm_database('remove', pkgname=pkg)
 
         if rm_from_fs:
-            fix_perms = True
-
             for pkg in rm_from_fs:
                 self._remove_package_from_filesystem(pkg)
-
-        if fix_perms:
-            recursive_chown(self.path, 33, 33)
 
     def _update_repo(self):
         self.sync_repo_packages_data(release_lock_after=False)

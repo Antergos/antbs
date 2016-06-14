@@ -69,7 +69,8 @@ from utils.utilities import (
     remove,
     RQWorkerCustomExceptionHandler,
     get_build_queue,
-    all_file_paths_exist
+    all_file_paths_exist,
+    try_run_command
 )
 
 from webhook import Webhook
