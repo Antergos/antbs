@@ -237,7 +237,7 @@ def build_pkg_now():
             if 'cnchi-dev' == pkgnames[0]:
                 db.set('CNCHI-DEV-OVERRIDE', True)
 
-            trans = get_trans_object(packages=pkgnames, repo_queue=repo_queue)
+            trans = get_trans_object(packages=list(set(pkgnames)), repo_queue=repo_queue)
             status.transaction_queue.rpush(trans.tnum)
             transaction_queue.enqueue_call(handle_hook, timeout=84600)
             get_timeline_object(

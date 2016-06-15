@@ -478,7 +478,7 @@ class Build(RedisHash):
         open(os.path.join(status.MKARCHISO_DIR, 'first-run'), 'a').close()
 
         try:
-            doc.start(bld_obj.container)
+            doc.start(self.container)
             cont = self.container
             stream_process = Process(target=self.publish_build_output)
             stream_process.start()
@@ -521,7 +521,7 @@ class Build(RedisHash):
 
         stream_process.join()
 
-        if not bld_obj.failed:
+        if not self.failed:
             remove('/opt/archlinux-mkarchiso/antergos-iso')
             doc_util.do_docker_clean(self._pkg_obj.pkgname)
 

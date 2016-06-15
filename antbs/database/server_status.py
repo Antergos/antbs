@@ -55,7 +55,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
                           'mirrors'],
                      path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
                            'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
-                           'REPO_BASE_DIR']))
+                           'REPO_BASE_DIR', 'MKARCHISO_DIR']))
 
         super().__namespaceinit__()
 

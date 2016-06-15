@@ -146,7 +146,7 @@ class Package(PackageMeta):
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
-            raise RuntimeError(self.pkgbuild)
+            raise RuntimeError(name)
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
@@ -346,8 +346,10 @@ class Package(PackageMeta):
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored
 
-        if not can_push or old_val == new_val or new_val in [None, 'None']:
-            logger.error('cant push to github! %s', self.pkgname)
+        if not can_push or old_val == new_val or new_val in [None, 'None'] or True:
+            logger.error(
+                'cant push to github! %s, old_val: %s, new_val: %s', self.pkgname, old_val, new_val
+            )
             return
 
         gh = login(token=status.github_token)
@@ -374,6 +376,7 @@ class Package(PackageMeta):
         else:
             commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
                                                                                     self.name)
+
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
         if commit and 'commit' in commit:

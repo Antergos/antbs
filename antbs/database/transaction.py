@@ -77,7 +77,7 @@ class TransactionMeta(RedisHash):
 
         self.attrib_lists.update(dict(
             string=['building', 'start_str', 'end_str', 'initiated_by'],
-            bool=['is_running', 'is_finished'],
+            bool=['is_running', 'is_finished', 'sync_pkgbuilds_only'],
             int=['tnum'],
             list=['queue'],
             set=['packages', 'builds', 'completed', 'failed', 'generated_pkgs'],
@@ -155,6 +155,9 @@ class Transaction(TransactionMeta):
         status.current_status = 'Processing packages.'
 
         self.process_packages()
+
+        if self.sync_pkgbuilds_only:
+            return
 
         status.current_status = 'Cleaning pacman package cache.'
 

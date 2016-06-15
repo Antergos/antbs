@@ -39,7 +39,6 @@ from gitlab import Gitlab
 
 import iso
 import webhook
-from database import package
 from database.base_objects import RedisHash
 from database.server_status import status
 from database.package import get_pkg_object
@@ -81,6 +80,7 @@ class Monitor(RedisHash):
 
         build_pkgs = []
         quiet_down_noisy_loggers()
+        self.check_for_new_monitored_packages()
 
         logger.info('Checking github repos for changes...')
 
@@ -101,6 +101,14 @@ class Monitor(RedisHash):
             version = self.db.get('antbs:misc:iso-release:do_check')
             self.check_mirror_for_iso(version)
 
+    def check_for_new_monitored_packages(self):
+        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
+        new_pkgs = [p for p in pkg_objs if p.is_monitored and p.pkgname not in self.packages]
+
+        if new_pkgs:
+            for pkg in new_pkgs:
+                self.packages.add(pkg)
+
     def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
         gh = login(token=GITHUB_TOKEN)
         project = pkg_obj.monitored_project
@@ -108,33 +116,15 @@ class Monitor(RedisHash):
         last_result = pkg_obj.monitored_last_result
         gh_repo = gh.repository(project, repo)
         latest = None
+        must_contain = None
 
-        if 'commits' == pkg_obj.monitored_type:
-            commits = gh_repo.commits()
+        if 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
+            must_contain = '1.14'
 
-            try:
-                commit = commits.next()
-                latest = commit.sha
-            except Exception as err:
-                logger.warning(err)
+        latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
 
-        elif 'releases' == pkg_obj.monitored_type:
-            releases = gh_repo.releases()
-
-            try:
-                release = releases.next()
-                latest = release.tag_name
-            except Exception as err:
-                logger.warning(err)
-
-        elif 'tags' == pkg_obj.monitored_type:
-            tags = gh_repo.tags()
-
-            try:
-                release = tags.next()
-                latest = str(release)
-            except Exception as err:
-                logger.warning(err)
+        if not latest and 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
+            latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
 
         if latest and latest != last_result and latest.replace('v', '') != last_result:
             if 'commits' != pkg_obj.monitored_type:
@@ -150,6 +140,36 @@ class Monitor(RedisHash):
             logger.error('latest for %s is Falsey: %s', latest, pkg_obj.name)
 
         return build_pkgs
+
+    @staticmethod
+    def _get_releases_tags_or_commits(gh_repo, what_to_get, must_contain=None):
+        git_item = getattr(gh_repo, what_to_get)
+        res = git_item()
+        latest = ''
+
+        def _get_next_item():
+            _latest = ''
+            try:
+                item = res.next()
+
+                if 'commits' == what_to_get:
+                    _latest = item.sha
+                elif 'releases' == what_to_get:
+                    _latest = item.tag_name
+                elif 'tags' == what_to_get:
+                    _latest = str(item)
+            except Exception as err:
+                logger.exception(err)
+
+            return _latest
+
+        latest = _get_next_item()
+
+        if must_contain and must_contain not in latest:
+            while must_contain not in latest:
+                latest = _get_next_item()
+
+        return latest
 
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)

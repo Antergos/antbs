@@ -102,12 +102,13 @@ class WebhookMeta:
 
     def __init__(self):
         super().__init__()
-        self.attrib_lists = dict(bool=['is_authorized', 'is_monitor', 'is_cnchi', 'is_manual',
-                                       'is_numix', 'is_github', 'is_gitlab'],
-                                 int=['manual_hook_index'],
-                                 dict=['payload'],
-                                 list=['changes', 'commits'],
-                                 string=['repo', 'full_name', 'pusher', 'result', 'building'])
+        self.attrib_lists = dict(
+            bool=['is_authorized', 'is_monitor', 'is_cnchi', 'is_manual',
+                  'is_numix', 'is_github', 'is_gitlab', 'sync_pkgbuilds_only'],
+            int=['manual_hook_index'],
+            dict=['payload'],
+            list=['changes', 'commits'],
+            string=['repo', 'full_name', 'pusher', 'result', 'building'])
 
         self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
 
@@ -153,7 +154,7 @@ class Webhook(WebhookMeta):
 
         self.request = request
 
-        if self.is_monitor or self.is_from_authorized_sender():
+        if not self.is_monitor and self.is_from_authorized_sender():
             cnchi_result = self.request.args.get('result', None)
 
             if self.is_manual:
@@ -178,7 +179,7 @@ class Webhook(WebhookMeta):
             if len(self.changes) > 0:
                 self.process_changes()
         else:
-            if not self.result:
+            if not self.is_monitor and not self.result:
                 self.result = 'Nothing to see here, move along ...'
 
     def is_from_authorized_sender(self):
@@ -270,6 +271,10 @@ class Webhook(WebhookMeta):
         self.repo = self.payload['repository']['name']
         self.pusher = self.payload['pusher']['name']
         self.commits = [c for c in self.payload['commits'] if '__NOBUILD__' not in c['message']]
+        sync_only = [c for c in self.payload['commits'] if '__SYNCONLY__' in c['message']]
+
+        if sync_only:
+            self.sync_pkgbuilds_only = True
 
         if self.repo == 'numix-icon-theme':
             rate_limit = True
@@ -363,6 +368,8 @@ class Webhook(WebhookMeta):
                 trans_obj = get_trans_object(packages=the_pkgs)
                 initiated_by = 'RepoMonitor' if (self.is_monitor or self.is_numix) else 'Github'
                 trans_obj.initiated_by = initiated_by
+                trans_obj.sync_pkgbuilds_only = self.sync_pkgbuilds_only
+
                 status.transaction_queue.append(trans_obj.tnum)
                 queue.enqueue_call(builder.handle_hook, timeout=84600)
 
