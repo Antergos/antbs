@@ -510,7 +510,7 @@ class Package(PackageMeta):
             self.monitored_type = monitored_type
             self.monitored_project = project
             self.monitored_repo = repo
-            self.db.zadd(status.MONITOR_PKGS_KEY, self.pkgname)
+            self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):
         if not self.pkgver:

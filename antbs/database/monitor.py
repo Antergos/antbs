@@ -33,6 +33,7 @@ Repo Monitor Module:
     when new commits are detected.
 """
 
+import gevent
 import requests
 from github3 import login
 from gitlab import Gitlab
@@ -102,7 +103,7 @@ class Monitor(RedisHash):
             self.check_mirror_for_iso(version)
 
     def check_for_new_monitored_packages(self):
-        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
+        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p and gevent.sleep(0.4)]
         new_pkgs = [p for p in pkg_objs if p.is_monitored and p.pkgname not in self.packages]
 
         if new_pkgs:

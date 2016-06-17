@@ -49,7 +49,7 @@ TESTING_DIR = os.path.join(REPO_DIR, 'testing')
 RELEASE_DIR = os.path.join(REPO_DIR, 'release')
 PASSWORD = status.gpg_password
 GPG_KEY = status.gpg_key
-API_KEY = db.get('antbs:misc:antergos.com_api_key')
+API_KEY = db.get(status.ANTERGOS_API_DB_KEY_NAME)
 
 
 class ISOUtility:
@@ -64,6 +64,17 @@ class ISOUtility:
         self.files = [self.file_path, self.file_path + '.sig',
                       self.file_path + '.md5', self.file_path + '.torrent']
         self.md5 = None
+        self.webseeds = self.get_webseeds()
+        logger.debug(self.webseeds)
+
+    def get_webseeds(self):
+        webseeds = []
+
+        with open(os.path.join(status.SCRIPTS_DIR, 'webseeds.list'), 'r') as seeds_list:
+            for line in seeds_list:
+                webseeds.append(line.strip())
+
+        return webseeds
 
     @staticmethod
     def get_version():
@@ -87,21 +98,17 @@ class ISOUtility:
 
     def create_torrent_file(self):
         try:
-            trackers = {
-                'obt': 'udp://tracker.openbittorrent.com:80,',
-                'cps': 'udp://tracker.coppersurfer.tk:6969,',
-                'lpd': 'udp://tracker.leechers-paradise.org:6969,',
-                'dem': 'udp://open.demonii.com:1337'
-            }
+            trackers = [
+                'udp://tracker.openbittorrent.com:80',
+                'udp://tracker.coppersurfer.tk:6969',
+                'udp://tracker.leechers-paradise.org:6969',
+                'udp://open.demonii.com:1337'
+            ]
             cmd = ['mktorrent',
-                   '-a',
-                   trackers['obt'] + trackers['cps'] + trackers['lpd'] + trackers['dem'],
-                   '-n',
-                   self.file_name,
-                   '-o',
-                   self.file_name + '.torrent',
-                   '-w',
-                   self.mirror_url,
+                   '-a', ','.join(trackers),
+                   '-n', self.file_name,
+                   '-o', self.file_name + '.torrent',
+                   '-w', ','.join(self.webseeds),
                    self.file_name]
 
             subprocess.check_output(cmd, cwd=TESTING_DIR)
@@ -130,9 +137,10 @@ class ISOUtility:
         md5_path = self.file_path + '.md5'
         md5_sum = self.checksum_md5(self.file_path)
         self.md5 = md5_sum
+        line = '{} {}'.format(md5_sum, self.file_name)
 
         with open(md5_path, 'w') as check_sum:
-            check_sum.write(md5_sum)
+            check_sum.write(line)
 
         check_sum.close()
 
