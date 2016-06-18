@@ -53,7 +53,7 @@ def get_timeline(tlpage=None):
 
     timeline = []
 
-    for event_id in status.all_tl_events[1000:-1]:
+    for event_id in status.all_tl_events[9000:-1]:
         event = get_timeline_object(event_id=event_id)
         timeline.append(event)
 

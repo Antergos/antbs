@@ -135,20 +135,6 @@ class Build(RedisHash):
             self.live_output_key = 'live:build_output:{0}'.format(self.bnum)
             self.last_line_key = 'tmp:build_log_last_line:{0}'.format(self.bnum)
 
-    @staticmethod
-    def datetime_to_string(dt):
-        """
-        Converts a datetime to a string.
-
-        Args:
-            dt (datetime.datetime): `datetime` to be converted.
-
-        Returns:
-            str: The datetime string.
-
-        """
-        return dt.strftime("%m/%d/%Y %I:%M%p")
-
     def publish_build_output(self):
         if not self.container:
             logger.error('Unable to publish build output. (Container is None)')
@@ -235,7 +221,7 @@ class Build(RedisHash):
         else:
             self.version_str = self._pkg_obj.version_str
 
-        pkg_link = '<a href="{0}">{0}</a>'.format(self._pkg_obj.pkgname)
+        pkg_link = '<a href="/package/{0}">{0}</a>'.format(self._pkg_obj.pkgname)
 
         tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> started.'
 
@@ -252,9 +238,11 @@ class Build(RedisHash):
             current_job.save()
 
     def save_build_results(self, result):
+        pkg_link = '<a href="/package/{0}">{0}</a>'.format(self._pkg_obj.pkgname)
+
         if result is True:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> was successful.'
-            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.pkgname, self.version_str)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> was successful.'
+            tlmsg = tpl.format(str(self.bnum), pkg_link, self.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=4)
 
             self.review_status = 'pending'
@@ -264,8 +252,8 @@ class Build(RedisHash):
             status.completed.rpush(self.bnum)
 
         else:
-            tpl = 'Build <a href="/build/{0}">{0}</a> for <strong>{1}-{2}</strong> failed.'
-            tlmsg = tpl.format(str(self.bnum), self._pkg_obj.pkgname, self.version_str)
+            tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> failed.'
+            tlmsg = tpl.format(str(self.bnum), pkg_link, self.version_str)
             _ = get_timeline_object(msg=tlmsg, tl_type=5)
 
             self.failed = True
@@ -404,8 +392,6 @@ class Build(RedisHash):
                                                                self._pkg_obj.pkgver)
         status.current_status = own_status
         status.iso_building = True
-
-        bld_obj = self.process_and_save_build_metadata(self._pkg_obj.pkgver)
 
         i686_flag = os.path.join(status.REPO_BASE_DIR, 'iso/testing/.ISO32')
         minimal = os.path.join(status.REPO_BASE_DIR, 'iso/testing/.MINIMAL')

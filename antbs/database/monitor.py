@@ -32,6 +32,7 @@ Repo Monitor Module:
     Monitors commit activity on 3rd-party repos and schedules builds
     when new commits are detected.
 """
+from datetime import datetime
 
 import gevent
 import requests
@@ -132,6 +133,7 @@ class Monitor(RedisHash):
                 latest = latest.replace('v', '')
 
             pkg_obj.monitored_last_result = latest
+            pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
             build_pkgs.append(pkg_obj.name)
 
             if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:

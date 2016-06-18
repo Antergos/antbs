@@ -43,7 +43,7 @@ package_view = Blueprint('package', __name__)
 ##
 ###
 
-@package_view.route('/pkg/<pkgname>', methods=['GET'])
+@package_view.route('/<pkgname>', methods=['GET'])
 def get_and_show_pkg_profile(pkgname=None):
     if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)

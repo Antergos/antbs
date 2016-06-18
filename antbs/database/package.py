@@ -64,7 +64,8 @@ class PackageMeta(RedisHash):
                     'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
                     'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
                     'pkgver',       'pkgname',        'pkgbuild',       'short_name',
-                    'success_rate', 'url',            'version_str',    'gh_path', 'filename_str'],
+                    'success_rate', 'url',            'version_str',    'gh_path',
+                    'filename_str'  'monitored_last_checked'],
 
             bool=['is_metapkg',   'auto_sum',     'is_split_package', 'is_initialized',
                   'push_version', 'is_monitored', 'saved_commit',     'is_iso'],
@@ -346,7 +347,7 @@ class Package(PackageMeta):
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored
 
-        if not can_push or old_val == new_val or new_val in [None, 'None'] or True:
+        if not can_push or old_val == new_val or new_val in [None, 'None']:
             logger.error(
                 'cant push to github! %s, old_val: %s, new_val: %s', self.pkgname, old_val, new_val
             )

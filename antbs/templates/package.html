@@ -1,47 +1,246 @@
 {% extends "base.html" %}
 
 {% block pagetitle -%}Package Profile{%- endblock pagetitle %}
+{% block head %}
+<link rel="stylesheet" type="text/css" href="/static/css/bootstrap-switch.css"/>
+	{{ super() }}
+{% endblock head %}
+
 {% block stats %}{% endblock stats %}
 
 {% block bottomcontent -%}
+	<div class="row">
+		<div class="col-md-8">
+			<div class="block-flat profile-info">
+				<div class="row">
+					<div class="col-md-1">
+						<div class="avatar">
+							<img src="http://antergos.info/apps/
 
-	<div class="col-sm-12">
-		<div class="block-flat profile-info">
-			<div class="row">
-				<div class="col-sm-1">
-					<div class="avatar">
-						<img src="http://antergos.info/apps/
+								{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
+						</div>
+					</div>
+					<div class="col-md-5">
+						<div class="personal">
+							<h1 class="name">{{ pkg.name }}</h1>
 
-							{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
+							<p class="description">{{ pkg.pkgdesc }}<p>
+						</div>
+					</div>
+					<div class="col-md-2" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
+						<h3 style="margin-bottom: 20px;">Total Builds</h3>
+						{{ pkg.builds|length() }}
+					</div>
+					<div class="col-md-4">
+						<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
+
+						<div class="progress">
+							<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate|float|round(2) }}% Completed</div>
+							<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate|float|round(2) }}% Failed</div>
+						</div>
+						{#					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>#}
 					</div>
 				</div>
-				<div class="col-sm-3">
-					<div class="personal">
-						<h1 class="name">{{ pkg.name }}</h1>
-
-						<p class="description">{{ pkg.pkgdesc }}<p>
+			</div>
+		</div>
+			<div class="col-md-3">
+				<div id="summary" class="block block-color info">
+					<div class="header">
+						<div class="actions">
+							<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+							<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+							<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+						</div>
+						<h3><i class="glyphicon glyphicon-eye"></i> Source Repo Monitor</h3>
 					</div>
-				</div>
-				<div class="col-sm-2" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
-					<h3 style="margin-bottom: 20px;">Total Builds</h3>
-					{{ pkg.builds|length() }}
-				</div>
-				<div class="col-sm-6">
-					<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
-
-					<div class="progress">
-						<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate|float|round(2) }}% Completed</div>
-						<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate|float|round(2) }}% Failed</div>
+					<div class="content no-padding">
+						<table id="noDt" class="table no-border hover">
+							<tbody class="no-border-y">
+							<tr>
+								<td>Status:</td>
+								{% set readonly = 'readonly' if not current_user.is_authenticated else '' %}
+								{% set checked = 'checked' if pkg.is_monitored else '' %}
+								<td>
+									<input class="switch" type="checkbox" {{ checked }} data-on-color="info" {{ readonly }}>
+								</td>
+							</tr>
+							{% if pkg.is_monitored %}
+								<tr>
+									<td>Service:</td>
+									<td>{{ pkg.monitored_service|capitalize() }}</td>
+								</tr>
+								<tr>
+									<td>Type:</td>
+									<td>{{ pkg.monitored_type }}</td>
+								</tr>
+								<tr>
+									<td>Project:</td>
+									<td>{{ pkg.monitored_project }}</td>
+								</tr>
+								<tr>
+									<td>Repo:</td>
+									<td>{{ pkg.monitored_repo }}</td>
+								</tr>
+								<tr>
+									<td>Last Check:</td>
+									<td>{{ pkg.monitored_last_checked }}</td>
+								</tr>
+								<tr>
+									<td>Next Check:</td>
+									<td></td>
+								</tr>
+							{% else %}
+								<tr>
+									<td>Service:</td>
+									<td></td>
+								</tr>
+								<tr>
+									<td>Type:</td>
+									<td></td>
+								</tr>
+								<tr>
+									<td>Project:</td>
+									<td></td>
+								</tr>
+								<tr>
+									<td>Repo:</td>
+									<td></td>
+								</tr>
+								<tr>
+									<td>Last Check:</td>
+									<td></td>
+								</tr>
+								<tr>
+									<td>Next Check:</td>
+									<td></td>
+								</tr>
+							{% endif %}
+							</tbody>
+						</table>
 					</div>
-					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>
 				</div>
 			</div>
 		</div>
 	</div>
+	<div class="row">
+
+			<div class="col-md-2" style=""></div>
+			<div class="col-md-6 col-md-6-offset-1" style="">
+				<div class="col-md-11 pull-right">
+					<div class="block-flat dark-box">
+						<div class="header">
+							<div class="actions">
+								<a class="minimize ant-disabled" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
+								<a class="refresh ant-disabled" href="#"><i class="fa"></i></a>
+								<a class="close-down ant-disabled" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
+							</div>
+							<h3>Build Activity</h3>
+						</div>
+						<div class="content build_heat" style="width: 100%;">
+
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
 {% endblock bottomcontent %}
 {% block scripts %}
 	{{ super() }}
-	{#    <script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>#}
+	<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
+	<script>
+	$(window).load(function() {
+		/*Switch*/
+		$('.switch').bootstrapSwitch();
+	});
+	</script>
+	{% if build_history %}
+		<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
+		<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
+		<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>
+		<style>
+			.graph-label {
+				font-size: 14px;
+				color: #CACACA;
+			}
+		#summary td:first-child {
+			padding-left: 20px;
+		}
+
+			#summary td:last-child {
+				padding-right: 20px;
+			}
+		</style>
+		<script>
+			$(window).load(function () {
+				var history = $.parseJSON('{{ timestamps|tojson }}');
+				var cal = new CalHeatMap(),
+					today = new Date(),
+					day = new Date(),
+					last_year = day.setMonth(today.getMonth() - 12),
+					position_map = {
+						m_2: 'translateX(0px)',
+						m_3: 'translateX(-24px)',
+						m_4: 'translateX(-36px)',
+						m_5: 'translateX(-60px)',
+						m_6: 'translateX(-72px)',
+						m_7: 'translateX(-96px)',
+						m_8: 'translateX(0px)',
+						m_9: 'translateX(0px)',
+						m_10: 'translateX(0px)',
+						m_11: 'translateX(0px)',
+						m_12: 'translateX(0px)',
+						m_1: 'translateX(0px)'
+					};
+				cal.init({
+					itemSelector: ".build_heat",
+					domain: "month",
+					subDomain: "day",
+					dataType: "json",
+					data: history,
+					start: new Date(last_year),
+					minDate: new Date(last_year),
+					maxDate: today,
+					cellSize: 12.5,
+					legendCellSize: 13.5,
+					cellRadius: 0,
+					cellPadding: 2,
+					legendCellPadding: 3,
+					legendHorizontalPosition: "center",
+					range: 7,
+					domainMargin: 0,
+					domainGutter: 3,
+					animationDuration: 800,
+					domainDynamicDimension: false,
+					{#previousSelector: "#build_history-Previous",
+					nextSelector: "#build_history-Next",#}
+					considerMissingDataAsZero: true,
+					label: {
+						position: "bottom",
+						align: "center",
+						height: 22,
+						offset: {x: -3}
+					},
+					itemName: ["build", "builds"],
+					tooltip: true,
+					legend: [1, 2, 3, 5],
+					//legendColors: {min: "#F9F1F4", max: "#F42D6B", empty: "#FEFEFE"},
+					legendColors: {min: "#FBE2EA", max: "#F42D6B", empty: "#383A41"},
+					domainLabelFormat: "%b '%y",
+					onComplete: function () {
+						var _this = this;
+						$('#build_history-Next').click(function () {
+							_this.next(8);
+						});
+						$('#build_history-Previous').click(function () {
+							_this.previous(8);
+						});
+					}
+				});
+				cal.jumpTo(new Date());
+			});
+		</script>
+	{% endif %}
+	{#<script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>
 	<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
 	<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
 	<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>
@@ -98,7 +297,7 @@
 
 
 
-	{#<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
 	<script type="text/javascript">
 		google.load("visualization", "1.1", {packages: ["calendar"]});
 		google.setOnLoadCallback(drawChart);
@@ -129,9 +328,9 @@
 
 			chart.draw(dataTable, options);
 		}
-	</script>#}
+	</script>
 	<script>
-		{#var plot_builds = $.plot($("#build_stats"), [{
+		var plot_builds = $.plot($("#build_stats"), [{
 			data: pageviews,
 			label: "Version History"
 		}
@@ -174,6 +373,6 @@
 				ticks: 6,
 				tickDecimals: 0
 			}
-		});#}
-	</script>
+		});
+	</script>#}
 {% endblock scripts %}

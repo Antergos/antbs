@@ -337,7 +337,7 @@ class Webhook(WebhookMeta):
                     html.append('<ul class="hook-pkg-list">')
                 for p in the_pkgs:
                     if p:
-                        pkg_link = '<a href="/pkg/{0}">{0}</a>'.format(p)
+                        pkg_link = '<a href="/package/{0}">{0}</a>'.format(p)
 
                         if len(the_pkgs) > 1:
                             item = '<li>{0}</li>'.format(pkg_link)

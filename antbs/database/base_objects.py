@@ -557,3 +557,17 @@ class RedisHash(RedisObject):
         else:
             # All path components and hence pathname itself are valid.
             return True
+
+    @staticmethod
+    def datetime_to_string(dt):
+        """
+        Converts a datetime to a string.
+
+        Args:
+            dt (datetime.datetime): `datetime` to be converted.
+
+        Returns:
+            str: The datetime string.
+
+        """
+        return dt.strftime("%m/%d/%Y %I:%M%p")
