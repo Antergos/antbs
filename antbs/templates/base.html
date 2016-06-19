@@ -571,16 +571,16 @@
 											<a href="/repo/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
 											<ul class="sub-menu">
 												<li {% if request.path == "/repo/browse/main" %}class="active"{% endif %}>
-													<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main Repo</span></a>
+													<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main</span></a>
 												</li>
 												<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
-													<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging Repo</span></a>
+													<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging</span></a>
 												</li>
 											</ul>
 
 										</li>
 										<li {% if request.path == "/repo" %}class="active"{% endif %}>
-											<a href="/repo"><i class="fa  fa-archive"></i><span>Repo Packages</span></a>
+											<a href="/repo"><i class="fa  fa-archive"></i><span>Packages</span></a>
 											<ul class="sub-menu">
 												<li {% if '/repo/antergos/packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
 													<a href="/repo/antergos/packages"><i class="fa   fa-list"></i><span>Main</span></a>

@@ -44,9 +44,9 @@ from database.base_objects import db
 from database.server_status import status
 from utils.logging_config import logger
 
-REPO_DIR = status.ISO_DIR
-TESTING_DIR = os.path.join(REPO_DIR, 'testing')
-RELEASE_DIR = os.path.join(REPO_DIR, 'release')
+TESTING_DIR = os.path.join(status.ISO_DIR, 'testing')
+RELEASE_DIR = os.path.join(status.ISO_DIR, 'release')
+SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
 PASSWORD = status.gpg_password
 GPG_KEY = status.gpg_key
 API_KEY = db.get(status.ANTERGOS_API_DB_KEY_NAME)
@@ -70,7 +70,7 @@ class ISOUtility:
     def get_webseeds(self):
         webseeds = []
 
-        with open(os.path.join(status.SCRIPTS_DIR, 'webseeds.list'), 'r') as seeds_list:
+        with open(os.path.join(SCRIPTS_DIR, 'webseeds.list'), 'r') as seeds_list:
             for line in seeds_list:
                 webseeds.append(line.strip())
 

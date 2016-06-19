@@ -3555,7 +3555,7 @@ fieldset[disabled] .btn-primary.active {
   padding-top: 7px;
 }
 .no-border {
-  border-top: 0;
+  border-top: 0 !important;
 }
 .blue-chart {
   border-left: 1px solid #258fec;
@@ -5180,7 +5180,7 @@ body.modal-open,
   padding: 3px 0;
 }
 .block-flat .header.no-border {
-  border: 0;
+  border: 0 !important;
 }
 .block-flat .content {
   padding: 15px 3px 0 3px;
@@ -5842,58 +5842,58 @@ table.no-strip tr:nth-child(2n) {
 }
 /*No-Internal borders in thead*/
 table .no-border th {
-  border-left: 0;
+  border-left: 0 !important;
 }
 table .no-border tr th:first-child {
   border-left: 1px solid #dadada;
 }
 /*No-Internal borders in tbody x and y*/
 table .no-border-x td {
-  border-bottom: 0;
+  border-bottom: 0 !important;
 }
 table .no-border-x tr:last-child td {
   border-bottom: 1px solid #dadada;
 }
 table .no-border-y td {
-  border-left: 0;
+  border-left: 0 !important;
 }
 table .no-border-y tr td:first-child {
   border-left: 1px solid #dadada;
 }
 /*No-External borders general table*/
 table.no-border tr th {
-  border-top: 0;
+  border-top: 0 !important;
 }
 table.no-border tr th:first-child {
-  border-left: 0;
+  border-left: 0 !important;
 }
 table.no-border tr th:last-child {
-  border-right: 0;
+  border-right: 0 !important;
 }
 table.no-border tr td:first-child {
-  border-left: 0;
+  border-left: 0 !important;
 }
 table.no-border tr td:last-child {
-  border-right: 0;
+  border-right: 0 !important;
 }
 table.no-border tr:last-child td {
-  border-bottom: 0;
+  border-bottom: 0 !important;
 }
 /*No-External borders when .no-padding in block*/
 .no-padding table th:first-child {
-  border-left: 0;
+  border-left: 0 !important;
 }
 .no-padding table th:last-child {
-  border-right: 0;
+  border-right: 0 !important;
 }
 .no-padding table tr td:first-child {
-  border-left: 0;
+  border-left: 0 !important;
 }
 .no-padding table tr td:last-child {
-  border-right: 0;
+  border-right: 0 !important;
 }
 .no-padding table tr:last-child td {
-  border-bottom: 0;
+  border-bottom: 0 !important;
 }
 table tbody .toggle-details {
   cursor: pointer;
@@ -5906,7 +5906,7 @@ table tbody td .btn {
 }
 /*list style table*/
 table.list.no-border {
-  border-top: 0;
+  border-top: 0 !important;
 }
 table.list .items td {
   vertical-align: middle;
@@ -7030,7 +7030,7 @@ ul.timeline >  li > .date {
   padding: 11px 10px 7px 10px;
 }
 .block .no-border {
-  border-bottom: 0;
+  border-bottom: 0 !important;
 }
 .block .content h2,
 .widget-block .content h2 {

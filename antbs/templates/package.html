@@ -2,7 +2,7 @@
 
 {% block pagetitle -%}Package Profile{%- endblock pagetitle %}
 {% block head %}
-<link rel="stylesheet" type="text/css" href="/static/css/bootstrap-switch.css"/>
+	<link rel="stylesheet" type="text/css" href="/static/css/bootstrap-switch.css"/>
 	{{ super() }}
 {% endblock head %}
 
@@ -10,7 +10,7 @@
 
 {% block bottomcontent -%}
 	<div class="row">
-		<div class="col-md-8">
+		<div class="col-md-12">
 			<div class="block-flat profile-info">
 				<div class="row">
 					<div class="col-md-1">
@@ -20,14 +20,14 @@
 								{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
 						</div>
 					</div>
-					<div class="col-md-5">
+					<div class="col-md-4">
 						<div class="personal">
 							<h1 class="name">{{ pkg.name }}</h1>
 
 							<p class="description">{{ pkg.pkgdesc }}<p>
 						</div>
 					</div>
-					<div class="col-md-2" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
+					<div class="col-md-3" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
 						<h3 style="margin-bottom: 20px;">Total Builds</h3>
 						{{ pkg.builds|length() }}
 					</div>
@@ -43,19 +43,47 @@
 				</div>
 			</div>
 		</div>
-			<div class="col-md-3">
-				<div id="summary" class="block block-color info">
-					<div class="header">
-						<div class="actions">
-							<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-							<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-							<a class="close-down" href="#"><i class="fa fa-times"></i></a>
-						</div>
-						<h3><i class="glyphicon glyphicon-eye"></i> Source Repo Monitor</h3>
+
+	</div>
+	<div class="row">
+		<div class="col-md-5">
+			<div class="tab-container">
+				<ul class="nav nav-tabs">
+					<li class="active"><a data-toggle="tab" href="#pkg_details">Details</a></li>
+					<li class=""><a data-toggle="tab" href="#monitor">Monitor</a></li>
+					<li class=""><a data-toggle="tab" href="#pkg_actions">Actions</a></li>
+				</ul>
+				<div class="tab-content">
+					<div id="pkg_details" class="tab-pane cont no-border active">
+						<table id="noDt" class="table no-border">
+							<tbody class="no-border-y no-border-x">
+							<tr>
+								<td>Version:</td>
+								<td>{{ pkg.version_str }}</td>
+							</tr>
+							<tr>
+								<td>Upstream URL:</td>
+								<td>{{ pkg.url }}</td>
+							</tr>
+							<tr>
+								<td>Groups:</td>
+								<td>{% if pkg.groups %}
+									{% for group in pkg.groups %}
+										{{ '<a href="/repo/antergos/%s" class="label label-info">%s</a> '|format(group) }}
+									{% endfor %}
+								{% endif %}</td>
+							</tr>
+							<tr>
+								<td>Depends:</td>
+								<td></td>
+							</tr>
+							</tbody>
+						</table>
+
 					</div>
-					<div class="content no-padding">
-						<table id="noDt" class="table no-border hover">
-							<tbody class="no-border-y">
+					<div id="monitor" class="tab-pane cont no-border">
+						<table id="noDt" class="table no-border">
+							<tbody class="no-border-y no-border-x">
 							<tr>
 								<td>Status:</td>
 								{% set readonly = 'readonly' if not current_user.is_authenticated else '' %}
@@ -118,40 +146,41 @@
 							</tbody>
 						</table>
 					</div>
+					<div id="pkg_actions" class="tab-pane">
+
+					</div>
+					<div class="md-overlay"></div>
 				</div>
 			</div>
 		</div>
-	</div>
-	<div class="row">
-
-			<div class="col-md-2" style=""></div>
-			<div class="col-md-6 col-md-6-offset-1" style="">
-				<div class="col-md-11 pull-right">
-					<div class="block-flat dark-box">
-						<div class="header">
-							<div class="actions">
-								<a class="minimize ant-disabled" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
-								<a class="refresh ant-disabled" href="#"><i class="fa"></i></a>
-								<a class="close-down ant-disabled" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
-							</div>
-							<h3>Build Activity</h3>
+		<div class="col-md-1" style=""></div>
+		<div class="col-md-6 col-md-6-offset-1" style="">
+			<div class="col-md-11 pull-right">
+				<div class="block-flat dark-box">
+					<div class="header">
+						<div class="actions">
+							<a class="minimize ant-disabled" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
+							<a class="refresh ant-disabled" href="#"><i class="fa"></i></a>
+							<a class="close-down ant-disabled" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
 						</div>
-						<div class="content build_heat" style="width: 100%;">
+						<h3>Build Activity</h3>
+					</div>
+					<div class="content build_heat" style="width: 100%;">
 
-						</div>
 					</div>
 				</div>
 			</div>
 		</div>
+	</div>
 {% endblock bottomcontent %}
 {% block scripts %}
 	{{ super() }}
 	<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
 	<script>
-	$(window).load(function() {
-		/*Switch*/
-		$('.switch').bootstrapSwitch();
-	});
+		$(window).load(function () {
+			/*Switch*/
+			$('.switch').bootstrapSwitch();
+		});
 	</script>
 	{% if build_history %}
 		<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
@@ -162,9 +191,10 @@
 				font-size: 14px;
 				color: #CACACA;
 			}
-		#summary td:first-child {
-			padding-left: 20px;
-		}
+
+			#summary td:first-child {
+				padding-left: 20px;
+			}
 
 			#summary td:last-child {
 				padding-right: 20px;

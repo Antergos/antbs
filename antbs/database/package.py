@@ -421,6 +421,8 @@ class Package(PackageMeta):
             self.update_pkgbuild_and_push_github('pkgrel', old_vals['pkgrel'], '1')
             changed['pkgrel'] = '1'
 
+            gevent.sleep(5)
+
         version = changed['pkgver'] or self.pkgver
 
         if version and 'None' in version:

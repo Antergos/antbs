@@ -167,11 +167,11 @@ def get_build_history_chart_data(pkg_obj=None):
             all_builds = sum([int(num) for num in
                               [chart_data[key]['builds'] for key in chart_data]])
             if len(pkg_obj.builds) > all_builds:
-                chart_data = '{}'
+                chart_data = '[]'
 
-    timestamps = {}
+    timestamps = []
 
-    if not chart_data or chart_data in ['{}', '_']:
+    if not chart_data or chart_data in ['[]', '_']:
         chart_data = dict()
         builds = [b for b in builds if b]
         for bld in builds:
@@ -179,11 +179,14 @@ def get_build_history_chart_data(pkg_obj=None):
             if not bld_obj.end_str:
                 continue
             dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
-            key = dt.strftime("%s")
+            key = dt.strftime("%m-%d-%Y")
             if not chart_data.get(key, False):
-                chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
-                                       timestamp=key)
+                # chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,
+                #                      timestamp=key)
+                chart_data[key] = dict(date=key, builds=1)
             else:
+                if chart_data[key]['builds'] > 35:
+                    continue
                 chart_data[key]['builds'] += 1
 
         if pkg_obj is None:
@@ -194,9 +197,9 @@ def get_build_history_chart_data(pkg_obj=None):
         chart_data = json.loads(chart_data)
 
     for key in chart_data:
-        timestamps[key] = chart_data[key]['builds']
+        timestamps.append(chart_data[key])
 
-    return chart_data, timestamps
+    return chart_data, json.dumps(timestamps)
 
 
 from views.api import api_view
