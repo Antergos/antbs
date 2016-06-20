@@ -116,7 +116,7 @@ def homepage(tlpage=None):
 
         stats[stat] = len(within)
 
-    return try_render_template("overview.html", stats=stats, tl_events=tl_events,
+    return try_render_template("home.html", stats=stats, tl_events=tl_events,
                                all_pages=all_pages, page=tlpage, build_history=build_history,
                                timestamps=timestamps)
 

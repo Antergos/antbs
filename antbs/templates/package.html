@@ -1,12 +1,6 @@
 {% extends "base.html" %}
 
-{% block pagetitle -%}Package Profile{%- endblock pagetitle %}
-{% block head %}
-	<link rel="stylesheet" type="text/css" href="/static/css/bootstrap-switch.css"/>
-	{{ super() }}
-{% endblock head %}
-
-{% block stats %}{% endblock stats %}
+{% block pagetitle %}Package Profile{% endblock pagetitle %}
 
 {% block bottomcontent -%}
 	<div class="row">
@@ -16,6 +10,7 @@
 					<div class="col-md-1">
 						<div class="avatar">
 							<img src="http://antergos.info/apps/
+
 
 								{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
 						</div>
@@ -270,7 +265,7 @@
 			});
 		</script>
 	{% endif %}
-	{#<script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>
+	{# <script type="text/javascript" src="/static/js/jquery.easypiechart/jquery.easy-pie-chart.js"></script>
 	<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
 	<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
 	<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>
@@ -324,41 +319,6 @@
 		{% endif %}
 	});
 	</script>
-
-
-
-	<script type="text/javascript" src="https://www.google.com/jsapi"></script>
-	<script type="text/javascript">
-		google.load("visualization", "1.1", {packages: ["calendar"]});
-		google.setOnLoadCallback(drawChart);
-
-		function drawChart() {
-			var wwidth = $(window).width(),
-				the_width = (wwidth > 1366) ? 761 : (wwidth > 1024) ? 485 : (wwidth > 767) ? 340 : 240;
-			var dataTable = new google.visualization.DataTable();
-			dataTable.addColumn({type: 'date', id: 'Date'});
-			dataTable.addColumn({type: 'number', id: 'Won/Loss'});
-			dataTable.addRows([
-				{% if build_history %}
-					{% for dt in build_history.itervalues() %}
-						[new Date({{ dt.year }}, {{ dt.month }}, {{ dt.day }}), {{ dt.builds }}]{% if not loop.last %},{% endif %}
-					{% endfor %}
-				{% endif %}
-
-			]);
-
-			var chart = new google.visualization.Calendar(document.getElementById('build_history'));
-
-			var options = {
-				title: "Build Frequency",
-				height: 200,
-				width: the_width,
-				calendar: {cellSize: 12}
-			};
-
-			chart.draw(dataTable, options);
-		}
-	</script>
 	<script>
 		var plot_builds = $.plot($("#build_stats"), [{
 			data: pageviews,
@@ -404,5 +364,5 @@
 				tickDecimals: 0
 			}
 		});
-	</script>#}
+	</script> #}
 {% endblock scripts %}

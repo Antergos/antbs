@@ -1,0 +1,123 @@
+<!-- TOP BAR -->
+<div id="head-nav" class="navbar navbar-default">
+	<div class="container-fluid">
+		<div class="navbar-collapse">
+			{% if current_user.is_authenticated %}
+				<ul class="nav navbar-nav navbar-right user-nav">
+					<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
+						<a href="#"><i class="fa fa-refresh"></i></a>
+					</li>
+					<li data-toggle="tooltip" title="Do ISO Release" data-placement="left">
+						<a href="#" id="do_iso_release" data-toggle="modal" data-target="#do_iso_release_confirm_modal">
+							<i class="fa fa-ship"></i>
+						</a>
+					</li>
+					<li class="dropdown profile_menu">
+						<a href="#" class="dropdown-toggle" data-toggle="dropdown">
+							<i class="fa fa-user"></i> {{ user.username }}<b class="caret"></b></a>
+						<ul class="dropdown-menu">
+							<li>
+								<a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a>
+							</li>
+						</ul>
+					</li>
+				</ul>
+				<ul class="nav navbar-nav not-nav">
+					<li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}" data-toggle="tooltip" title="Pending Review" data-placement="right">
+						<a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle" data-toggle="dropdown"{% endif %}>
+							<i class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
+							<span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
+						</a>
+						{% if rev_pending|count() > 0 %}
+							<ul class="dropdown-menu">
+								<li>
+									<div class="nano" style="width:280px;">
+										<div class="nano-content content">
+											<ul>
+
+												{% for build in rev_pending|sort(attribute='bnum') %}
+													<li>
+														<a href="/pkg_review"><i class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
+															{{ build.version_str }}
+															<span class="date">{{ build.end_str }}</span></a>
+													</li>
+
+												{% endfor %}
+
+
+											</ul>
+										</div>
+									</div>
+									<ul class="foot">
+										<li><a href="/pkg_review">View All </a></li>
+									</ul>
+								</li>
+							</ul>
+						{% endif %}
+					</li>
+					<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
+						<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+					</li>
+					<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+						<pre id="status_bar_pre">Idle</pre>
+					</li>
+				</ul>
+				<!-- ISO RELEASE MODAL -->
+				<div class="modal fade colored-header prusia" id="do_iso_release_confirm_modal" tabindex="-1" role="dialog">
+					<div class="modal-dialog">
+						<div class="modal-content">
+							<div class="modal-header">
+								<h3>Do ISO Release</h3>
+								<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+							</div>
+							<div class="modal-body">
+								<div class="text-center">
+									<div class="i-circle primary"><i class="fa fa-check"></i>
+									</div>
+									<h4>Are you sure you want to do this?</h4>
+
+									<p>The following is required in order for this to be successful:</p>
+
+									<div style="margin:0 auto; max-width: 340px; text-align:left;">
+										<ul>
+											<li>All four ISO images exist in the iso testing
+												directory.
+											</li>
+											<li>All images have the same version (date) in filename.
+											</li>
+										</ul>
+									</div>
+								</div>
+							</div>
+							<div class="modal-footer">
+								<button type="button" class="btn btn-default btn-flat" data-dismiss="modal">
+									Cancel
+								</button>
+								<button type="button" id="do_iso_release_confirm" class="btn btn-primary btn-flat" data-dismiss="modal">
+									Proceed
+								</button>
+							</div>
+						</div>
+					</div>
+				</div> <!-- END ISO RELEASE MODAL -->
+
+			{% else %}
+				{# User is not logged in.. #}
+				<ul class="nav navbar-nav navbar-right user-nav">
+					<li class="dropdown profile_menu">
+						<a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
+					</li>
+				</ul>
+				<ul class="nav navbar-nav not-nav">
+					<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
+						<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
+					</li>
+					<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
+						<pre id="status_bar_pre">Idle</pre>
+					</li>
+				</ul>
+				{# END if current_user.is_authenticated #}
+			{% endif %}
+		</div>
+	</div>
+</div> <!-- END TOP BAR -->

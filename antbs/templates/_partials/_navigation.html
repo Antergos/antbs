@@ -1,0 +1,38 @@
+{% from '_macros.html' import nav_link with context %}
+
+<ul class="cl-vnavigation">
+	{{ nav_link('/', 'Overview', 'home') }}
+	{{ nav_link('/building', 'Live Build Output', 'eye') }}
+
+	<li class="parent">
+		<a href="#"><i class="fa fa-bar-chart-o"></i><span>Build Reports</span></a>
+		<ul class="sub-menu">
+			{{ nav_link('/builds/queue', 'Build Queue', 'clock-o') }}
+			{{ nav_link('/builds/completed', 'Completed', 'thumbs-o-up') }}
+			{{ nav_link('/builds/failed', 'Failed', 'exclamation-circle') }}
+		</ul>
+	</li>
+
+	<li class="parent">
+		<a href="#"><i class="fa fa-archive"></i><span>Packages</span></a>
+		<ul class="sub-menu">
+			{{ nav_link('/repo/antergos/packages', 'Main', 'list') }}
+			{{ nav_link('/repo/antergos-staging/packages', 'Staging', 'list') }}
+		</ul>
+	</li>
+
+	<li class="parent">
+		<a href="#"><i class="fa fa-file-archive-o"></i><span>Repo Browser</span></a>
+		<ul class="sub-menu">
+			{{ nav_link('/repo/browse/main', 'Main', 'cloud') }}
+			{{ nav_link('/repo/browse', 'Staging', 'cloud-upload') }}
+		</ul>
+	</li>
+
+	{{ nav_link('/repo/browse/release', 'Releases', 'bullhorn') }}
+	{{ nav_link('/repo/browse/testing', 'Testing', 'wrench') }}
+
+	{% if current_user.is_authenticated %}
+		{{ nav_link('/issues', 'Issues', 'bug') }}
+	{% endif %}
+</ul>

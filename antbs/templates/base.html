@@ -1,3 +1,5 @@
+{% from '_macros.html' import page_heading with context %}
+
 {% block doc -%}
 	<!DOCTYPE html>
 	<html{% block html_attribs %} lang="en"{% endblock html_attribs %}>
@@ -8,11 +10,15 @@
 				<meta name="description" content="Antergos Automated Build Server">
 				<meta name="author" content="Antergos Developers">
 				<link rel="shortcut icon" href="/static/images/fav.png">
-				<title>AntBS | {% block pagetitle %}{% endblock pagetitle %}</title>
+				<title>{% block pagetitle %}{% endblock pagetitle %} | AntBS</title>
 
 				{%- block metas %}
 					<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				{%- endblock metas %}
+
+				{% if '/package/' in request.path %}
+					<link rel="stylesheet" type="text/css" href="/static/css/bootstrap-switch.css"/>
+				{% endif %}
 
 				{%- block styles %}
 					<link href='//fonts.googleapis.com/css?family=Open+Sans:400,300,600,400italic,700,800' rel='stylesheet' type='text/css'>
@@ -23,773 +29,52 @@
 					<link rel="stylesheet" href="/static/fonts/font-awesome-4/css/font-awesome.min.css">
 					<link rel="stylesheet" type="text/css" href="/static/js/jquery.datatables/bootstrap-adapter/css/datatables.css"/>
 
-					<!-- HTML5 shim and Respond.js IE8 support of HTML5 elements and media queries -->
-					<!--[if lt IE 9]>
-					<script src="../../assets/js/html5shiv.js"></script>
-					<script src="../../assets/js/respond.min.js"></script>
-					<![endif]-->
-
 					<link href="/static/css/skin-blue.css" rel="stylesheet"/>
-					<link href="/static/css/monokai.css" rel="stylesheet">
-					<link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet">
-					<style type="text/css">
-						body, .cl-mcont {
-							background-color: #EFEFEF
-						}
-
-						.cl-mcont {
-							margin-left: 50px;
-							margin-right: 50px;
-							padding-top: 40px
-						}
-
-						.cl-sidebar, .cl-sidebar .collapse-button {
-							max-width: 225px;
-							width: 225px
-						}
-
-						.cl-sidebar .collapse-button .search {
-							width: 163px
-						}
-
-						.sidebar-logo {
-							background: #272930
-						}
-
-						.sidebar-logo .logo {
-							display: block;
-							margin: 0 auto
-						}
-
-						.sidebar-logo .logo a img {
-							display: block;
-							position: relative;
-							right: 8px;
-							top: 17px;
-							height: auto;
-							max-width: 79%;
-							margin: 0 auto
-						}
-
-						.sb-collapsed .sidebar-logo {
-							background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930
-						}
-
-						.sb-collapsed .sidebar-logo .logo {
-							display: initial;
-							margin: initial
-						}
-
-						.sb-collapsed .sidebar-logo .logo a img {
-							display: none
-						}
-
-						.pre-scrollable {
-							margin-top: 0px;
-							border: none;
-							white-space: pre-wrap;
-						}
-
-						.block .header h3 {
-							margin: 3px 0;
-							font-weight: 400;
-							font-family: "Raleway", Helvetica, sans-serif
-						}
-
-						.hfloat {
-							float: left
-						}
-
-						h3.hfloat {
-							width: 240px
-						}
-
-						.hclear {
-							clear: right
-						}
-
-						.sidebar-logo {
-							padding: 0px 20px
-						}
-
-						.sb-collapsed .sidebar-logo {
-							background: url("/static/images/overlay.png") no-repeat scroll 12px 0px #272930;
-							background-size: 62%;
-						}
-
-						.sb-collapsed .logo:after {
-							display: block;
-							position: absolute;
-							right: 0;
-							top: 8px;
-							height: 35px;
-							width: 10px;
-							background: #272930;
-							content: "";
-							z-index: 99999;
-						}
-
-						.profile_menu .dropdown-toggle {
-							padding: 22px
-						}
-
-						#build_now_form {
-							display: inline-block
-						}
-
-						#status_bar {
-							display: none
-						}
-
-						#status_bar span {
-							float: left
-						}
-
-						#cl-wrapper .cl-sidebar .side-user {
-							font-size: 13px
-						}
-
-						.fd-tile .content h1 {
-							font-size: 45px
-						}
-
-						#status_bar_pre {
-							float: left;
-							margin-bottom: 0px;
-							margin-top: 6px;
-							padding-bottom: 1px;
-							padding-top: 4px
-						}
-
-						@media only screen and (min-width: 1200px) and (max-width: 1366px) {
-							.fd-tile .content p {
-								font-size: 9px;
-								font-weight: 600
-							}
-						}
-
-						@media only screen and (max-width: 568px) {
-							.cl-sidebar {
-								max-width: 100%
-							}
-						}
-
-						ul.timeline {
-							margin-bottom: 0px;
-							font-size: 14px
-						}
-
-						ul.timeline > li > .fa-rocket {
-							background: #7761A7
-						}
-
-						ul.timeline > li > .fa-times {
-							background: #EA6153
-						}
-
-						ul.timeline > li > .fa-check {
-							background: #2CC36B
-						}
-
-						ul.timeline > li .content {
-							position: relative;
-							margin-left: 75px;
-							padding: 12px 10px;
-							background: #FFF;
-							border: 1px solid #D0D0D0;
-							border-radius: 3px;
-							line-height: 15px;
-						}
-
-						ul.timeline > li .content a {
-							font-weight: 600;
-						}
-
-						ul.timeline > li .content:before {
-							position: absolute;
-							left: -6px;
-							top: 14px;
-							height: 10px;
-							width: 10px;
-							border-bottom: 1px solid #D0D0D0;
-							border-left: 1px solid #D0D0D0;
-							background: #FFF;
-							content: "";
-						}
-
-						ul.timeline > li .content p {
-							padding-bottom: 5px;
-							margin: 0
-						}
-
-						ul.timeline > li > .date {
-							display: block;
-							position: absolute;
-							top: 49px;
-							padding: 0 5px;
-							color: #000;
-							font-size: 11px;
-							text-align: center;
-							background: #D0D0D0;
-							border: 1px solid #D0D0D0;
-							border-radius: 1px;
-							line-height: 19px;
-							text-shadow: 0 1px 0 #fafafa;
-						}
-
-						ul.timeline:before {
-							background-color: #D0D0D0
-						}
-
-						ul.timeline > li > .date {
-							width: 69px;
-							left: -10px;
-						}
-
-						ul.pagination {
-							margin: 0 auto
-						}
-
-						.timeline {
-							text-align: left
-						}
-
-						.tlwrap {
-							text-align: center
-						}
-
-						.tlwrap h4 {
-							text-align: left
-						}
-
-						ul.custom {
-							float: right !important
-						}
-
-						ul.hook-pkg-list {
-							margin-bottom: 20px;
-							margin-top: 20px
-						}
-
-						ul.hook-pkg-list li {
-							font-size: 14px;
-							list-style-type: none
-						}
-
-						ul.hook-pkg-list li:before {
-							display: inline-block;
-							margin-right: 8px;
-							font-size: 10px;
-							font-weight: normal;
-							font-style: normal;
-							-moz-osx-font-smoothing: grayscale;
-							-webkit-font-smoothing: antialiased;
-							content: "\f187";
-							font-family: FontAwesome;
-							line-height: 1;
-						}
-
-						.phab {
-							position: absolute;
-							top: 2px;
-							height: 40px;
-							width: 40px;
-							background-color: #21415B !important;
-							background-image: url('/static/images/phab.png') !important;
-							background-position: center center !important;
-							background-repeat: no-repeat !important;
-							background-size: 22px 14px !important;
-						}
-
-						.fa-github {
-							background-color: #1f1f1f !important;
-							font-size: 19px !important
-						}
-
-						.fa-github:before {
-							position: relative;
-							bottom: 2px;
-							right: 1px;
-							content: "\f09b"
-						}
-
-						.profile-info .avatar {
-							padding-top: 10px;
-							text-align: right
-						}
-
-						.profile-info .avatar img {
-							max-height: 64px;
-							max-width: 64px
-						}
-
-						.block-flat .actions a {
-							color: rgba(0, 0, 0, 0.7)
-						}
-
-						.block-flat .actions a:hover {
-							color: #fff
-						}
-
-						b {
-							font-weight: 600
-						}
-
-						.navbar-nav > li.button:first-child .dropdown-menu {
-							max-width: 300px;
-							min-width: 280px;
-							padding: 0
-						}
-
-						.navbar-default .navbar-nav > li.button .dropdown-menu li ul > li > a {
-							max-width: 280px;
-							overflow: hidden;
-							text-overflow: ellipsis;
-							white-space: nowrap;
-						}
-
-						.gritter-item-wrapper.clean.error .gritter-close {
-							background: #ea6153
-						}
-
-						#gritter-notice-wrapper {
-							max-width: 100%;
-							width: 460px
-						}
-
-						.gritter-without-image, .gritter-with-image {
-							max-width: 100%;
-							width: 450px;
-							padding-left: 7px;
-						}
-
-						.nano > .nano-pane {
-							width: 7px;
-							border-radius: 0px
-						}
-
-						.dataTables_filter {
-							display: none
-						}
-
-						.cl-sidebar {
-							width: 225px;
-							max-width: 225px;
-							position: fixed;
-							left: auto;
-							padding-top: 10px;
-						}
-
-						#cl-wrapper, body {
-							background: #272930;
-						}
-
-						#pcont.container-fluid {
-							padding-left: 225px;
-							background: #272930;
-						}
-
-						#main {
-							background: #EFEFEF;
-						}
-
-						.sb-collapsed #pcont.container-fluid {
-							padding-left: 70px;
-						}
-
-						.cl-sidebar .collapse-button {
-							padding: 7px 9px;
-						}
-
-						.cl-sidebar .cl-navblock {
-							padding-bottom: 246px;
-						}
-
-						#top-bar {
-							width: 100%;
-							height: 31px;
-							background: #272930;
-							overflow: hidden;
-						}
-
-						#top-bar > div:first-child {
-							width: 225px;
-							height: 31px;
-							float: left;
-							background: #272930;
-						}
-
-						#top-bar > div:last-child {
-							padding: 0px 10px;
-							float: left;
-							height: 31px;
-							clear: right;
-							background: transparent;
-						}
-
-						.sb-collapsed #top-bar > div:first-child {
-							width: 85px;
-						}
-
-						.sb-collapsed #top-bar > div:last-child .navbar-nav.navbar-right:last-child {
-							margin-left: 140px;
-						}
-
-						#top-bar .navbar-nav.navbar-right:last-child {
-							margin-right: 27px;
-						}
-
-						#top-bar .navbar-nav > li > a {
-							font-size: 13.5px;
-							color: #ffffff;
-							padding: 5.5px 12px;
-							-webkit-font-smoothing: subpixel-antialiased;
-						}
-
-						#top-bar .navbar-nav > li > a:hover, #top-bar .navbar-nav > li > a:focus {
-							background: #272930;
-							color: #2EA3F2;
-						}
-
-						.navbar {
-							background-color: #ffffff;
-						}
-
-						#et-info-email {
-							margin-left: 8px;
-							font-size: 13.5px;
-						}
-
-						.cl-mcont {
-							padding-left: 50px;
-							padding-right: 50px;
-							margin-right: 0px;
-							margin-left: 0px;
-							box-sizing: border-box;
-						}
-
-						.et-social-icon a, .et-social-icon {
-							font-size: 15px !important;
-						}
-
-						table.now_building_stats > tbody > tr > td {
-							height: 51px;
-							vertical-align: middle;
-							padding-left: 15px;
-							padding-right: 15px;
-						}
-
-					</style>
+					<link href="/static/css/monokai.css" rel="stylesheet"/>
+					<link href="/static/js/jquery.nanoscroller/nanoscroller.css" rel="stylesheet"/>
+					<link href="/static/css/style.css" rel="stylesheet"/>
 				{%- endblock styles %}
 			{%- endblock head %}
 		</head>
 		<body{% block body_attribs %} class="animated"{% endblock body_attribs %}>
+
 		{% block body -%}
-			<div id="top-bar">
-				<div></div>
-				<div id="top-header" class="">
-					<div class="container-fluid">
-						<ul class="nav navbar-nav not-nav">
-							<li>
-								<a href="mailto:info@antergos.com"><span class="et-social-icon fa fa-envelope"></span><span id="et-info-email">info@antergos.com</span></a>
-							</li>
-							<li class="et-social-icon et-social-facebook">
-								<a href="//www.facebook.com/antergos" class="fa fa-twitter">
-								</a>
-							</li>
-							<li class="et-social-icon et-social-twitter">
-								<a href="//www.twitter.com/antergos" class="fa fa-facebook">
-								</a>
-							</li>
-							<li class="et-social-icon et-social-google-plus">
-								<a href="//plus.google.com/+Antergos" class="fa fa-google-plus">
-								</a>
-							</li>
-							<li class="et-social-icon et-social-rss">
-								<a href="http://antergos.com/feed" class="fa fa-rss">
-								</a>
-							</li>
-						</ul>
-
-						<ul id="et-secondary-nav" class="nav navbar-nav navbar-right">
-							<li class="">
-								<a href="https://antergos.com/">Main</a></li>
-							<li class="">
-								<a href="https://forum.antergos.com/">Forum</a></li>
-							<li class="">
-								<a href="https://antergos.com/wiki">Wiki</a></li>
-							<li class="">
-								<a target="_blank" href="//github.com/antergos">Bugs</a></li>
-						</ul>
-					</div>
-				</div>
-			</div>
+			{% include '_partials/_antergos_links_bar.html' %}
+			<!-- WRAPPER -->
 			<div id="cl-wrapper">
+
 				{% block sidebar %}
-					<div class="cl-sidebar">
-						<div class="cl-toggle"><i class="fa fa-bars"></i></div>
-						<div class="cl-navblock">
-							<div class="menu-space">
-								<div class="content">
-									<div class="sidebar-logo">
-										<div class="logo">
-											<a href="/"><img src="/static/images/antergos-everyone.png"/></a>
-										</div>
-									</div>
-									<div class="side-user">
-										<dl style="color:rgba(255, 255, 255, 0.6);">
-											<dt>Antergos Build Server</dt>
-											<dd>Automated repo management application that builds packages and iso
-												images.
-											</dd>
-										</dl>
-									</div>
-									<ul class="cl-vnavigation">
-										<li {% if request.path == "/" %}class="active"{% endif %}>
-											<a href="/"><i class="fa fa-home"></i><span>Overview</span></a>
-										</li>
-										<li {% if request.path == "/building" %}class="active"{% endif %}>
-											<a href="/building"><i class="fa fa-eye"></i><span>Live Build Output</span></a>
-										</li>
-										<li class="parent">
-											<a href="#"><i class="fa  fa-bar-chart-o"></i><span>Build Reports</span></a>
-											<ul class="sub-menu">
-												<li {% if request.path == "/builds/queue" %}class="active"{% endif %}>
-													<a href="/builds/queue"><i class="fa  fa-clock-o"></i><span>Build Queue</span></a>
-												</li>
-												<li {% if request.path == "/builds/completed" or res == "completed" %}class="active"{% endif %}>
-													<a href="/builds/completed"><i class="fa  fa-thumbs-o-up"></i><span>Completed</span></a>
-												</li>
-												<li
-													{% if request.path == "/builds/failed" or res == "failed" %} class="active"{% endif %}>
-													<a href="/builds/failed"><i class="fa fa-exclamation-circle"></i><span>Failed</span></a>
-												</li>
-											</ul>
-										</li>
-
-										<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
-											<a href="/repo/browse"><i class="fa  fa-archive"></i><span>Repo Browser</span></a>
-											<ul class="sub-menu">
-												<li {% if request.path == "/repo/browse/main" %}class="active"{% endif %}>
-													<a href="/repo/browse/main"><i class="fa   fa-cloud"></i><span>Main</span></a>
-												</li>
-												<li {% if request.path == "/repo/browse" %}class="active"{% endif %}>
-													<a href="/repo/browse"><i class="fa   fa-cloud-upload"></i><span>Staging</span></a>
-												</li>
-											</ul>
-
-										</li>
-										<li {% if request.path == "/repo" %}class="active"{% endif %}>
-											<a href="/repo"><i class="fa  fa-archive"></i><span>Packages</span></a>
-											<ul class="sub-menu">
-												<li {% if '/repo/antergos/packages' in request.path and not 'staging' in request.path %}class="active"{% endif %}>
-													<a href="/repo/antergos/packages"><i class="fa   fa-list"></i><span>Main</span></a>
-												</li>
-												<li {% if '/repo/antergos-staging/packages' in request.path and 'staging' in request.path %}class="active"{% endif %}>
-													<a href="/repo/antergos-staging/packages"><i class="fa   fa-list"></i><span>Staging</span></a>
-												</li>
-											</ul>
-										</li>
-										<li {% if request.path == "/repo/browse/release" %}class="active"{% endif %}>
-											<a href="/repo/browse/release"><i class="fa  fa-bullhorn"></i><span>Releases</span></a>
-
-										</li>
-										<li {% if request.path == "/repo/browse/testing" %}class="active"{% endif %}>
-											<a href="/repo/browse/testing"><i class="fa fa-wrench"></i><span>Testing</span></a>
-										</li>
-										{% if current_user.is_authenticated %}
-											<li {% if request.path == "/issues" %}class="active"{% endif %}>
-												<a href="/issues"><i class="fa  fa-bug"></i><span>Issues</span></a>
-
-											</li>
-										{% endif %}
-
-
-									</ul>
-								</div>
-							</div>
-						</div>
-						<div class="text-right collapse-button">
-							{% if current_user.is_authenticated %}
-								<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
-									<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
-									<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
-								</form>
-							{% endif %}
-							<button id="sidebar-collapse" class="btn btn-default" style="">
-								<i style="color:#fff;" class="fa fa-angle-left"></i>
-							</button>
-						</div>
-					</div>
+					{% include '_partials/_sidebar.html' %}
 				{% endblock sidebar %}
+
+				<!-- MAIN CONTAINER -->
 				<div class="container-fluid" id="pcont">
 
 					{% block topbar %}
-						<!-- TOP BAR -->
-						<div id="head-nav" class="navbar navbar-default">
-							<div class="container-fluid">
-								<div class="navbar-collapse">
-
-									{% if current_user.is_authenticated %}
-										<ul class="nav navbar-nav navbar-right user-nav">
-											<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
-												<a href="#"><i class="fa fa-refresh"></i></a>
-											</li>
-											<li data-toggle="tooltip" title="Do ISO Release" data-placement="left">
-												<a href="#" id="do_iso_release" data-toggle="modal" data-target="#do_iso_release_confirm_modal">
-													<i class="fa fa-ship"></i>
-												</a>
-											</li>
-											<li class="dropdown profile_menu">
-												<a href="#" class="dropdown-toggle" data-toggle="dropdown">
-													<i class="fa fa-user"></i> {{ user.username }}<b class="caret"></b></a>
-												<ul class="dropdown-menu">
-													<li>
-														<a href="/logout"><i class="fa fa-sign-out"></i> Log Out</a>
-													</li>
-												</ul>
-
-											</li>
-										</ul>
-
-										<ul class="nav navbar-nav not-nav">
-											<li class="button{% if rev_pending|count() > 0 %} dropdown{% endif %}" data-toggle="tooltip" title="Pending Review" data-placement="right">
-												<a href="#" {% if rev_pending|count() > 0 %}class="dropdown-toggle" data-toggle="dropdown"{% endif %}>
-													<i class="fa fa-archive"></i>{% if rev_pending|count() > 0 %}
-													<span class="bubble">{{ rev_pending|count() }}</span>{% endif %}
-												</a>
-												{% if rev_pending|count() > 0 %}
-													<ul class="dropdown-menu">
-														<li>
-															<div class="nano" style="width:280px;">
-																<div class="nano-content content">
-																	<ul>
-
-																		{% for build in rev_pending|sort(attribute='bnum') %}
-																			<li>
-																				<a href="/pkg_review"><i class="fa fa-archive"></i><b>{{ build.pkgname }}</b>
-																					{{ build.version_str }}
-																					<span class="date">{{ build.end_str }}</span></a>
-																			</li>
-
-																		{% endfor %}
-
-
-																	</ul>
-																</div>
-															</div>
-															<ul class="foot">
-																<li><a href="/pkg_review">View All </a></li>
-															</ul>
-														</li>
-													</ul>
-												{% endif %}
-											</li>
-											<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
-												<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-											</li>
-											<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-												<pre id="status_bar_pre">Idle</pre>
-											</li>
-										</ul>
-										<!-- Do ISO Release Modal -->
-										<div class="modal fade colored-header prusia" id="do_iso_release_confirm_modal" tabindex="-1" role="dialog">
-											<div class="modal-dialog">
-												<div class="modal-content">
-													<div class="modal-header">
-														<h3>Do ISO Release</h3>
-														<button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
-													</div>
-													<div class="modal-body">
-														<div class="text-center">
-															<div class="i-circle primary"><i class="fa fa-check"></i>
-															</div>
-															<h4>Are you sure you want to do this?</h4>
-
-															<p>The following is required in order for this to be successful:</p>
-
-															<div style="margin:0 auto; max-width: 340px; text-align:left;">
-																<ul>
-																	<li>All four ISO images exist in the iso testing
-																		directory.
-																	</li>
-																	<li>All images have the same version (date) in filename.
-																	</li>
-																</ul>
-															</div>
-														</div>
-													</div>
-													<div class="modal-footer">
-														<button type="button" class="btn btn-default btn-flat" data-dismiss="modal">
-															Cancel
-														</button>
-														<button type="button" id="do_iso_release_confirm" class="btn btn-primary btn-flat" data-dismiss="modal">
-															Proceed
-														</button>
-													</div>
-												</div>
-												<!-- /.modal-content -->
-											</div>
-										</div><!-- /.modal-dialog -->
-
-									{% else %}
-										<ul class="nav navbar-nav navbar-right user-nav">
-											<li class="dropdown profile_menu">
-												<a href="/login" class="dropdown-toggle"><i class="fa fa-sign-in"></i> Login</a>
-											</li>
-										</ul>
-										<ul class="nav navbar-nav not-nav">
-											<li class="button status" {% if idle == 'True' %}data-toggle="tooltip" title="Status: Idle" data-placement="right"{% endif %}>
-												<a href="#"><i class="fa {% if idle == 'False' %}fa-spinner fa-spin{% else %}fa-dot-circle-o{% endif %}"></i></a>
-											</li>
-											<li id="status_bar" class="button {% if idle == 'False' %}not-idle{% else %}idle{% endif %}">
-												<pre id="status_bar_pre">Idle</pre>
-											</li>
-										</ul>
-									{% endif %}
-								</div>
-							</div>
-						</div>
-
+						{% include '_partials/_topbar.html' %}
 					{%- endblock topbar %}
-						<!-- Main -->
+
 					{% block maincontainer %}
 						<div id="main" class="cl-mcont">
-							{% block subheader %}
-								{% if request.path != "/" %}
-									<div class="page-head"><h2>{{ self.pagetitle() }}</h2>
-										<ol class="breadcrumb">
-											<li><a href="/">Home</a></li>
 
-											<li class="active">{{ self.pagetitle() }}</li>
-										</ol>
-									</div>
-								{% endif %}
-							{% endblock subheader %}
+							{% block heading %}
+								{{ page_heading(self.pagetitle()) }}
+							{% endblock heading %}
 
-							<!-- upper section -->
+							<!-- TOP SECTION -->
 							<div class="container-fluid">
-								{% block topcontent -%}
+								{% block topcontent -%} {%- endblock topcontent %}
+							</div> <!-- END TOP SECTION -->
 
-
-								{%- endblock topcontent %}
-							</div>
+							<!-- BOTTOM SECTION -->
 							<div class="container-fluid">
-								{% block bottomcontent -%}
+								{% block bottomcontent -%} {%- endblock bottomcontent %}
+							</div> <!-- END BOTTOM SECTION -->
 
-
-								{%- endblock bottomcontent %}
-							</div>
-							<!--/row-->
-
-							<!-- /upper section -->
-
-						</div><!--/container-->
+						</div>
 					{% endblock maincontainer %}
-				</div> <!-- /Main -->
-			</div>
-
-
+				</div> <!-- END MAIN CONTAINER -->
+			</div> <!-- END WRAPPER -->
 
 			{% block scripts %}
 				<script src="/static/js/jquery.js"></script>
@@ -824,8 +109,6 @@
 						})
 					})(jQuery);
 				</script>
-
-				<!--<script src="/static/js/jquery.niftymodals/js/jquery.modalEffects.js"></script>-->
 
 				<script type="text/javascript" src="/static/js/jquery.ui/jquery-ui.js"></script>
 				<script type="text/javascript" src="/static/js/jquery.nanoscroller/jquery.nanoscroller.min.js"></script>
@@ -1008,9 +291,7 @@
 									}
 								}
 							{% endif %}
-						}
-					)
-
+						});
 				</script>
 			{%- endblock scripts %}
 		{%- endblock body %}

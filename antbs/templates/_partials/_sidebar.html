@@ -1,0 +1,34 @@
+<div class="cl-sidebar">
+	<div class="cl-toggle"><i class="fa fa-bars"></i></div>
+	<div class="cl-navblock">
+		<div class="menu-space">
+			<div class="content">
+				<div class="sidebar-logo">
+					<div class="logo">
+						<a href="/"><img src="/static/images/antergos-everyone.png"/></a>
+					</div>
+				</div>
+				<div class="side-user">
+					<dl style="color:rgba(255, 255, 255, 0.6);">
+						<dt>Antergos Build Server</dt>
+						<dd>Automated repo management application that builds packages and iso images.</dd>
+					</dl>
+				</div>
+
+				{% include '_partials/_navigation.html' %}
+
+			</div>
+		</div>
+	</div>
+	<div class="text-right collapse-button">
+		{% if current_user.is_authenticated %}
+			<form action="/api/build_pkg_now" role="form" id="build_now_form" method="post">
+				<input type="text" class="form-control search" name="pkgname" id="pkgname" placeholder="Build Now..."/>
+				<input type="hidden" name="dev" id="dev" value="{{ user.username }}"/>
+			</form>
+		{% endif %}
+		<button id="sidebar-collapse" class="btn btn-default" style="">
+			<i style="color:#fff;" class="fa fa-angle-left"></i>
+		</button>
+	</div>
+</div>

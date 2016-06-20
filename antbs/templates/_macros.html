@@ -1,0 +1,68 @@
+{#
+ # _macros.html
+ #
+ # Copyright © 2013-2016 Antergos
+ #
+ # This file is part of The Antergos Build Server, (AntBS).
+ #
+ # AntBS is free software; you can redistribute it and/or modify
+ # it under the terms of the GNU General Public License as published by
+ # the Free Software Foundation; either version 3 of the License, or
+ # (at your option) any later version.
+ #
+ # AntBS is distributed in the hope that it will be useful,
+ # but WITHOUT ANY WARRANTY; without even the implied warranty of
+ # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ # GNU General Public License for more details.
+ #
+ # The following additional terms are in effect as per Section 7 of the license:
+ #
+ # The preservation of all legal notices and author attributions in
+ # the material or in the Appropriate Legal Notices displayed
+ # by works containing it is required.
+ #
+ # You should have received a copy of the GNU General Public License
+ # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
+ #}
+
+{# Macros (Reusable Code Snippets) #}
+
+
+{#
+ # Generates navigation menu items and adds "active" class for current page.
+ #
+ # Args:
+ #     endpoint (str):   The link url relative to root.
+ #     text: (str):      The link text.
+ #     icon_class (str): The css class for the menu icon.
+ #
+ #}
+{% macro nav_link(endpoint, text, icon_class='', active_class='') %}
+	{% if request.endpoint.endswith(endpoint) %}
+		{% set active_class = 'class="active"' %}
+	{% endif %}
+
+	<li {{ active_class }}>
+		<a href="{{ endpoint }}"><i class="fa fa-{{ icon_class }}"></i> <span>{{ text }}</span></a>
+	</li>
+{% endmacro %}
+
+
+{#
+ # Generates page heading and breadcrumbs.
+ #
+ # Args:
+ #     pagetitle (str): The title text for the page.
+ #
+ #}
+{% macro page_heading(pagetitle) %}
+	{% if request.path != "/" %}
+		<div class="page-head">
+			<h2>{{ pagetitle }}</h2>
+			<ol class="breadcrumb">
+				<li><a href="/">Home</a></li>
+				<li class="active">{{ pagetitle }}</li>
+			</ol>
+		</div>
+	{% endif %}
+{% endmacro %}
