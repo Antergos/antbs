@@ -110,3 +110,7 @@ body { background: #272930 }
 table.now_building_stats > tbody > tr > td { height: 51px; padding-left: 15px; padding-right: 15px; vertical-align: middle; }
 .et-social-icon a,
 .et-social-icon { font-size: 15px !important }
+
+.package .profile-info .row { margin-top: 0px; margin-bottom: 0px; }
+.simple_counter { font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px; }
+.simple_counter h3 { margin-bottom: 20px; }

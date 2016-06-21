@@ -77,34 +77,34 @@
  #
  #}
 {% macro calendar_heatmap(data, selector) %}
-<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
-<script src="/static/js/calendar_heatmap.bundle.js"></script>
-<script>
-	$(window).load(function () {
-		var history = $.parseJSON('{{ data|safe() }}');
+	<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
+	<script src="/static/js/calendar_heatmap.bundle.js"></script>
+	<script>
+		$(window).load(function () {
+			var history = $.parseJSON('{{ data|safe() }}');
 
-		calendar_heatmap.create({
-			data: history,
-			date_var: 'date',
-			fill_var: 'builds',
-			target: '{{ selector }}',
-			missing_as_zero: true,
-			sunday_start: true,
-			date_format: '%m-%d-%Y',
-			color_scheme: calendar_heatmap.color_ramps.RdPu,
-			abbr_weekdays: true,
-			number_format: 'g',
-			tile_width: 14.5,
-			tile_height: 15,
-			stroke_color: '#383A41',
-			unselected_color: '#FAA6B7',
-			accent_color: '#ffffff',
-			show_toggle: false,
-			margin_top: 30,
-			margin_bottom: 0
+			calendar_heatmap.create({
+				data: history,
+				date_var: 'date',
+				fill_var: 'builds',
+				target: '{{ selector }}',
+				missing_as_zero: true,
+				sunday_start: true,
+				date_format: '%m-%d-%Y',
+				color_scheme: calendar_heatmap.color_ramps.RdPu,
+				abbr_weekdays: true,
+				number_format: 'g',
+				tile_width: 14.5,
+				tile_height: 15,
+				stroke_color: '#383A41',
+				unselected_color: '#FAA6B7',
+				accent_color: '#ffffff',
+				show_toggle: false,
+				margin_top: 30,
+				margin_bottom: 0
+			});
 		});
-	});
-</script>
+	</script>
 {% endmacro %}
 
 
@@ -113,12 +113,12 @@
  #
  #}
 {% macro toggles_init(data, selector) %}
-<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
-<script>
-	$(window).load(function () {
-		$('.switch').bootstrapSwitch();
-	});
-</script>
+	<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
+	<script>
+		$(window).load(function () {
+			$('.switch').bootstrapSwitch();
+		});
+	</script>
 {% endmacro %}
 
 
@@ -132,47 +132,68 @@
  #
  #}
 {% macro build_activity_timeline(tl_events, all_pages, page) %}
-{% set icons = ['', 'fa-github', 'phab', 'fa-rocket', 'fa-check', 'fa-times', 'fa-comment'] %}
-<div class="block-transparent tlwrap">
-	<div class="header">
-		<h4>Timeline</h4>
-	</div>
+	{% set icons = ['', 'fa-github', 'phab', 'fa-rocket', 'fa-check', 'fa-times', 'fa-comment'] %}
+	<div class="block-transparent tlwrap">
+		<div class="header">
+			<h4>Timeline</h4>
+		</div>
 
-	<ul class="timeline">
-		{%- for event in tl_events %}
-			<li id="{{ event.event_id }}">
-				<i class="fa {{ icons[event.tl_type] }}"></i>
-				<span class="date">{{ event.date_str }}</span>
+		<ul class="timeline">
+			{%- for event in tl_events %}
+				<li id="{{ event.event_id }}">
+					<i class="fa {{ icons[event.tl_type] }}"></i>
+					<span class="date">{{ event.date_str }}</span>
 
-				<div class="content" style="padding-bottom:3px;">
-					{{ event.message|safe() }}
+					<div class="content" style="padding-bottom:3px;">
+						{{ event.message|safe() }}
 
-					<p style="margin-top:10px;padding-bottom: 0px;">
-						<small>{{ event.time_str }}</small>
-						{% if current_user.is_authenticated and event.packages|count() > 0 %}
-							<a href="#" class="rerun-transaction" data-tlevent="{{ event.event_id }}">
-								<i class="fa fa-repeat" data-toggle="tooltip" title="Rerun This Transaction"></i>
-							</a>
-						{% endif %}
-					</p>
+						<p style="margin-top:10px;padding-bottom: 0px;">
+							<small>{{ event.time_str }}</small>
+							{% if current_user.is_authenticated and event.packages|count() > 0 %}
+								<a href="#" class="rerun-transaction" data-tlevent="{{ event.event_id }}">
+									<i class="fa fa-repeat" data-toggle="tooltip" title="Rerun This Transaction"></i>
+								</a>
+							{% endif %}
+						</p>
 
-				</div>
+					</div>
 
-			</li>
-		{% endfor -%}
-	</ul>
-
-	{% if all_pages > 1 %}
-		<ul class="pagination">
-			{% if page >= 2 %}
-				<li><a href="/timeline/{{ page - 1 }}">&laquo;</a></li>
-			{% else %}
-				<li class="disabled"><a href="#">&laquo;</a></li>
-			{% endif %}
-
-			<li class="active"><a href="#">{{ page }}</a></li>
-			<li><a href="/timeline/{{ page + 1 }}">&raquo;</a></li>
+				</li>
+			{% endfor -%}
 		</ul>
+
+		{% if all_pages > 1 %}
+			<ul class="pagination">
+				{% if page >= 2 %}
+					<li><a href="/timeline/{{ page - 1 }}">&laquo;</a></li>
+				{% else %}
+					<li class="disabled"><a href="#">&laquo;</a></li>
+				{% endif %}
+
+				<li class="active"><a href="#">{{ page }}</a></li>
+				<li><a href="/timeline/{{ page + 1 }}">&raquo;</a></li>
+			</ul>
+		{% endif %}
+	</div>
+{% endmacro %}
+
+
+{#
+ # Generates HTML for simple counters like the ones on the package profile pages.
+ #
+ # Args:
+ #     number (int): The number for the counter to display.
+ #     title_text (str): The title for the counter.
+ #     color_class (str): Color class (primary, success, danger, etc)
+ #     column_size (str): The column size that the counter will be wrapped with.
+ #
+ #}
+{% macro simple_counter(number, title_text, color_class, column_size='4') %}
+	{% if '' != color_class %}
+		{% set color_class = 'text-' + color_class %}
 	{% endif %}
-</div>
+	<div class="col-md-{{ column_size }} simple_counter {{ color_class }}">
+		<h3>{{ title_text }}</h3>
+		{{ number }}
+	</div>
 {% endmacro %}

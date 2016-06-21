@@ -202,6 +202,11 @@ def get_build_history_chart_data(pkg_obj=None):
     return chart_data, json.dumps(timestamps)
 
 
+def build_failed(bnum):
+    bld_obj = get_build_object(bnum=bnum)
+    return bld_obj.failed
+
+
 from views.api import api_view
 from views.build import build_view
 from views.home import home_view

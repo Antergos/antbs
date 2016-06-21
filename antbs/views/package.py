@@ -51,11 +51,28 @@ def get_build_events_timeline(pkg_obj, tlpage=1):
     return this_page, all_pages
 
 
+def get_build_counts(pkg_obj):
+    completed = [b for b in pkg_obj.builds if b and not build_failed(b)]
+    failed = [b for b in pkg_obj.builds if b and build_failed(b)]
+
+    completed = len(completed)
+    failed = len(failed)
+
+    counts = [
+        ('Total Builds', completed + failed, ''),
+        ('Completed', completed, 'success'),
+        ('Failed', failed, 'danger')
+    ]
+
+    return counts
+
+
 ###
 ##
 #   Views Start Here
 ##
 ###
+
 
 @package_view.route('/<pkgname>', methods=['GET'])
 @package_view.route('/<pkgname>/<int:tlpage>', methods=['GET'])
@@ -63,15 +80,21 @@ def get_and_show_pkg_profile(pkgname=None, tlpage=1):
     if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)
 
-    pkgobj = get_pkg_object(name=pkgname)
+    pkg_obj = get_pkg_object(name=pkgname)
 
-    if '' == pkgobj.description:
-        desc = pkgobj.get_from_pkgbuild('pkgdesc')
-        pkgobj.description = desc
-        pkgobj.pkgdesc = desc
+    if '' == pkg_obj.description:
+        desc = pkg_obj.get_from_pkgbuild('pkgdesc')
+        pkg_obj.description = desc
+        pkg_obj.pkgdesc = desc
 
-    tl_events, all_pages = get_build_events_timeline(pkgobj, tlpage=tlpage)
+    tl_events, all_pages = get_build_events_timeline(pkg_obj, tlpage=tlpage)
+    build_counts = get_build_counts(pkg_obj)
 
     return try_render_template(
-        'package.html', pkg=pkgobj, tl_events=tl_events, page=tlpage, all_pages=all_pages
+        'package.html',
+        pkg=pkg_obj,
+        tl_events=tl_events,
+        page=tlpage,
+        all_pages=all_pages,
+        build_counts=build_counts
     )
