@@ -105,3 +105,71 @@
 		});
 	});
 </script>
+
+
+{#
+ # Generates HTML (& JavaScript) for activating custom toggles/switches.
+ #
+ #}
+{% macro toggles_init(data, selector) %}
+<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
+<script>
+	$(window).load(function () {
+		$('.switch').bootstrapSwitch();
+	});
+</script>
+
+
+{#
+ # Generates HTML for a build activity timeline.
+ #
+ # Args:
+ #     tl_events (list): The data for the timeline as a list of `TimelineEvent` objects.
+ #     all_pages (int): Number of pages available.
+ #     page (int): The current page.
+ #
+ #}
+{% macro build_activity_timeline(tl_events, all_pages, page) %}
+{% set icons = ['', 'fa-github', 'phab', 'fa-rocket', 'fa-check', 'fa-times', 'fa-comment'] %}
+<div class="block-transparent tlwrap">
+	<div class="header">
+		<h4>Timeline</h4>
+	</div>
+
+	<ul class="timeline">
+		{%- for event in tl_events %}
+			<li id="{{ event.event_id }}">
+				<i class="fa {{ icons[event.tl_type] }}"></i>
+				<span class="date">{{ event.date_str }}</span>
+
+				<div class="content" style="padding-bottom:3px;">
+					{{ event.message|safe() }}
+
+					<p style="margin-top:10px;padding-bottom: 0px;">
+						<small>{{ event.time_str }}</small>
+						{% if current_user.is_authenticated and event.packages|count() > 0 %}
+							<a href="#" class="rerun-transaction" data-tlevent="{{ event.event_id }}">
+								<i class="fa fa-repeat" data-toggle="tooltip" title="Rerun This Transaction"></i>
+							</a>
+						{% endif %}
+					</p>
+
+				</div>
+
+			</li>
+		{% endfor -%}
+	</ul>
+
+	{% if all_pages > 1 %}
+		<ul class="pagination">
+			{% if page >= 2 %}
+				<li><a href="/timeline/{{ page - 1 }}">&laquo;</a></li>
+			{% else %}
+				<li class="disabled"><a href="#">&laquo;</a></li>
+			{% endif %}
+
+			<li class="active"><a href="#">{{ page }}</a></li>
+			<li><a href="/timeline/{{ page + 1 }}">&raquo;</a></li>
+		</ul>
+	{% endif %}
+</div>

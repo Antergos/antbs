@@ -63,6 +63,7 @@ ul.hook-pkg-list li { font-size: 14px; list-style-type: none; }
 ul.hook-pkg-list li:before { -moz-osx-font-smoothing: grayscale; -webkit-font-smoothing: antialiased; content: "\f187"; display: inline-block; font-family: FontAwesome; font-size: 10px; font-style: normal; font-weight: normal; line-height: 1; margin-right: 8px; }
 .fa-github { background-color: #1f1f1f !important; font-size: 19px !important; }
 .fa-github:before { bottom: 2px; content: "\f09b"; position: relative; right: 1px; }
+.rerun-transaction i { margin-left: 5px; color: #f4275c; }
 
 .profile-info .avatar { padding-top: 10px; text-align: right; }
 .profile-info .avatar img { max-height: 64px; max-width: 64px; }

@@ -37,6 +37,20 @@ package_view = Blueprint('package', __name__)
 ##
 ###
 
+def get_build_events_timeline(pkg_obj, tlpage=1):
+    timeline = []
+    start_at = len(pkg_obj.tl_events) - 300
+    start_at = max(0, start_at)
+
+    for event_id in pkg_obj.tl_events[start_at:-1]:
+        event = get_timeline_object(event_id=event_id)
+        timeline.append(event)
+
+    this_page, all_pages = get_paginated(timeline, 6, tlpage)
+
+    return this_page, all_pages
+
+
 ###
 ##
 #   Views Start Here
@@ -44,17 +58,20 @@ package_view = Blueprint('package', __name__)
 ###
 
 @package_view.route('/<pkgname>', methods=['GET'])
-def get_and_show_pkg_profile(pkgname=None):
+@package_view.route('/<pkgname>/<int:tlpage>', methods=['GET'])
+def get_and_show_pkg_profile(pkgname=None, tlpage=1):
     if pkgname is None or not status.all_packages.ismember(pkgname):
         abort(404)
 
     pkgobj = get_pkg_object(name=pkgname)
+
     if '' == pkgobj.description:
         desc = pkgobj.get_from_pkgbuild('pkgdesc')
         pkgobj.description = desc
         pkgobj.pkgdesc = desc
 
-    build_history, timestamps = get_build_history_chart_data(pkgobj)
+    tl_events, all_pages = get_build_events_timeline(pkgobj, tlpage=tlpage)
 
-    return try_render_template('package.html', pkg=pkgobj, build_history=build_history,
-                               timestamps=timestamps)
+    return try_render_template(
+        'package.html', pkg=pkgobj, tl_events=tl_events, page=tlpage, all_pages=all_pages
+    )

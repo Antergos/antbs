@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% from '_macros.html' import calendar_heatmap %}
+{% from '_macros.html' import calendar_heatmap, build_activity_timeline %}
 
 {% block pagetitle -%}Overview{%- endblock pagetitle %}
 
@@ -70,60 +70,25 @@
 
 {% block bottomcontent %}
 	<div class="row">
-		{% if tl_events %}
-			<div class="col-md-5" style="padding-left: 25px; margin-top: 30px;">
-				<div class="block-transparent tlwrap">
-					<div class="header">
-						<h4>Timeline</h4>
-					</div>
-					<ul class="timeline">
-						{%- for event in tl_events %}
-							<li id="{{ event|attr('event_id') }}">
-								<i class="{% if event|attr('tl_type') == 1 %}fa fa-github{% elif event|attr('tl_type') == 2 %}fa phab{% elif event|attr('tl_type') == 3 %}fa fa-rocket{% elif event|attr('tl_type') == 4 %}fa fa-check{% elif event|attr('tl_type') == 5 %}fa fa-times{% else %}fa fa-comment{% endif %}"></i>
-								<span class="date">{{ event|attr('date_str') }}</span>
 
-								<div class="content" style="padding-bottom:3px;">
-									{{ event|attr('message')|safe() }}
-									<p style="margin-top:10px;padding-bottom: 0px;">
-										<small>{{ event|attr('time_str') }}</small>
-										{% if current_user.is_authenticated and event|attr('packages')|count() > 0 %}
-											<a href="#" class="rerun-transaction" data-tlevent="{{ event|attr('event_id') }}"><i class="fa fa-repeat" style="margin-left:5px;color:#F4275C;" data-toggle="tooltip" title="Rerun This Transaction"></i></a>
-										{% endif %}
-									</p>
-								</div>
-							</li>
-						{% endfor -%}
-					</ul>
-					{% if all_pages > 1 %}
-						<ul class="pagination">
-							{% if page >= 2 %}
-								<li><a href="/timeline/{{ page - 1 }}">&laquo;</a></li>
-							{% else %}
-								<li class="disabled"><a href="#">&laquo;</a></li>
-							{% endif %}
-							<li class="active"><a href="#">{{ page }}</a></li>
+		<div class="col-md-5" style="padding-left: 25px; margin-top: 30px;">
+			{% if tl_events %}
+				{{ build_activity_timeline(tl_events, all_pages, page) }}
+			{% endif %}
+		</div>
 
-							<li><a href="/timeline/{{ page + 1 }}">&raquo;</a></li>
-						</ul>
-					{% endif %}
-				</div>
-			</div>
-		{% endif %}
 		<div class="col-md-7" style="margin-top: 47px; width: 52%; float: right;">
-				<div class="block-flat dark-box" style="padding-bottom: 0px;">
-					<div class="header">
-						<div class="actions">
-							<a class="minimize ant-disabled" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
-							<a class="refresh ant-disabled" href="#"><i class="fa"></i></a>
-							<a class="close-down ant-disabled" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
-						</div>
-						<h3>Build Activity</h3>
+			<div class="block-flat dark-box" style="padding-bottom: 0px;">
+				<div class="header">
+					<div class="actions">
+						<a class="minimize ant-disabled" href="#" id="build_history-Previous"><i class="fa fa-chevron-left"></i></a>
+						<a class="refresh ant-disabled" href="#"><i class="fa"></i></a>
+						<a class="close-down ant-disabled" href="#" id="build_history-Next"><i class="fa fa-chevron-right"></i></a>
 					</div>
-					<div class="content build_heat no-padding" style="width: 100%;">
-
-					</div>
+					<h3>Build Activity</h3>
 				</div>
-
+				<div class="content build_heat no-padding" style="width: 100%;"></div>
+			</div>
 		</div>
 	</div>
 {% endblock bottomcontent %}
@@ -154,7 +119,7 @@
 
 		{% if current_user.is_authenticated %}
 			function rerun_trans_handler() {
-				$('.tlwrap').on('click', '.rerun-transaction', function(e) {
+				$('.tlwrap').on('click', '.rerun-transaction', function (e) {
 					e.preventDefault();
 
 					var $icon = $(this).find('i'),
@@ -162,8 +127,8 @@
 
 					$icon.addClass('fa-spin');
 
-					$.getJSON(url, function(data) {
-						setTimeout(function($the_icon) {
+					$.getJSON(url, function (data) {
+						setTimeout(function ($the_icon) {
 							$the_icon.removeClass('fa-spin');
 						}, 2000, $icon);
 					});
