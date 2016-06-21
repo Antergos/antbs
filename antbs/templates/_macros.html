@@ -66,3 +66,42 @@
 		</div>
 	{% endif %}
 {% endmacro %}
+
+
+{#
+ # Generates HTML (& JavaScript) for a calendar heatmap chart.
+ #
+ # Args:
+ #     data (list): The data for the chart as a list of dicts.
+ #     selector (str): CSS selector for the heatmap container.
+ #
+ #}
+{% macro calendar_heatmap(data, selector) %}
+<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
+<script src="/static/js/calendar_heatmap.bundle.js"></script>
+<script>
+	$(window).load(function () {
+		var history = $.parseJSON('{{ data|safe() }}');
+
+		calendar_heatmap.create({
+			data: history,
+			date_var: 'date',
+			fill_var: 'builds',
+			target: '{{ selector }}',
+			missing_as_zero: true,
+			sunday_start: true,
+			date_format: '%m-%d-%Y',
+			color_scheme: calendar_heatmap.color_ramps.RdPu,
+			abbr_weekdays: true,
+			number_format: 'g',
+			tile_width: 14.5,
+			tile_height: 15,
+			stroke_color: '#383A41',
+			unselected_color: '#FAA6B7',
+			accent_color: '#ffffff',
+			show_toggle: false,
+			margin_top: 30,
+			margin_bottom: 0
+		});
+	});
+</script>

@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import calendar_heatmap %}
+
 {% block pagetitle -%}Overview{%- endblock pagetitle %}
 
 {% block topcontent %}
@@ -125,133 +127,15 @@
 		</div>
 	</div>
 {% endblock bottomcontent %}
+
 {% block scripts %}
 	{{ super() }}
+
 	{% if build_history %}
-		<script type="text/javascript" src="//d3js.org/d3.v3.min.js"></script>
-		"""<script type="text/javascript" src="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.min.js"></script>
-		<link rel="stylesheet" href="//cdn.jsdelivr.net/cal-heatmap/3.3.10/cal-heatmap.css"/>"""
-		<script src="/static/js/calendar_heatmap.bundle.js"></script>
-		<style>
-			.graph-label {
-				font-size: 14px;
-				color: #CACACA;
-			}
-		</style>
-		<script>
-			$(window).load(function () {
-				var history = $.parseJSON('{{ timestamps|safe() }}');
-				var new_format;
-
-				"""function format_data(callback) {
-					var new_format_arr = [];
-					for (var key in history) {
-						if (!history.hasOwnProperty(key)) {
-							continue;
-						}
-						var _date = new Date(parseInt(key) * 1000);
-						var date_obj = {"date": _date.toLocaleString(), "count": history[key]};
-						new_format_arr.push(date_obj);
-					}
-					console.log(JSON.stringify(new_format_arr));
-					callback(new_format_arr);
-				}"""
-
-
-
-				//function init_heatmap(new_format) {
-				calendar_heatmap.create({
-					data: history,
-					date_var: "date",
-					fill_var: "builds",
-					target: ".build_heat",
-					missing_as_zero: true,
-					sunday_start: true,
-					date_format: "%m-%d-%Y",
-					color_scheme: calendar_heatmap.color_ramps.RdPu,
-					abbr_weekdays: true,
-					number_format: "g",
-					tile_width: 14.5,
-					tile_height: 15,
-					stroke_color: "#383A41",
-					unselected_color: "#FAA6B7",
-					accent_color: "#ffffff",
-					show_toggle: false,
-					margin_top: 30,
-					margin_bottom: 0
-				});
-				//}
-
-				//format_data(init_heatmap);
-
-				"""var cal = new CalHeatMap(),
-					today = new Date(),
-					day = new Date(),
-					last_year = day.setMonth( today.getMonth() - 12 ),
-					position_map = {
-						m_2: 'translateX(0px)',
-						m_3: 'translateX(-24px)',
-						m_4: 'translateX(-36px)',
-						m_5: 'translateX(-60px)',
-						m_6: 'translateX(-72px)',
-						m_7: 'translateX(-96px)',
-						m_8: 'translateX(0px)',
-						m_9: 'translateX(0px)',
-						m_10: 'translateX(0px)',
-						m_11: 'translateX(0px)',
-						m_12: 'translateX(0px)',
-						m_1: 'translateX(0px)'
-					};
-				cal.init( {
-					itemSelector: ".build_heat",
-					domain: "month",
-					subDomain: "day",
-					dataType: "json",
-					data: history,
-					start: new Date( last_year ),
-					minDate: new Date( last_year ),
-					maxDate: today,
-					cellSize: 12.5,
-					legendCellSize: 12,
-					cellRadius: 0,
-					cellPadding: 2,
-					legendCellPadding: 3,
-					legendHorizontalPosition: "center",
-					range: 8,
-					domainMargin: 0,
-					domainGutter: 3,
-					animationDuration: 800,
-					domainDynamicDimension: true,
-					""""""previousSelector: "#build_history-Previous",
-					nextSelector: "#build_history-Next",""""""
-					considerMissingDataAsZero: true,
-					label: {
-						position: "bottom",
-						align: "center",
-						height: 22,
-						offset: {x:-3}
-					},
-					itemName: [ "build", "builds" ],
-					tooltip: true,
-					legend: [ 1, 3, 6, 12, 24 ],
-					//legendColors: {min: "#F9F1F4", max: "#F42D6B", empty: "#FEFEFE"},
-					legendColors: { min: "#FBE2EA", max: "#F42D6B", empty: "#383A41" },
-					domainLabelFormat: "%b '%y",
-					onComplete: function() {
-						var _this = this;
-						$('#build_history-Next' ).click(function() {
-							_this.next(8);
-						});
-						$( '#build_history-Previous' ).click( function() {
-							_this.previous( 8 );
-						} );
-					}
-				} );
-				cal.jumpTo( new Date() );"""
-			});
-		</script>
+		{{ calendar_heatmap(build_history, '.build_heat') }}
 	{% endif %}
-	<script type="text/javascript">
+
+	<script>
 		function tlhandler() {
 			$('.pagination').on('click', 'a', function (e) {
 				e.preventDefault();
@@ -265,22 +149,27 @@
 			});
 			$('.tlwrap [data-toggle]').tooltip();
 		}
+
 		$(document).ready(tlhandler);
+
 		{% if current_user.is_authenticated %}
 			function rerun_trans_handler() {
-				jQuery('.tlwrap').on('click', '.rerun-transaction', function (e) {
+				$('.tlwrap').on('click', '.rerun-transaction', function(e) {
 					e.preventDefault();
+
 					var $icon = $(this).find('i'),
 						url = '/api/ajax?rerun_transaction=' + $(this).attr('data-tlevent');
+
 					$icon.addClass('fa-spin');
-					$.getJSON(url, function (data) {
-						console.log(data);
-						setTimeout(function ($the_icon) {
+
+					$.getJSON(url, function(data) {
+						setTimeout(function($the_icon) {
 							$the_icon.removeClass('fa-spin');
 						}, 2000, $icon);
 					});
 				});
 			}
+
 			$(document).ready(rerun_trans_handler);
 		{% endif %}
 	</script>
