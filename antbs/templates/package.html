@@ -1,157 +1,157 @@
 {% extends "base.html" %}
 
-{% from '_macros.html' import calendar_heatmap, toggles_init, build_activity_timeline %}
+{% from '_macros.html' import calendar_heatmap, toggles_init, build_activity_timeline with context %}
 
 {% block pagetitle %}Package Profile{% endblock pagetitle %}
 
 {% block bottomcontent -%}
 	<div class="row">
-		<div class="col-md-12">
-			<div class="block-flat profile-info">
-				<div class="row">
-					<div class="col-md-1">
-						<div class="avatar">
-							<img src="http://antergos.info/apps/
+		<div class="col-md-6">
+			<div class="row">
+				<div class="col-md-12">
+					<div class="block-flat profile-info">
+						<div class="row">
+							<div class="col-md-1">
+								<div class="avatar">
+									<img src="http://antergos.info/apps/{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
+								</div>
+							</div>
+							<div class="col-md-4">
+								<div class="personal">
+									<h1 class="name">{{ pkg.name }}</h1>
 
+									<p class="description">{{ pkg.pkgdesc }}<p>
+								</div>
+							</div>
+							<div class="col-md-3" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
+								<h3 style="margin-bottom: 20px;">Total Builds</h3>
+								{{ pkg.builds|length() }}
+							</div>
+							<div class="col-md-4">
+								<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
 
-								{% if pkg.short_name != '' %}{{ pkg.short_name }}{% else %}{{ pkg.name }}{% endif %}.png" class="profile-avatar" width="48" height="48" onError="this.onerror=null;this.src='http://antergos.info/apps/archpkg.png';"/>
+								<div class="progress">
+									<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate|float|round(2) }}% Completed</div>
+									<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate|float|round(2) }}% Failed</div>
+								</div>
+								{#					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>#}
+							</div>
 						</div>
-					</div>
-					<div class="col-md-4">
-						<div class="personal">
-							<h1 class="name">{{ pkg.name }}</h1>
-
-							<p class="description">{{ pkg.pkgdesc }}<p>
-						</div>
-					</div>
-					<div class="col-md-3" style="font-size: 48px; text-align: center; height: 94px; position: relative; bottom: 10px;">
-						<h3 style="margin-bottom: 20px;">Total Builds</h3>
-						{{ pkg.builds|length() }}
-					</div>
-					<div class="col-md-4">
-						<h3 style="margin-top: 10px;margin-bottom: 20px;"></h3>
-
-						<div class="progress">
-							<div class="progress-bar progress-bar-success" style="width: {{ pkg.success_rate }}%;">{{ pkg.success_rate|float|round(2) }}% Completed</div>
-							<div class="progress-bar progress-bar-danger right" style="width: {{ pkg.failure_rate }}%;">{{ pkg.failure_rate|float|round(2) }}% Failed</div>
-						</div>
-						{#					<div id="build_history" style="height: 200px; width: 100%; max-width:767px;"></div>#}
 					</div>
 				</div>
 			</div>
-		</div>
+			<div class="row">
+				<div class="col-md-12">
+					<div class="tab-container">
+						<ul class="nav nav-tabs">
+							<li class="active"><a data-toggle="tab" href="#pkg_details">Details</a></li>
+							<li class=""><a data-toggle="tab" href="#monitor">Monitor</a></li>
+							<li class=""><a data-toggle="tab" href="#pkg_actions">Actions</a></li>
+						</ul>
+						<div class="tab-content">
+							<div id="pkg_details" class="tab-pane cont no-border active">
+								<table id="noDt" class="table no-border">
+									<tbody class="no-border-y no-border-x">
+									<tr>
+										<td>Version:</td>
+										<td>{{ pkg.version_str }}</td>
+									</tr>
+									<tr>
+										<td>Upstream URL:</td>
+										<td>{{ pkg.url }}</td>
+									</tr>
+									<tr>
+										<td>Groups:</td>
+										<td>{% if pkg.groups %}
+											{% for group in pkg.groups %}
+												{{ '<a href="/repo/antergos/%s" class="label label-info">%s</a> '|format(group) }}
+											{% endfor %}
+										{% endif %}</td>
+									</tr>
+									<tr>
+										<td>Depends:</td>
+										<td></td>
+									</tr>
+									</tbody>
+								</table>
 
-	</div>
-	<div class="row">
-		<div class="col-md-5">
-			<div class="tab-container">
-				<ul class="nav nav-tabs">
-					<li class="active"><a data-toggle="tab" href="#pkg_details">Details</a></li>
-					<li class=""><a data-toggle="tab" href="#monitor">Monitor</a></li>
-					<li class=""><a data-toggle="tab" href="#pkg_actions">Actions</a></li>
-				</ul>
-				<div class="tab-content">
-					<div id="pkg_details" class="tab-pane cont no-border active">
-						<table id="noDt" class="table no-border">
-							<tbody class="no-border-y no-border-x">
-							<tr>
-								<td>Version:</td>
-								<td>{{ pkg.version_str }}</td>
-							</tr>
-							<tr>
-								<td>Upstream URL:</td>
-								<td>{{ pkg.url }}</td>
-							</tr>
-							<tr>
-								<td>Groups:</td>
-								<td>{% if pkg.groups %}
-									{% for group in pkg.groups %}
-										{{ '<a href="/repo/antergos/%s" class="label label-info">%s</a> '|format(group) }}
-									{% endfor %}
-								{% endif %}</td>
-							</tr>
-							<tr>
-								<td>Depends:</td>
-								<td></td>
-							</tr>
-							</tbody>
-						</table>
+							</div>
+							<div id="monitor" class="tab-pane cont no-border">
+								<table id="noDt" class="table no-border">
+									<tbody class="no-border-y no-border-x">
+									<tr>
+										<td>Status:</td>
+										{% set readonly = 'readonly' if not current_user.is_authenticated else '' %}
+										{% set checked = 'checked' if pkg.is_monitored else '' %}
+										<td>
+											<input class="switch" type="checkbox" {{ checked }} data-on-color="info" {{ readonly }}>
+										</td>
+									</tr>
+									{% if pkg.is_monitored %}
+										<tr>
+											<td>Service:</td>
+											<td>{{ pkg.monitored_service|capitalize() }}</td>
+										</tr>
+										<tr>
+											<td>Type:</td>
+											<td>{{ pkg.monitored_type }}</td>
+										</tr>
+										<tr>
+											<td>Project:</td>
+											<td>{{ pkg.monitored_project }}</td>
+										</tr>
+										<tr>
+											<td>Repo:</td>
+											<td>{{ pkg.monitored_repo }}</td>
+										</tr>
+										<tr>
+											<td>Last Check:</td>
+											<td>{{ pkg.monitored_last_checked }}</td>
+										</tr>
+										<tr>
+											<td>Next Check:</td>
+											<td></td>
+										</tr>
+									{% else %}
+										<tr>
+											<td>Service:</td>
+											<td></td>
+										</tr>
+										<tr>
+											<td>Type:</td>
+											<td></td>
+										</tr>
+										<tr>
+											<td>Project:</td>
+											<td></td>
+										</tr>
+										<tr>
+											<td>Repo:</td>
+											<td></td>
+										</tr>
+										<tr>
+											<td>Last Check:</td>
+											<td></td>
+										</tr>
+										<tr>
+											<td>Next Check:</td>
+											<td></td>
+										</tr>
+									{% endif %}
+									</tbody>
+								</table>
+							</div>
+							<div id="pkg_actions" class="tab-pane">
 
+							</div>
+							<div class="md-overlay"></div>
+						</div>
 					</div>
-					<div id="monitor" class="tab-pane cont no-border">
-						<table id="noDt" class="table no-border">
-							<tbody class="no-border-y no-border-x">
-							<tr>
-								<td>Status:</td>
-								{% set readonly = 'readonly' if not current_user.is_authenticated else '' %}
-								{% set checked = 'checked' if pkg.is_monitored else '' %}
-								<td>
-									<input class="switch" type="checkbox" {{ checked }} data-on-color="info" {{ readonly }}>
-								</td>
-							</tr>
-							{% if pkg.is_monitored %}
-								<tr>
-									<td>Service:</td>
-									<td>{{ pkg.monitored_service|capitalize() }}</td>
-								</tr>
-								<tr>
-									<td>Type:</td>
-									<td>{{ pkg.monitored_type }}</td>
-								</tr>
-								<tr>
-									<td>Project:</td>
-									<td>{{ pkg.monitored_project }}</td>
-								</tr>
-								<tr>
-									<td>Repo:</td>
-									<td>{{ pkg.monitored_repo }}</td>
-								</tr>
-								<tr>
-									<td>Last Check:</td>
-									<td>{{ pkg.monitored_last_checked }}</td>
-								</tr>
-								<tr>
-									<td>Next Check:</td>
-									<td></td>
-								</tr>
-							{% else %}
-								<tr>
-									<td>Service:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Type:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Project:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Repo:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Last Check:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Next Check:</td>
-									<td></td>
-								</tr>
-							{% endif %}
-							</tbody>
-						</table>
-					</div>
-					<div id="pkg_actions" class="tab-pane">
-
-					</div>
-					<div class="md-overlay"></div>
 				</div>
 			</div>
+
 		</div>
-		<div class="col-md-1" style=""></div>
-		<div class="col-md-6 col-md-6-offset-1" style="">
+		<div class="col-md-5 pull-right" style="">
 			{% if tl_events %}
 				{{ build_activity_timeline(tl_events, all_pages, page) }}
 			{% endif %}

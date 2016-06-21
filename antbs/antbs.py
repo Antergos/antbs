@@ -36,6 +36,7 @@ import gevent.monkey
 gevent.monkey.patch_all()
 # Stop ignoring
 
+import re
 from datetime import timedelta
 
 from flask import (
@@ -139,6 +140,13 @@ def inject_global_template_variables():
         user=current_user,
         current_user=current_user
     )
+
+
+@app.template_filter('tpl_name')
+def tpl_name(s):
+    res = re.findall('\'([^\']*)\'', str(s))
+
+    return None if not res else res[0]
 
 
 @app.errorhandler(404)

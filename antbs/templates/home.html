@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% from '_macros.html' import calendar_heatmap, build_activity_timeline %}
+{% from '_macros.html' import calendar_heatmap, build_activity_timeline with context %}
 
 {% block pagetitle -%}Overview{%- endblock pagetitle %}
 
@@ -96,8 +96,8 @@
 {% block scripts %}
 	{{ super() }}
 
-	{% if build_history %}
-		{{ calendar_heatmap(build_history, '.build_heat') }}
+	{% if timestamps %}
+		{{ calendar_heatmap(timestamps, '.build_heat') }}
 	{% endif %}
 
 	<script>

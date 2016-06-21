@@ -36,7 +36,7 @@
 				{%- endblock styles %}
 			{%- endblock head %}
 		</head>
-		<body{% block body_attribs %} class="animated"{% endblock body_attribs %}>
+		<body{% block body_attribs %} class="animated {{ self|tpl_name()|replace('.html', '') }}"{% endblock body_attribs %}>
 
 		{% block body -%}
 			{% include '_partials/_antergos_links_bar.html' %}
