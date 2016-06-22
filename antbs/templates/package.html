@@ -4,6 +4,7 @@
 	calendar_heatmap,
 	toggles_init,
 	simple_counter,
+	label_tag_link,
 	build_activity_timeline with context %}
 
 {% block pagetitle %}Package Profile{% endblock pagetitle %}
@@ -58,33 +59,61 @@
 					<li class=""><a data-toggle="tab" href="#monitor">Monitor</a></li>
 					<li class=""><a data-toggle="tab" href="#pkg_actions">Actions</a></li>
 				</ul>
-				<div class="tab-content">
-					<div id="pkg_details" class="tab-pane cont no-border active">
-						<table id="noDt" class="table no-border">
-							<tbody class="no-border-y no-border-x">
-							<tr>
-								<td>Version:</td>
-								<td>{{ pkg.version_str }}</td>
-							</tr>
-							<tr>
-								<td>Upstream URL:</td>
-								<td>{{ pkg.url }}</td>
-							</tr>
-							<tr>
-								<td>Groups:</td>
-								<td>{% if pkg.groups %}
-									{% for group in pkg.groups %}
-										{{ '<a href="/repo/antergos/%s" class="label label-info">%s</a> '|format(group) }}
-									{% endfor %}
-								{% endif %}</td>
-							</tr>
-							<tr>
-								<td>Depends:</td>
-								<td></td>
-							</tr>
-							</tbody>
-						</table>
-
+				<div class="tab-content no-padding">
+					<div id="pkg_details" class="tab-pane cont no-padding active">
+					<div class="list-group">
+						<div class="list-group-item">
+							<div class="row">
+								<div class="col-md-6">
+									<p>Version:</p>
+								</div>
+								<div class="col-md-6">
+									<p>{{ pkg.version_str }}</p>
+								</div>
+							</div>
+						</div>
+						<div class="list-group-item">
+							<div class="row">
+								<div class="col-md-6">
+									<p>Upstream URL:</p>
+								</div>
+								<div class="col-md-6">
+									<p>{{ pkg.url|urlize() }}</p>
+								</div>
+							</div>
+						</div>
+						<div class="list-group-item">
+							<div class="row">
+								<div class="col-md-6">
+									<p>Groups:</p>
+								</div>
+								<div class="col-md-6">
+									{% if pkg.groups %}<p>
+										{% for group in pkg.groups %}
+											{% set url_base = '/repo/antergos/' %}
+											{{ label_tag_link(url_base, group, group, 'info') }}
+										{% endfor %}
+									{% endif %}</p>
+								</div>
+							</div>
+						</div>
+						<div class="list-group-item">
+							<div class="row">
+								<div class="col-md-6">
+									<p>Depends:</p>
+								</div>
+								<div class="col-md-6 depends"><p>
+									{% if pkg.depends %}
+										{% for depend in pkg.depends %}
+											{% set url_base = '/package/' if depend in _all_packages else '#' %}
+											{%  set color_class = 'default' if '#' == url_base else 'info' %}
+											{{ label_tag_link(url_base, depend, depend, color_class) }}
+										{% endfor %}
+									{% endif %}</p>
+								</div>
+							</div>
+						</div>
+					</div>
 					</div>
 					<div id="monitor" class="tab-pane cont no-border">
 						<table id="noDt" class="table no-border">

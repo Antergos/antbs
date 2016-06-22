@@ -205,10 +205,13 @@ class Package(PackageMeta):
 
     def get_from_pkgbuild(self, var):
         """
-        Get a variable from this package's PKGBUILD (which is stored in antergos-packages gh repo).
+        Get a variable from this package's PKGBUILD (stored on github).
 
-        :param var: (str) A variable to extract from the PKGBUILD.
-        :return: (str) The variable's value after extracted from PKGBUILD.
+        Args:
+            var (str): A variable to get from the PKGBUILD.
+
+        Returns:
+            (str): The variable's value parsed from PKGBUILD.
 
         """
 
@@ -218,14 +221,14 @@ class Package(PackageMeta):
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if var not in self.pkgbuild:
-            logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            logger.debug('%s not found in PKGBUILD for %s.', var, self.pkgname)
             return val
 
         if not self._pkgbuild:
             self.setup_pkgbuild_parser()
 
         if var not in self._pkgbuild.values:
-            logger.info('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            logger.debug('%s not found in parsed PKGBUILD for %s.', var, self.pkgname)
             return val
 
         if self._pkgbuild.values[var]:
@@ -391,6 +394,7 @@ class Package(PackageMeta):
             return False
 
     def get_version_str(self):
+        # TODO: This is still garbage. Rewrite and simplify!
         changed = {'epoch': False, 'pkgrel': False, 'pkgver': False}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
         version_from_tag = self.is_monitored and self.monitored_type in ['releases', 'tags']
@@ -453,18 +457,15 @@ class Package(PackageMeta):
 
         return version
 
-    def get_deps(self):
-        """
-
-
-        :return:
-        """
+    def get_deps(self, makedepends=False):
         depends = []
-        deps = list(self.get_from_pkgbuild('depends'))
-        mkdeps = list(self.get_from_pkgbuild('makedepends'))
 
-        all_deps = deps + mkdeps
-        for dep in all_deps:
+        if makedepends:
+            deps = list(self.get_from_pkgbuild('makedepends'))
+        else:
+            deps = list(self.get_from_pkgbuild('depends'))
+
+        for dep in deps:
             has_ver = re.search(r'^[\d\w-]+(?=\=|\>|\<)', dep)
             if has_ver:
                 dep = has_ver.group(0)
@@ -480,8 +481,10 @@ class Package(PackageMeta):
         if 'pkgname' == key_name and self.is_split_package:
             attrib = getattr(self, 'split_packages')
 
-        elif key_name in ['depends', 'makedepends']:
+        elif key_name == 'depends':
             from_pbuild = set(self.get_deps())
+        elif key_name == 'makedepends':
+            from_pbuild = set(self.get_deps(makedepends=True))
 
         from_db = set(attrib)
         to_remove = from_db - from_pbuild
@@ -519,8 +522,10 @@ class Package(PackageMeta):
         if not self.pkgver:
             self.pkgver = self.get_from_pkgbuild('pkgver')
 
-        if 'None' in self.version_str:
+        if 'None' in self.version_str and 'None' not in self.pkgver:
             self.version_str = self.pkgver
+        elif 'None' in self.version_str:
+            raise ValueError('version_str and pkgver cannot be None')
 
         if not self.pkgdesc or not self.description:
             self.pkgdesc = self.get_from_pkgbuild('pkgdesc')
@@ -533,6 +538,7 @@ class Package(PackageMeta):
             self.sync_pkgbuild_array_by_key('pkgname')
 
         self.sync_pkgbuild_array_by_key('depends')
+        self.sync_pkgbuild_array_by_key('makedepends')
         self.sync_pkgbuild_array_by_key('groups')
 
 

@@ -4600,18 +4600,7 @@ a.list-group-item.active:focus {
   padding: 13px 15px;
   line-height: 22px;
 }
-a.list-group-item:hover {
-  border-left: 5px solid #4aa3df;
-  border-color: #4aa3df;
-  padding-left: 11px;
-}
-a.list-group-item:hover + a.list-group-item {
-  border-top-color: #4aa3df;
-}
-.list-group .active:hover {
-  padding-left: 15px;
-  border-left: 1px solid #4aa3df;
-}
+
 /*Modals*/
 .md-modal.full-width {
   width: 90%;

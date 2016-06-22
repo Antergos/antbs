@@ -197,3 +197,18 @@
 		{{ number }}
 	</div>
 {% endmacro %}
+
+
+{#
+ # Generates HTML for styled a label/tag link.
+ #
+ # Args:
+ #     url_base (str): The first part of the URL to link to.
+ #     url_end (str): The last part of the URL to link to.
+ #     text (str): The text for the tag/label.
+ #     color_class (str): Color class (primary, success, danger, etc)
+ #
+ #}
+{% macro label_tag_link(url_base, url_end, text, color_class) %}
+	<a href="{{ url_base }}{{ url_end }}" class="label label-{{ color_class }}">{{ text }}</a>
+{% endmacro %}

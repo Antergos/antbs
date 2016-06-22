@@ -243,7 +243,7 @@ class Build(RedisHash):
         if result is True:
             tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> was successful.'
             tlmsg = tpl.format(str(self.bnum), pkg_link, self.version_str)
-            _ = get_timeline_object(msg=tlmsg, tl_type=4)
+            tl_event_obj = get_timeline_object(msg=tlmsg, tl_type=4)
 
             self.review_status = 'pending'
             self.failed = False
@@ -254,12 +254,14 @@ class Build(RedisHash):
         else:
             tpl = 'Build <a href="/build/{0}">{0}</a> for {1} <strong>{2}</strong> failed.'
             tlmsg = tpl.format(str(self.bnum), pkg_link, self.version_str)
-            _ = get_timeline_object(msg=tlmsg, tl_type=5)
+            tl_event_obj = get_timeline_object(msg=tlmsg, tl_type=5)
 
             self.failed = True
             self.completed = False
 
             status.failed.rpush(self.bnum)
+
+        self._pkg_obj.tl_events.append(tl_event_obj.event_id)
 
         self.end_str = self.datetime_to_string(datetime.now())
 

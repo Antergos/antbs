@@ -138,7 +138,8 @@ def inject_global_template_variables():
         now_building=status.now_building,
         rev_pending=status.pending_review,
         user=current_user,
-        current_user=current_user
+        current_user=current_user,
+        _all_packages=status.all_packages
     )
 
 
