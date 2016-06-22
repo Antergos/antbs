@@ -56,9 +56,9 @@ def get_repo_packages(repo_name=None, group=None, page=None):
         return pkgs, rev_pending
 
     if group:
-        repo_packages = [p for p in list(repo_obj.pkgnames.sort()) if package_in_group(p, group)]
+        repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, group)]
     else:
-        repo_packages = [p for p in list(repo_obj.pkgnames.sort())]
+        repo_packages = [p for p in sorted(repo_obj.pkgnames)]
 
     packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
 

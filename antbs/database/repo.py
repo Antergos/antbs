@@ -333,7 +333,7 @@ class PacmanRepo(RedisHash):
 
         self.packages.remove_range(0, -1)
         self.unaccounted_for.remove_range(0, -1)
-        self.pkgnames.remove_range(0, -1)
+        self.pkgnames.remove_range(-1, -0)
 
         for pkg in accounted_for:
             self.packages.add(pkg)
@@ -341,7 +341,8 @@ class PacmanRepo(RedisHash):
         for pkg in unaccounted_for:
             self.unaccounted_for.add(pkg)
 
-        self.pkgnames.extend(self._get_pkgnames(accounted_for))
+        for pkg in self._get_pkgnames(accounted_for):
+            self.pkgnames.append(pkg)
 
         logger.debug([self.name, unaccounted_for])
 
