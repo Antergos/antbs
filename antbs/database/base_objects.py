@@ -133,11 +133,6 @@ class RedisObject:
         """ Return this object's full_key as a string. This can be extended by subclasses. """
         return self.full_key
 
-    @staticmethod
-    def _hget(key, field, default_value=''):
-        val = db.hget(key, field)
-        return val if val is not None else default_value
-
     @classmethod
     def as_child(cls, parent, tag, item_type):
         """
@@ -387,14 +382,14 @@ class RedisHash(RedisObject):
         key = self.full_key
 
         if attrib in self.attrib_lists['string'] + self.attrib_lists['path']:
-            return self.db.hget(key, attrib) if self.db.hexists(key, attrib) else ''
+            return self.hget(key, attrib)
 
         elif attrib in self.attrib_lists['bool']:
-            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else 'False'
-            return self.bool_string_helper(val) if '' != val else False
+            val = self.hget(key, attrib, 'False')
+            return self.bool_string_helper(val)
 
         elif attrib in self.attrib_lists['int']:
-            return int(self.db.hget(key, attrib)) if self.db.hexists(key, attrib) else 0
+            return int(self.hget(key, attrib, 0))
 
         elif attrib in self.attrib_lists['list']:
             return RedisList.as_child(self, attrib, str)
@@ -403,12 +398,12 @@ class RedisHash(RedisObject):
             return RedisZSet.as_child(self, attrib, str)
 
         elif attrib.endswith('__exp'):
-            val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else time.time()
+            val = self.hget(key, attrib, time.time())
             return int(val) - 1
 
     def __is_expired__(self, attrib):
         exp_key = attrib + '__exp'
-        expire_time = self.db.hget(self.full_key, exp_key) or 0
+        expire_time = self.hget(self.full_key, exp_key, 0)
         now = int(time.time())
 
         return now > int(expire_time)
@@ -419,7 +414,7 @@ class RedisHash(RedisObject):
 
     def __len__(self):
         """ Return the len of this object (total number of fields in its redis hash). """
-        return int(self.db.hlen(self.full_key))
+        return self.db.hlen(self.full_key)
 
     def __keysinit__(self):
         """ Initializes the object's predefined attributes as hash fields in Redis. """
@@ -498,6 +493,11 @@ class RedisHash(RedisObject):
     def __str__(self):
         """ Return this object as a friendly (human readable) string. """
         return '<{0} {1}>'.format(self.__class__.__name__, self.key)
+
+    @staticmethod
+    def _hget(key, field, default_value=''):
+        val = db.hget(key, field)
+        return val if val is not None else default_value
 
     @staticmethod
     def bool_string_helper(value):
