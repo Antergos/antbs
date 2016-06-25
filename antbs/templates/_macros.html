@@ -94,8 +94,8 @@
 				color_scheme: calendar_heatmap.color_ramps.RdPu,
 				abbr_weekdays: true,
 				number_format: 'g',
-				tile_width: 14.5,
-				tile_height: 15,
+				tile_width: 12,
+				tile_height: 13,
 				stroke_color: '#383A41',
 				unselected_color: '#FAA6B7',
 				accent_color: '#ffffff',
@@ -132,7 +132,7 @@
  #
  #}
 {% macro build_activity_timeline(tl_events, all_pages, page) %}
-	{% set icons = ['', 'fa-github', 'phab', 'fa-rocket', 'fa-check', 'fa-times', 'fa-comment'] %}
+	{% set icons = ['fa-bolt', 'fa-github', 'phab', 'fa-rocket', 'fa-check', 'fa-times', 'fa-comment'] %}
 	<div class="block-transparent tlwrap">
 		<div class="header">
 			<h4>Timeline</h4>
@@ -212,3 +212,113 @@
 {% macro label_tag_link(url_base, url_end, text, color_class) %}
 	<a href="{{ url_base }}{{ url_end }}" class="label label-{{ color_class }}">{{ text }}</a>
 {% endmacro %}
+
+
+{#
+ # Generates HTML for listing table search box.
+ #
+ #}
+{% macro table_search_box(url_base, url_end, text, color_class) %}
+	<div class="col-md-3 pull-right">
+		<div class="form-group">
+			<div class="input-group">
+				<label for="search_input" class="sr-only">Search</label>
+				<input id="search_input" type="text" class="form-control"/>
+				<span class="input-group-btn">
+					<button id="search_btn" class="btn btn-primary" type="button">Search!</button>
+				</span>
+			</div>
+		</div>
+	</div>
+{% endmacro %}
+
+
+{#
+ # Generates HTML for action/review_result dropdown (Logged-in users only).
+ #
+ # Args:
+ #     dd_type (str): The type of dropdown ('Action' or 'Set Result').
+ #     obj (Package||Build): The `Package` or `Build` object for the dropdown.
+ #     menu_items (list): List of tuples containing menu items' id, icon class, color, and label text.
+ #     dd_class (str): CSS class(es) for the menu.
+ #
+ #}
+{% macro table_dropdown(dd_type, obj, menu_items, dd_class='') %}
+	{% if current_user.is_authenticated %}
+
+		{% set bnum = obj._build.bnum if 'Action' == dd_type else obj.bnum  %}
+
+		<div class="btn-group">
+			<button class="btn btn-default btn-xs" type="button">{{ dd_type }}</button>
+			<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">
+				<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
+			</button>
+			<ul role="menu" class="dropdown-menu{{ dd_class }}">
+				{% if menu_items and menu_items is iterable %}
+					{% for menu_item in menu_items %}
+						<li>
+							<a href="#" id="{{ menu_item[0] }}" data-bnum="{{ bnum }}" data-pkg="{{ obj.pkgname }}">
+								<i class="fa fa-{{ menu_item[1] }}" style="color:{{ menu_item[2] }};"></i> {{ menu_item[3] }}
+							</a>
+						</li>
+					{% endfor %}
+				{% endif %}
+			</ul>
+		</div>
+
+	{% endif %}
+{% endmacro %}
+
+
+
+{#
+ # Generates HTML for listing table.
+ #
+ # Args:
+ #     columns_info (list): List of dicts containing info for each column.
+ #                          Dict keys expected are heading_text, obj_attr, content_type, base_url, dd_info
+ #     objs (list): List of `Package` or `Build` objects to be listed in table.
+ #     text (str): The text for the tag/label.
+ #     color_class (str): Color class (primary, success, danger, etc)
+ #
+ #}
+{% macro listing_table(columns_info, objs) %}
+	<table class="table no-border hover">
+		<thead class="no-border">
+			<tr>
+				{% for column in columns_info %}
+					<td>{{ column.heading_text }}</td>
+				{% endfor %}
+			</tr>
+		</thead>
+		<tbody class="no-border-y">
+			{% if objs and objs is iterable %}
+				{% for obj in objs %}
+					<tr>
+						{% for column in columns_info %}
+							<td>
+								{% set obj_attr = obj|attr(column.obj_attr) %}
+
+								{% if 'link' == column.content_type %}
+									<a href="{{ column.base_url }}{{ obj_attr }}">{{ obj_attr }}</a>
+								{% elif 'text' == column.content_type %}
+									{{ obj_attr }}
+								{% elif 'dropdown' == column.content_type and column.dd_info %}
+									{% set dd_type, menu_items, dd_class = column.dd_info %}
+									{% set content = caller() %}
+
+									{% call table_dropdown(dd_type, obj, menu_items, dd_class) %}
+
+									{{ content }}
+
+									{% endcall %}
+								{% endif %}
+							</td>
+						{% endfor %}
+					</tr>
+				{% endfor %}
+			{% endif %}
+		</tbody>
+	</table>
+{% endmacro %}
+

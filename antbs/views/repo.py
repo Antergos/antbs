@@ -85,6 +85,57 @@ def get_repo_packages(repo_name=None, group=None, page=None):
     return pkgs, rev_pending, all_pages
 
 
+def get_table_columns_info():
+    # 'Name', 'Version', 'Build', 'Reviewed By', 'Reviewed On'
+    url = '/package/'
+    return [
+        {
+            'heading_text': 'ID',
+            'obj_attr': 'pkg_id',
+            'content_type': 'link',
+            'base_url': url,
+            'dd_info': ''
+        },
+        {
+            'heading_text': 'Name',
+            'obj_attr': 'pkgname',
+            'content_type': 'link',
+            'base_url': url,
+            'dd_info': ''
+        },
+        {
+            'heading_text': 'Version',
+            'obj_attr': 'version_str',
+            'content_type': 'text',
+            'base_url': '',
+            'dd_info': ''
+        },
+        {
+            'heading_text': 'Build',
+            'obj_attr': 'pkg_id',
+            'content_type': 'link',
+            'base_url': '/build/',
+            'dd_info': ''
+        },
+        {
+            'heading_text': 'Reviewed By',
+            'obj_attr': '_reviewed_by',
+            'content_type': 'text',
+            'base_url': '',
+            'dd_info': ''
+        },
+        {
+            'heading_text': 'Reviewed On',
+            'obj_attr': '_reviewed_on',
+            'content_type': 'text',
+            'base_url': '',
+            'dd_info': ''
+        },
+
+
+    ]
+
+
 ###
 ##
 #   Views Start Here

@@ -72,7 +72,7 @@ class ServerStatus(RedisHash, metaclass=Singleton):
 class TimelineEvent(RedisHash, DateTimeStrings):
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
-        if not event_id and not all([msg, tl_type]):
+        if not event_id and any(True for i in [msg, tl_type] if not i and 0 != i):
             raise ValueError('msg and tl_type required when event_id is not provided.')
 
         the_id = event_id

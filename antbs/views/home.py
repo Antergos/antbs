@@ -47,10 +47,7 @@ def maybe_check_for_remote_commits():
         repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
 
 
-def get_timeline(tlpage=None):
-    if not tlpage:
-        tlpage = 1
-
+def get_timeline(tlpage=1):
     timeline = []
     start_at = len(status.all_tl_events) - 300
 

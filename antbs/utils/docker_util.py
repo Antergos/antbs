@@ -228,24 +228,28 @@ class DockerUtils(metaclass=Singleton):
             return True
         elif status.docker_image_building:
             wait = status.docker_image_building
-            while wait:
+            logger.debug('waiting for docker image')
+            waiting = 0
+            while wait and waiting < 300:
+                waiting += 10
                 time.sleep(10)
                 wait = status.docker_image_building
+
             return True
 
         # No image was built in the past 24 hours, let's build one.
         status.docker_image_building = True
+        logger.debug('building new docker images')
         status.current_status = 'Docker images are stale. Building new images.'
         build_script = os.path.join(DOC_DIR, 'base-devel.sh')
         build_it = False
         try:
             build_it = subprocess.check_output([build_script])
         except subprocess.CalledProcessError as err:
-            logger.error('@@-docker_util.py-@@ | Image build script failed with error: %s',
-                         err.output)
+            logger.exception('Image build script failed with error: %s', err.output)
             return self.do_image_build_finished(False)
         except shutil.Error as err2:
-            logger(err2)
+            logger.exception(err2)
 
         if build_it:
             try:
@@ -297,7 +301,7 @@ class DockerUtils(metaclass=Singleton):
             if build_it:
                 self.push_to_hub('antergos/makepkg')
         except Exception as err:
-            logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
+            logger.exception('Building makepkg failed with error: %s', err)
             return False
 
         return True
@@ -337,7 +341,7 @@ class DockerUtils(metaclass=Singleton):
             if not response:
                 logger.info('Pushing to Docker hub might not have completed successfully.')
         except Exception as err:
-            logger.error('Pushing to docker hub failed with error: %s', err)
+            logger.exception('Pushing to docker hub failed with error: %s', err)
 
     def get_pkgbuild_generates(self, pkgname, hconfig, build_env, result_dir):
         result_dirname = result_dir.split('/')[-2:-1]

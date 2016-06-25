@@ -118,17 +118,19 @@ class Monitor(RedisHash):
         last_result = pkg_obj.monitored_last_result
         gh_repo = gh.repository(project, repo)
         latest = None
-        must_contain = None
+        must_contain = '.' if 'arc-icon-theme' != repo else '2016'
 
         if 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
             must_contain = '1.14'
 
         latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
 
-        if not latest and 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
+        if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
             latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
 
-        if latest and latest != last_result and latest.replace('v', '') != last_result:
+        is_new = latest and latest != last_result and latest.replace('v', '') != last_result
+
+        if is_new or (latest and not last_result):
             if 'commits' != pkg_obj.monitored_type:
                 latest = latest.replace('v', '')
 
@@ -149,6 +151,8 @@ class Monitor(RedisHash):
         git_item = getattr(gh_repo, what_to_get)
         res = git_item()
         latest = ''
+        items_checked = 0
+        logger.debug([gh_repo, what_to_get, must_contain, res])
 
         def _get_next_item():
             _latest = ''
@@ -167,11 +171,17 @@ class Monitor(RedisHash):
             return _latest
 
         latest = _get_next_item()
+        logger.debug(latest)
 
         if must_contain and must_contain not in latest:
             while must_contain not in latest:
                 latest = _get_next_item()
+                items_checked += 1
 
+                if items_checked > 5:
+                    break
+
+        logger.debug(latest)
         return latest
 
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):

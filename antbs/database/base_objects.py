@@ -57,9 +57,6 @@ class RedisObject:
             return False
         return self.db.exists(self.full_key)
 
-    def __nonzero__(self):
-        return self.__bool__()
-
     def __eq__(self, other):
         """ Tests if two redis objects are equal (they have the same full_key). """
         res = False
@@ -68,13 +65,6 @@ class RedisObject:
             res = self.full_key == other.full_key
 
         return res
-
-    def __str__(self):
-        """ Return this object's full_key as a string. This can be extended by subclasses. """
-        return self.full_key
-
-    def __iter__(self):
-        raise NotImplementedError
 
     def __getitem__(self, index):
         """ Load an item by index where index is either an int or a slice. """
@@ -101,9 +91,8 @@ class RedisObject:
         else:
             return RedisObject.decode_value(self.item_type, self.db.lindex(self.full_key, index))
 
-    def delete(self):
-        """ Delete this object from redis. """
-        self.db.delete(self.full_key)
+    def __iter__(self):
+        raise NotImplementedError
 
     def __jsonable__(self):
         """
@@ -137,9 +126,17 @@ class RedisObject:
 
         return res
 
-    def json(self):
-        """ Return this object as a json serialized string. """
-        return json.dumps(self.__jsonable__())
+    def __nonzero__(self):
+        return self.__bool__()
+
+    def __str__(self):
+        """ Return this object's full_key as a string. This can be extended by subclasses. """
+        return self.full_key
+
+    @staticmethod
+    def _hget(key, field, default_value=''):
+        val = db.hget(key, field)
+        return val if val is not None else default_value
 
     @classmethod
     def as_child(cls, parent, tag, item_type):
@@ -169,10 +166,18 @@ class RedisObject:
         else:
             return obj_type(value)
 
+    def delete(self):
+        """ Delete this object from redis. """
+        self.db.delete(self.full_key)
+
     @staticmethod
     def encode_value(value):
         """ Encode a value using json.dumps, with default = str. """
         return str(value)
+
+    def json(self):
+        """ Return this object as a json serialized string. """
+        return json.dumps(self.__jsonable__())
 
 
 class RedisList(RedisObject, list):
@@ -282,22 +287,22 @@ class RedisZSet(RedisObject, set):
             for item in items:
                 self.add(item)
 
-    def __len__(self):
-        """ Return the size of the set. """
-        return self.db.zcard(self.full_key) if self.db.exists(self.full_key) else 0
+    def __contains__(self, item):
+        """ Check if item is in the set. """
+        return item in self.db.zrange(self.full_key, 0, -1)
 
     def __iter__(self):
         """ Iterate over all items in this set. """
         for el in self.db.zrange(self.full_key, 0, -1):
             yield super().decode_value(self.item_type, el)
 
+    def __len__(self):
+        """ Return the size of the set. """
+        return self.db.zcard(self.full_key)
+
     def __str__(self):
         """ Return this object as a string """
         return str([x for x in self.__iter__()])
-
-    def __contains__(self, item):
-        """ Check if item is in the set. """
-        return item in self.db.zrange(self.full_key, 0, -1)
 
     def add(self, *values):
         """ Add member to set if it doesn't exist. """
@@ -310,21 +315,21 @@ class RedisZSet(RedisObject, set):
     def append(self, val):
         self.add(val)
 
-    def remove(self, val):
-        """ Remove a member from the set. """
-        self.db.zrem(self.full_key, super().encode_value(val))
-
     def ismember(self, val):
         """ Check if value is a member of set. """
         return self.db.zrank(self.full_key, super().encode_value(val))
 
-    def sort(self, alpha=True):
-        """ Get list of members sorted alphabetically. """
-        return self.db.sort(self.full_key, alpha=alpha)
+    def remove(self, val):
+        """ Remove a member from the set. """
+        self.db.zrem(self.full_key, super().encode_value(val))
 
     def remove_range(self, start, stop):
         """ Remove all members at indexes from start to stop """
         return self.db.zremrangebyrank(self.full_key, start, stop)
+
+    def sort(self, alpha=True):
+        """ Get list of members sorted alphabetically. """
+        return self.db.sort(self.full_key, alpha=alpha)
 
 
 class RedisHash(RedisObject):
@@ -366,62 +371,9 @@ class RedisHash(RedisObject):
         self.full_key = id_key
         self.all_attribs = []
 
-    def __namespaceinit__(self):
-        """ Makes sure that the objects `full_key` and `all_attribs` attributes are set properly. """
-        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
-
-        if self.full_key[-1] == ':':
-            self.full_key = self.full_key[:-1]
-
-    def __keysinit__(self):
-        """ Initializes the object's predefined attributes as hash fields in Redis. """
-        for key in self.all_attribs:
-            value = getattr(self, key, '')
-            is_string = key in self.attrib_lists['string']
-            initialized = (not is_string and '' != value) or (is_string and '_' != value)
-
-            if initialized:
-                continue
-
-            if 'ServerStatus' == self.__class__.__name__:
-                value = os.environ.get(key.upper())
-
-            if key in self.attrib_lists['string'] + self.attrib_lists['path']:
-                value = value or ''
-                setattr(self, key, value)
-            elif key in self.attrib_lists['bool']:
-                value = value or False
-                setattr(self, key, value)
-            elif key in self.attrib_lists['int']:
-                value = value or 0
-                setattr(self, key, value)
-            elif key in self.attrib_lists['list']:
-                setattr(self, key, RedisList.as_child(self, key, str))
-            elif key in self.attrib_lists['set']:
-                setattr(self, key, RedisZSet.as_child(self, key, str))
-
-    def __str__(self):
-        """ Return this object as a friendly (human readable) string. """
-        return '<{0} {1}>'.format(self.__class__.__name__, self.key)
-
-    def __len__(self):
-        """ Return the len of this object (total number of fields in its redis hash). """
-        return int(self.db.hlen(self.full_key))
-
     def __getitem__(self, item):
         """ Get and return the value of a field (item) from this objects redis hash."""
         return self.__getattribute__(item)
-
-    def __setitem__(self, key, value):
-        """ Set the value of a field (item) from this objects redis hash."""
-        return self.__setattribute__(key, value)
-
-    def __iter__(self):
-        """ Return an iterator with all the keys in redis hash. """
-        return [key for key in self.all_attribs]
-
-    def iterkeys(self):
-        return self.__iter__()
 
     def __getattribute__(self, attrib):
         """ Get attribute value if stored in redis otherwise pass call to parent class """
@@ -453,6 +405,55 @@ class RedisHash(RedisObject):
         elif attrib.endswith('__exp'):
             val = self.db.hget(key, attrib) if self.db.hexists(key, attrib) else time.time()
             return int(val) - 1
+
+    def __is_expired__(self, attrib):
+        exp_key = attrib + '__exp'
+        expire_time = self.db.hget(self.full_key, exp_key) or 0
+        now = int(time.time())
+
+        return now > int(expire_time)
+
+    def __iter__(self):
+        """ Return an iterator with all the keys in redis hash. """
+        return [key for key in self.all_attribs]
+
+    def __len__(self):
+        """ Return the len of this object (total number of fields in its redis hash). """
+        return int(self.db.hlen(self.full_key))
+
+    def __keysinit__(self):
+        """ Initializes the object's predefined attributes as hash fields in Redis. """
+        for key in self.all_attribs:
+            value = getattr(self, key, '')
+            is_string = key in self.attrib_lists['string']
+            initialized = (not is_string and '' != value) or (is_string and '_' != value)
+
+            if initialized:
+                continue
+
+            if 'ServerStatus' == self.__class__.__name__:
+                value = os.environ.get(key.upper())
+
+            if key in self.attrib_lists['string'] + self.attrib_lists['path']:
+                value = value or ''
+                setattr(self, key, value)
+            elif key in self.attrib_lists['bool']:
+                value = value or False
+                setattr(self, key, value)
+            elif key in self.attrib_lists['int']:
+                value = value or 0
+                setattr(self, key, value)
+            elif key in self.attrib_lists['list']:
+                setattr(self, key, RedisList.as_child(self, key, str))
+            elif key in self.attrib_lists['set']:
+                setattr(self, key, RedisZSet.as_child(self, key, str))
+
+    def __namespaceinit__(self):
+        """ Ensures that the objects `full_key` and `all_attribs` attributes are set properly. """
+        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
+
+        if self.full_key[-1] == ':':
+            self.full_key = self.full_key[:-1]
 
     def __setattr__(self, attrib, value, score=None):
         """ Set attribute value if stored in redis otherwise pass call to parent class """
@@ -490,19 +491,13 @@ class RedisHash(RedisObject):
             raise AttributeError('class {0} has no attribute {1}.'.format(
                 self.__class__.__name__, attrib))
 
-    def __is_expired__(self, attrib):
-        exp_key = attrib + '__exp'
-        expire_time = self.db.hget(self.full_key, exp_key) or 0
-        now = int(time.time())
+    def __setitem__(self, key, value):
+        """ Set the value of a field (item) from this objects redis hash."""
+        return self.__setattribute__(key, value)
 
-        return now > int(expire_time)
-
-    def expire_in(self, attrib, seconds):
-        expires = int(time.time()) + seconds
-        attrib_key = attrib + '__exp'
-
-        self.db.hset(self.full_key, attrib_key, expires)
-
+    def __str__(self):
+        """ Return this object as a friendly (human readable) string. """
+        return '<{0} {1}>'.format(self.__class__.__name__, self.key)
 
     @staticmethod
     def bool_string_helper(value):
@@ -518,6 +513,26 @@ class RedisHash(RedisObject):
             raise ValueError(
                 'value must be of type(bool) or type(str), {0} given.'.format(type(value))
             )
+
+    @staticmethod
+    def datetime_to_string(dt):
+        """
+        Converts a datetime to a string.
+
+        Args:
+            dt (datetime.datetime): `datetime` to be converted.
+
+        Returns:
+            str: The datetime string.
+
+        """
+        return dt.strftime("%m/%d/%Y %I:%M%p")
+
+    def expire_in(self, attrib, seconds):
+        expires = int(time.time()) + seconds
+        attrib_key = attrib + '__exp'
+
+        self.db.hset(self.full_key, attrib_key, expires)
 
     @staticmethod
     def is_pathname_valid(pathname):
@@ -558,16 +573,5 @@ class RedisHash(RedisObject):
             # All path components and hence pathname itself are valid.
             return True
 
-    @staticmethod
-    def datetime_to_string(dt):
-        """
-        Converts a datetime to a string.
-
-        Args:
-            dt (datetime.datetime): `datetime` to be converted.
-
-        Returns:
-            str: The datetime string.
-
-        """
-        return dt.strftime("%m/%d/%Y %I:%M%p")
+    def iterkeys(self):
+        return self.__iter__()

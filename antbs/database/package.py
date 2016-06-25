@@ -304,11 +304,11 @@ class Package(PackageMeta):
 
 
     @staticmethod
-    def get_github_api_client():
+    def get_github_api_client(project='antergos', repo='antergos-packages'):
         gh = login(token=status.github_token)
-        repo = gh.repository('antergos', 'antergos-packages')
+        gh_repo = gh.repository(project, repo)
 
-        return gh, repo
+        return gh, gh_repo
 
     def fetch_pkgbuild_from_github(self):
         logger.debug('fetch_pkgbuild_from_github! %s', self.pkgname)
@@ -350,7 +350,7 @@ class Package(PackageMeta):
     def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
         can_push = self.push_version or self.is_monitored
 
-        if not can_push or old_val == new_val or new_val in [None, 'None']:
+        if not can_push or old_val == new_val or new_val in [None, 'None', '']:
             logger.error(
                 'cant push to github! %s, old_val: %s, new_val: %s', self.pkgname, old_val, new_val
             )
@@ -380,6 +380,9 @@ class Package(PackageMeta):
         else:
             commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
                                                                                     self.name)
+
+        if new_pb_contents == pb_contents:
+            return
 
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
@@ -537,6 +540,7 @@ class Package(PackageMeta):
         if self.is_split_package:
             self.sync_pkgbuild_array_by_key('pkgname')
 
+        self.sync_repo_monitor_config()
         self.sync_pkgbuild_array_by_key('depends')
         self.sync_pkgbuild_array_by_key('makedepends')
         self.sync_pkgbuild_array_by_key('groups')

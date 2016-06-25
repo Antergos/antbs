@@ -1,5 +1,17 @@
 {% extends "base.html" %}
+
+{% from '_macros.html' import table_search_box %}
+
 {% set link = '/repo/' + name + '/packages' %}
+{% set table_headers =  [
+	{ 'heading_text': , 'obj_attr'] %}
+heading_text, obj_attr, content_type, base_url, dd_info
+{% for column in ['ID', 'Name', 'Version', 'Groups', 'Build', 'Reviewed By', 'Reviewed On'] %}
+	{% do table_headers.append({'heading_text': column, 'obj_attr':  %}
+
+{% if current_user.is_authenticated %}
+	{% do table_headers.append('Manage') %}
+{% endif %}
 
 {% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
 
@@ -15,22 +27,12 @@
 				{% if not repo_packages %}
 					None
 				{% else %}
-					<div class="col-md-3 pull-right">
-						<div class="form-group">
-							<div class="input-group">
-								<label for="search_input" class="sr-only">Search</label>
-								<input id="search_input" type="text" class="form-control"/>
-								<span class="input-group-btn">
-									<button id="search_btn" class="btn btn-primary" type="button">Search!</button>
-								</span>
-							</div>
-						</div>
-					</div>
+					{{ table_search_box() }}
 					<table class="table no-border hover">
 						<thead class="no-border">
 						<tr>
 							<th>ID&nbsp;&nbsp;</th>
-							<th>Name&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</th>
+							<th></th>
 							<th>Version</th>
 							<th>Groups</th>
 							<th>Build</th>

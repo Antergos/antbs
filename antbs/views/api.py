@@ -242,7 +242,7 @@ def build_pkg_now():
             transaction_queue.enqueue_call(handle_hook, timeout=84600)
             get_timeline_object(
                 msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-                    dev, ' '.join(pkgnames)), tl_type='0')
+                    dev, ' '.join(pkgnames)), tl_type=0)
         else:
             flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
 

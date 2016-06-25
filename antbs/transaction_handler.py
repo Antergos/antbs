@@ -88,6 +88,8 @@ def handle_hook():
 
     saved_status = set_server_status(first=True)
 
+    logger.debug('calling maybe build docker image')
+
     if not status.iso_flag:
         image = docker_utils.DockerUtils().maybe_build_base_devel()
     else:
