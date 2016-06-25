@@ -382,14 +382,14 @@ class RedisHash(RedisObject):
         key = self.full_key
 
         if attrib in self.attrib_lists['string'] + self.attrib_lists['path']:
-            return self.hget(key, attrib)
+            return self._hget(key, attrib)
 
         elif attrib in self.attrib_lists['bool']:
-            val = self.hget(key, attrib, 'False')
+            val = self._hget(key, attrib, 'False')
             return self.bool_string_helper(val)
 
         elif attrib in self.attrib_lists['int']:
-            return int(self.hget(key, attrib, 0))
+            return int(self._hget(key, attrib, 0))
 
         elif attrib in self.attrib_lists['list']:
             return RedisList.as_child(self, attrib, str)
@@ -398,12 +398,12 @@ class RedisHash(RedisObject):
             return RedisZSet.as_child(self, attrib, str)
 
         elif attrib.endswith('__exp'):
-            val = self.hget(key, attrib, time.time())
+            val = self._hget(key, attrib, time.time())
             return int(val) - 1
 
     def __is_expired__(self, attrib):
         exp_key = attrib + '__exp'
-        expire_time = self.hget(self.full_key, exp_key, 0)
+        expire_time = self._hget(self.full_key, exp_key, 0)
         now = int(time.time())
 
         return now > int(expire_time)
