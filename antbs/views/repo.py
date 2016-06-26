@@ -86,21 +86,19 @@ def get_repo_packages(repo_name=None, group=None, page=None):
 
 
 def get_table_columns_info():
-    # 'Name', 'Version', 'Build', 'Reviewed By', 'Reviewed On'
-    url = '/package/'
-    return [
+    columns_info = [
         {
             'heading_text': 'ID',
             'obj_attr': 'pkg_id',
             'content_type': 'link',
-            'base_url': url,
+            'base_url': '/package/',
             'dd_info': ''
         },
         {
             'heading_text': 'Name',
             'obj_attr': 'pkgname',
             'content_type': 'link',
-            'base_url': url,
+            'base_url': '/package/',
             'dd_info': ''
         },
         {
@@ -131,9 +129,16 @@ def get_table_columns_info():
             'base_url': '',
             'dd_info': ''
         },
-
-
     ]
+
+    if current_user.is_authenticated:
+        columns_info.append({
+            'heading_text': 'Manage',
+            'obj_attr': '',
+            'content_type': 'dd_info',
+            'base_url': '',
+            'dd_info': ''
+        })
 
 
 ###
@@ -154,10 +159,12 @@ def repo_packages_listing(name=None, group=None, page=None):
 
     packages, rev_pending, all_pages = get_repo_packages(name, group, page)
     pagination = Pagination(page, 10, all_pages)
+    columns_info = get_table_columns_info()
 
     return try_render_template("repos/listing.html", repo_packages=packages,
                                pagination=pagination, all_pages=all_pages,
-                               rev_pending=rev_pending, name=name, group=group)
+                               columns_info=columns_info, rev_pending=rev_pending,
+                               name=name, group=group)
 
 
 @repo_view.route('/browse/<goto>')

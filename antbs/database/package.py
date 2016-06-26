@@ -54,36 +54,34 @@ class PackageMeta(RedisHash):
 
     """
 
+    attrib_lists = dict(
+        string=['git_name',     'build_path',     'description',    'epoch',
+                'git_url',      'failure_rate',   'gh_project',     'iso_md5',
+                'name',         'gh_repo',        'iso_url',        'monitored_last_result',
+                'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
+                'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
+                'pkgver',       'pkgname',        'pkgbuild',       'short_name',
+                'success_rate', 'url',            'version_str',    'gh_path',
+                'filename_str'  'monitored_last_checked'],
+
+        bool=['is_metapkg', 'auto_sum', 'is_split_package', 'is_initialized',
+              'push_version', 'is_monitored', 'saved_commit', 'is_iso'],
+
+        int=['pkg_id'],
+
+        list=['allowed_in', 'builds', 'tl_events', 'transactions',
+              'split_packages'],
+
+        set=['depends', 'groups', 'makedepends']
+    )
+
     def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):
         super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
-
-        self.attrib_lists.update(dict(
-            string=['git_name',     'build_path',     'description',    'epoch',
-                    'git_url',      'failure_rate',   'gh_project',     'iso_md5',
-                    'name',         'gh_repo',        'iso_url',        'monitored_last_result',
-                    'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
-                    'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
-                    'pkgver',       'pkgname',        'pkgbuild',       'short_name',
-                    'success_rate', 'url',            'version_str',    'gh_path',
-                    'filename_str'  'monitored_last_checked'],
-
-            bool=['is_metapkg',   'auto_sum',     'is_split_package', 'is_initialized',
-                  'push_version', 'is_monitored', 'saved_commit',     'is_iso'],
-
-            int=['pkg_id'],
-
-            list=['allowed_in',    'builds', 'tl_events', 'transactions',
-                  'split_packages'],
-
-            set=['depends', 'groups', 'makedepends']
-        ))
 
         self.__namespaceinit__()
 
         if (not self or not self.pkg_id) and self.is_package_on_github(name=key):
             # Package is not in the database, so it must be new. Let's initialize it.
-            self.__keysinit__()
-
             self.pkgname = key
             self.name = key
 

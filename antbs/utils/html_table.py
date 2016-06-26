@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# pagination.py
+# html_table.py
 #
 # Copyright © 2014-2016 Antergos
 #
@@ -27,7 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-class Pagination(object):
+class HTMLTable(object):
     """
 
     :param page:

@@ -91,6 +91,18 @@ class Build(RedisHash):
 
     """
 
+    attrib_lists = dict(
+        string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
+                'start_str', 'end_str', 'version_str', 'container', 'review_status',
+                'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
+                'repo_container', 'live_output_key', 'last_line_key'],
+        bool=['failed', 'completed', 'is_iso'],
+        int=[],
+        list=['log', 'generated_files', 'staging_files'],
+        set=['generated_pkgs'],
+        path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
+    )
+
     def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
         if not pkg_obj and not bnum:
             raise ValueError
@@ -101,18 +113,6 @@ class Build(RedisHash):
 
         super().__init__(prefix=prefix, key=the_bnum)
 
-        self.attrib_lists.update(dict(
-            string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
-                    'start_str', 'end_str', 'version_str', 'container', 'review_status',
-                    'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
-                    'repo_container', 'live_output_key', 'last_line_key'],
-            bool=['failed', 'completed', 'is_iso'],
-            int=[],
-            list=['log', 'generated_files', 'staging_files'],
-            set=['generated_pkgs'],
-            path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
-        ))
-
         self.__namespaceinit__()
 
         self._pkg_obj = None
@@ -120,20 +120,12 @@ class Build(RedisHash):
         if pkg_obj and (not self or not self.bnum):
             self._pkg_obj = pkg_obj
 
-            self.__keysinit__()
-
-            for key in pkg_obj.all_attribs:
-                if key in self.all_attribs:
-                    val = getattr(pkg_obj, key)
-                    value = False if 'is_iso' == key and '' == val else val
-                    setattr(self, key, value)
-
             self.bnum = the_bnum
             self.tnum = tnum
             self.failed = False
             self.completed = False
-            self.live_output_key = 'live:build_output:{0}'.format(self.bnum)
-            self.last_line_key = 'tmp:build_log_last_line:{0}'.format(self.bnum)
+            self.live_output_key = 'live:build_output:{0}'.format(the_bnum)
+            self.last_line_key = 'tmp:build_log_last_line:{0}'.format(the_bnum)
 
     def publish_build_output(self):
         if not self.container:

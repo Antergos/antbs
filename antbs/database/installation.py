@@ -40,6 +40,12 @@ if not db.exists(next_install_id_key):
 
 class AntergosInstallation(RedisHash, DateTimeStrings):
 
+    attrib_lists = dict(
+        string=['install_id', 'ip_address', 'start_date', 'start_time',
+                'start_str', 'end_date', 'end_time', 'end_str'],
+        bool=['completed']
+    )
+
     def __init__(self, namespace='cnchi14', prefix='install', install_id='', ip=None):
         if not install_id and not ip:
             raise ValueError('ip is required to initialize this class')
@@ -49,16 +55,9 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
 
         super().__init__(namespace=namespace, prefix=prefix, key=install_id)
 
-        self.attrib_lists.update(dict(string=['install_id', 'ip_address', 'start_date', 'start_time',
-                                           'start_str', 'end_date', 'end_time', 'end_str'],
-                                      bool=['completed']))
-
         self.__namespaceinit__()
 
         if not self or not self.install_id:
-            if not ip:
-                raise ValueError('ip required to create a new installation object')
-            self.__keysinit__()
             self.install_id = install_id
             self.ip_address = ip
             dt = datetime.datetime.now()
@@ -75,12 +74,14 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
 
 class AntergosInstallationUser(RedisHash):
 
+    attrib_lists = dict(
+        string=['ip_address', 'country'],
+        set=['installs', 'installs_completed', 'installs_failed']
+    )
+
     def __init__(self, ip=None, install_id=None, namespace='cnchi14', prefix='user'):
 
         super().__init__(namespace=namespace, prefix=prefix, key=ip)
-
-        self.attrib_lists.update(dict(string=['ip_address', 'country'],
-                                      set=['installs', 'installs_completed', 'installs_failed']))
 
         self.__namespaceinit__()
 
@@ -88,7 +89,6 @@ class AntergosInstallationUser(RedisHash):
             if not ip:
                 raise ValueError('ip required to create a new InstallationUser object')
 
-            self.__keysinit__()
             self.ip_address = ip
 
         if install_id:

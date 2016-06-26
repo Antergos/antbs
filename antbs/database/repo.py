@@ -85,21 +85,21 @@ class PacmanRepo(RedisHash):
 
     """
 
+    attrib_lists = dict(
+        string=['name', 'alpm_db', 'arch'],
+        bool=['locked'],
+        int=['pkg_count_alpm', 'pkg_count_fs'],
+        list=['pkgnames'],
+        set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
+        path=['path', 'alpm_db_path']
+    )
+
     def __init__(self, name, db_key, path=None, prefix='repo'):
         super().__init__(prefix=prefix, key=db_key)
-
-        self.attrib_lists.update(
-            dict(string=['name', 'alpm_db', 'arch'],
-                 bool=['locked'],
-                 int=['pkg_count_alpm', 'pkg_count_fs'],
-                 list=['pkgnames'],
-                 set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
-                 path=['path', 'alpm_db_path']))
 
         super().__namespaceinit__()
 
         if not self or not self.name:
-            self.__keysinit__()
             self.name = name
             self.arch = 'x86_64' if '32' not in db_key else 'i686'
             self.path = os.path.join(path, name, self.arch)

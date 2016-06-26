@@ -31,37 +31,42 @@
 
 import datetime
 
-from database.base_objects import RedisHash, RedisList, RedisZSet
-from utils.utilities import DateTimeStrings, Singleton
+from database.base_objects import RedisHash
+from utils.utilities import DateTimeStrings, Singleton, CooperativeMeta
 
 
-class ServerStatus(RedisHash, metaclass=Singleton):
+class ServerStatus(RedisHash, Singleton, metaclass=CooperativeMeta):
+
+    attrib_lists = dict(
+        string=['current_status', 'container', 'github_token',
+                'gitlab_token', 'building_start', 'building_num', 'docker_user',
+                'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
+                'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
+                'sp_app', 'gh_repo_url', 'request_from', 'ANTERGOS_API_DB_KEY_NAME',
+                'MONITOR_PKGS_KEY'],
+
+        bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
+              'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging'],
+
+        int=['building_num'],
+
+        list=['completed', 'failed', 'transaction_queue', 'pending_review',
+              'all_tl_events', 'build_queue', 'transactions_running', 'now_building'],
+
+        set=['all_packages', 'iso_pkgs', 'repos', 'review_pending', 'package_groups',
+             'mirrors'],
+
+        path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
+              'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
+              'REPO_BASE_DIR', 'MKARCHISO_DIR']
+    )
 
     def __init__(self, prefix='status', key='', *args, **kwargs):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
 
-        self.attrib_lists.update(
-                dict(string=['current_status', 'container', 'github_token',
-                             'gitlab_token', 'building_start', 'building_num', 'docker_user',
-                             'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
-                             'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
-                             'sp_app', 'gh_repo_url', 'request_from', 'ANTERGOS_API_DB_KEY_NAME',
-                             'MONITOR_PKGS_KEY'],
-                     bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
-                           'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging'],
-                     int=['building_num'],
-                     list=['completed', 'failed', 'transaction_queue', 'pending_review',
-                           'all_tl_events', 'build_queue', 'transactions_running', 'now_building'],
-                     set=['all_packages', 'iso_pkgs', 'repos', 'review_pending', 'package_groups',
-                          'mirrors'],
-                     path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
-                           'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
-                           'REPO_BASE_DIR', 'MKARCHISO_DIR']))
-
         super().__namespaceinit__()
 
         if not self or not self.status:
-            self.__keysinit__()
             self.status = True
             self.current_status = 'Idle'
             self.idle = True
@@ -70,6 +75,14 @@ class ServerStatus(RedisHash, metaclass=Singleton):
 
 
 class TimelineEvent(RedisHash, DateTimeStrings):
+
+    attrib_lists = dict(
+        string=['event_type', 'date_str', 'time_str', 'message'],
+        int=['event_id', 'tl_type'],
+        bool=[],
+        list=['packages'],
+        set=[]
+    )
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
         if not event_id and any(True for i in [msg, tl_type] if not i and 0 != i):
@@ -80,23 +93,11 @@ class TimelineEvent(RedisHash, DateTimeStrings):
             the_id = self.db.incr('antbs:misc:event_id:next')
 
         super().__init__(prefix=prefix, key=the_id)
+        self.__namespaceinit__()
 
-        super().__namespaceinit__()
-
-        self.attrib_lists.update(
-                dict(string=['event_type', 'date_str', 'time_str', 'message'],
-                     int=['event_id', 'tl_type'],
-                     bool=[],
-                     list=['packages'],
-                     set=[]))
-
-        self.all_attribs = [item for sublist in self.attrib_lists.values() for item in sublist]
-
-        if not self or not event_id:
-            super().__keysinit__()
+        if not self or not self.event_id:
             self.event_id = the_id
-            all_events = status.all_tl_events
-            all_events.append(self.event_id)
+            status.all_tl_events.append(self.event_id)
             self.tl_type = tl_type
             self.message = msg
             dt = datetime.datetime.now()

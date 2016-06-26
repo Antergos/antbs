@@ -62,7 +62,7 @@ class DispatcherBotMessage(RedisHash):
         self.__namespaceinit__()
 
         if not self or not self.msg_id:
-            self.__keysinit__()
+            self.__bindattrs__()
             self.msg_id = msg_id
 
 
@@ -84,7 +84,7 @@ class DispatcherBot(RedisHash):
         self.__namespaceinit__()
 
         if not self or not self.name:
-            self.__keysinit__()
+            self.__bindattrs__()
             self.name = name
 
         if self._slack is None:

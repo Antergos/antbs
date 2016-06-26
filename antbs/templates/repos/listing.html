@@ -3,11 +3,6 @@
 {% from '_macros.html' import table_search_box %}
 
 {% set link = '/repo/' + name + '/packages' %}
-{% set table_headers =  [
-	{ 'heading_text': , 'obj_attr'] %}
-heading_text, obj_attr, content_type, base_url, dd_info
-{% for column in ['ID', 'Name', 'Version', 'Groups', 'Build', 'Reviewed By', 'Reviewed On'] %}
-	{% do table_headers.append({'heading_text': column, 'obj_attr':  %}
 
 {% if current_user.is_authenticated %}
 	{% do table_headers.append('Manage') %}

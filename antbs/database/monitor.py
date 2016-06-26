@@ -57,23 +57,21 @@ class Monitor(RedisHash):
     for changes (like Github, Gitlab, etc).
     """
 
+    attrib_lists = dict(
+        string=['name'],
+        bool=['checked_recently'],
+        int=[],
+        list=[],
+        set=['packages'],
+        path=[]
+    )
+
     def __init__(self, name):
         super().__init__(prefix='monitor', key=name)
-
-        key_lists = dict(
-            string=['name'],
-            bool=['checked_recently'],
-            int=[],
-            list=[''],
-            set=['packages'],
-            path=[]
-        )
-        self.attrib_lists.update(key_lists)
 
         self.__namespaceinit__()
 
         if not self or not self.name:
-            self.__keysinit__()
             self.name = name
 
     def check_repos_for_changes(self):

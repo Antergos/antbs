@@ -62,6 +62,20 @@ class TransactionMeta(RedisHash):
         See `Transaction` docstring.
     """
 
+    _main_repo = get_repo_object('antergos', 'x86_64')
+    _staging_repo = get_repo_object('antergos-staging', 'x86_64')
+    _main_repo32 = get_repo_object('antergos', 'i686')
+    _staging_repo32 = get_repo_object('antergos-staging', 'i686')
+
+    attrib_lists = dict(
+        string=['building', 'start_str', 'end_str', 'initiated_by'],
+        bool=['is_running', 'is_finished', 'sync_pkgbuilds_only'],
+        int=['tnum'],
+        list=['queue'],
+        set=['packages', 'builds', 'completed', 'failed', 'generated_pkgs'],
+        path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
+    )
+
     def __init__(self, packages=None, tnum=None, base_path='/var/tmp/antbs', namespace='antbs',
                  prefix='trans', repo_queue=None):
         if not packages and not tnum:
@@ -75,28 +89,14 @@ class TransactionMeta(RedisHash):
 
         super().__init__(namespace=namespace, prefix=prefix, key=the_tnum)
 
-        self.attrib_lists.update(dict(
-            string=['building', 'start_str', 'end_str', 'initiated_by'],
-            bool=['is_running', 'is_finished', 'sync_pkgbuilds_only'],
-            int=['tnum'],
-            list=['queue'],
-            set=['packages', 'builds', 'completed', 'failed', 'generated_pkgs'],
-            path=['base_path', 'path', 'result_dir', 'cache', 'cache_i686', 'upd_repo_result']
-        ))
-
         self.__namespaceinit__()
 
         self._repo_queue = repo_queue
         self._internal_deps = []
         self._build_dirpaths = {}
         self._pkgvers = {}
-        self._main_repo = get_repo_object('antergos', 'x86_64')
-        self._staging_repo = get_repo_object('antergos-staging', 'x86_64')
-        self._main_repo32 = get_repo_object('antergos', 'i686')
-        self._staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
         if not self or not self.tnum:
-            self.__keysinit__()
             self.tnum = the_tnum
             self.base_path = base_path
             self.cache = pkg_cache_obj.cache

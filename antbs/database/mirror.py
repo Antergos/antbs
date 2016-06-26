@@ -75,6 +75,20 @@ class RepoMirror(RedisHash):
 
     """
 
+    attrib_lists = dict(
+        string=['url', 'domain', 'port', 'protocol'],
+
+        bool=['is_synced', 'is_initialized'],
+
+        int=['pkg_count', 'last_sync', 'mnum'],
+
+        list=[],
+
+        set=['pkgs', 'missing_pkgs', 'extra_pkgs', 'protocols', 'all_urls'],
+
+        path=[]
+    )
+
     def __init__(self, mnum=None, url=None, domain=None, prefix='mirror'):
         if not any(True for arg in [url, domain, mnum] if arg):
             raise ValueError('At least one of [url, domain, mnum] is required.')
@@ -96,31 +110,17 @@ class RepoMirror(RedisHash):
 
         super().__init__(prefix=prefix, key=domain)
 
-        self.attrib_lists.update(dict(
-            string=['url', 'domain', 'port', 'protocol'],
-
-            bool=['is_synced', 'is_initialized'],
-
-            int=['pkg_count', 'last_sync', 'mnum'],
-
-            list=[],
-
-            set=['pkgs', 'missing_pkgs', 'extra_pkgs', 'protocols', 'all_urls'],
-
-            path=[]
-        ))
-
         super().__namespaceinit__()
 
         if not self or not self.mnum:
             # This is a new mirror. Let's add it.
-            self.__keysinit__()
             self.domain = _domain
             self.url = url
             self.port = port if port else ''
             self.protocol = domain.scheme
 
             status.mirrors.add(domain)
+
             if not self.is_initialized:
                 self.initialize_once()
 
