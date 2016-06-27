@@ -72,7 +72,9 @@ class PackageMeta(RedisHash):
         list=['allowed_in', 'builds', 'tl_events', 'transactions',
               'split_packages'],
 
-        set=['depends', 'groups', 'makedepends']
+        set=['depends', 'groups', 'makedepends'],
+
+        path=[]
     )
 
     def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):

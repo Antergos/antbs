@@ -37,6 +37,43 @@ import subprocess
 import gevent
 from redis.exceptions import LockError
 
+from database.base_objects import RedisDataHashField, RedisDataRedisObject
+from database.base_objects import RedisList
+from database.base_objects import RedisZSet
+
+
+class RedisHashMeta(type):
+    def __new__(mcs, cls, bases, cls_dict):
+        instance = super().__new__(mcs, cls, bases, cls_dict)
+        _strings = instance.attrib_lists['string'] + instance.attrib_lists['path']
+        instance.all_attribs = [
+            item for sublist in instance.attrib_lists.values()
+            for item in sublist
+            ]
+
+        for attrib_name in instance.all_attribs:
+            if attrib_name in _strings:
+                value = RedisDataHashField(attrib_name, '', str)
+
+            elif attrib_name in instance.attrib_lists['bool']:
+                value = RedisDataHashField(attrib_name, False, bool)
+
+            elif attrib_name in instance.attrib_lists['int']:
+                value = RedisDataHashField(attrib_name, 0, int)
+
+            elif attrib_name in instance.attrib_lists['list']:
+                value = RedisDataRedisObject(attrib_name, RedisList)
+
+            elif attrib_name in instance.attrib_lists['set']:
+                value = RedisDataRedisObject(attrib_name, RedisZSet)
+
+            else:
+                raise ValueError()
+
+            setattr(instance, attrib_name, value)
+
+        return instance
+
 
 class Singleton(type):
     _instance = None
@@ -44,28 +81,12 @@ class Singleton(type):
     def __call__(cls, *args, **kwargs):
         if not cls._instance:
             cls._instance = super().__call__(*args, **kwargs)
+
         return cls._instance
 
 
-class CooperativeMeta(type):
-    def __new__(cls, name, bases, members):
-        # collect up the metaclasses
-        metas = [type(base) for base in bases]
-
-        # prune repeated or conflicting entries
-        metas = [meta for index, meta in enumerate(metas)
-                 if not [later for later in metas[index + 1:]
-                         if issubclass(later, meta)]]
-
-        # whip up the actual combined meta class derive off all of these
-        meta = type(name, tuple(metas), dict(combined_metas=metas))
-
-        # make the actual object
-        return meta(name, bases, members)
-
-    def __init__(self, name, bases, members):
-        for meta in self.combined_metas:
-            meta.__init__(self, name, bases, members)
+class RedisSingleton(Singleton, RedisHashMeta):
+    pass
 
 
 class DateTimeStrings:
@@ -192,6 +213,34 @@ class MyLock:
     def __exit__(self, type, value, tb):
         if self.locked:
             self.lock.release()
+
+
+def bool_string_helper(value):
+    """
+    Given a `str`, returns value as `bool`. Given a `bool`, returns value as `str`.
+
+    Args:
+        value (str|bool): Value to convert.
+
+    Examples:
+        >>> bool_string_helper('False')
+        False
+        >>> bool_string_helper(True)
+        'True'
+
+    Raises:
+        ValueError: If value is not of type(bool) or type(str).
+
+    """
+
+    if isinstance(value, str):
+        return True if 'True' == value else False
+    elif isinstance(value, bool):
+        return 'True' if value else 'False'
+    else:
+        raise ValueError(
+            'value must be of type(bool) or type(str), {0} given.'.format(type(value))
+        )
 
 
 def truncate_middle(s, n):

@@ -43,7 +43,8 @@ class AntergosInstallation(RedisHash, DateTimeStrings):
     attrib_lists = dict(
         string=['install_id', 'ip_address', 'start_date', 'start_time',
                 'start_str', 'end_date', 'end_time', 'end_str'],
-        bool=['completed']
+        bool=['completed'],
+        int=[], list=[], set=[], path=[]
     )
 
     def __init__(self, namespace='cnchi14', prefix='install', install_id='', ip=None):
@@ -76,7 +77,9 @@ class AntergosInstallationUser(RedisHash):
 
     attrib_lists = dict(
         string=['ip_address', 'country'],
-        set=['installs', 'installs_completed', 'installs_failed']
+        bool=[],
+        set=['installs', 'installs_completed', 'installs_failed'],
+        int=[], list=[], path=[]
     )
 
     def __init__(self, ip=None, install_id=None, namespace='cnchi14', prefix='user'):

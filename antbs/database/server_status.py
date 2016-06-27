@@ -32,10 +32,10 @@
 import datetime
 
 from database.base_objects import RedisHash
-from utils.utilities import DateTimeStrings, Singleton, CooperativeMeta
+from utils.utilities import DateTimeStrings, RedisSingleton
 
 
-class ServerStatus(RedisHash, Singleton, metaclass=CooperativeMeta):
+class ServerStatus(RedisHash, metaclass=RedisSingleton):
 
     attrib_lists = dict(
         string=['current_status', 'container', 'github_token',
@@ -81,7 +81,8 @@ class TimelineEvent(RedisHash, DateTimeStrings):
         int=['event_id', 'tl_type'],
         bool=[],
         list=['packages'],
-        set=[]
+        set=[],
+        path=[]
     )
 
     def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):

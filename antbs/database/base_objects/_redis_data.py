@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
-# _redis_types.py
+# _redis_data.py
 #
 # Copyright © 2013-2016 Antergos
 #
@@ -26,9 +26,11 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-""" Descriptor objects for data stored in redis. """
+""" Descriptor objects for accessing data stored in redis. """
 
 import redis
+
+from . import bool_string_helper
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
 
@@ -38,7 +40,6 @@ class RedisData:
        Base class for descriptors that faciliate attribute access to data stored in redis.
 
        Attributes:
-           key (str): The key under which the data is stored in redis.
            default_value (mixed): The default value for the bound attribute.
            value_type (mixed): The python type for the value of the bound attribute.
 
@@ -58,16 +59,7 @@ class RedisData:
 
     @staticmethod
     def bool_string_helper(value):
-        """ Given a `str`, returns value as `bool`. Given a `bool`, returns value as `str`. """
-
-        if isinstance(value, str):
-            return True if 'True' == value else False
-        elif isinstance(value, bool):
-            return 'True' if value else 'False'
-        else:
-            raise ValueError(
-                'value must be of type(bool) or type(str), {0} given.'.format(type(value))
-            )
+        bool_string_helper(value)
 
     @staticmethod
     def _decode_value(value, default_value, value_type):
@@ -81,7 +73,7 @@ class RedisData:
 
     @staticmethod
     def _type_check(value, value_type, class_name):
-        if not isinstance(value, (value_type, None)):
+        if not isinstance(value, (value_type, type(None))):
             errmsg = '{0} values must be of type: {1}, type: {2} given'.format(
                 class_name,
                 type(value_type),
@@ -96,10 +88,7 @@ class RedisDataHashField(RedisData):
        Descriptor that faciliates attribute access to data stored in redis hashes.
 
        Attributes:
-           key (str): The key for the redis hash.
            field_name (str): The name of the redis hash field for the bound attribute.
-           default_value (mixed): The default value for the bound attribute.
-           value_type (mixed): The python type for the value of the bound attribute.
 
     """
 
@@ -129,9 +118,7 @@ class RedisDataRedisObject(RedisData):
        Descriptor that faciliates attribute access to other redis objects from a redis object.
 
        Attributes:
-           parent_key (str): The key for the redis hash.
-           name (str): The name for the bound attribute (redis key = parent_key:name)
-           default_value (mixed): The default value for the bound attribute.
+           key (str): The name for the bound attribute (redis key = parent_key:name)
 
     """
 

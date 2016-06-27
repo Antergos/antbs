@@ -70,6 +70,8 @@ class Monitor(RedisHash):
         super().__init__(prefix='monitor', key=name)
 
         self.__namespaceinit__()
+        logger.debug(dir(self))
+        logger.debug(self.json())
 
         if not self or not self.name:
             self.name = name

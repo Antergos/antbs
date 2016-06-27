@@ -39,7 +39,7 @@ from database.server_status import status
 from utils.logging_config import logger
 
 from utils.utilities import (
-    Singleton,
+    RedisSingleton,
     remove,
     try_run_command,
     recursive_chown
@@ -439,22 +439,22 @@ class PacmanRepo(RedisHash):
         self.locked = False
 
 
-class AntergosRepo(PacmanRepo, metaclass=Singleton):
+class AntergosRepo(PacmanRepo, metaclass=RedisSingleton):
     def __init__(self, name='antergos', *args, **kwargs):
         super().__init__(name, name, *args, **kwargs)
 
 
-class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
+class AntergosStagingRepo(PacmanRepo, metaclass=RedisSingleton):
     def __init__(self, name='antergos-staging', *args, **kwargs):
         super().__init__(name, name, *args, **kwargs)
 
 
-class AntergosRepo32(PacmanRepo, metaclass=Singleton):
+class AntergosRepo32(PacmanRepo, metaclass=RedisSingleton):
     def __init__(self, name='antergos', *args, **kwargs):
         super().__init__(name, 'antergos32', *args, **kwargs)
 
 
-class AntergosStagingRepo32(PacmanRepo, metaclass=Singleton):
+class AntergosStagingRepo32(PacmanRepo, metaclass=RedisSingleton):
     def __init__(self, name='antergos-staging', *args, **kwargs):
         super().__init__(name, 'antergos-staging32', *args, **kwargs)
 
