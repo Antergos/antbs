@@ -213,7 +213,7 @@
 
 							{% if '/' != request.path %}
 								jQuery('.loading').fadeIn();
-								if (jQuery('table').length && !jQuery('#noDt').length) {
+								if (jQuery('table.no-border').length && !jQuery('#noDt').length) {
 									jQuery.fn.dataTableExt.oSort['num-html-asc'] = function (a, b) {
 										var x = a.replace(/<.*?>/g, "");
 										var y = b.replace(/<.*?>/g, "");
@@ -230,7 +230,7 @@
 										return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
 									};
 
-									jQuery('table').not('#issuetable').on('init.dt', function (e, settings, data) {
+									jQuery('table.no-border').not('#issuetable').on('init.dt', function (e, settings, data) {
 										setTimeout(function () {
 											jQuery('.loading').fadeOut();
 										}, 750)

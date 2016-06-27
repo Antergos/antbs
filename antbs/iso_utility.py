@@ -59,6 +59,7 @@ class ISOUtility:
         self.file_name = (pkg_obj.pkgname.rsplit('-', 1)[-2] + '-' + self.version + '-' +
                           pkg_obj.pkgname.rsplit('-', 1)[-1] + '.iso')
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
+        self.md5sums_path = os.path.join(TESTING_DIR, 'MD5SUMS')
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
         self.files = [self.file_path, self.file_path + '.sig',
                       self.file_path + '.md5', self.file_path + '.torrent']
@@ -85,13 +86,10 @@ class ISOUtility:
         raise ValueError
 
     def prep_release(self):
-        status.current_status = 'ISO Release: Step 1/4 - Generating checksum for %s' % self.file_name
+        status.current_status = 'ISO Release: Step 1/3 - Generating checksum for %s' % self.file_name
         logger.debug(status.current_status)
         self.generate_checksums()
-        status.current_status = 'ISO Release: Step 2/4 - Creating detached gpg signature for %s' % self.file_name
-        logger.debug(status.current_status)
-        self.sign_with_gnupg()
-        status.current_status = 'ISO Release: Step 3/4 - Creating torrent file for %s' % self.file_name
+        status.current_status = 'ISO Release: Step 2/3 - Creating torrent file for %s' % self.file_name
         logger.debug(status.current_status)
         self.create_torrent_file()
 
@@ -133,19 +131,16 @@ class ISOUtility:
 
     def generate_checksums(self):
         """ Write checksum to a file """
-        md5_path = self.file_path + '.md5'
         md5_sum = self.checksum_md5(self.file_path)
         self.md5 = md5_sum
         line = '{} {}'.format(md5_sum, self.file_name)
 
-        with open(md5_path, 'w') as check_sum:
+        with open(self.md5sums_path, 'a') as check_sum:
             check_sum.write(line)
-
-        check_sum.close()
 
     def sign_with_gnupg(self):
         """ Create a detached signature using GNUPG. """
-        batch_sign([self.file_path], is_iso=True)
+        batch_sign([self.md5sums_path], is_iso=True)
 
 
 class WordPressBridge:
@@ -231,33 +226,33 @@ def iso_release_job():
         status.idle = False
 
     status.current_status = 'Starting ISO Release Job...'
-    iso_names = ['antergos-x86_64', 'antergos-i686',
-                 'antergos-minimal-x86_64', 'antergos-minimal-i686']
-    version = None
+    iso_names = ['antergos-x86_64', 'antergos-minimal-x86_64']
+    version = iso_obj = None
 
     for name in iso_names:
         try:
             pkg_obj = package.get_pkg_object(name=name)
-            iso = ISOUtility(pkg_obj=pkg_obj)
+            iso_obj = ISOUtility(pkg_obj=pkg_obj)
 
-            iso.prep_release()
-            iso.do_release()
+            iso_obj.prep_release()
+            iso_obj.do_release()
 
-            pkg_obj.iso_url = iso.mirror_url
-            pkg_obj.iso_md5 = iso.md5
+            pkg_obj.iso_url = iso_obj.mirror_url
+            pkg_obj.iso_md5 = iso_obj.md5
 
             if version is None:
-                version = iso.version
+                version = iso_obj.version
 
             status.iso_pkgs.add(pkg_obj.name)
 
         except Exception as err:
             logger.error(err)
 
-    if version and db:
+    if version and db and iso_obj:
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
         db.set('antbs:misc:iso-release:do_check', version)
+        iso_obj.sign_with_gnupg()
 
     if saved_status and not status.idle:
         status.current_status = saved_status

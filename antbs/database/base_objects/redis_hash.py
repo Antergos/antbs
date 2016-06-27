@@ -47,7 +47,7 @@ class RedisHashMeta(type):
         instance.all_attribs = [
             item for sublist in instance.attrib_lists.values()
             for item in sublist
-            ]
+        ]
 
         for attrib_name in instance.all_attribs:
             if attrib_name in _strings:

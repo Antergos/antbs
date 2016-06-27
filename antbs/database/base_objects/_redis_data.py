@@ -52,7 +52,6 @@ class RedisData:
     def __init__(self, default_value, value_type):
         self.default_value = default_value
         self.value_type = value_type
-        # logger.warning('%s initialized with default_value: %s and value_type: %s', self.__class__.__name__, default_value, value_type)
 
     def __get__(self, obj, obj_type):
         raise NotImplementedError(self._not_implemented)
@@ -84,6 +83,9 @@ class RedisData:
     def _encode_value(value, default_value):
         val = value if value is not None else default_value
 
+        if isinstance(val, bool):
+            val = bool_string_helper(val)
+
         return val if isinstance(val, str) else str(val)
 
     @staticmethod
@@ -91,8 +93,8 @@ class RedisData:
         if not isinstance(value, value_type) and value is not None:
             errmsg = '{0} {3} value must be of type: {1}, type: {2} given'.format(
                 class_name,
-                type(value_type),
-                type(value),
+                value_type,
+                value,
                 field_name
             )
 
@@ -122,9 +124,9 @@ class RedisDataHashField(RedisData):
         return value
 
     def __set__(self, obj, value):
-        self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
-
         val = self._encode_value(value, self.default_value)
+
+        self._type_check(val, str, self.__class__.__name__, self.field_name)
 
         db.hset(obj.full_key, self.field_name, val)
 

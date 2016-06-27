@@ -48,7 +48,7 @@ from werkzeug.contrib.fixers import ProxyFix
 
 import rq_dashboard
 
-from utils import logger, handle_exceptions
+from utils import logger, handle_exceptions, AntBSDebugToolbar
 from database.server_status import status
 from database.monitor import get_monitor_object, check_repos_for_changes
 
@@ -71,7 +71,7 @@ def initialize_app():
 
     handle_exceptions(app)
 
-    # Stormpath configuration
+    # Configuration
     app.config.update({'SECRET_KEY': status.sp_session_key,
                        'STORMPATH_API_KEY_ID': status.sp_api_id,
                        'STORMPATH_API_KEY_SECRET': status.sp_api_key,
@@ -82,7 +82,12 @@ def initialize_app():
                        'STORMPATH_REDIRECT_URL': '/builds/completed',
                        'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
                        'STORMPATH_COOKIE_DURATION': timedelta(days=14),
-                       'STORMPATH_ENABLE_FORGOT_PASSWORD': True})
+                       'STORMPATH_ENABLE_FORGOT_PASSWORD': True,
+                       'DEBUG_TB_PROFILER_ENABLED': True})
+
+    # Debug Toolbar - only enabled in debug mode and only for logged-in users:
+    # app.debug = True
+    # AntBSDebugToolbar(app)
 
     # Create Stormpath Manager object.
     StormpathManager(app)

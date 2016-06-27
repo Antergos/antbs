@@ -1,4 +1,9 @@
-# Copyright © 2013-2016 Antergos
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# debug.py
+#
+# Copyright © 2016 Antergos
 #
 # This file is part of The Antergos Build Server, (AntBS).
 #
@@ -21,32 +26,11 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from utils.utility_functions import (
-    bool_string_helper,
-    truncate_middle,
-    try_run_command,
-    remove,
-    symlink,
-    copy_or_symlink,
-    quiet_down_noisy_loggers,
-    all_file_paths_exist,
-    get_build_queue,
-    recursive_chown
-)
+from flask_debugtoolbar import DebugToolbarExtension
+from database.server_status import status
+from flask_stormpath import current_user
 
-from utils.utility_classes import (
-    Singleton,
-    RedisSingleton,
-    DateTimeStrings,
-    PacmanPackageCache,
-    CustomSet,
-    RQWorkerCustomExceptionHandler,
-    MyLock
-)
 
-from utils.logging_config import logger, handle_exceptions
-from utils.docker_util import DockerUtils
-from utils.sign_pkgs import sign_packages, batch_sign
-from utils.pkgbuild import Pkgbuild
-from utils.pagination import Pagination
-from utils.debug import AntBSDebugToolbar
+class AntBSDebugToolbar(DebugToolbarExtension):
+    def _show_toolbar(self):
+        return current_user.is_authenticated and status.debug_toolbar_enabled

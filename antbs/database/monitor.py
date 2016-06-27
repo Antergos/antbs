@@ -39,7 +39,7 @@ import requests
 from github3 import login
 from gitlab import Gitlab
 
-import iso
+import iso_utility
 import webhook
 from database.base_objects import RedisHash
 from database.server_status import status
@@ -218,14 +218,14 @@ class Monitor(RedisHash):
         if len(synced) == 4:
             success = self.add_iso_versions_to_wordpress(synced)
             if success:
-                iso.clean_up_after_release(version)
+                iso_utility.clean_up_after_release(version)
                 self.db.delete('antbs:misc:iso-release:do_check')
             else:
                 logger.error('At least one iso was not successfully added to wordpress.')
 
     @staticmethod
     def add_iso_versions_to_wordpress(iso_pkgs):
-        bridge = iso.WordPressBridge(auth=(status.docker_user, status.wp_password))
+        bridge = iso_utility.WordPressBridge(auth=(status.docker_user, status.wp_password))
         success = []
         for iso_pkg in iso_pkgs:
             success.append(bridge.add_new_iso_version(iso_pkg))

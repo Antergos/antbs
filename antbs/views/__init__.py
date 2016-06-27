@@ -65,7 +65,7 @@ from utils import *
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
 
-import iso
+import iso_utility
 
 
 # Setup rq (background task queue manager)

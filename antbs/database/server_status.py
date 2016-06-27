@@ -46,7 +46,8 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
                 'MONITOR_PKGS_KEY'],
 
         bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
-              'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging'],
+              'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging',
+              'debug_toolbar_enabled'],
 
         int=['building_num'],
 
