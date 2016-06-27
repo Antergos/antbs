@@ -35,7 +35,7 @@ from slackclient import SlackClient
 # from github3 import login
 
 from database.base_objects import db, RedisHash
-from .logging_config import logger
+from utils import logger
 
 
 ET_SLACK_IDENTIFIER = db.get('slack:misc:identifiers:et')

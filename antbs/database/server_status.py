@@ -32,7 +32,7 @@
 import datetime
 
 from database.base_objects import RedisHash
-from utils.utilities import DateTimeStrings, RedisSingleton
+from utils import DateTimeStrings, RedisSingleton
 
 
 class ServerStatus(RedisHash, metaclass=RedisSingleton):

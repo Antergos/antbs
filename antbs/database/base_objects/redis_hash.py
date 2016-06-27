@@ -30,9 +30,47 @@ import errno
 import os
 import time
 
-from ._redis_data import db
-from ._redis_object import RedisObject
-from utils.utilities import RedisHashMeta
+from . import (
+    db,
+    RedisObject,
+    RedisDataHashField,
+    RedisDataRedisObject,
+    RedisList,
+    RedisZSet
+)
+
+
+class RedisHashMeta(type):
+    def __new__(mcs, cls, bases, cls_dict):
+        instance = super().__new__(mcs, cls, bases, cls_dict)
+        _strings = instance.attrib_lists['string'] + instance.attrib_lists['path']
+        instance.all_attribs = [
+            item for sublist in instance.attrib_lists.values()
+            for item in sublist
+            ]
+
+        for attrib_name in instance.all_attribs:
+            if attrib_name in _strings:
+                value = RedisDataHashField(attrib_name, '', str)
+
+            elif attrib_name in instance.attrib_lists['bool']:
+                value = RedisDataHashField(attrib_name, False, bool)
+
+            elif attrib_name in instance.attrib_lists['int']:
+                value = RedisDataHashField(attrib_name, 0, int)
+
+            elif attrib_name in instance.attrib_lists['list']:
+                value = RedisDataRedisObject(attrib_name, RedisList)
+
+            elif attrib_name in instance.attrib_lists['set']:
+                value = RedisDataRedisObject(attrib_name, RedisZSet)
+
+            else:
+                raise ValueError()
+
+            setattr(instance, attrib_name, value)
+
+        return instance
 
 
 class RedisHash(RedisObject, metaclass=RedisHashMeta):

@@ -38,6 +38,7 @@ import shutil
 
 import requests
 import gevent
+from rq import Connection, Queue, Worker
 
 import transaction_handler as builder
 from database import package
@@ -45,8 +46,7 @@ from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-from rq import Connection, Queue, Worker
-from utils.logging_config import logger
+from utils import logger
 
 with Connection(db):
     queue = Queue('transactions')

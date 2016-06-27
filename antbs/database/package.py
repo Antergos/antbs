@@ -20,26 +20,22 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-
 import os
 import re
 import shutil
 import subprocess
-import time
 import zipfile
 from glob import glob
 
 import gevent
 import requests
 from gitlab import Gitlab
-
-from database.base_objects import RedisHash, db
-from database.server_status import status
-from gevent import sleep
 from github3 import login
 from github3.exceptions import UnprocessableResponseBody
-from utils.logging_config import logger
-from utils.pkgbuild import Pkgbuild
+
+from database.base_objects import RedisHash
+from database.server_status import status
+from utils import logger, Pkgbuild
 
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token

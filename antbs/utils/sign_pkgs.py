@@ -29,19 +29,14 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-
 """ Sign packages with gpg """
 
-import glob
 import os
-import shutil
 import subprocess
 
 from database.base_objects import db
 from database.server_status import status
-from utils.utilities import remove
-
-from .logging_config import logger
+from utils import remove, logger
 
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'

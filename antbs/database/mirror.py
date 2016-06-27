@@ -28,16 +28,19 @@
 
 import re
 import os
-import gevent
 from urllib.parse import urlparse
+
+from utils import (
+    logger,
+    RedisSingleton,
+    DockerUtils,
+    remove
+)
 
 from database.base_objects import RedisHash
 from database.server_status import status
-from utils.logging_config import logger
-from utils.utilities import Singleton, remove
-import utils.docker_util as docker_util
 
-doc_util = docker_util.DockerUtils()
+doc_util = DockerUtils()
 doc = doc_util.doc
 
 
@@ -304,14 +307,14 @@ class RepoMirror(RedisHash):
         return result == 0
 
 
-class AntergosRepo(PacmanRepo, metaclass=Singleton):
-    def __init__(self, name='antergos', *args, **kwargs):
-        super().__init__(name=name, *args, **kwargs)
-
-
-class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
-    def __init__(self, name='antergos-staging', *args, **kwargs):
-        super().__init__(name=name, *args, **kwargs)
+# class AntergosRepo(PacmanRepo, metaclass=Singleton):
+#     def __init__(self, name='antergos', *args, **kwargs):
+#         super().__init__(name=name, *args, **kwargs)
+#
+#
+# class AntergosStagingRepo(PacmanRepo, metaclass=Singleton):
+#     def __init__(self, name='antergos-staging', *args, **kwargs):
+#         super().__init__(name=name, *args, **kwargs)
 
 
 def get_repo_object(name, path=None):

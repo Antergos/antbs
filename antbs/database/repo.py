@@ -36,18 +36,17 @@ import gevent
 
 from database.base_objects import RedisHash
 from database.server_status import status
-from utils.logging_config import logger
 
-from utils.utilities import (
+from utils import (
     RedisSingleton,
     remove,
     try_run_command,
-    recursive_chown
+    recursive_chown,
+    DockerUtils,
+    logger
 )
 
-import utils.docker_util as docker_util
-
-doc_util = docker_util.DockerUtils()
+doc_util = DockerUtils()
 doc = doc_util.doc
 PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'

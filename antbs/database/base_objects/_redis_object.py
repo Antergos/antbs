@@ -28,7 +28,7 @@
 
 import json
 
-from ._redis_data import db
+from . import db
 
 
 class RedisObject:

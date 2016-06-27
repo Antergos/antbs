@@ -26,15 +26,13 @@ import subprocess
 import tempfile
 import gevent
 
-import utils.docker_util as docker_util
-from utils.logging_config import logger
-
-from utils.utilities import (
-    PacmanPackageCache,
-    remove,
+from utils import (
     all_file_paths_exist,
     copy_or_symlink,
-    try_run_command
+    try_run_command,
+    logger,
+    DockerUtils,
+    PacmanPackageCache
 )
 
 from .base_objects import RedisHash
@@ -43,7 +41,7 @@ from .package import get_pkg_object
 from .server_status import status
 from .repo import get_repo_object
 
-doc_util = docker_util.DockerUtils()
+doc_util = DockerUtils()
 doc = doc_util.doc
 
 pkg_cache_obj = PacmanPackageCache()

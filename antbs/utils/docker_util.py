@@ -29,18 +29,16 @@
 """ Docker Utilities """
 
 import os
-import re
 import shutil
 import subprocess
-import tempfile
 import time
 
 import docker
+
 from database.base_objects import db
 from database.server_status import status
 
-from .logging_config import logger
-from .utilities import Singleton
+from utils import logger, Singleton
 
 doc_user = status.docker_user
 doc_pass = status.docker_password

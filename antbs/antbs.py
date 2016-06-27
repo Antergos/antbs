@@ -48,7 +48,7 @@ from werkzeug.contrib.fixers import ProxyFix
 
 import rq_dashboard
 
-from utils.logging_config import logger, handle_exceptions
+from utils import logger, handle_exceptions
 from database.server_status import status
 from database.monitor import get_monitor_object, check_repos_for_changes
 

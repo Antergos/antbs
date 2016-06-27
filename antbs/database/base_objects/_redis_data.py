@@ -29,10 +29,12 @@
 """ Descriptor objects for accessing data stored in redis. """
 
 import redis
+import logging
 
 from . import bool_string_helper
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
+logger = logging.getLogger()
 
 
 class RedisData:
@@ -50,6 +52,7 @@ class RedisData:
     def __init__(self, default_value, value_type):
         self.default_value = default_value
         self.value_type = value_type
+        # logger.warning('%s initialized with default_value: %s and value_type: %s', self.__class__.__name__, default_value, value_type)
 
     def __get__(self, obj, obj_type):
         raise NotImplementedError(self._not_implemented)
@@ -59,25 +62,38 @@ class RedisData:
 
     @staticmethod
     def bool_string_helper(value):
-        bool_string_helper(value)
+        return bool_string_helper(value)
 
     @staticmethod
     def _decode_value(value, default_value, value_type):
         val = value if value is not None else default_value
-        return val if isinstance(val, value_type) else value_type(val)
+
+        if not isinstance(val, value_type):
+            if value_type is bool:
+                val = bool_string_helper(val)
+
+            elif value_type in [int, str]:
+                val = value_type(val)
+
+            else:
+                raise ValueError
+
+        return val
 
     @staticmethod
     def _encode_value(value, default_value):
         val = value if value is not None else default_value
+
         return val if isinstance(val, str) else str(val)
 
     @staticmethod
-    def _type_check(value, value_type, class_name):
-        if not isinstance(value, (value_type, type(None))):
-            errmsg = '{0} values must be of type: {1}, type: {2} given'.format(
+    def _type_check(value, value_type, class_name, field_name):
+        if not isinstance(value, value_type) and value is not None:
+            errmsg = '{0} {3} value must be of type: {1}, type: {2} given'.format(
                 class_name,
                 type(value_type),
-                type(value)
+                type(value),
+                field_name
             )
 
             raise ValueError(errmsg)
@@ -99,14 +115,14 @@ class RedisDataHashField(RedisData):
 
     def __get__(self, obj, obj_type):
         val = db.hget(obj.full_key, self.field_name)
-        value = val if self.value_type is not bool else self.bool_string_helper(val)
+        value = self._decode_value(val, self.default_value, self.value_type)
 
-        self._type_check(value, self.value_type, self.__class__.__name__)
+        self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
 
-        return self._decode_value(value, self.default_value, self.value_type)
+        return value
 
     def __set__(self, obj, value):
-        self._type_check(value, self.value_type, self.__class__.__name__)
+        self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
 
         val = self._encode_value(value, self.default_value)
 

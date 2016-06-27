@@ -44,8 +44,8 @@ import webhook
 from database.base_objects import RedisHash
 from database.server_status import status
 from database.package import get_pkg_object
-from utils.utilities import quiet_down_noisy_loggers
-from utils.logging_config import logger
+
+from utils import logger, quiet_down_noisy_loggers
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token

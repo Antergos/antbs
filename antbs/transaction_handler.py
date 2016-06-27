@@ -39,16 +39,13 @@ from rq import (
     get_current_job
 )
 
-import utils.docker_util as docker_utils
-
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
-from database.build import get_build_object
 from database.repo import get_repo_object
-from utils.logging_config import logger
+from utils import logger, DockerUtils
 
-doc_utils = docker_utils.DockerUtils()
+doc_utils = DockerUtils()
 doc = doc_utils.doc
 
 with Connection(db):

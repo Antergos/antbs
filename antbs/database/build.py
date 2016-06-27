@@ -38,10 +38,14 @@ from pygments.lexers import BashLexer
 
 from database.base_objects import RedisHash
 from database.server_status import status, get_timeline_object
-from utils.logging_config import logger
-from utils.docker_util import DockerUtils
-from utils.utilities import CustomSet, remove
-from utils.sign_pkgs import sign_packages
+
+from utils import (
+    logger,
+    DockerUtils,
+    CustomSet,
+    remove,
+    sign_packages
+)
 
 
 doc_util = DockerUtils()

@@ -36,9 +36,10 @@ from bugsnag.handlers import BugsnagHandler
 from bugsnag.flask import handle_exceptions
 
 from database.base_objects import db
-
-from .utilities import Singleton
 from database.server_status import status
+
+from utils import Singleton
+
 
 
 class LoggingConfig(metaclass=Singleton):

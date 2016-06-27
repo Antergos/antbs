@@ -3,7 +3,7 @@
 #
 #  pkgbuild.py
 #
-#  Copyright ©2016  Antergos
+#  Copyright © 2016  Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
@@ -27,8 +27,9 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 import os
-from .logging_config import logger
 from datetime import datetime
+
+from utils import logger
 
 
 class Pkgbuild:

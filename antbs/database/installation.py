@@ -30,7 +30,7 @@
 import datetime
 
 from database.base_objects import RedisHash, db
-from utils.utilities import DateTimeStrings
+from utils import DateTimeStrings
 
 next_install_id_key = 'cnchi:misc:next_install_id'
 
