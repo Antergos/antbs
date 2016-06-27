@@ -53,7 +53,7 @@ def get_repo_packages(repo_name=None, group=None, page=None):
 
     if not repo_obj.pkgnames:
         logger.error('repo is empty!')
-        return pkgs, rev_pending
+        return pkgs, rev_pending, all_pages
 
     if group:
         repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, group)]
@@ -116,8 +116,15 @@ def get_table_columns_info():
             'dd_info': ''
         },
         {
+            'heading_text': 'Review Status',
+            'obj_attr': '_build.reviewed_by',
+            'content_type': 'text',
+            'base_url': '',
+            'dd_info': ''
+        },
+        {
             'heading_text': 'Reviewed By',
-            'obj_attr': '_reviewed_by',
+            'obj_attr': '_build.reviewed_by',
             'content_type': 'text',
             'base_url': '',
             'dd_info': ''
@@ -128,7 +135,7 @@ def get_table_columns_info():
             'content_type': 'text',
             'base_url': '',
             'dd_info': ''
-        },
+        }
     ]
 
     if current_user.is_authenticated:
@@ -137,8 +144,33 @@ def get_table_columns_info():
             'obj_attr': '',
             'content_type': 'dd_info',
             'base_url': '',
-            'dd_info': ''
+            'dd_info': {
+                'dd_type': 'manage',
+                'menu_items': [
+                    {
+                        'text': 'Manage',
+                        'icon_class': '',
+                        'class': '',
+                        'icon_color': ''
+                    },
+                    {
+                        'text': 'Build',
+                        'icon_class': 'hammer',
+                        'class': 'dd_manage',
+                        'icon_color': '#3D566D'
+                    },
+                    {
+                        'text': 'Remove From Repo',
+                        'icon_class': 'cross',
+                        'class': 'dd_remove',
+                        'icon_color': '#EA6153'
+                    }
+                ],
+                'dd_class': 'dd_manage'
+            }
         })
+
+    return columns_info
 
 
 ###
@@ -150,12 +182,9 @@ def get_table_columns_info():
 @repo_view.route('/<name>/packages/<group>')
 @repo_view.route('/<name>/packages/<int:page>')
 @repo_view.route('/<name>/packages')
-def repo_packages_listing(name=None, group=None, page=None):
+def repo_packages_listing(name=None, group=None, page=1):
     if not name or name not in status.repos or (group and group not in status.package_groups):
         abort(404)
-
-    if page is None:
-        page = 1
 
     packages, rev_pending, all_pages = get_repo_packages(name, group, page)
     pagination = Pagination(page, 10, all_pages)

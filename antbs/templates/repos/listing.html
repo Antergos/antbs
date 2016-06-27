@@ -1,112 +1,29 @@
 {% extends "base.html" %}
 
-{% from '_macros.html' import table_search_box %}
+{% from '_macros.html' import table_search_box, listing_table %}
 
 {% set link = '/repo/' + name + '/packages' %}
-
-{% if current_user.is_authenticated %}
-	{% do table_headers.append('Manage') %}
-{% endif %}
 
 {% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
 
 {% block bottomcontent -%}
 	<div class="row">
-	<div class="col-md-12">
-		<div id="bottom-wrap" class="block-flat">
-			<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
-			<div class="header">
-				<h3>{{ name }}</h3>
-			</div>
-			<div class="content">
-				{% if not repo_packages %}
-					None
-				{% else %}
-					{{ table_search_box() }}
-					<table class="table no-border hover">
-						<thead class="no-border">
-						<tr>
-							<th>ID&nbsp;&nbsp;</th>
-							<th></th>
-							<th>Version</th>
-							<th>Groups</th>
-							<th>Build</th>
-							<th>Reviewed By</th>
-							<th>Reviewed On</th>
-							{% if current_user.is_authenticated %}
-								<th>Manage</th>{% endif %}
-						</tr>
-						</thead>
-						<tbody class="no-border-y">
-						{% for package in repo_packages %}
-							<tr>
-								<td><a href="#">{{ package.pkg_id }}</a></td>
-								<td><a href="/package/{{ package.pkgname }}">{{ package.pkgname }}</a></td>
-								<td>{{ package.version_str }}</td>
-								<td>
-									{% if package.groups %}
-										{% for group in package.groups %}
-											<a href="{{ link }}/{{ group }}">{{ group }}</a>{% if loop.length > 1 and not loop.last %}, {% endif %}
-										{% endfor %}
-									{% else %}
-										-
-									{% endif %}
-								</td>
-								<td><a href="/build/{{ package._build.bnum }}">{{ package._build.bnum }}</a></td>
-								<td>{% if '' != package._build.review_dev %}<i class="fa fa-user"></i>
-									{{ package._build.review_dev }}{% else %}-{% endif %}</td>
-								<td>{% if '' != package._build.review_date %}<i class="fa fa-calendar"></i>
-									{{ package._build.review_date }}{% else %}-{% endif %}</td>
-								{% if current_user.is_authenticated %}
-									<td>
-										<div class="btn-group">
-											<button class="btn btn-default btn-xs" type="button">Action</button>
-											<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">
-												<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
-											</button>
-											<ul role="menu" class="dropdown-menu actions repo_actions">
-												<li>
-													<a href="#" id="2" data-bnum="{{ package._build.bnum }}"><i class="fa fa-refresh" style="color:green;"></i>Rebuild</a>
-												</li>
-												<li>
-													<a href="#" id="3" data-bnum="{{ package._build.bnum }}"><i class="fa fa-trash" style="color:red;"></i>Remove</a>
-												</li>
-											</ul>
-										</div>
-									</td>
-								{% endif %}
-
-							</tr>
-
-						{% endfor %}
-						</tbody>
-					</table>
-					{% macro render_pagination(pagination) %}
-						<ul class="pagination custom">
-							{% if pagination.has_prev %}
-								<li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
-							{% endif %}
-							{%- for page in pagination.iter_pages() %}
-								{% if page %}
-									{% if page != pagination.page %}
-										<li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
-									{% else %}
-										<li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
-									{% endif %}
-								{% else %}
-									<li><span class=ellipsis>…</span></li>
-								{% endif %}
-							{%- endfor %}
-							{% if pagination.has_next %}
-								<li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
-							{% endif %}
-						</ul>
-					{% endmacro %}
-					{{ render_pagination(pagination) }}
-				{% endif %}
+		<div class="col-md-12">
+			<div id="bottom-wrap" class="block-flat">
+				<div class="loading"><i class="fa fa-refresh fa-spin"></i></div>
+				<div class="header">
+					<h3>{{ name }}</h3>
+				</div>
+				<div class="content">
+					{% if not repo_packages %}
+						None
+					{% else %}
+						{{ table_search_box() }}
+						{{ listing_table(columns_info, repo_packages, pagination) }}
+					{% endif %}
+				</div>
 			</div>
 		</div>
-	</div>
 	</div>
 {%- endblock bottomcontent %}
 

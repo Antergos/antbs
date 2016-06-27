@@ -46,7 +46,7 @@ from database.base_objects import db
 from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-from utils import logger
+from utils import logger, bool_string_helper
 
 with Connection(db):
     queue = Queue('transactions')
@@ -170,7 +170,7 @@ class Webhook(WebhookMeta):
                     logger.debug(
                         'Cnchi install_id {0} result is {1}'.format(install_id, cnchi_result)
                     )
-                    result = AntergosInstallation.bool_string_helper(cnchi_result)
+                    result = bool_string_helper(cnchi_result)
                     self.process_cnchi_end(install_id, result)
 
             if self.is_github:

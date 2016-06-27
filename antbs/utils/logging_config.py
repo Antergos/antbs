@@ -41,39 +41,34 @@ from database.server_status import status
 from utils import Singleton
 
 
-
 class LoggingConfig(metaclass=Singleton):
-    _initialized = False
+    logger = None
 
     def __init__(self):
         self.noisy_loggers = ["github3",
                               "requests",
                               "stormpath.http",
                               "docker"]
-        self.logger = None
 
-        if not self._initialized:
+        if self.logger is None:
             self._initialize()
 
     def _initialize(self):
-        for logger_name in self.noisy_loggers:
-            logger = logging.getLogger(logger_name)
-            logger.setLevel(logging.ERROR)
-
         bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
         logging.config.dictConfig(self.get_logging_config())
 
         self.logger = logging.getLogger()
 
-        handlers = [h for h in self.logger.handlers if isinstance(h, BugsnagHandler)]
+        for logger_name in self.noisy_loggers:
+            _logger = logging.getLogger(logger_name)
+            _logger.setLevel(logging.ERROR)
 
-        if not handlers:
+        bs_handler_found = [h for h in self.logger.handlers if isinstance(h, BugsnagHandler)]
+
+        if not bs_handler_found:
             bugsnag_handler = BugsnagHandler()
             bugsnag_handler.setLevel(logging.WARNING)
-            self.logger.addHandler(BugsnagHandler())
-
-        self._initialized = True
-        logger = None
+            self.logger.addHandler(bugsnag_handler)
 
     def get_logging_config(self):
         return {

@@ -215,6 +215,39 @@
 
 
 {#
+ # Generates HTML for pagination links.
+ #
+ # Args:
+ #     pagination (Pagination): `Pagination` object for the table.
+ #
+ #}
+{% macro render_pagination(pagination) %}
+	<ul class="pagination custom">
+		{% if pagination.has_prev %}
+			<li><a href="{{ url_for_other_page(pagination.page - 1) }}">&laquo; Previous</a></li>
+		{% endif %}
+		{%- for page in pagination.iter_pages() %}
+			{% if page %}
+				{% if page != pagination.page %}
+					<li><a href="{{ url_for_other_page(page) }}">{{ page }}</a></li>
+				{% else %}
+					<li class="active"><a href="#"><strong>{{ page }}</strong></a></li>
+				{% endif %}
+			{% else %}
+				<li><span class=ellipsis>…</span></li>
+			{% endif %}
+		{%- endfor %}
+		{% if pagination.has_next %}
+			<li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
+		{% endif %}
+	</ul>
+	{% if caller is defined %}
+		{{ caller() }}
+	{% endif %}
+{% endmacro %}
+
+
+{#
  # Generates HTML for listing table search box.
  #
  #}
@@ -257,18 +290,20 @@
 				{% if menu_items and menu_items is iterable %}
 					{% for menu_item in menu_items %}
 						<li>
-							<a href="#" id="{{ menu_item[0] }}" data-bnum="{{ bnum }}" data-pkg="{{ obj.pkgname }}">
-								<i class="fa fa-{{ menu_item[1] }}" style="color:{{ menu_item[2] }};"></i> {{ menu_item[3] }}
+							<a href="#" class="{{ menu_item['class'] }}" data-bnum="{{ bnum }}" data-pkg="{{ obj.pkgname }}">
+								<i class="fa fa-{{ menu_item['icon_class'] }}" style="color:{{ menu_item['icon_color'] }};"></i> {{ menu_item['text'] }}
 							</a>
 						</li>
 					{% endfor %}
 				{% endif %}
 			</ul>
 		</div>
+		{% if caller is defined %}
+			{{ caller() }}
+		{% endif %}
 
 	{% endif %}
 {% endmacro %}
-
 
 
 {#
@@ -277,12 +312,12 @@
  # Args:
  #     columns_info (list): List of dicts containing info for each column.
  #                          Dict keys expected are heading_text, obj_attr, content_type, base_url, dd_info
- #     objs (list): List of `Package` or `Build` objects to be listed in table.
- #     text (str): The text for the tag/label.
- #     color_class (str): Color class (primary, success, danger, etc)
+ #     objs (list):         List of `Package` or `Build` objects to be listed in table.
+ #     text (str):          The text for the tag/label.
+ #     color_class (str):   Color class (primary, success, danger, etc)
  #
  #}
-{% macro listing_table(columns_info, objs) %}
+{% macro listing_table(columns_info, objs, pagination) %}
 	<table class="table no-border hover">
 		<thead class="no-border">
 			<tr>
@@ -297,20 +332,23 @@
 					<tr>
 						{% for column in columns_info %}
 							<td>
-								{% set obj_attr = obj|attr(column.obj_attr) %}
+								{% if '.' in column.obj_attr %}
+									{% set obj_attr, nested_obj_attr = column.obj_attr.split('.') %}
+									{% set value = obj|attr(obj_attr) %}
+									{% set value = value|attr(nested_obj_attr) %}
+								{% else %}
+									{% set value = obj|attr(column.obj_attr) %}
+								{% endif %}
 
 								{% if 'link' == column.content_type %}
-									<a href="{{ column.base_url }}{{ obj_attr }}">{{ obj_attr }}</a>
+									<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
 								{% elif 'text' == column.content_type %}
-									{{ obj_attr }}
+									{{ value }}
 								{% elif 'dropdown' == column.content_type and column.dd_info %}
 									{% set dd_type, menu_items, dd_class = column.dd_info %}
-									{% set content = caller() %}
 
 									{% call table_dropdown(dd_type, obj, menu_items, dd_class) %}
-
-									{{ content }}
-
+										&nbsp;
 									{% endcall %}
 								{% endif %}
 							</td>
@@ -320,5 +358,8 @@
 			{% endif %}
 		</tbody>
 	</table>
+	{% call render_pagination(pagination) %}
+		&nbsp;
+	{% endcall %}
 {% endmacro %}
 
