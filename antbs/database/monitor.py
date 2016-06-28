@@ -39,13 +39,12 @@ import requests
 from github3 import login
 from gitlab import Gitlab
 
+from utils import logger, quiet_down_noisy_loggers
 import iso_utility
 import webhook
 from database.base_objects import RedisHash
 from database.server_status import status
 from database.package import get_pkg_object
-
-from utils import logger, quiet_down_noisy_loggers
 
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
@@ -65,20 +64,18 @@ class Monitor(RedisHash):
         set=['packages'],
         path=[]
     )
+    can_expire = ['checked_recently']
 
     def __init__(self, name):
         super().__init__(prefix='monitor', key=name)
 
         self.__namespaceinit__()
-        logger.debug(dir(self))
-        logger.debug(self.json())
 
         if not self or not self.name:
             self.name = name
 
     def check_repos_for_changes(self):
-        self.checked_recently = True
-        self.expire_in('checked_recently', 930)
+        self.checked_recently = (True, 930)
 
         build_pkgs = []
         quiet_down_noisy_loggers()

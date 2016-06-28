@@ -50,14 +50,16 @@ class RedisHashMeta(type):
         ]
 
         for attrib_name in instance.all_attribs:
+            can_expire = attrib_name in instance.can_expire
+
             if attrib_name in _strings:
-                value = RedisDataHashField(attrib_name, '', str)
+                value = RedisDataHashField(attrib_name, '', str, can_expire)
 
             elif attrib_name in instance.attrib_lists['bool']:
-                value = RedisDataHashField(attrib_name, False, bool)
+                value = RedisDataHashField(attrib_name, False, bool, can_expire)
 
             elif attrib_name in instance.attrib_lists['int']:
-                value = RedisDataHashField(attrib_name, 0, int)
+                value = RedisDataHashField(attrib_name, 0, int, can_expire)
 
             elif attrib_name in instance.attrib_lists['list']:
                 value = RedisDataRedisObject(attrib_name, RedisList)
@@ -98,6 +100,8 @@ class RedisHash(RedisObject, metaclass=RedisHashMeta):
     """
 
     attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
+    all_attribs = []
+    can_expire = []
 
     def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):
         if 'status' != prefix and not key and not prefix:
@@ -111,23 +115,10 @@ class RedisHash(RedisObject, metaclass=RedisHashMeta):
         self.prefix = prefix
         self.key = key
         self.full_key = id_key
-        self.all_attribs = []
 
     def __getitem__(self, item):
         """ Get and return the value of a field (item) from this objects redis hash."""
         return getattr(self, item)
-
-    @staticmethod
-    def __hget__(key, field, default_value):
-        val = db.hget(key, field)
-        return val if val is not None else default_value
-
-    def __is_expired__(self, attrib):
-        exp_key = attrib + '__exp'
-        expire_time = self.__hget__(self.full_key, exp_key, 0)
-        now = int(time.time())
-
-        return now > int(expire_time)
 
     def __iter__(self):
         """ Return an iterator with all the keys in redis hash. """
@@ -163,12 +154,6 @@ class RedisHash(RedisObject, metaclass=RedisHashMeta):
 
         """
         return dt.strftime("%m/%d/%Y %I:%M%p")
-
-    def expire_in(self, attrib, seconds):
-        expires = int(time.time()) + seconds
-        field_name = attrib + '__exp'
-
-        self.db.hset(self.full_key, field_name, expires)
 
     @staticmethod
     def is_pathname_valid(pathname):

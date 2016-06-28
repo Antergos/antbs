@@ -31,9 +31,11 @@
 
 import logging
 import logging.config
+
 import bugsnag
 from bugsnag.handlers import BugsnagHandler
 from bugsnag.flask import handle_exceptions
+import rlog
 
 from database.base_objects import db
 from database.server_status import status
@@ -57,7 +59,7 @@ class LoggingConfig(metaclass=Singleton):
         bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
         logging.config.dictConfig(self.get_logging_config())
 
-        self.logger = logging.getLogger()
+        self.logger = logging.getLogger('antbs')
 
         for logger_name in self.noisy_loggers:
             _logger = logging.getLogger(logger_name)

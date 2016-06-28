@@ -30,9 +30,10 @@
 
 import redis
 import logging
+import time
 
 db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
-logger = logging.getLogger()
+logger = logging.getLogger('antbs')
 
 
 class RedisData:
@@ -108,12 +109,20 @@ class RedisDataHashField(RedisData):
 
     """
 
-    def __init__(self, field_name, default_value, value_type):
+    def __init__(self, field_name, default_value, value_type, can_expire=False):
         super().__init__(default_value, value_type)
 
         self.field_name = field_name
+        self.can_expire = can_expire
+        self.expire_key = ''
+
+        if can_expire:
+            self.expire_key = field_name + '__exp'
 
     def __get__(self, obj, obj_type):
+        if self.can_expire:
+            self._check_expire(obj)
+
         val = db.hget(obj.full_key, self.field_name)
         value = self._decode_value(val, self.default_value, self.value_type)
 
@@ -122,11 +131,43 @@ class RedisDataHashField(RedisData):
         return value
 
     def __set__(self, obj, value):
+        if self.can_expire and isinstance(value, tuple):
+            value, expire_time = value
+
+            self._expire_in(obj, self.expire_key, expire_time)
+
         val = self._encode_value(value, self.default_value)
 
         self._type_check(val, str, self.__class__.__name__, self.field_name)
 
         db.hset(obj.full_key, self.field_name, val)
+
+    def _check_expire(self, obj):
+        if self._will_expire(obj, self.expire_key) and self._is_expired(obj):
+            db.hdel(obj.full_key, self.expire_key)
+            self.__set__(obj, self.default_value)
+
+    @staticmethod
+    def _expire_in(obj, exp_key, seconds):
+        """ Set field to expire in redis. """
+        expires = int(time.time()) + seconds
+
+        db.hset(obj.full_key, exp_key, expires)
+
+    @staticmethod
+    def _hget(key, field, default_value):
+        val = db.hget(key, field)
+        return val if val is not None else default_value
+
+    def _is_expired(self, obj):
+        expire_time = self._hget(obj.full_key, self.expire_key, 0)
+        now = int(time.time())
+
+        return now > int(expire_time)
+
+    @staticmethod
+    def _will_expire(obj, exp_key):
+        return db.hexists(obj.full_key, exp_key)
 
 
 class RedisDataRedisObject(RedisData):

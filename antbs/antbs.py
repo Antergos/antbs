@@ -133,7 +133,7 @@ def maybe_check_monitored_repos():
     monitor_obj = get_monitor_object('github')
 
     if not monitor_obj.checked_recently:
-        views.repo_queue.enqueue_call(check_repos_for_changes('github'))
+        views.repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
 
 
 @app.context_processor

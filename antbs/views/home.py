@@ -37,15 +37,6 @@ home_view = Blueprint('home', __name__)
 ##
 ###
 
-@home_view.before_request
-def maybe_check_for_remote_commits():
-    monitor = get_monitor_object(name='github')
-
-    check_expired = monitor.__is_expired__('checked_recently')
-
-    if not monitor.checked_recently or check_expired:
-        repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
-
 
 def get_timeline(tlpage=1):
     timeline = []
