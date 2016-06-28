@@ -123,6 +123,11 @@ class Build(RedisHash):
 
         if pkg_obj and (not self or not self.bnum):
             self._pkg_obj = pkg_obj
+            attribs = [a for a in pkg_obj.all_attribs if a in self.all_attribs]
+
+            for attrib in attribs:
+                value = getattr(pkg_obj, attrib)
+                setattr(self, attrib, value)
 
             self.bnum = the_bnum
             self.tnum = tnum
@@ -528,6 +533,7 @@ def get_build_object(pkg_obj=None, bnum=None, tnum=None):
     Args:
         pkg_obj (Package): Create a new build for this package.
         bnum (int): Get an existing build identified by `bnum`.
+        tnum (int): The transaction number for this build (when creating new build)
 
     Returns:
         Build: A fully initiallized `Build`.

@@ -39,10 +39,10 @@
  #}
 {% macro nav_link(endpoint, text, icon_class='', active_class='') %}
 	{% if request.path == endpoint %}
-		{% set active_class = 'class="active"' %}
+		{% set active_class = 'active' %}
 	{% endif %}
 
-	<li {{ active_class }}>
+	<li class="{{ active_class }}">
 		<a href="{{ endpoint }}"><i class="fa fa-{{ icon_class }}"></i> <span>{{ text }}</span></a>
 	</li>
 {% endmacro %}
