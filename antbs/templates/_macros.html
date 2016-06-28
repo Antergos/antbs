@@ -383,7 +383,7 @@
 									{% set value = obj|attr(column.obj_attr) %}
 								{% endif %}
 
-								{%- if not value -%}
+								{%- if not value and 'dropdown' != column.content_type -%}
 									-
 
 								{%- elif 'link' == column.content_type %}

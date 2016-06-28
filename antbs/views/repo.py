@@ -217,7 +217,7 @@ def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
     return try_render_template('repo/packages.html', objs=packages,
                                pagination=pagination, all_pages=all_pages,
                                columns_info=columns_info, rev_pending=rev_pending,
-                               name=name)
+                               table_heading=name)
 
 
 @repo_view.route('/browse/<goto>')
