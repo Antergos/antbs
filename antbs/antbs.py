@@ -86,8 +86,8 @@ def initialize_app():
                        'DEBUG_TB_PROFILER_ENABLED': True})
 
     # Debug Toolbar - only enabled in debug mode and only for logged-in users:
-    # app.debug = True
-    # AntBSDebugToolbar(app)
+    app.debug = True
+    AntBSDebugToolbar(app)
 
     # Create Stormpath Manager object.
     StormpathManager(app)
@@ -97,6 +97,7 @@ def initialize_app():
     app.jinja_options['lstrip_blocks'] = True
     app.jinja_options['trim_blocks'] = True
     app.jinja_env.globals['url_for_other_page'] = url_for_other_page
+    app.jinja_env.add_extension('jinja2.ext.do')
 
     # Use gunicorn with nginx proxy
     app.wsgi_app = ProxyFix(app.wsgi_app)

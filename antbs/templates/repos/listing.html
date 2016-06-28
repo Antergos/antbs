@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% from '_macros.html' import table_search_box, listing_table %}
+{% from '_macros.html' import listing_table with context %}
 
 {% set link = '/repo/' + name + '/packages' %}
 
@@ -18,7 +18,6 @@
 					{% if not repo_packages %}
 						None
 					{% else %}
-						{{ table_search_box() }}
 						{{ listing_table(columns_info, repo_packages, pagination) }}
 					{% endif %}
 				</div>

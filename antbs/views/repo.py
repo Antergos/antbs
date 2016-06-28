@@ -109,30 +109,52 @@ def get_table_columns_info():
             'dd_info': ''
         },
         {
-            'heading_text': 'Build',
-            'obj_attr': 'pkg_id',
+            'heading_text': 'Last Build',
+            'obj_attr': '_build.bnum',
             'content_type': 'link',
             'base_url': '/build/',
             'dd_info': ''
         },
         {
             'heading_text': 'Review Status',
-            'obj_attr': '_build.reviewed_by',
-            'content_type': 'text',
+            'obj_attr': '_build.review_status',
+            'content_type': 'text_with_icon',
+            'icon_info': {
+                'class': {
+                    'pending': 'clock-o',
+                    'passed': 'check',
+                    'failed': 'exclamation-circle',
+                    'skip': 'eye-slash'
+                },
+                'color': {
+                    'pending': '#F0DE10',
+                    'passed': '#2CC36B',
+                    'failed': '#EA6153',
+                    'skip': '#999999'
+                }
+            },
             'base_url': '',
             'dd_info': ''
         },
         {
             'heading_text': 'Reviewed By',
-            'obj_attr': '_build.reviewed_by',
-            'content_type': 'text',
+            'obj_attr': '_build.review_dev',
+            'content_type': 'text_with_icon',
+            'icon_info': {
+                'class': 'user',
+                'color': ''
+            },
             'base_url': '',
             'dd_info': ''
         },
         {
             'heading_text': 'Reviewed On',
-            'obj_attr': '_reviewed_on',
-            'content_type': 'text',
+            'obj_attr': '_build.review_date',
+            'content_type': 'text_with_icon',
+            'icon_info': {
+                'class': 'calendar',
+                'color': ''
+            },
             'base_url': '',
             'dd_info': ''
         }
@@ -142,27 +164,21 @@ def get_table_columns_info():
         columns_info.append({
             'heading_text': 'Manage',
             'obj_attr': '',
-            'content_type': 'dd_info',
+            'content_type': 'dropdown',
             'base_url': '',
             'dd_info': {
                 'dd_type': 'manage',
                 'menu_items': [
                     {
-                        'text': 'Manage',
-                        'icon_class': '',
-                        'class': '',
-                        'icon_color': ''
-                    },
-                    {
                         'text': 'Build',
                         'icon_class': 'hammer',
-                        'class': 'dd_manage',
+                        'link_class': 'dd_manage',
                         'icon_color': '#3D566D'
                     },
                     {
                         'text': 'Remove From Repo',
                         'icon_class': 'cross',
-                        'class': 'dd_remove',
+                        'link_class': 'dd_remove',
                         'icon_color': '#EA6153'
                     }
                 ],

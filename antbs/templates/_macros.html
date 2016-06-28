@@ -248,10 +248,10 @@
 
 
 {#
- # Generates HTML for listing table search box.
+ # Generates HTML for package/build/mirror listing table search box.
  #
  #}
-{% macro table_search_box(url_base, url_end, text, color_class) %}
+{% macro table_search_box() %}
 	<div class="col-md-3 pull-right">
 		<div class="form-group">
 			<div class="input-group">
@@ -263,6 +263,9 @@
 			</div>
 		</div>
 	</div>
+	{% if caller is defined %}
+		{{ caller() }}
+	{% endif %}
 {% endmacro %}
 
 
@@ -270,27 +273,32 @@
  # Generates HTML for action/review_result dropdown (Logged-in users only).
  #
  # Args:
- #     dd_type (str): The type of dropdown ('Action' or 'Set Result').
- #     obj (Package||Build): The `Package` or `Build` object for the dropdown.
- #     menu_items (list): List of tuples containing menu items' id, icon class, color, and label text.
- #     dd_class (str): CSS class(es) for the menu.
+ #    obj (Package|Build):       The `Package` or `Build` object for the dropdown.
+ #    dd_info (dict):            A dict containing info for dropdown:
+ #        dd_type    (str):         The type of dropdown ('Action' or 'Set Result').
+ #        menu_items (list[dict]):  List of dicts containing menu items' class, icon class, color, and label text.
+ #        dd_class   (str):         CSS class(es) for the menu.
  #
  #}
-{% macro table_dropdown(dd_type, obj, menu_items, dd_class='') %}
+{% macro table_dropdown(obj, dd_info) %}
 	{% if current_user.is_authenticated %}
 
-		{% set bnum = obj._build.bnum if 'Action' == dd_type else obj.bnum  %}
+		{% if 'Action' == dd_type %}
+			{% set bnum = obj._build.bnum %}
+		{% else %}
+			{% set bnum = obj.bnum %}
+		{% endif %}
 
 		<div class="btn-group">
-			<button class="btn btn-default btn-xs" type="button">{{ dd_type }}</button>
+			<button class="btn btn-default btn-xs" type="button">{{ dd_info.dd_type|capitalize() }}</button>
 			<button data-toggle="dropdown" class="btn btn-xs btn-primary dropdown-toggle" type="button">
 				<span class="caret"></span><span class="sr-only">Toggle Dropdown</span>
 			</button>
-			<ul role="menu" class="dropdown-menu{{ dd_class }}">
-				{% if menu_items and menu_items is iterable %}
-					{% for menu_item in menu_items %}
+			<ul role="menu" class="dropdown-menu {{ dd_info.dd_class }}">
+				{% if dd_info.menu_items and dd_info.menu_items is iterable %}
+					{% for menu_item in dd_info.menu_items %}
 						<li>
-							<a href="#" class="{{ menu_item['class'] }}" data-bnum="{{ bnum }}" data-pkg="{{ obj.pkgname }}">
+							<a href="#" class="{{ menu_item['link_class'] }}" data-bnum="{{ bnum }}" data-pkg="{{ obj.pkgname }}">
 								<i class="fa fa-{{ menu_item['icon_class'] }}" style="color:{{ menu_item['icon_color'] }};"></i> {{ menu_item['text'] }}
 							</a>
 						</li>
@@ -307,17 +315,52 @@
 
 
 {#
- # Generates HTML for listing table.
+ # Generates HTML for text with icon.
  #
  # Args:
- #     columns_info (list): List of dicts containing info for each column.
- #                          Dict keys expected are heading_text, obj_attr, content_type, base_url, dd_info
- #     objs (list):         List of `Package` or `Build` objects to be listed in table.
- #     text (str):          The text for the tag/label.
- #     color_class (str):   Color class (primary, success, danger, etc)
+ #     icon_info  (dict): Dict which maps one or more icon_class(es) & icon_color(s) to possible `text` values.
+ #     text       (str):  The text to display next to the icon. Not required when calling this
+ #                        macro from another macro. You should place text inside call block instead.
  #
  #}
-{% macro listing_table(columns_info, objs, pagination) %}
+{% macro text_with_icon(icon_info, text=None) %}
+	{% if text is none %}
+		{% set text = caller() %}
+	{% endif %}
+
+	{% set icon_class = icon_info.class %}
+	{% set icon_color = icon_info.color %}
+
+	{% if icon_info.class is mapping %}
+		{% set icon_class = icon_info.class[text] %}
+	{% endif %}
+
+	{% if icon_info.color is mapping %}
+		{% set icon_color = icon_info.color[text] %}
+	{% endif %}
+
+	<i class="fa fa-{{ icon_class }}" style="color: {{ icon_color }}"></i> {{ text }}
+{% endmacro %}
+
+
+{#
+ # Generates HTML for package/build/mirror listing table.
+ #
+ # Args:
+ #     columns_info   (list[dict]):                 List of dicts containing info for each column. Dict keys expected
+ #                                                  are heading_text, obj_attr, content_type, base_url, dd_info
+ #     objs           (list[Package|Build|Mirror]): List of `Package`|`Build`|`Mirror` objects to be listed in table.
+ #     pagination     (Pagination):                 The `Pagination` object for the table.
+ #     search_enabled (bool):                       Whether or not search box should be output for the table.
+ #
+ #}
+{% macro listing_table(columns_info, objs, pagination, search_enabled=True) %}
+	{% if search_enabled %}
+		{% call table_search_box() %}
+			&nbsp;
+		{% endcall %}
+	{% endif %}
+
 	<table class="table no-border hover">
 		<thead class="no-border">
 			<tr>
@@ -342,12 +385,17 @@
 
 								{% if 'link' == column.content_type %}
 									<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
+
+								{% elif 'text_with_icon' == column.content_type %}
+									{%- call text_with_icon(column.icon_info) -%}
+										{{ value }}
+									{%- endcall -%}
+
 								{% elif 'text' == column.content_type %}
 									{{ value }}
-								{% elif 'dropdown' == column.content_type and column.dd_info %}
-									{% set dd_type, menu_items, dd_class = column.dd_info %}
 
-									{% call table_dropdown(dd_type, obj, menu_items, dd_class) %}
+								{% elif 'dropdown' == column.content_type and 'dd_info' in column %}
+									{% call table_dropdown(obj, column.dd_info) %}
 										&nbsp;
 									{% endcall %}
 								{% endif %}

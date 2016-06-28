@@ -99,7 +99,7 @@
 									<td>{{ build.end_str }}</td>
 									<td>
 									{% if build.review_status == 'pending' %}
-										<i class="fa fa-clock-o" style="color:yellow;"></i>{{ build.review_status }}
+										<i class="fa fa-clock-o" style="color:#f0de10;"></i>{{ build.review_status }}
 									{% elif build.review_status == 'passed' %}
 										<i class="fa fa-check" style="color:green;"></i>{{ build.review_status }}
 									{% elif build.review_status == 'failed' %}
