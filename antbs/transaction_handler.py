@@ -3,7 +3,7 @@
 #
 # transaction_handler.py
 #
-# Copyright © 2013-2015 Antergos
+# Copyright © 2013-2016 Antergos
 #
 # This file is part of The Antergos Build Server, (AntBS).
 #
@@ -27,10 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-""" Build packages when triggered by /hook """
-
-import os
-import sys
+""" Transaction Handler Module: This is the point-of-entry for RQ Workers. """
 
 from rq import (
     Connection,
@@ -39,11 +36,12 @@ from rq import (
     get_current_job
 )
 
+from utils import logger, DockerUtils
 from database.base_objects import db
 from database.server_status import status
 from database.transaction import get_trans_object
 from database.repo import get_repo_object
-from utils import logger, DockerUtils
+
 
 doc_utils = DockerUtils()
 doc = doc_utils.doc
@@ -82,16 +80,15 @@ def set_server_status(first=True, saved_status=False, is_review=False):
 
 
 def handle_hook():
-
     saved_status = set_server_status(first=True)
 
     logger.debug('calling maybe build docker image')
 
     if not status.iso_flag:
-        image = docker_utils.DockerUtils().maybe_build_base_devel()
+        image = DockerUtils().maybe_build_base_devel()
     else:
         status.iso_flag = False
-        image = docker_utils.DockerUtils().maybe_build_mkarchiso()
+        image = DockerUtils().maybe_build_mkarchiso()
 
     if not image:
         set_server_status(first=False, saved_status=saved_status)

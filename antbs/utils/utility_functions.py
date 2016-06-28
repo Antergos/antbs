@@ -32,34 +32,6 @@ import shutil
 import subprocess
 
 
-def bool_string_helper(value):
-    """
-    Given a `str`, returns value as `bool`. Given a `bool`, returns value as `str`.
-
-    Args:
-        value (str|bool): Value to convert.
-
-    Examples:
-        >>> bool_string_helper('False')
-        False
-        >>> bool_string_helper(True)
-        'True'
-
-    Raises:
-        ValueError: If value is not of type(bool) or type(str).
-
-    """
-
-    if isinstance(value, str):
-        return True if 'True' == value else False
-    elif isinstance(value, bool):
-        return 'True' if value else 'False'
-    else:
-        raise ValueError(
-            'value must be of type(bool) or type(str), {0} given.'.format(type(value))
-        )
-
-
 def truncate_middle(s, n):
     if len(s) <= n:
         # string is already short-enough

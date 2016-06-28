@@ -22,7 +22,6 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from utils.utility_functions import (
-    bool_string_helper,
     truncate_middle,
     try_run_command,
     remove,

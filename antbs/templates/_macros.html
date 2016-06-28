@@ -38,7 +38,7 @@
  #
  #}
 {% macro nav_link(endpoint, text, icon_class='', active_class='') %}
-	{% if request.endpoint.endswith(endpoint) %}
+	{% if request.path == endpoint %}
 		{% set active_class = 'class="active"' %}
 	{% endif %}
 

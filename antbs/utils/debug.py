@@ -26,6 +26,7 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+from flask import request
 from flask_debugtoolbar import DebugToolbarExtension
 from database.server_status import status
 from flask_stormpath import current_user
@@ -33,4 +34,6 @@ from flask_stormpath import current_user
 
 class AntBSDebugToolbar(DebugToolbarExtension):
     def _show_toolbar(self):
-        return current_user.is_authenticated and status.debug_toolbar_enabled
+        return (current_user.is_authenticated
+                and status.debug_toolbar_enabled
+                and '/rq' not in request.path)

@@ -40,13 +40,13 @@ import requests
 import gevent
 from rq import Connection, Queue, Worker
 
+from utils import logger
 import transaction_handler as builder
 from database import package
-from database.base_objects import db
+from database.base_objects import db, bool_string_helper
 from database.installation import AntergosInstallation, AntergosInstallationUser
 from database.server_status import get_timeline_object, status
 from database.transaction import get_trans_object
-from utils import logger, bool_string_helper
 
 with Connection(db):
     queue = Queue('transactions')
