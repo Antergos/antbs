@@ -214,7 +214,7 @@ def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
     pagination = Pagination(page, 10, all_pages)
     columns_info = get_table_columns_info()
 
-    return try_render_template('repo/packages.html', repo_packages=packages,
+    return try_render_template('repo/packages.html', objs=packages,
                                pagination=pagination, all_pages=all_pages,
                                columns_info=columns_info, rev_pending=rev_pending,
                                name=name)
