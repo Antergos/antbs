@@ -39,13 +39,16 @@ import requests
 from github3 import login
 from gitlab import Gitlab
 
-from utils import logger, quiet_down_noisy_loggers
-import iso_utility
-import webhook
-from database.base_objects import RedisHash
-from database.server_status import status
-from database.package import get_pkg_object
+from . import (
+    RedisHash,
+    status,
+    get_pkg_object
+)
 
+from utils import quiet_down_noisy_loggers
+import iso_utility
+
+logger = status.logger
 GITLAB_TOKEN = status.gitlab_token
 GITHUB_TOKEN = status.github_token
 
@@ -74,7 +77,7 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-    def check_repos_for_changes(self):
+    def check_repos_for_changes(self, webhook):
         self.checked_recently = (True, 930)
 
         build_pkgs = []
@@ -94,7 +97,7 @@ class Monitor(RedisHash):
         build_pkgs = [p for p in build_pkgs if p]
 
         if len(build_pkgs) > 0:
-            self.add_to_build_queue(build_pkgs)
+            self.add_to_build_queue(build_pkgs, webhook)
 
         if self.db.exists('antbs:misc:iso-release:do_check'):
             version = self.db.get('antbs:misc:iso-release:do_check')
@@ -231,9 +234,9 @@ class Monitor(RedisHash):
         return all(success)
 
     @staticmethod
-    def add_to_build_queue(pkgs):
+    def add_to_build_queue(pkgs, whook):
         req = dict(method='POST', args={})
-        wh = webhook.Webhook(req)
+        wh = whook(req)
 
         wh.is_numix = True
         wh.repo = 'antergos-packages'
@@ -259,7 +262,7 @@ def get_monitor_object(name):
     return monitor_obj
 
 
-def check_repos_for_changes(name):
+def check_repos_for_changes(name, webhook):
     monitor_obj = get_monitor_object(name)
-    monitor_obj.check_repos_for_changes()
+    monitor_obj.check_repos_for_changes(webhook)
 

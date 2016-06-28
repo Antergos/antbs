@@ -199,7 +199,7 @@ class RedisDataRedisObject(RedisData):
     def __set__(self, obj, value):
         name, full_key = self._get_key_info_from_object(obj)
 
-        self._type_check(value, self.value_type, self.__class__.__name__)
+        self._type_check(value, self.value_type, self.__class__.__name__, None)
 
         self._instances[name] = value
 

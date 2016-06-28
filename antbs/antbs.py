@@ -48,11 +48,15 @@ from werkzeug.contrib.fixers import ProxyFix
 
 import rq_dashboard
 
-from utils import logger, handle_exceptions, AntBSDebugToolbar
+from logging_config import handle_exceptions
+from utils import AntBSDebugToolbar
 from database.server_status import status
 from database.monitor import get_monitor_object, check_repos_for_changes
 
 import views
+import webhook
+
+logger = status.logger
 
 
 def url_for_other_page(page):
@@ -86,8 +90,8 @@ def initialize_app():
                        'DEBUG_TB_PROFILER_ENABLED': True})
 
     # Debug Toolbar - only enabled in debug mode and only for logged-in users:
-    app.debug = True
-    AntBSDebugToolbar(app)
+    # app.debug = True
+    # AntBSDebugToolbar(app)
 
     # Create Stormpath Manager object.
     StormpathManager(app)
@@ -133,7 +137,7 @@ def maybe_check_monitored_repos():
     monitor_obj = get_monitor_object('github')
 
     if not monitor_obj.checked_recently:
-        views.repo_queue.enqueue_call(check_repos_for_changes, args=('github',))
+        views.repo_queue.enqueue_call(check_repos_for_changes, args=('github', webhook.Webhook))
 
 
 @app.context_processor

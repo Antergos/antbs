@@ -52,20 +52,25 @@ from datetime import datetime, timedelta
 from flask_stormpath import current_user, groups_required
 from jinja2 import TemplateNotFound
 
-from database.package import get_pkg_object
-from database.repo import get_repo_object
-from database.build import get_build_object
-from database.server_status import status, get_timeline_object
-from database.transaction import get_trans_object
-from database.base_objects import db
-from database.monitor import get_monitor_object, check_repos_for_changes
+from database import (
+    get_pkg_object,
+    get_repo_object,
+    get_build_object,
+    status,
+    get_timeline_object,
+    get_trans_object,
+    db,
+    get_monitor_object,
+    check_repos_for_changes
+)
 
 from utils import *
 
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
+from iso_utility import ISOUtility
 
-import iso_utility
+logger = status.logger
 
 
 # Setup rq (background task queue manager)
@@ -196,9 +201,9 @@ def build_failed(bnum):
     return bld_obj.failed
 
 
-from views.api import api_view
-from views.build import build_view
-from views.home import home_view
-from views.live import live_view
-from views.package import package_view
-from views.repo import repo_view
+from .api import api_view
+from .build import build_view
+from .home import home_view
+from .live import live_view
+from .package import package_view
+from .repo import repo_view

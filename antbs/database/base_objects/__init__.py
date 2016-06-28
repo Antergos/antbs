@@ -26,15 +26,16 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+from utils.utility_classes import Singleton
 
-from database.base_objects._redis_data import (
+from ._redis_data import (
     db,
     RedisDataHashField,
     RedisDataRedisObject,
     bool_string_helper
 )
 
-from database.base_objects._redis_object import RedisObject
-from database.base_objects.redis_list import RedisList
-from database.base_objects.redis_zset import RedisZSet
-from database.base_objects.redis_hash import RedisHashMeta, RedisHash
+from ._redis_object import RedisObject
+from .redis_list import RedisList
+from .redis_zset import RedisZSet
+from .redis_hash import RedisHashMeta, RedisHash, RedisSingleton

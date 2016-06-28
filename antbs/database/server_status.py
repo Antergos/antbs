@@ -31,8 +31,9 @@
 
 import datetime
 
-from database.base_objects import RedisHash
-from utils import DateTimeStrings, RedisSingleton
+from . import RedisHash, Singleton, RedisSingleton
+from logging_config import get_logger_object
+from utils import DateTimeStrings
 
 
 class ServerStatus(RedisHash, metaclass=RedisSingleton):
@@ -43,7 +44,7 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
                 'docker_password', 'gpg_key', 'gpg_password', 'wp_password',
                 'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
                 'sp_app', 'gh_repo_url', 'request_from', 'ANTERGOS_API_DB_KEY_NAME',
-                'MONITOR_PKGS_KEY'],
+                'MONITOR_PKGS_KEY', 'smtp_pass'],
 
         bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
               'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging',
@@ -61,6 +62,7 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
               'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
               'REPO_BASE_DIR', 'MKARCHISO_DIR']
     )
+    logger = None
 
     def __init__(self, prefix='status', key='', *args, **kwargs):
         super().__init__(prefix=prefix, key=key, *args, **kwargs)
@@ -73,6 +75,9 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
             self.idle = True
             self.iso_flag = False
             self.iso_building = False
+
+        if self.logger is None:
+            self.logger = get_logger_object(self)
 
 
 class TimelineEvent(RedisHash, DateTimeStrings):

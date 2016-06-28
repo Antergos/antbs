@@ -33,19 +33,17 @@
 
 import os
 import subprocess
+import logging
 
-from database.base_objects import db
-from database.server_status import status
-from utils import remove, logger
+from . import remove
 
+logger = logging.getLogger('antbs')
 GPG_BIN = '/usr/bin/gpg'
 SIG_EXT = '.sig'
 PKG_EXT = '.pkg.tar.xz'
-password = status.gpg_password
-gpg_key = status.gpg_key
 
 
-def batch_sign(paths, bnum='', uid=gpg_key, passphrase=password, is_iso=False):
+def batch_sign(paths, db, bnum='', uid='', passphrase='', is_iso=False):
     if not isinstance(paths, list):
         logger.error('paths must be a list')
         return False
@@ -117,7 +115,7 @@ def batch_sign(paths, bnum='', uid=gpg_key, passphrase=password, is_iso=False):
     return True
 
 
-def sign_packages(generated_pkgs, bnum=''):
+def sign_packages(generated_pkgs, db, bnum='', uid='', gpg_pass=''):
 
     db.publish('live:build_output:{0}'.format(bnum), 'Signing packages..')
 
@@ -130,6 +128,6 @@ def sign_packages(generated_pkgs, bnum=''):
             if os.path.exists(existing_sig):
                 remove(existing_sig)
 
-        return batch_sign(generated_pkgs, bnum)
+        return batch_sign(generated_pkgs, db, bnum, uid, gpg_pass)
 
     return False

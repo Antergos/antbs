@@ -29,8 +29,6 @@
 import os
 from datetime import datetime
 
-from utils import logger
-
 
 class Pkgbuild:
     """
@@ -158,9 +156,7 @@ class Pkgbuild:
     def maybe_fix_pkgver(self):
         if 'pkgver' not in self.values:
             self.get_value('pkgver')
-            logger.debug(self.values['pkgver'])
         if '$' not in self.values['pkgver']:
-            logger.debug(self.values['pkgver'])
             return
 
         if '_buildver' in self.values['pkgver']:

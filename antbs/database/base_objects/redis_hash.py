@@ -36,7 +36,8 @@ from . import (
     RedisDataHashField,
     RedisDataRedisObject,
     RedisList,
-    RedisZSet
+    RedisZSet,
+    Singleton
 )
 
 
@@ -75,6 +76,10 @@ class RedisHashMeta(type):
         return instance
 
 
+class RedisSingleton(Singleton, RedisHashMeta):
+    pass
+
+
 class RedisHash(RedisObject, metaclass=RedisHashMeta):
     """
         This is the base class for all of the redis-backed classes in this application.
@@ -99,8 +104,8 @@ class RedisHash(RedisObject, metaclass=RedisHashMeta):
 
     """
 
-    attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
     all_attribs = []
+    attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
     can_expire = []
 
     def __init__(self, namespace='antbs', prefix='', key='', *args, **kwargs):

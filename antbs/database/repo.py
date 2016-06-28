@@ -34,19 +34,20 @@ from pkg_resources import parse_version
 
 import gevent
 
-from database.base_objects import RedisHash
-from database.server_status import status
-
-from utils import (
-    RedisSingleton,
-    remove,
-    try_run_command,
-    recursive_chown,
-    DockerUtils,
-    logger
+from . import (
+    RedisHash,
+    status,
+    RedisSingleton
 )
 
-doc_util = DockerUtils()
+from utils import (
+    remove,
+    try_run_command,
+    DockerUtils
+)
+
+logger = status.logger
+doc_util = DockerUtils(status)
 doc = doc_util.doc
 PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'

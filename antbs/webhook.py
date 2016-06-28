@@ -40,17 +40,23 @@ import requests
 import gevent
 from rq import Connection, Queue, Worker
 
-from utils import logger
 import transaction_handler as builder
-from database import package
-from database.base_objects import db, bool_string_helper
-from database.installation import AntergosInstallation, AntergosInstallationUser
-from database.server_status import get_timeline_object, status
-from database.transaction import get_trans_object
+
+from database import (
+    get_pkg_object,
+    db,
+    AntergosInstallation,
+    AntergosInstallationUser,
+    get_timeline_object,
+    status,
+    get_trans_object
+)
 
 with Connection(db):
     queue = Queue('transactions')
     w = Worker([queue])
+
+logger = status.logger
 
 
 def rm_file_or_dir(src):

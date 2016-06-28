@@ -35,41 +35,47 @@ import time
 
 import docker
 
-from database.base_objects import db
-from database.server_status import status
-
-from utils import logger, Singleton
-
-doc_user = status.docker_user
-doc_pass = status.docker_password
-
-SRC_DIR = status.APP_DIR
-DOC_DIR = os.path.join(SRC_DIR, 'build/docker')
-BUILD_DIR = os.path.join(SRC_DIR, 'build')
+from . import Singleton
 
 
 class DockerUtils(metaclass=Singleton):
-    _doc = None
+    doc = _db = _status = _logger = _app_dir = _src_dir = _doc_dir = _build_dir = None
 
-    def __init__(self):
+    def __init__(self, _status=None):
         self.cache_dir = '/var/tmp/pkg_cache'
         self.cache_i686 = '/var/tmp/pkg_cache_i686'
         self.is_building_images = False
-
         self.result_dir = '/tmp/pkgver_result'
+
         if os.path.exists(self.result_dir):
             shutil.rmtree(self.result_dir)
+
         os.mkdir(self.result_dir)
 
-        if self._doc is None:
-            # Initiate communication with build daemon
+        if self._db is None:
+            self._db = _status.db
+
+        if self._status is None:
+            self._status = _status
+
+        if self._logger is None:
+            self._logger = _status.logger
+
+        if self._app_dir is None:
+            self._app_dir = _status.APP_DIR
+            self._src_dir = _status.APP_DIR
+            self._doc_dir = os.path.join(self._src_dir, 'build/docker')
+            self._build_dir = os.path.join(self._src_dir, 'build')
+
+        if self.doc is None:
+            # Initiate communication with docker daemon
             try:
                 self._doc = docker.Client(base_url='unix://var/run/docker.sock', version='auto')
             except Exception as err:
-                logger.error("Cant connect to Docker daemon. Error msg: %s", err)
+                self._logger.error("Cant connect to Docker daemon. Error msg: %s", err)
                 raise RuntimeError
 
-        self.doc = self._doc
+            self.doc = self._doc
 
     def do_docker_clean(self, pkg=None):
         try:
@@ -113,7 +119,7 @@ class DockerUtils(metaclass=Singleton):
                     'bind': '/var/cache/pacman_i686',
                     'ro': False
                 },
-            BUILD_DIR:
+            self._build_dir:
                 {
                     'bind': '/makepkg',
                     'ro': False
@@ -160,7 +166,7 @@ class DockerUtils(metaclass=Singleton):
         """
         repos_hconfig = self.doc.create_host_config(
             binds={
-                BUILD_DIR:
+                self._build_dir:
                     {
                         'bind': '/makepkg',
                         'ro': False
@@ -190,7 +196,7 @@ class DockerUtils(metaclass=Singleton):
         return repos_hconfig
 
     def create_unprivileged_host_config(self, pbpath, tmp_dir):
-        script_path = os.path.join(BUILD_DIR, 'get_from_pkgbuild.sh')
+        script_path = os.path.join(self._build_dir, 'get_from_pkgbuild.sh')
         binds = {
             pbpath: {
                 'bind': '/PKGBUILD',
@@ -213,7 +219,7 @@ class DockerUtils(metaclass=Singleton):
         return hconfig
 
     def do_image_build_finished(self, result):
-        status.docker_image_building = False
+        self._status.docker_image_building = False
         return result
 
     def maybe_build_base_devel(self):
@@ -222,32 +228,32 @@ class DockerUtils(metaclass=Singleton):
 
         :return:
         """
-        if db.exists('antbs:docker-images:base-devel:built-today'):
+        if self._db.exists('antbs:docker-images:base-devel:built-today'):
             return True
-        elif status.docker_image_building:
-            wait = status.docker_image_building
-            logger.debug('waiting for docker image')
+        elif self._status.docker_image_building:
+            wait = self._status.docker_image_building
+            self._logger.debug('waiting for docker image')
             waiting = 0
             while wait and waiting < 300:
                 waiting += 10
                 time.sleep(10)
-                wait = status.docker_image_building
+                wait = self._status.docker_image_building
 
             return True
 
         # No image was built in the past 24 hours, let's build one.
-        status.docker_image_building = True
-        logger.debug('building new docker images')
-        status.current_status = 'Docker images are stale. Building new images.'
-        build_script = os.path.join(DOC_DIR, 'base-devel.sh')
+        self._status.docker_image_building = True
+        self._logger.debug('building new docker images')
+        self._status.current_status = 'Docker images are stale. Building new images.'
+        build_script = os.path.join(self._doc_dir, 'base-devel.sh')
         build_it = False
         try:
             build_it = subprocess.check_output([build_script])
         except subprocess.CalledProcessError as err:
-            logger.exception('Image build script failed with error: %s', err.output)
+            self._logger.exception('Image build script failed with error: %s', err.output)
             return self.do_image_build_finished(False)
         except shutil.Error as err2:
-            logger.exception(err2)
+            self._logger.exception(err2)
 
         if build_it:
             try:
@@ -258,7 +264,7 @@ class DockerUtils(metaclass=Singleton):
             mpkg = self.build_makepkg()
             if not mpkg:
                 return self.do_image_build_finished(False)
-            db.setex('antbs:docker-images:base-devel:built-today', 84600, 'True')
+            self._db.setex('antbs:docker-images:base-devel:built-today', 84600, 'True')
             return self.do_image_build_finished(True)
         else:
             return self.do_image_build_finished(False)
@@ -269,18 +275,18 @@ class DockerUtils(metaclass=Singleton):
 
         :return:
         """
-        if db.exists('antbs:docker-images:mkarchiso:built-today'):
+        if self._db.exists('antbs:docker-images:mkarchiso:built-today'):
             return True
 
         # No image was built in the past 24 hours, let's build one.
-        status.current_status = 'Docker images are stale. Building new images.'
+        self._status.current_status = 'Docker images are stale. Building new images.'
 
         archiso = self.build_mkarchiso()
 
         if not archiso:
             return False
 
-        db.setex('antbs:docker-images:mkarchiso:built-today', 84600, 'True')
+        self._db.setex('antbs:docker-images:mkarchiso:built-today', 84600, 'True')
 
         return True
 
@@ -290,7 +296,7 @@ class DockerUtils(metaclass=Singleton):
 
         :return:
         """
-        dockerfile = os.path.join(DOC_DIR, 'makepkg')
+        dockerfile = os.path.join(self._doc_dir, 'makepkg')
         try:
             build_it = [line for line in
                         self.doc.build(dockerfile, 'antergos/makepkg', quiet=False, nocache=True,
@@ -299,7 +305,7 @@ class DockerUtils(metaclass=Singleton):
             if build_it:
                 self.push_to_hub('antergos/makepkg')
         except Exception as err:
-            logger.exception('Building makepkg failed with error: %s', err)
+            self._logger.exception('Building makepkg failed with error: %s', err)
             return False
 
         return True
@@ -320,7 +326,7 @@ class DockerUtils(metaclass=Singleton):
             if build_it:
                 self.push_to_hub('antergos/mkarchiso')
         except Exception as err:
-            logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
+            self._logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
             return False
 
         return True
@@ -334,12 +340,13 @@ class DockerUtils(metaclass=Singleton):
         if repo is None:
             return
         try:
-            self.doc.login(username=doc_user, password=doc_pass, email='dustin@falgout.us')
+            self.doc.login(username=self._status.docker_user,
+                           password=self._status.docker_password, email='dustin@falgout.us')
             response = [line for line in self.doc.push(repo, stream=True, insecure_registry=True)]
             if not response:
-                logger.info('Pushing to Docker hub might not have completed successfully.')
+                self._logger.info('Pushing to Docker hub might not have completed successfully.')
         except Exception as err:
-            logger.exception('Pushing to docker hub failed with error: %s', err)
+            self._logger.exception('Pushing to docker hub failed with error: %s', err)
 
     def get_pkgbuild_generates(self, pkgname, hconfig, build_env, result_dir):
         result_dirname = result_dir.split('/')[-2:-1]
@@ -359,10 +366,10 @@ class DockerUtils(metaclass=Singleton):
             )
 
             if container.get('Warnings', False):
-                logger.error(container.get('Warnings'))
+                self._logger.error(container.get('Warnings'))
 
         except Exception as err:
-            logger.error('Create container failed. Error Msg: %s' % err)
+            self._logger.error('Create container failed. Error Msg: %s' % err)
             raise RuntimeError
 
         container_id = container.get('Id')
@@ -385,6 +392,6 @@ class DockerUtils(metaclass=Singleton):
                 return pkgs
 
         except Exception as err:
-            logger.error('Failed get packages generated by pkgbuild. error was: %s', err)
+            self._logger.error('Failed get packages generated by pkgbuild. error was: %s', err)
 
         raise RuntimeError

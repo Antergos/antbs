@@ -36,19 +36,21 @@ from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
 
-from database.base_objects import RedisHash
-from database.server_status import status, get_timeline_object
+from . import (
+    RedisHash,
+    status,
+    get_timeline_object
+)
 
 from utils import (
-    logger,
     DockerUtils,
     CustomSet,
     remove,
     sign_packages
 )
 
-
-doc_util = DockerUtils()
+logger = status.logger
+doc_util = DockerUtils(status)
 doc = doc_util.doc
 PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'
@@ -123,6 +125,8 @@ class Build(RedisHash):
 
         if pkg_obj and (not self or not self.bnum):
             self._pkg_obj = pkg_obj
+            logger.warning(pkg_obj)
+            raise RuntimeError([self.all_attribs, pkg_obj])
             attribs = [a for a in pkg_obj.all_attribs if a in self.all_attribs]
 
             for attrib in attribs:
@@ -366,7 +370,8 @@ class Build(RedisHash):
             # self.get_save_pkgbuild_generates()
             self.get_save_generated_files_paths()
 
-            _signed_packages = sign_packages(self.generated_files, self.bnum)
+            _signed_packages = sign_packages(self.generated_files, self.db, self.bnum,
+                                             status.gpg_key, status.gpg_password)
 
             if not _signed_packages:
                 logger.error('Failed to sign packages!')

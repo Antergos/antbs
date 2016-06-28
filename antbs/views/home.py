@@ -26,7 +26,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from views import *
+from . import *
 
 home_view = Blueprint('home', __name__)
 

@@ -33,10 +33,14 @@ from gitlab import Gitlab
 from github3 import login
 from github3.exceptions import UnprocessableResponseBody
 
-from database.base_objects import RedisHash
-from database.server_status import status
-from utils import logger, Pkgbuild
+from . import (
+    RedisHash,
+    status
+)
 
+from utils import Pkgbuild
+
+logger = status.logger
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
 GH_REPO_BASE_URL = 'http://github.com/Antergos/antergos-packages/blob/master/'

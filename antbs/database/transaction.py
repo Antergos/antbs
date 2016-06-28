@@ -30,18 +30,21 @@ from utils import (
     all_file_paths_exist,
     copy_or_symlink,
     try_run_command,
-    logger,
     DockerUtils,
-    PacmanPackageCache
+    PacmanPackageCache,
+    remove
 )
 
-from .base_objects import RedisHash
-from .build import get_build_object
-from .package import get_pkg_object
-from .server_status import status
-from .repo import get_repo_object
+from . import (
+    RedisHash,
+    get_build_object,
+    get_pkg_object,
+    status,
+    get_repo_object
+)
 
-doc_util = DockerUtils()
+logger = status.logger
+doc_util = DockerUtils(status)
 doc = doc_util.doc
 
 pkg_cache_obj = PacmanPackageCache()
@@ -101,6 +104,8 @@ class TransactionMeta(RedisHash):
             self.cache_i686 = pkg_cache_obj.cache_i686
 
             if packages:
+                packages = [p for p in packages if p]
+
                 for pkg in packages:
                     self.packages.add(pkg)
 

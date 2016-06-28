@@ -35,8 +35,7 @@ import os
 import gevent
 from redis.exceptions import LockError
 
-from database.base_objects import RedisHashMeta
-from utils import remove
+from . import remove
 
 
 class Singleton(type):
@@ -47,10 +46,6 @@ class Singleton(type):
             cls._instance = super().__call__(*args, **kwargs)
 
         return cls._instance
-
-
-class RedisSingleton(Singleton, RedisHashMeta):
-    pass
 
 
 class DateTimeStrings:

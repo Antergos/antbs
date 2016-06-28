@@ -38,11 +38,15 @@ import subprocess
 import requests
 from requests_toolbelt.adapters.source import SourceAddressAdapter
 
-from utils import batch_sign, logger
-from database import package
-from database.base_objects import db
-from database.server_status import status
+from utils import batch_sign
 
+from database import (
+    get_pkg_object,
+    db,
+    status
+)
+
+logger = status.logger
 TESTING_DIR = os.path.join(status.ISO_DIR, 'testing')
 RELEASE_DIR = os.path.join(status.ISO_DIR, 'release')
 SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
@@ -140,7 +144,7 @@ class ISOUtility:
 
     def sign_with_gnupg(self):
         """ Create a detached signature using GNUPG. """
-        batch_sign([self.md5sums_path], is_iso=True)
+        batch_sign([self.md5sums_path], db, GPG_KEY, PASSWORD, is_iso=True)
 
 
 class WordPressBridge:
@@ -231,7 +235,7 @@ def iso_release_job():
 
     for name in iso_names:
         try:
-            pkg_obj = package.get_pkg_object(name=name)
+            pkg_obj = get_pkg_object(name=name)
             iso_obj = ISOUtility(pkg_obj=pkg_obj)
 
             iso_obj.prep_release()

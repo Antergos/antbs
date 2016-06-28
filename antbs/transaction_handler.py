@@ -36,14 +36,17 @@ from rq import (
     get_current_job
 )
 
-from utils import logger, DockerUtils
-from database.base_objects import db
-from database.server_status import status
-from database.transaction import get_trans_object
-from database.repo import get_repo_object
+from database import (
+    get_repo_object,
+    db,
+    status,
+    get_trans_object
+)
+
+from utils import DockerUtils
 
 
-doc_utils = DockerUtils()
+doc_utils = DockerUtils(status)
 doc = doc_utils.doc
 
 with Connection(db):
@@ -85,10 +88,10 @@ def handle_hook():
     logger.debug('calling maybe build docker image')
 
     if not status.iso_flag:
-        image = DockerUtils().maybe_build_base_devel()
+        image = doc_utils.maybe_build_base_devel()
     else:
         status.iso_flag = False
-        image = DockerUtils().maybe_build_mkarchiso()
+        image = doc_utils.maybe_build_mkarchiso()
 
     if not image:
         set_server_status(first=False, saved_status=saved_status)

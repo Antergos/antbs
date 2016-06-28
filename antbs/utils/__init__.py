@@ -21,7 +21,7 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from utils.utility_functions import (
+from .utility_functions import (
     truncate_middle,
     try_run_command,
     remove,
@@ -33,9 +33,8 @@ from utils.utility_functions import (
     recursive_chown
 )
 
-from utils.utility_classes import (
+from .utility_classes import (
     Singleton,
-    RedisSingleton,
     DateTimeStrings,
     PacmanPackageCache,
     CustomSet,
@@ -43,9 +42,8 @@ from utils.utility_classes import (
     MyLock
 )
 
-from utils.logging_config import logger, handle_exceptions
-from utils.docker_util import DockerUtils
-from utils.sign_pkgs import sign_packages, batch_sign
-from utils.pkgbuild import Pkgbuild
-from utils.pagination import Pagination
-from utils.debug import AntBSDebugToolbar
+from .docker_util import DockerUtils
+from .sign_pkgs import sign_packages, batch_sign
+from .pkgbuild import Pkgbuild
+from .pagination import Pagination
+from .debug import AntBSDebugToolbar

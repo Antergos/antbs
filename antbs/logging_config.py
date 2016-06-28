@@ -32,45 +32,67 @@
 import logging
 import logging.config
 
+import gevent
+import rlog
 import bugsnag
 from bugsnag.handlers import BugsnagHandler
 from bugsnag.flask import handle_exceptions
-import rlog
-
-from database.base_objects import db
-from database.server_status import status
 
 from utils import Singleton
 
 
 class LoggingConfig(metaclass=Singleton):
-    logger = None
+    logger = _noisy_loggers = _db = _bugsnag_key = _app_dir = _initializing = _smtp_pass = None
 
-    def __init__(self):
-        self.noisy_loggers = ["github3",
-                              "requests",
-                              "stormpath.http",
-                              "docker"]
+    def __init__(self, status):
+        if self._noisy_loggers is None:
+            self._noisy_loggers = ['github3', 'requests', 'stormpath.http', 'docker']
 
-        if self.logger is None:
+        if self._db is None:
+            self._db = status.db
+
+        if self._bugsnag_key is None:
+            self._bugsnag_key = status.bugsnag_key
+
+        if self._app_dir is None:
+            self._app_dir = status.APP_DIR
+
+        if self._smtp_pass is None:
+            self._smtp_pass = status.smtp_pass
+
+        if self.logger is None and not self._initializing:
+            self._initializing = True
             self._initialize()
 
+        elif self._initializing and self.logger is None:
+            waiting = 0
+
+            while self.logger is None:
+                gevent.sleep(1)
+
+                if waiting > 60:
+                    raise RuntimeError('Failed to initialize logger!')
+
+                waiting += 1
+
     def _initialize(self):
-        bugsnag.configure(api_key=status.bugsnag_key, project_root=status.APP_DIR)
+        bugsnag.configure(api_key=self._bugsnag_key, project_root=self._app_dir)
         logging.config.dictConfig(self.get_logging_config())
 
-        self.logger = logging.getLogger('antbs')
+        logger = logging.getLogger('antbs')
 
-        for logger_name in self.noisy_loggers:
+        for logger_name in self._noisy_loggers:
             _logger = logging.getLogger(logger_name)
             _logger.setLevel(logging.ERROR)
 
-        bs_handler_found = [h for h in self.logger.handlers if isinstance(h, BugsnagHandler)]
+        bs_handler_found = [h for h in logger.handlers if isinstance(h, BugsnagHandler)]
 
         if not bs_handler_found:
             bugsnag_handler = BugsnagHandler()
             bugsnag_handler.setLevel(logging.WARNING)
-            self.logger.addHandler(bugsnag_handler)
+            logger.addHandler(bugsnag_handler)
+
+        self.logger = logger
 
     def get_logging_config(self):
         return {
@@ -109,7 +131,7 @@ class LoggingConfig(metaclass=Singleton):
                     'level': 'DEBUG',
                     'class': 'rlog.RedisHandler',
                     'channel': 'log_stream',
-                    'redis_client': db,
+                    'redis_client': self._db,
                     'formatter': 'redis'
                 },
                 'email': {
@@ -119,13 +141,13 @@ class LoggingConfig(metaclass=Singleton):
                     'fromaddr': 'error@build.antergos.org',
                     'toaddrs': 'admin@antergos.org',
                     'subject': 'AntBS Error Report',
-                    'credentials': '["error@build.antergos.org", "U7tGQGoi4spS"]',
+                    'credentials': ['error@build.antergos.org', self._smtp_pass],
                     'formatter': 'email'
                 },
                 'bugsnag': {
                     'level': 'WARNING',
                     'class': 'bugsnag.handlers.BugsnagHandler',
-                    'api_key': status.bugsnag_key
+                    'api_key': self._bugsnag_key
                 }
             },
             'loggers': {
@@ -138,5 +160,18 @@ class LoggingConfig(metaclass=Singleton):
         }
 
 
-logging_config = LoggingConfig()
-logger = logging_config.logger
+def get_logger_object(status):
+    """
+    Gets logger object used throughout the application.
+
+    Args:
+        status (ServerStatus): ServerStatus object.
+
+    Returns:
+        logger: A fully initiallized `logging.Logger` object.
+
+    """
+
+    logging_config_obj = LoggingConfig(status)
+
+    return logging_config_obj.logger
