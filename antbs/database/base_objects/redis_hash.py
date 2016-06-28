@@ -44,6 +44,7 @@ from . import (
 class RedisHashMeta(type):
     def __new__(mcs, cls, bases, cls_dict):
         instance = super().__new__(mcs, cls, bases, cls_dict)
+
         _strings = instance.attrib_lists['string'] + instance.attrib_lists['path']
         instance.all_attribs = [
             item for sublist in instance.attrib_lists.values()
@@ -120,6 +121,9 @@ class RedisHash(RedisObject, metaclass=RedisHashMeta):
         self.prefix = prefix
         self.key = key
         self.full_key = id_key
+
+        self.all_attribs = getattr(type(self), 'all_attribs')
+        self.attrib_lists = getattr(type(self), 'attrib_lists')
 
     def __getitem__(self, item):
         """ Get and return the value of a field (item) from this objects redis hash."""

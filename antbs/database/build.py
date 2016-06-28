@@ -125,8 +125,6 @@ class Build(RedisHash):
 
         if pkg_obj and (not self or not self.bnum):
             self._pkg_obj = pkg_obj
-            logger.warning(pkg_obj)
-            raise RuntimeError([self.all_attribs, pkg_obj])
             attribs = [a for a in pkg_obj.all_attribs if a in self.all_attribs]
 
             for attrib in attribs:
@@ -370,8 +368,7 @@ class Build(RedisHash):
             # self.get_save_pkgbuild_generates()
             self.get_save_generated_files_paths()
 
-            _signed_packages = sign_packages(self.generated_files, self.db, self.bnum,
-                                             status.gpg_key, status.gpg_password)
+            _signed_packages = sign_packages(self.generated_files, self.bnum)
 
             if not _signed_packages:
                 logger.error('Failed to sign packages!')

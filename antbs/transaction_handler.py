@@ -45,7 +45,7 @@ from database import (
 
 from utils import DockerUtils
 
-
+logger = status.logger
 doc_utils = DockerUtils(status)
 doc = doc_utils.doc
 
