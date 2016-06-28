@@ -89,110 +89,6 @@ def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
     return pkgs, rev_pending, all_pages
 
 
-def get_table_columns_info():
-    columns_info = [
-        {
-            'heading_text': 'ID',
-            'obj_attr': 'pkg_id',
-            'content_type': 'link',
-            'base_url': '/package/',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Name',
-            'obj_attr': 'pkgname',
-            'content_type': 'link',
-            'base_url': '/package/',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Version',
-            'obj_attr': 'version_str',
-            'content_type': 'text',
-            'base_url': '',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Last Build',
-            'obj_attr': '_build.bnum',
-            'content_type': 'link',
-            'base_url': '/build/',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Review Status',
-            'obj_attr': '_build.review_status',
-            'content_type': 'text_with_icon',
-            'icon_info': {
-                'class': {
-                    'pending': 'clock-o',
-                    'passed': 'check',
-                    'failed': 'exclamation-circle',
-                    'skip': 'eye-slash'
-                },
-                'color': {
-                    'pending': '#F0DE10',
-                    'passed': '#2CC36B',
-                    'failed': '#EA6153',
-                    'skip': '#999999'
-                }
-            },
-            'base_url': '',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Reviewed By',
-            'obj_attr': '_build.review_dev',
-            'content_type': 'text_with_icon',
-            'icon_info': {
-                'class': 'user',
-                'color': ''
-            },
-            'base_url': '',
-            'dd_info': ''
-        },
-        {
-            'heading_text': 'Reviewed On',
-            'obj_attr': '_build.review_date',
-            'content_type': 'text_with_icon',
-            'icon_info': {
-                'class': 'calendar',
-                'color': ''
-            },
-            'base_url': '',
-            'dd_info': ''
-        }
-    ]
-
-    if current_user.is_authenticated:
-        columns_info.append({
-            'heading_text': 'Manage',
-            'obj_attr': '',
-            'content_type': 'dropdown',
-            'base_url': '',
-            'dd_info': {
-                'dd_type': 'manage',
-                'menu_items': [
-                    {
-                        'text': 'Build',
-                        'icon_class': 'hammer',
-                        'link_class': 'dd_manage',
-                        'icon_color': '#3D566D'
-                    },
-                    {
-                        'text': 'Remove From Repo',
-                        'icon_class': 'cross',
-                        'link_class': 'dd_remove',
-                        'icon_color': '#EA6153'
-                    }
-                ],
-                'dd_class': 'dd_manage'
-            }
-        })
-
-    return columns_info
-
-
 ###
 ##
 #   Views Start Here
@@ -211,12 +107,13 @@ def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
         abort(404)
 
     packages, rev_pending, all_pages = get_repo_packages(name, filter, filter_by, page)
-    pagination = Pagination(page, 10, all_pages)
-    columns_info = get_table_columns_info()
+    _pagination = Pagination(page, 10, all_pages)
+    columns_info_obj = ColumnsInfo(current_user)
+    _columns_info = columns_info_obj.columns_info
 
     return try_render_template('repo/packages.html', objs=packages,
-                               pagination=pagination, all_pages=all_pages,
-                               columns_info=columns_info, rev_pending=rev_pending,
+                               pagination=_pagination, all_pages=all_pages,
+                               columns_info=_columns_info, rev_pending=rev_pending,
                                table_heading=name)
 
 

@@ -47,3 +47,4 @@ from .sign_pkgs import sign_packages, batch_sign
 from .pkgbuild import Pkgbuild
 from .pagination import Pagination
 from .debug import AntBSDebugToolbar
+from .columns_info import ColumnsInfo

@@ -49,7 +49,8 @@ from database import (
     AntergosInstallationUser,
     get_timeline_object,
     status,
-    get_trans_object
+    get_trans_object,
+    bool_string_helper
 )
 
 with Connection(db):
@@ -368,7 +369,7 @@ class Webhook(WebhookMeta):
                         tl_event = get_timeline_object(msg=tpl.format(source, the_pkgs_str),
                                                        tl_type=tltype,
                                                        packages=the_pkgs)
-                        p_obj = package.get_pkg_object(name=p, fetch_pkgbuild=True)
+                        p_obj = get_pkg_object(name=p, fetch_pkgbuild=True)
                         p_obj.tl_events.append(tl_event.event_id)
 
                 trans_obj = get_trans_object(packages=the_pkgs)

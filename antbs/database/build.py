@@ -54,6 +54,8 @@ doc_util = DockerUtils(status)
 doc = doc_util.doc
 PKG_EXT = '.pkg.tar.xz'
 SIG_EXT = '.sig'
+gpg_key = status.gpg_key
+gpg_password = status.gpg_password
 
 
 class Build(RedisHash):
@@ -368,7 +370,9 @@ class Build(RedisHash):
             # self.get_save_pkgbuild_generates()
             self.get_save_generated_files_paths()
 
-            _signed_packages = sign_packages(self.generated_files, self.bnum)
+            _signed_packages = sign_packages(
+                self.generated_files, self.db, self.bnum, gpg_key, gpg_password
+            )
 
             if not _signed_packages:
                 logger.error('Failed to sign packages!')

@@ -111,7 +111,7 @@ def builds_with_status(build_status=None, page=None, query=None):
     builds, all_pages, rev_pending = get_builds_with_status(page, build_status, query)
     pagination = Pagination(page, 10, all_pages)
 
-    return try_render_template('builds/listing.html', builds=builds, all_pages=all_pages,
+    return try_render_template('build/listing.html', builds=builds, all_pages=all_pages,
                                pagination=pagination, build_status=build_status)
 
 
