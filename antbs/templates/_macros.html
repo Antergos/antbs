@@ -409,8 +409,10 @@
 			{% endif %}
 		</tbody>
 	</table>
-	{% call render_pagination(pagination) %}
-		&nbsp;
-	{% endcall %}
+	{% if all_pages > 1 %}
+		{% call render_pagination(pagination) %}
+			&nbsp;
+		{% endcall %}
+	{% endif %}
 {% endmacro %}
 
