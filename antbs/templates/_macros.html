@@ -383,7 +383,10 @@
 									{% set value = obj|attr(column.obj_attr) %}
 								{% endif %}
 
-								{% if 'link' == column.content_type %}
+								{%- if not value -%}
+									-
+
+								{%- elif 'link' == column.content_type %}
 									<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
 
 								{% elif 'text_with_icon' == column.content_type %}

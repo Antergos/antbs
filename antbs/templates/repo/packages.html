@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% set link = '/repo/' + name + '/packages' %}
+
+{% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
+
+{% block bottomcontent -%}
+	<div class="row">
+		<div class="col-md-12">
+			{% include '_partials/_listing_table.html' %}
+		</div>
+	</div>
+{%- endblock bottomcontent %}

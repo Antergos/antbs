@@ -117,7 +117,7 @@ def builds_with_status(build_status=None, page=None, query=None):
 
 @build_view.route('/queue')
 def build_queue():
-    return try_render_template("builds/scheduled.html",
+    return try_render_template("build/scheduled.html",
                                queued=get_build_queue(status, get_trans_object))
 
 
@@ -143,6 +143,6 @@ def build_info(bnum=None):
 
     result = 'completed' if bld_obj.completed else 'failed'
 
-    return try_render_template("builds/build_info.html", bld_obj=bld_obj, container=container,
+    return try_render_template("build/build_info.html", bld_obj=bld_obj, container=container,
                                result=result)
 

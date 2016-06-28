@@ -37,8 +37,8 @@ repo_view = Blueprint('repo', __name__)
 ##
 ###
 
-def get_repo_packages(repo_name=None, group=None, page=None):
-    if repo_name is None or page is None:
+def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
+    if repo_name is None:
         abort(500)
 
     pkgs = []
@@ -55,8 +55,12 @@ def get_repo_packages(repo_name=None, group=None, page=None):
         logger.error('repo is empty!')
         return pkgs, rev_pending, all_pages
 
-    if group:
-        repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, group)]
+    if filter and 'group' == filter:
+        repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)]
+
+    elif filter and 'search' == filter:
+        repo_packages = [p for p in sorted(repo_obj.pkgnames) if filter_by in p]
+
     else:
         repo_packages = [p for p in sorted(repo_obj.pkgnames)]
 
@@ -195,38 +199,43 @@ def get_table_columns_info():
 ##
 ###
 
-@repo_view.route('/<name>/packages/<group>')
+@build_view.route('/<name>/packages/<filter>/<filter_by>')
+@build_view.route('/<name>/packages/<filter>/<filter_by>/<int:page>')
 @repo_view.route('/<name>/packages/<int:page>')
 @repo_view.route('/<name>/packages')
-def repo_packages_listing(name=None, group=None, page=1):
-    if not name or name not in status.repos or (group and group not in status.package_groups):
+def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
+    name_ok = name and name in status.repos
+    filter_ok = 'search' == filter or ('group' == filter and filter_by in status.package_groups)
+
+    if not name_ok or (filter and not filter_ok):
         abort(404)
 
-    packages, rev_pending, all_pages = get_repo_packages(name, group, page)
+    packages, rev_pending, all_pages = get_repo_packages(name, filter, filter_by, page)
     pagination = Pagination(page, 10, all_pages)
     columns_info = get_table_columns_info()
 
-    return try_render_template("repos/listing.html", repo_packages=packages,
+    return try_render_template('repo/packages.html', repo_packages=packages,
                                pagination=pagination, all_pages=all_pages,
                                columns_info=columns_info, rev_pending=rev_pending,
-                               name=name, group=group)
+                               name=name)
 
 
 @repo_view.route('/browse/<goto>')
 @repo_view.route('/browse')
 def repo_browser(goto=None):
+    # TODO: This needs a rewrite.
     building = status.now_building
     release = False
     testing = False
     main = False
-    template = "repo_browser/repo_browser.html"
+    template = "repo/repo_browser.html"
     if goto == 'release':
         release = True
     elif goto == 'testing':
         testing = True
     elif goto == 'main':
         main = True
-        template = "repo_browser/repo_browser_main.html"
+        template = "repo/repo_browser_main.html"
 
     return try_render_template(template, building=building, release=release, testing=testing,
                                main=main)
