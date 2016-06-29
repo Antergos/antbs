@@ -334,8 +334,9 @@ class Webhook(WebhookMeta):
                             has_pkgs = True
 
             if has_pkgs:
-                # Allow github's servers time to make the pushed commits available via their API
-                gevent.sleep(30)
+                if self.is_monitor or self.is_numix:
+                    # Allow github time to make the pushed commits available via their API
+                    gevent.sleep(15)
 
                 the_pkgs = list(set(no_dups))
                 last_pkg = the_pkgs[-1]

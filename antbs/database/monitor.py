@@ -94,6 +94,8 @@ class Monitor(RedisHash):
             elif 'gitlab' == pkg_obj.monitored_service:
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
 
+            gevent.sleep(1)
+
         build_pkgs = [p for p in build_pkgs if p]
 
         if len(build_pkgs) > 0:
@@ -118,7 +120,7 @@ class Monitor(RedisHash):
         last_result = pkg_obj.monitored_last_result
         gh_repo = gh.repository(project, repo)
         latest = None
-        must_contain = '.' if 'arc-icon-theme' != repo else '2016'
+        must_contain = '.' if 'arc-icon-theme' != pkg_obj.pkgname else '2016'
 
         if 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
             must_contain = '1.14'
@@ -128,12 +130,10 @@ class Monitor(RedisHash):
         if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
             latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
 
-        is_new = latest and latest != last_result and latest.replace('v', '') != last_result
+        if 'commits' != pkg_obj.monitored_type:
+            latest = latest.replace('v', '')
 
-        if is_new or (latest and not last_result):
-            if 'commits' != pkg_obj.monitored_type:
-                latest = latest.replace('v', '')
-
+        if latest and latest != last_result or (latest and not last_result):
             pkg_obj.monitored_last_result = latest
             pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
             build_pkgs.append(pkg_obj.name)

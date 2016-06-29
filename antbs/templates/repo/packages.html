@@ -1,5 +1,7 @@
 {% extends "base.html" %}
 
+{% from '_macros.html' import table_search_box_js with context %}
+
 {% set link = '/repo/' + table_heading + '/packages' %}
 
 {% block pagetitle -%}Repo Packages{%- endblock pagetitle %}
@@ -11,3 +13,8 @@
 		</div>
 	</div>
 {%- endblock bottomcontent %}
+
+{% block scripts %}
+	{{ super() }}
+	{{ table_search_box_js() }}
+{% endblock scripts %}

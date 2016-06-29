@@ -416,3 +416,28 @@
 	{% endif %}
 {% endmacro %}
 
+
+{#
+ # Generates JavaScript for listing table search box event handlers.
+ #
+ #}
+{% macro table_search_box_js() %}
+	<script>
+		(function($) {
+			$('#search_btn').on('click', function() {
+				var search = $('#search_input').val(),
+					path = window.location.pathname.split('/'),
+					_ = path.splice(4),
+					path = path.join('/');
+
+				window.location.pathname = path + '/search/' + search;
+			});
+
+			$("#search_input").keyup(function(e) {
+				if (e.keyCode == 13) {
+					$('#search_btn').trigger('click');
+				}
+			});
+		})(jQuery);
+	</script>
+{% endmacro %}

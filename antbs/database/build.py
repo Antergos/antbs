@@ -198,7 +198,7 @@ class Build(RedisHash):
         elif not self._pkg_obj:
             self._pkg_obj = pkg_obj
 
-        self.process_and_save_build_metadata(self._pkg_obj.pkgver)
+        self.process_and_save_build_metadata(self._pkg_obj.version_str)
         
         if self.is_iso:
             result = self._build_iso()

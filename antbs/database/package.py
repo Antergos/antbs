@@ -358,10 +358,7 @@ class Package(PackageMeta):
 
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
-        pb_file = repo.file_contents(self.name + '/PKGBUILD')
-
-        if not pb_file:
-            pb_file = repo.file_contents('cinnamon/' + self.name + '/PKGBUILD')
+        pb_file = repo.file_contents(self.gh_path)
 
         pb_contents = pb_file.decoded.decode('utf-8')
         search_str = '{0}={1}'.format(var, old_val)
@@ -373,7 +370,7 @@ class Package(PackageMeta):
         new_pb_contents = pb_contents.replace(search_str, replace_str)
 
         if 'pkgver' == var:
-            commit_msg = '[ANTBS] | [updpkg] {0} {1}'.format(self.name, new_val)
+            commit_msg = '[ANTBS] | [updpkg] {0} {1}'.format(self.pkgname, new_val)
             search_str = 'pkgrel={0}'.format(self.pkgrel)
             replace_str = 'pkgrel={0}'.format('1')
             new_pb_contents = new_pb_contents.replace(search_str, replace_str)

@@ -95,8 +95,8 @@ def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
 ##
 ###
 
-@build_view.route('/<name>/packages/<filter>/<filter_by>')
-@build_view.route('/<name>/packages/<filter>/<filter_by>/<int:page>')
+@repo_view.route('/<name>/packages/<filter>/<filter_by>')
+@repo_view.route('/<name>/packages/<filter>/<filter_by>/<int:page>')
 @repo_view.route('/<name>/packages/<int:page>')
 @repo_view.route('/<name>/packages')
 def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
