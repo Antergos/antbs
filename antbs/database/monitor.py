@@ -93,7 +93,7 @@ class Monitor(RedisHash):
                 self.packages.remove(pkg)
 
     def check_repos_for_changes(self, webhook):
-        self.checked_recently = (True, 930)
+        self.checked_recently = (True, 3600)
 
         build_pkgs = []
         quiet_down_noisy_loggers()
@@ -177,6 +177,9 @@ class Monitor(RedisHash):
                     _latest = item.tag_name
                 elif 'tags' == what_to_get:
                     _latest = str(item)
+
+            except StopIteration:
+                pass
             except Exception as err:
                 logger.exception(err)
 

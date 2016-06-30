@@ -144,6 +144,7 @@ class Package(PackageMeta):
             self.determine_github_path()
 
         if fetch_pkgbuild or not self.pkgbuild:
+            logger.debug('%s: Fetching pkgbuild from github..', self.pkgname)
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if not self.pkgbuild:
@@ -415,17 +416,10 @@ class Package(PackageMeta):
                 return self.version_str if 'None' not in self.version_str else self.pkgver
         else:
             changed['pkgver'] = self.monitored_last_result
-
-            setattr(self, 'pkgver', changed['pkgver'])
-            self.update_pkgbuild_and_push_github('pkgver', old_vals['pkgver'], changed['pkgver'])
-
-            gevent.sleep(5)
-
-            setattr(self, 'pkgrel', '1')
-            self.update_pkgbuild_and_push_github('pkgrel', old_vals['pkgrel'], '1')
             changed['pkgrel'] = '1'
 
-            gevent.sleep(5)
+            setattr(self, 'pkgver', changed['pkgver'])
+            setattr(self, 'pkgrel', '1')
 
         version = changed['pkgver'] or self.pkgver
 
@@ -519,20 +513,14 @@ class Package(PackageMeta):
             self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):
-        if not self.pkgver:
-            self.pkgver = self.get_from_pkgbuild('pkgver')
-
         if 'None' in self.version_str and 'None' not in self.pkgver:
             self.version_str = self.pkgver
         elif 'None' in self.version_str:
             raise ValueError('version_str and pkgver cannot be None')
 
-        if not self.pkgdesc or not self.description:
-            self.pkgdesc = self.get_from_pkgbuild('pkgdesc')
-            self.description = self.pkgdesc
-
-        if not self.url:
-            self.url = self.get_from_pkgbuild('url')
+        self.pkgdesc = self.get_from_pkgbuild('pkgdesc')
+        self.description = self.pkgdesc
+        self.url = self.get_from_pkgbuild('url')
 
         if self.is_split_package:
             self.sync_pkgbuild_array_by_key('pkgname')
