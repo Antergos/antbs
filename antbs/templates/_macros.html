@@ -112,14 +112,14 @@
  # Generates HTML (& JavaScript) for activating custom toggles/switches.
  #
  #}
-{% macro toggles_init(data, selector) %}
+{%- macro toggles_init() -%}
 	<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
 	<script>
 		$(window).load(function () {
 			$('.switch').bootstrapSwitch();
 		});
 	</script>
-{% endmacro %}
+{%- endmacro -%}
 
 
 {#
@@ -441,3 +441,80 @@
 		})(jQuery);
 	</script>
 {% endmacro %}
+
+
+{#
+ # Generates HTML for list groups with items containing two columns.
+ #
+ # Args:
+ #     items (list[tuples]): List of tuples which contain the column contents for each list group item.
+ #
+ #}
+{% macro list_group(items) %}
+	{% if items is iterable %}
+		<div class="list-group">
+			{% for item in items %}
+				<div class="list-group-item">
+					<div class="row">
+						<div class="col-md-6">
+							<p>{{ item[0] }}:</p>
+						</div>
+						<div class="col-md-6">
+							<p>{{ item[1] }}</p>
+						</div>
+					</div>
+				</div>
+			{% endfor %}
+		</div>
+	{% endif %}
+{% endmacro %}
+
+
+{#
+ # Outputs "readonly" if condition evaluates to a truthy value.
+ #
+ # Args:
+ #     condition (mixed): If condition is truthy, output "readonly".
+ #
+ #}
+{%- macro readonly(condition) -%}
+	{%- if condition -%}
+		readonly
+	{%- endif -%}
+{%- endmacro -%}
+
+
+{#
+ # Outputs `text` if condition evaluates to a truthy value.
+ #
+ # Args:
+ #     condition (mixed): If condition is truthy, output "checked".
+ #     text      (str):   The text to output. Not required when calling this macro from another macro;
+ #                        you should place text inside call block instead.
+ #
+ #}
+{%- macro conditional_text(condition, text=None) -%}
+	{% if text is none %}
+		{% set text = caller() %}
+	{% endif %}
+	{%- if condition -%}
+		{{ text }}
+	{%- endif -%}
+{%- endmacro -%}
+
+
+{#
+ # Outputs HTML for toggle switch (input) field.
+ #
+ # Args:
+ #     on_text           (str):   Text displayed when toggle is "checked".
+ #     off_text          (str):   Text displayed when toggle is not "checked".
+ #     ro_condition      (mixed): If condition is truthy, mark the toggle input as "readonly".
+ #     checked_condition (mixed): If condition is truthy, mark the toggle input as "checked".
+ #
+ #}
+{%- macro toggle_switch(on_text='ON', off_text='OFF', ro_condition=False, checked_condition=False) -%}
+	<input class="switch" type="checkbox" data-on-color="info" data-on-text="{{ on_text }}" data-off-text="{{ off_text }}"
+		{%- call conditional_text(ro_condition) -%}readonly {% endcall -%}
+		{%- call conditional_text(checked_condition) -%}checked {% endcall -%} />
+{%- endmacro -%}

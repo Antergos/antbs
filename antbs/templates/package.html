@@ -5,6 +5,8 @@
 	toggles_init,
 	simple_counter,
 	label_tag_link,
+	toggle_switch,
+	list_group,
 	build_activity_timeline with context %}
 
 {% block pagetitle %}Package Profile{% endblock pagetitle %}
@@ -116,69 +118,19 @@
 					</div>
 					</div>
 					<div id="monitor" class="tab-pane cont no-border">
-						<table id="noDt" class="table no-border">
-							<tbody class="no-border-y no-border-x">
-							<tr>
-								<td>Status:</td>
-								{% set readonly = 'readonly' if not current_user.is_authenticated else '' %}
-								{% set checked = 'checked' if pkg.is_monitored else '' %}
-								<td>
-									<input class="switch" type="checkbox" {{ checked }} data-on-color="info" {{ readonly }}>
-								</td>
-							</tr>
-							{% if pkg.is_monitored %}
-								<tr>
-									<td>Service:</td>
-									<td>{{ pkg.monitored_service|capitalize() }}</td>
-								</tr>
-								<tr>
-									<td>Type:</td>
-									<td>{{ pkg.monitored_type }}</td>
-								</tr>
-								<tr>
-									<td>Project:</td>
-									<td>{{ pkg.monitored_project }}</td>
-								</tr>
-								<tr>
-									<td>Repo:</td>
-									<td>{{ pkg.monitored_repo }}</td>
-								</tr>
-								<tr>
-									<td>Last Check:</td>
-									<td>{{ pkg.monitored_last_checked }}</td>
-								</tr>
-								<tr>
-									<td>Next Check:</td>
-									<td></td>
-								</tr>
-							{% else %}
-								<tr>
-									<td>Service:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Type:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Project:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Repo:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Last Check:</td>
-									<td></td>
-								</tr>
-								<tr>
-									<td>Next Check:</td>
-									<td></td>
-								</tr>
-							{% endif %}
-							</tbody>
-						</table>
+						{% set readonly = not current_user.is_authenticated %}
+						{% set checked = pkg.is_monitored %}
+						{% set toggle = toggle_switch(ro_condition=readonly, checked_condition=checked) %}
+						{% set items = [('Status', toggle)] %}
+						{% if pkg.is_monitored %}
+							{% do items.append(('Service', pkg.monitored_service|capitalize())) %}
+							{% do items.append(('Type', pkg.monitored_type)) %}
+							{% do items.append(('Project', pkg.monitored_project)) %}
+							{% do items.append(('Repo', pkg.monitored_repo)) %}
+							{% do items.append(('Last Check', pkg.monitored_last_checked)) %}
+							{% do items.append(('Next Check', '')) %}
+						{% endif %}
+						{{ list_group(items) }}
 					</div>
 					<div id="pkg_actions" class="tab-pane">
 
