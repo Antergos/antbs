@@ -32,6 +32,7 @@ Repo Monitor Module:
     Monitors commit activity on 3rd-party repos and schedules builds
     when new commits are detected.
 """
+
 from datetime import datetime
 
 import gevent
@@ -77,12 +78,26 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
+    def _sync_monitored_packages_list(self):
+        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
+        monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
+        new_pkgs = list(set(monitored) - set(list(self.packages)))
+        rm_pkgs = list(set(list(self.packages)) - set(monitored))
+
+        if new_pkgs:
+            for pkg in new_pkgs:
+                self.packages.add(pkg)
+
+        if rm_pkgs:
+            for pkg in rm_pkgs:
+                self.packages.remove(pkg)
+
     def check_repos_for_changes(self, webhook):
         self.checked_recently = (True, 930)
 
         build_pkgs = []
         quiet_down_noisy_loggers()
-        self.check_for_new_monitored_packages()
+        self._sync_monitored_packages_list()
 
         logger.info('Checking github repos for changes...')
 
@@ -105,22 +120,16 @@ class Monitor(RedisHash):
             version = self.db.get('antbs:misc:iso-release:do_check')
             self.check_mirror_for_iso(version)
 
-    def check_for_new_monitored_packages(self):
-        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p and gevent.sleep(0.4)]
-        new_pkgs = [p for p in pkg_objs if p.is_monitored and p.pkgname not in self.packages]
-
-        if new_pkgs:
-            for pkg in new_pkgs:
-                self.packages.add(pkg)
-
     def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
         gh = login(token=GITHUB_TOKEN)
         project = pkg_obj.monitored_project
         repo = pkg_obj.monitored_repo
         last_result = pkg_obj.monitored_last_result
         gh_repo = gh.repository(project, repo)
-        latest = None
-        must_contain = '.' if 'arc-icon-theme' != pkg_obj.pkgname else '2016'
+        numbers_only = ['arc-icon-theme', 'gtk-theme-arc']
+        must_contain = '.' if pkg_obj.pkgname not in numbers_only else '2016'
+
+        pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
 
         if 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups:
             must_contain = '1.14'
@@ -130,19 +139,22 @@ class Monitor(RedisHash):
         if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
             latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
 
-        if 'commits' != pkg_obj.monitored_type:
+        if not latest:
+            logger.error(
+                '%s - latest: %s, last_result: %s, pkgver: %s',
+                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
+            )
+            return build_pkgs
+
+        if 'v' in latest and 'commits' != pkg_obj.monitored_type:
             latest = latest.replace('v', '')
 
-        if latest and latest != last_result or (latest and not last_result):
+        if latest != last_result or not last_result:
             pkg_obj.monitored_last_result = latest
-            pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
             build_pkgs.append(pkg_obj.name)
 
             if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:
                 pkg_obj.update_pkgbuild_and_push_github('pkgver', latest)
-
-        elif not latest:
-            logger.error('latest for %s is Falsey: %s', latest, pkg_obj.name)
 
         return build_pkgs
 
@@ -173,8 +185,8 @@ class Monitor(RedisHash):
         latest = _get_next_item()
         logger.debug(latest)
 
-        if must_contain and must_contain not in latest:
-            while must_contain not in latest:
+        if not latest or (must_contain and must_contain not in latest):
+            while not latest or (must_contain not in latest):
                 latest = _get_next_item()
                 items_checked += 1
 

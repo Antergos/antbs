@@ -289,8 +289,6 @@ class PacmanRepo(RedisHash):
     def _get_packages_unaccounted_for_info(self):
         unaccounted_for = {}
 
-        logger.debug([self.name, list(self.unaccounted_for)])
-
         for pkg in self.unaccounted_for:
             pkgname, pkgver, arch = self._split_pkg_info_string(pkg)
             unaccounted_for[pkgname] = dict(fs=[], alpm=[])
@@ -343,8 +341,6 @@ class PacmanRepo(RedisHash):
 
         for pkg in self._get_pkgnames(accounted_for):
             self.pkgnames.append(pkg)
-
-        logger.debug([self.name, unaccounted_for])
 
     def _process_repo_packages_unaccounted_for(self):
         unaccounted_for = self._get_packages_unaccounted_for_info()
