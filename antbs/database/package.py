@@ -303,7 +303,6 @@ class Package(PackageMeta):
             self.gh_path = gh_path
             return True
 
-
     @staticmethod
     def get_github_api_client(project='antergos', repo='antergos-packages'):
         gh = login(token=status.github_token)
@@ -409,47 +408,39 @@ class Package(PackageMeta):
 
                 elif new_val and (new_val != old_vals[key] or new_val not in self.version_str):
                     changed[key] = new_val
-                    setattr(self, key, new_val)
 
-            has_changes = [True for k in changed if changed[k] is not False]
-            if not has_changes:
-                return self.version_str if 'None' not in self.version_str else self.pkgver
         else:
-            changed['pkgver'] = self.monitored_last_result
-            changed['pkgrel'] = '1'
+            if self.monitored_last_result != old_vals['pkgver']:
+                changed['pkgver'] = self.monitored_last_result
+                changed['pkgrel'] = '1'
 
-            setattr(self, 'pkgver', changed['pkgver'])
-            setattr(self, 'pkgrel', '1')
+        changes = [k for k in changed if changed[k] is not False]
+        if not changes:
+            is_valid = self.version_str and 'None' not in self.version_str
+            return self.version_str if is_valid else self.pkgver
 
-        version = changed['pkgver'] or self.pkgver
+        for key in changes:
+            if changed[key] is False:
+                raise ValueError
+            setattr(self, key, changed[key])
 
-        if version and 'None' in version:
-            raise RuntimeError('None in version!')
+        version_str = '{0}-{1}'.format(self.pkgver, self.pkgrel)
 
-        if changed['epoch']:
-            version = '{0}:{1}'.format(changed['epoch'], version)
-        elif self.epoch:
-            version = '{0}:{1}'.format(self.epoch, version)
+        if self.epoch:
+            version_str = '{0}:{1}'.format(self.epoch, version_str)
 
-        if changed['pkgrel']:
-            version = '{0}-{1}'.format(version, changed['pkgrel'])
-        elif self.pkgrel:
-            version = '{0}-{1}'.format(version, self.pkgrel)
+        if version_str and len(version_str) > 3 and 'None' not in version_str:
+            self.version_str = version_str
         else:
-            version = '{0}-{1}'.format(version, '1')
-
-        if version and len(version) > 2 and 'None' not in version:
-            setattr(self, 'version_str', version)
-        else:
-            version = self.version_str if 'None' not in self.version_str else self.pkgver
+            raise ValueError
 
         if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
             if not self.db.exists('CNCHI-DEV-OVERRIDE'):
-                version = False
+                version_str = False
             else:
                 self.db.delete('CNCHI-DEV-OVERRIDE')
 
-        return version
+        return version_str
 
     def get_deps(self, makedepends=False):
         depends = []
