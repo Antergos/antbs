@@ -115,9 +115,21 @@
 {%- macro toggles_init() -%}
 	<script type="text/javascript" src="/static/js/bootstrap-switch.min.js"></script>
 	<script>
-		$(window).load(function () {
-			$('.switch').bootstrapSwitch();
-		});
+		(function($) {
+			$(window).load(function() {
+				var $inside_tab = $('.tab-pane:not(.active) .switch');
+
+				if ($inside_tab.length) {
+					$('a[data-toggle="tab"]').on('shown.bs.tab', function() {
+						var target = $(this).attr('href');
+						$(target).find('.switch').bootstrapSwitch();
+						$(this).off('shown.bs.tab');
+					});
+				} else {
+					$('.switch').bootstrapSwitch();
+				}
+			});
+		})(jQuery);
 	</script>
 {%- endmacro -%}
 
@@ -450,17 +462,21 @@
  #     items (list[tuples]): List of tuples which contain the column contents for each list group item.
  #
  #}
-{% macro list_group(items) %}
+{% macro list_group(items, column_sizes=['6', '6']) %}
 	{% if items is iterable %}
 		<div class="list-group">
 			{% for item in items %}
 				<div class="list-group-item">
 					<div class="row">
-						<div class="col-md-6">
+						<div class="col-md-{{ column_sizes[0] }}">
 							<p>{{ item[0] }}:</p>
 						</div>
-						<div class="col-md-6">
-							<p>{{ item[1] }}</p>
+						<div class="col-md-{{ column_sizes[1] }}">
+							{% if 'Status' != item[0] %}
+								<p>{{ item[1] }}</p>
+							{% else %}
+								{{ item[1] }}
+							{% endif %}
 						</div>
 					</div>
 				</div>

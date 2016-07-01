@@ -89,6 +89,8 @@ def get_and_show_pkg_profile(pkgname=None, tlpage=1):
 
     tl_events, all_pages = get_build_events_timeline(pkg_obj, tlpage=tlpage)
     build_counts = get_build_counts(pkg_obj)
+    columns_info_obj = ColumnsInfo(current_user)
+    service_icons_info = columns_info_obj.get_repo_monitor_services_icons_info()
 
     return try_render_template(
         'package.html',
@@ -96,5 +98,6 @@ def get_and_show_pkg_profile(pkgname=None, tlpage=1):
         tl_events=tl_events,
         page=tlpage,
         all_pages=all_pages,
-        build_counts=build_counts
+        build_counts=build_counts,
+        service_icons_info=service_icons_info
     )

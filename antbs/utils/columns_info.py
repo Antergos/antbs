@@ -139,3 +139,17 @@ class ColumnsInfo:
             })
 
         return columns_info
+
+    @staticmethod
+    def get_new_icon_info_dict():
+        return {'class': {}, 'color': {}}
+
+    def get_repo_monitor_services_icons_info(self):
+        icon_info = self.get_new_icon_info_dict()
+        icon_info['class']['GitHub'] = 'github'
+        icon_info['color']['GitHub'] = '#000000'
+        icon_info['class']['Gitlab'] = 'gitlab'
+        icon_info['color']['Gitlab'] = '#ffffff'
+
+        return icon_info
+
