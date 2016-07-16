@@ -39,11 +39,9 @@ from . import Singleton
 
 
 class DockerUtils(metaclass=Singleton):
-    doc = _db = _status = _logger = _app_dir = _src_dir = _doc_dir = _build_dir = None
+    doc = _db = _status = _logger = _app_dir = _src_dir = _doc_dir = _build_dir = gpg_dir = None
 
     def __init__(self, _status=None):
-        self.cache_dir = '/var/tmp/pkg_cache'
-        self.cache_i686 = '/var/tmp/pkg_cache_i686'
         self.is_building_images = False
         self.result_dir = '/tmp/pkgver_result'
 
@@ -54,18 +52,16 @@ class DockerUtils(metaclass=Singleton):
 
         if self._db is None:
             self._db = _status.db
-
-        if self._status is None:
             self._status = _status
-
-        if self._logger is None:
             self._logger = _status.logger
-
-        if self._app_dir is None:
             self._app_dir = _status.APP_DIR
             self._src_dir = _status.APP_DIR
             self._doc_dir = os.path.join(self._src_dir, 'build/docker')
             self._build_dir = os.path.join(self._src_dir, 'build')
+            self.gpg_dir = _status.GNUPG_DIR
+
+        self.cache_dir = self._status.PKG_CACHE_DIR
+        self.cache_i686 = self._status.PKG_CACHE_DIR32
 
         if self.doc is None:
             # Initiate communication with docker daemon
@@ -124,12 +120,12 @@ class DockerUtils(metaclass=Singleton):
                     'bind': '/makepkg',
                     'ro': False
                 },
-            '/srv/antergos.info/repo/antergos-staging':
+            self._status.STAGING_REPO:
                 {
                     'bind': '/staging',
                     'ro': False
                 },
-            '/srv/antergos.info/repo/antergos':
+            self._status.MAIN_REPO:
                 {
                     'bind': '/main',
                     'ro': False
@@ -139,7 +135,7 @@ class DockerUtils(metaclass=Singleton):
                     'bind': '/pkg',
                     'ro': False
                 },
-            '/root/.gnupg':
+            self.gpg_dir:
                 {
                     'bind': '/root/.gnupg',
                     'ro': False
@@ -169,17 +165,17 @@ class DockerUtils(metaclass=Singleton):
                         'bind': '/makepkg',
                         'ro': False
                     },
-                '/srv/antergos.info/repo/antergos':
+                self._status.MAIN_REPO:
                     {
                         'bind': '/main',
                         'ro': False
                     },
-                '/srv/antergos.info/repo/antergos-staging':
+                self._status.STAGING_REPO:
                     {
                         'bind': '/staging',
                         'ro': False
                     },
-                '/root/.gnupg':
+                self.gpg_dir:
                     {
                         'bind': '/root/.gnupg',
                         'ro': False
@@ -313,16 +309,11 @@ class DockerUtils(metaclass=Singleton):
         return True
 
     def build_mkarchiso(self):
-        """
+        shutil.rmtree(os.path.join(self._status.MKARCHISO_DIR, 'antergos-iso'), ignore_errors=True)
 
-
-        :return:
-        """
-        dockerfile = '/opt/archlinux-mkarchiso'
-        shutil.rmtree(os.path.join(dockerfile, 'antergos-iso'), ignore_errors=True)
         try:
             build_it = [line for line in
-                        self.doc.build(dockerfile,
+                        self.doc.build(self._status.MKARCHISO_DIR,
                                        tag='antergos/mkarchiso',
                                        quiet=False,
                                        nocache=True,

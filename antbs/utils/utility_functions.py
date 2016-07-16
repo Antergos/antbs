@@ -60,6 +60,14 @@ def remove(src):
             logging.error(err)
 
 
+def set_uid_and_gid():
+    uid = os.geteuid()
+    gid = os.getegid()
+
+    os.setresuid(33, 33, uid)
+    os.setresgid(33, 33, gid)
+
+
 def copy_or_symlink(src, dst, logger=None):
     """
     Copies the file at `src` to `dst`. If `src` is a symlink the link will be
@@ -157,15 +165,14 @@ def try_run_command(cmd, cwd, logger=None):
 
     res = None
     success = False
-    uid = os.geteuid()
-    gid = os.getegid()
-
-    os.setegid(33)
-    os.seteuid(33)
 
     try:
         res = subprocess.check_output(
-            cmd, stderr=subprocess.STDOUT, universal_newlines=True, cwd=cwd
+            cmd,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
+            cwd=cwd,
+            preexec_fn=set_uid_and_gid
         )
         success = True
     except subprocess.CalledProcessError as err:
@@ -174,9 +181,6 @@ def try_run_command(cmd, cwd, logger=None):
         else:
             logging.exception((err.output, err.stderr))
         res = err.output
-
-    os.setegid(gid)
-    os.seteuid(uid)
 
     return success, res
 
