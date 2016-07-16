@@ -132,8 +132,8 @@ class Monitor(RedisHash):
 
         pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
 
-        if is_mate_pkg and pkg_obj.pkgname not in ['galculator']:
-            must_contain = '1.14'
+        if (is_mate_pkg or 'mate-' in pkg_obj.pkgname) and pkg_obj.pkgname not in ['galculator']:
+            must_contain = '1.14' if 'themes' not in pkg_obj.pkgname else '3.20'
 
         latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
 

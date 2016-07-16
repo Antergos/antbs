@@ -151,11 +151,9 @@ class DockerUtils(metaclass=Singleton):
 
         binds[result_dir] = {'bind': '/result', 'ro': False}
 
-        pkgs_hconfig = self.doc.create_host_config(binds=binds,
-                                                   restart_policy={"MaximumRetryCount": 2,
-                                                                   "Name": "on-failure"},
-                                                   privileged=True, mem_limit='2G',
-                                                   memswap_limit='-1')
+        pkgs_hconfig = self.doc.create_host_config(
+            binds=binds, privileged=True, mem_limit='2G', memswap_limit='-1'
+        )
         return pkgs_hconfig
 
     def create_repo_update_host_config(self, result_dir='/tmp/result'):
@@ -299,9 +297,13 @@ class DockerUtils(metaclass=Singleton):
         dockerfile = os.path.join(self._doc_dir, 'makepkg')
         try:
             build_it = [line for line in
-                        self.doc.build(dockerfile, 'antergos/makepkg', quiet=False, nocache=True,
+                        self.doc.build(dockerfile,
+                                       'antergos/makepkg',
+                                       quiet=False,
+                                       nocache=True,
                                        rm=True,
-                                       stream=True, forcerm=True)]
+                                       stream=True,
+                                       forcerm=True)]
             if build_it:
                 self.push_to_hub('antergos/makepkg')
         except Exception as err:
@@ -320,9 +322,13 @@ class DockerUtils(metaclass=Singleton):
         shutil.rmtree(os.path.join(dockerfile, 'antergos-iso'), ignore_errors=True)
         try:
             build_it = [line for line in
-                        self.doc.build(dockerfile, tag='antergos/mkarchiso', quiet=False,
+                        self.doc.build(dockerfile,
+                                       tag='antergos/mkarchiso',
+                                       quiet=False,
                                        nocache=True,
-                                       rm=True, stream=True, forcerm=True)]
+                                       rm=True,
+                                       stream=True,
+                                       forcerm=True)]
             if build_it:
                 self.push_to_hub('antergos/mkarchiso')
         except Exception as err:
@@ -341,7 +347,7 @@ class DockerUtils(metaclass=Singleton):
             return
         try:
             self.doc.login(username=self._status.docker_user,
-                           password=self._status.docker_password, email='dustin@falgout.us')
+                           password=self._status.docker_password, email=self._status.email)
             response = [line for line in self.doc.push(repo, stream=True, insecure_registry=True)]
             if not response:
                 self._logger.info('Pushing to Docker hub might not have completed successfully.')

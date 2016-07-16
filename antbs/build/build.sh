@@ -232,8 +232,10 @@ setup_32bit_env() {
 	chmod -R 777 /32build
 	cp /usr/share/devtools/makepkg-i686.conf /32bit/makepkg.conf
 	cp /etc/pacman.conf /32bit
-	sed -i '/\[multilib/,+1 d' /32bit/pacman.conf
-	sed -i 's|Architecture = auto|Architecture = i686|g' /32bit/pacman.conf
+	sed -i '/\[multilib/,+1 d;
+		s|Architecture = auto|Architecture = i686|g; /32bit/pacman.conf
+		s|file:\/\/\/main\/\$arch|http://repo.antergos.info/\$repo/\$arch|g;
+		s|file:\/\/\/staging\/\$arch|http://repo.antergos.info/\$repo/\$arch|g;' /32bit/pacman.conf
 	mkdir /run/shm || true
 
 	if [[ "${_ALEXPKG}" = 'False' ]]; then
@@ -272,8 +274,6 @@ setup_32bit_env() {
 	chmod 755 /32build/root/etc/sudoers.d
 	chmod 700 /32build/root/usr/lib/sudo
 	chmod 600 /32build/root/usr/lib/sudo/*.so
-	sed -i 's|file:\/\/\/main/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
-	sed -i 's|file:\/\/\/staging/\$arch|http://repo.antergos.info/\$repo/\$arch|g' /32build/root/etc/pacman.conf
 	# mount -o bind /var/cache/pacman_i686 /32build/root/var/cache/pacman
 	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 	arch-chroot /32build/root reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
@@ -356,7 +356,7 @@ build_package() {
 	fi
 
 	# If we haven't exited before now then something went wrong. Build failed.
-	exit 1;
+	#exit 1;
 }
 
 
@@ -405,4 +405,9 @@ if [[ -n "${_GET_GENERATES}" ]]; then
 fi
 
 build_package || { _2log 'BUILD FAILED' && exit 1; }
+
+#while [[ -z "${ANTBS_STOP}" ]]
+#do
+#	sleep 15
+#done
 

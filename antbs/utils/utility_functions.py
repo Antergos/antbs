@@ -72,6 +72,9 @@ def copy_or_symlink(src, dst, logger=None):
 
     """
 
+    uid = os.geteuid()
+    gid = os.getegid()
+
     os.setegid(33)
     os.seteuid(33)
 
@@ -90,8 +93,8 @@ def copy_or_symlink(src, dst, logger=None):
         except Exception as err:
             logger.error(err)
 
-    os.setegid(0)
-    os.seteuid(0)
+    os.setegid(gid)
+    os.seteuid(uid)
 
 
 def symlink(src, dst, relative_to=None):
@@ -105,6 +108,9 @@ def symlink(src, dst, relative_to=None):
         dst (str): The path at which the link to the file at `src` should be created.
 
     """
+
+    uid = os.geteuid()
+    gid = os.getegid()
 
     os.setegid(33)
     os.seteuid(33)
@@ -120,8 +126,8 @@ def symlink(src, dst, relative_to=None):
 
     os.symlink(src, dst)
 
-    os.setegid(0)
-    os.seteuid(0)
+    os.setegid(gid)
+    os.seteuid(uid)
 
 
 def quiet_down_noisy_loggers():
@@ -151,6 +157,8 @@ def try_run_command(cmd, cwd, logger=None):
 
     res = None
     success = False
+    uid = os.geteuid()
+    gid = os.getegid()
 
     os.setegid(33)
     os.seteuid(33)
@@ -167,8 +175,8 @@ def try_run_command(cmd, cwd, logger=None):
             logging.exception((err.output, err.stderr))
         res = err.output
 
-    os.setegid(0)
-    os.seteuid(0)
+    os.setegid(gid)
+    os.seteuid(uid)
 
     return success, res
 
