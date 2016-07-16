@@ -62,6 +62,7 @@ prepare_makepkg_and_pacman_configs() {
 
 		cp /usr/share/devtools/makepkg-x86_64.conf "${_MAKEPKG_CONF}"
 		sed -i 's|unknown|x86_64|g' "${_MAKEPKG_CONF}"
+		echo 'PKGDEST=/result' >> "${_MAKEPKG_CONF}"
 	else
 		_PACMAN_CONF='/32bit/pacman.conf'
 		_MAKEPKG_CONF='/32bit/makepkg.conf'
@@ -83,18 +84,15 @@ prepare_makepkg_and_pacman_configs() {
 	else
 		sed -i '/\[multilib/,+1 d;
 				s|Architecture = auto|Architecture = i686|g;
-				1s%^%[antergos]\nSigLevel = PackageRequired\nServer = http:///repo.antergos.info/$repo/$arch\n%;
-				1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = http:///repo.antergos.info/$repo/$arch\n%;' "${_PACMAN_CONF}"
+				1s%^%[antergos]\nSigLevel = PackageRequired\nServer = http://repo.antergos.info/$repo/$arch\n%;
+				1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = http://repo.antergos.info/$repo/$arch\n%;' "${_PACMAN_CONF}"
 	fi
 
 	sed -i '' "${_PACMAN_CONF}"
-	echo 'PKGDEST=/result' >> "${_MAKEPKG_CONF}"
 
 }
 
 setup_environment() {
-	export update_error='ERROR UPDATING STAGING REPO (BUILD FAILED)'
-	export update_success='STAGING REPO UPDATE COMPLETE'
 	export HOME=/pkg
 
 	if [[ -f /pkg/PKGBUILD ]]; then
@@ -270,13 +268,6 @@ pkgbuild_produces_i686_package() {
 }
 
 
-export_update_repo_env_vars() {
-	export repo="${_REPO}"
-	export repo_dir="${_REPO_DIR}"
-	export RESULT="${_RESULT}"
-}
-
-
 build_package() {
 	_2log 'SYNCING REPO DATABASES'
 	reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
@@ -293,12 +284,11 @@ build_package() {
 	if pkgbuild_produces_i686_package; then
 		_2log 'i686 DETECTED'; cp --copy-contents -t /32bit /pkg/***
 
-		{ try_build 2>&1 && try_build 'i686' 2>&1 && exit 0; } || exit 1
+		{ try_build 2>&1 && try_build 'i686' 2>&1 && return 0; }
 	else
-		{ try_build 2>&1 && exit 0; } || exit 1
+		{ try_build 2>&1 && return 0; }
 	fi
 
-	# If we haven't exited before now then something went wrong. Build failed.
 	return 1;
 }
 
