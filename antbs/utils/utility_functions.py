@@ -64,8 +64,8 @@ def set_uid_and_gid():
     uid = os.geteuid()
     gid = os.getegid()
 
-    os.setresuid(33, 33, uid)
     os.setresgid(33, 33, gid)
+    os.setresuid(33, 33, uid)
 
 
 def copy_or_symlink(src, dst, logger=None):
