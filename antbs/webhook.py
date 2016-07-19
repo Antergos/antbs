@@ -394,6 +394,11 @@ class Webhook(WebhookMeta):
         namespace = 'cnchi' + self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
 
+        if not client_ip:
+            self.result = json.dumps({'id': 'unknown', 'ip': '0.0.0.0'})
+            logger.error('no ip!')
+            return
+
         install = AntergosInstallation(namespace=namespace, ip=client_ip)
         user = AntergosInstallationUser(namespace=namespace,
                                         ip=client_ip,
@@ -406,6 +411,11 @@ class Webhook(WebhookMeta):
 
         namespace = 'cnchi' + self.is_cnchi[2:4]
         client_ip = self.request.remote_addr
+
+        if not client_ip:
+            self.result = json.dumps({'msg': 'Ok!'})
+            logger.error('no ip!')
+            return
 
         install = AntergosInstallation(namespace=namespace, install_id=install_id)
         user = AntergosInstallationUser(namespace=namespace, ip=client_ip)
