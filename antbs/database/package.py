@@ -56,13 +56,13 @@ class PackageMeta(RedisHash):
 
     attrib_lists = dict(
         string=['git_name',     'build_path',     'description',    'epoch',
-                'git_url',      'failure_rate',   'gh_project',     'iso_md5',
-                'name',         'gh_repo',        'iso_url',        'monitored_last_result',
-                'pkgdesc',      'heat_map',       'monitored_type', 'monitored_project',
-                'pkgrel',       'monitored_repo', 'pbpath',         'monitored_service',
-                'pkgver',       'pkgname',        'pkgbuild',       'short_name',
-                'success_rate', 'url',            'version_str',    'gh_path',
-                'monitored_last_checked'],
+                'git_url',      'failure_rate',   'gh_project',     'gh_path',
+                'name',         'gh_repo',        'iso_url',        'iso_md5',
+                'pkgdesc',      'heat_map',       'monitored_type', 'monitored_last_checked',
+                'pkgrel',       'monitored_repo', 'pbpath',         'monitored_last_result',
+                'pkgver',       'pkgname',        'pkgbuild',       'monitored_project',
+                'short_name',   'url',            'version_str',    'monitored_service',
+                'success_rate'],
 
         bool=['is_metapkg', 'auto_sum', 'is_split_package', 'is_initialized',
               'push_version', 'is_monitored', 'saved_commit', 'is_iso'],

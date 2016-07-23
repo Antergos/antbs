@@ -78,87 +78,6 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-    def _sync_monitored_packages_list(self):
-        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
-        monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
-        new_pkgs = list(set(monitored) - set(list(self.packages)))
-        rm_pkgs = list(set(list(self.packages)) - set(monitored))
-
-        if new_pkgs:
-            for pkg in new_pkgs:
-                self.packages.add(pkg)
-
-        if rm_pkgs:
-            for pkg in rm_pkgs:
-                self.packages.remove(pkg)
-
-    def check_repos_for_changes(self, webhook):
-        self.checked_recently = (True, 3600)
-
-        build_pkgs = []
-        quiet_down_noisy_loggers()
-        self._sync_monitored_packages_list()
-
-        logger.info('Checking github repos for changes...')
-
-        for pkg in self.packages:
-            pkg_obj = get_pkg_object(name=pkg)
-
-            if 'github' == pkg_obj.monitored_service:
-                build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
-            elif 'gitlab' == pkg_obj.monitored_service:
-                build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
-
-            gevent.sleep(1.5)
-
-        build_pkgs = [p for p in build_pkgs if p]
-
-        if len(build_pkgs) > 0:
-            self.add_to_build_queue(build_pkgs, webhook)
-
-        if self.db.exists('antbs:misc:iso-release:do_check'):
-            version = self.db.get('antbs:misc:iso-release:do_check')
-            self.check_mirror_for_iso(version)
-
-    def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
-        gh = login(token=GITHUB_TOKEN)
-        project = pkg_obj.monitored_project
-        repo = pkg_obj.monitored_repo
-        last_result = pkg_obj.monitored_last_result
-        gh_repo = gh.repository(project, repo)
-        numbers_only = ['arc-icon-theme', 'gtk-theme-arc']
-        must_contain = '.' if pkg_obj.pkgname not in numbers_only else '2016'
-        is_mate_pkg = 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups
-
-        pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
-
-        if (is_mate_pkg or 'mate-' in pkg_obj.pkgname) and pkg_obj.pkgname not in ['galculator']:
-            must_contain = '1.14' if 'themes' not in pkg_obj.pkgname else '3.20'
-
-        latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
-
-        if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
-            latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
-
-        if not latest or latest in ['None']:
-            logger.error(
-                '%s - latest: %s, last_result: %s, pkgver: %s',
-                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
-            )
-            return build_pkgs
-
-        if 'v' in latest and 'commits' != pkg_obj.monitored_type:
-            latest = latest.replace('v', '')
-
-        if latest != last_result or latest != pkg_obj.pkgver or not last_result:
-            pkg_obj.monitored_last_result = latest
-            build_pkgs.append(pkg_obj.name)
-
-            if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:
-                pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)
-
-        return build_pkgs
-
     @staticmethod
     def _get_releases_tags_or_commits(gh_repo, what_to_get, must_contain=None):
         git_item = getattr(gh_repo, what_to_get)
@@ -200,6 +119,80 @@ class Monitor(RedisHash):
         logger.debug(latest)
         return latest
 
+    def _sync_monitored_packages_list(self):
+        pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
+        monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
+        new_pkgs = list(set(monitored) - set(list(self.packages)))
+        rm_pkgs = list(set(list(self.packages)) - set(monitored))
+
+        if new_pkgs:
+            for pkg in new_pkgs:
+                self.packages.add(pkg)
+
+        if rm_pkgs:
+            for pkg in rm_pkgs:
+                self.packages.remove(pkg)
+
+    @staticmethod
+    def add_iso_versions_to_wordpress(iso_pkgs):
+        bridge = iso_utility.WordPressBridge(auth=(status.docker_user, status.wp_password))
+        success = []
+        for iso_pkg in iso_pkgs:
+            success.append(bridge.add_new_iso_version(iso_pkg))
+            logger.info(success)
+
+        return all(success)
+
+    @staticmethod
+    def add_to_build_queue(pkgs, whook):
+        req = dict(method='POST', args={})
+        wh = whook(req)
+
+        wh.is_numix = True
+        wh.repo = 'antergos-packages'
+        wh.changes = [pkgs]
+
+        wh.process_changes()
+
+    def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
+        gh = login(token=GITHUB_TOKEN)
+        project = pkg_obj.monitored_project
+        repo = pkg_obj.monitored_repo
+        last_result = pkg_obj.monitored_last_result
+        gh_repo = gh.repository(project, repo)
+        numbers_only = ['arc-icon-theme', 'gtk-theme-arc']
+        must_contain = '.' if pkg_obj.pkgname not in numbers_only else '2016'
+        is_mate_pkg = 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups
+
+        pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
+
+        if (is_mate_pkg or 'mate-' in pkg_obj.pkgname) and pkg_obj.pkgname not in ['galculator']:
+            must_contain = '1.14' if 'themes' not in pkg_obj.pkgname else '3.20'
+
+        latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
+
+        if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
+            latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
+
+        if not latest or latest in ['None']:
+            logger.error(
+                '%s - latest: %s, last_result: %s, pkgver: %s',
+                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
+            )
+            return build_pkgs
+
+        if 'v' in latest and 'commits' != pkg_obj.monitored_type:
+            latest = latest.replace('v', '')
+
+        if latest != last_result or latest != pkg_obj.pkgver or not last_result:
+            pkg_obj.monitored_last_result = latest
+            build_pkgs.append(pkg_obj.name)
+
+            if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:
+                pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)
+
+        return build_pkgs
+
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
         gl.auth()
@@ -239,26 +232,33 @@ class Monitor(RedisHash):
             else:
                 logger.error('At least one iso was not successfully added to wordpress.')
 
-    @staticmethod
-    def add_iso_versions_to_wordpress(iso_pkgs):
-        bridge = iso_utility.WordPressBridge(auth=(status.docker_user, status.wp_password))
-        success = []
-        for iso_pkg in iso_pkgs:
-            success.append(bridge.add_new_iso_version(iso_pkg))
-            logger.info(success)
+    def check_repos_for_changes(self, webhook):
+        self.checked_recently = (True, 3600)
 
-        return all(success)
+        build_pkgs = []
+        quiet_down_noisy_loggers()
+        self._sync_monitored_packages_list()
 
-    @staticmethod
-    def add_to_build_queue(pkgs, whook):
-        req = dict(method='POST', args={})
-        wh = whook(req)
+        logger.info('Checking github repos for changes...')
 
-        wh.is_numix = True
-        wh.repo = 'antergos-packages'
-        wh.changes = [pkgs]
+        for pkg in self.packages:
+            pkg_obj = get_pkg_object(name=pkg)
 
-        wh.process_changes()
+            if 'github' == pkg_obj.monitored_service:
+                build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
+            elif 'gitlab' == pkg_obj.monitored_service:
+                build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
+
+            gevent.sleep(1.5)
+
+        build_pkgs = [p for p in build_pkgs if p]
+
+        if len(build_pkgs) > 0:
+            self.add_to_build_queue(build_pkgs, webhook)
+
+        if self.db.exists('antbs:misc:iso-release:do_check'):
+            version = self.db.get('antbs:misc:iso-release:do_check')
+            self.check_mirror_for_iso(version)
 
 
 def get_monitor_object(name):
