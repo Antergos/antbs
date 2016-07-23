@@ -289,7 +289,7 @@ def live_status_updates():
     #         return json.dumps(message)
 
     if iso_release and current_user.is_authenticated:
-        transaction_queue.enqueue_call(iso_utility.iso_release_job)
+        transaction_queue.enqueue_call(iso_release_job)
         return json.dumps(message)
 
     elif reset_queue and current_user.is_authenticated:

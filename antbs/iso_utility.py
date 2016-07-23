@@ -65,8 +65,7 @@ class ISOUtility:
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.md5sums_path = os.path.join(TESTING_DIR, 'MD5SUMS')
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
-        self.files = [self.file_path, self.file_path + '.sig',
-                      self.file_path + '.md5', self.file_path + '.torrent']
+        self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.torrent']
         self.md5 = None
         self.webseeds = self.get_webseeds()
         logger.debug(self.webseeds)
@@ -137,14 +136,14 @@ class ISOUtility:
         """ Write checksum to a file """
         md5_sum = self.checksum_md5(self.file_path)
         self.md5 = md5_sum
-        line = '{} {}'.format(md5_sum, self.file_name)
+        line = '{} {}\n'.format(md5_sum, self.file_name)
 
         with open(self.md5sums_path, 'a') as check_sum:
             check_sum.write(line)
 
     def sign_with_gnupg(self):
         """ Create a detached signature using GNUPG. """
-        batch_sign([self.md5sums_path], db, GPG_KEY, PASSWORD, is_iso=True)
+        batch_sign([self.file_path], db, passphrase=PASSWORD, is_iso=True)
 
 
 class WordPressBridge:
@@ -152,9 +151,7 @@ class WordPressBridge:
     def __init__(self, auth):
         self.post_id_map = {
             'antergos-x86_64': '2563',
-            'antergos-i686': '2564',
-            'antergos-minimal-x86_64': '2565',
-            'antergos-minimal-i686': '2566'
+            'antergos-minimal-x86_64': '2565'
         }
         self.auth = auth
         logger.info('WordPressBridge Object Initialized')
@@ -206,11 +203,11 @@ def clean_up_after_release(version):
     all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
 
-    if len(all_files) <= 16:
+    if len(all_files) <= 8:
         return
     for f in all_files:
         files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
-        if version not in f and len(files) > 16:
+        if version not in f and len(files) > 8:
             shutil.move(f, '/opt/old-iso-images')
             moved.append(os.path.basename(f))
 
@@ -239,6 +236,7 @@ def iso_release_job():
             iso_obj = ISOUtility(pkg_obj=pkg_obj)
 
             iso_obj.prep_release()
+            iso_obj.sign_with_gnupg()
             iso_obj.do_release()
 
             pkg_obj.iso_url = iso_obj.mirror_url
@@ -256,7 +254,10 @@ def iso_release_job():
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
         db.set('antbs:misc:iso-release:do_check', version)
-        iso_obj.sign_with_gnupg()
+        batch_sign([iso_obj.md5sums_path], db, passphrase=PASSWORD, is_iso=True)
+        _files = [iso_obj.md5sums_path, iso_obj.md5sums_path + '.sig']
+        for f in _files:
+            shutil.move(f, RELEASE_DIR)
 
     if saved_status and not status.idle:
         status.current_status = saved_status

@@ -68,7 +68,7 @@ from utils import *
 
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
-from iso_utility import ISOUtility
+from iso_utility import iso_release_job
 
 logger = status.logger
 

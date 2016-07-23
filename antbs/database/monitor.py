@@ -231,7 +231,7 @@ class Monitor(RedisHash):
             except Exception as err:
                 logger.info(err)
 
-        if len(synced) == 4:
+        if len(synced) == 2:
             success = self.add_iso_versions_to_wordpress(synced)
             if success:
                 iso_utility.clean_up_after_release(version)
