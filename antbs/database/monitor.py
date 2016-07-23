@@ -150,7 +150,7 @@ class Monitor(RedisHash):
         if 'v' in latest and 'commits' != pkg_obj.monitored_type:
             latest = latest.replace('v', '')
 
-        if latest != last_result or not last_result:
+        if latest != last_result or latest != pkg_obj.pkgver or not last_result:
             pkg_obj.monitored_last_result = latest
             build_pkgs.append(pkg_obj.name)
 
