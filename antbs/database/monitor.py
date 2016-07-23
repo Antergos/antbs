@@ -43,7 +43,8 @@ from gitlab import Gitlab
 from . import (
     RedisHash,
     status,
-    get_pkg_object
+    get_pkg_object,
+    get_repo_object
 )
 
 from utils import quiet_down_noisy_loggers
@@ -184,7 +185,7 @@ class Monitor(RedisHash):
         if 'v' in latest and 'commits' != pkg_obj.monitored_type:
             latest = latest.replace('v', '')
 
-        if latest != last_result or latest != pkg_obj.pkgver or not last_result:
+        if self.should_build_package(pkg_obj, latest, last_result):
             pkg_obj.monitored_last_result = latest
             build_pkgs.append(pkg_obj.name)
 
@@ -259,6 +260,29 @@ class Monitor(RedisHash):
         if self.db.exists('antbs:misc:iso-release:do_check'):
             version = self.db.get('antbs:misc:iso-release:do_check')
             self.check_mirror_for_iso(version)
+
+    @staticmethod
+    def should_build_package(pkg_obj, latest, last_result):
+        latest_is_new = not last_result or latest != last_result
+        latest_not_pkgver = latest != pkg_obj.pkgver
+
+        if latest_is_new or latest_not_pkgver:
+            return True
+
+        repo = get_repo_object('antergos', 'x86_64')
+        staging_repo = get_repo_object('antergos-staging', 'x86_64')
+        in_repo = in_staging_repo = None
+
+        if repo.has_package_alpm(pkg_obj.pkgname):
+            in_repo = repo.get_pkgver_alpm(pkg_obj.pkgname)
+
+        if staging_repo.has_package_alpm(pkg_obj.pkgname):
+            in_staging_repo = staging_repo.get_pkgver_alpm(pkg_obj.pkgname)
+
+        repo_check = in_repo is not None and in_repo != pkg_obj.pkgver
+        staging_repo_check = in_staging_repo is not None and in_staging_repo != pkg_obj.pkgver
+
+        return repo_check and not staging_repo_check
 
 
 def get_monitor_object(name):
