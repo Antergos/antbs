@@ -47,13 +47,13 @@ def remove(src):
     if not isinstance(src, str):
         raise ValueError('src must be of type(str), type({0}) given.'.format(type(src)))
 
-    if os.path.isdir(src):
+    if os.path.isdir(src, follow_symlinks=False):
         try:
             shutil.rmtree(src)
         except Exception as err:
             logging.exception(err)
 
-    elif os.path.isfile(src):
+    elif os.path.isfile(src, follow_symlinks=False):
         try:
             os.remove(src)
         except Exception as err:
