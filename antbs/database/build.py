@@ -287,7 +287,6 @@ class Build(RedisHash):
             for f in os.listdir(self.result_dir)
             if f.endswith(PKG_EXT) and f not in self.generated_files
         ]
-        logger.debug(generated_files)
 
         self.generated_files.extend(generated_files)
 

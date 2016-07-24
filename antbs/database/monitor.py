@@ -185,6 +185,7 @@ class Monitor(RedisHash):
         if 'v' in latest and 'commits' != pkg_obj.monitored_type:
             latest = latest.replace('v', '')
 
+        logger.debug([latest, last_result])
         if self.should_build_package(pkg_obj, latest, last_result):
             pkg_obj.monitored_last_result = latest
             build_pkgs.append(pkg_obj.name)
@@ -267,6 +268,7 @@ class Monitor(RedisHash):
         latest_not_pkgver = latest != pkg_obj.pkgver
 
         if latest_is_new or latest_not_pkgver:
+            logger.debug([pkg_obj.pkgname, latest, last_result])
             return True
 
         repo = get_repo_object('antergos', 'x86_64')
@@ -275,13 +277,18 @@ class Monitor(RedisHash):
 
         if repo.has_package_alpm(pkg_obj.pkgname):
             in_repo = repo.get_pkgver_alpm(pkg_obj.pkgname)
+            in_repo, pkgrel = in_repo.rsplit('-', 1)
+            logger.debug([repo.name, in_repo, pkgrel])
 
         if staging_repo.has_package_alpm(pkg_obj.pkgname):
             in_staging_repo = staging_repo.get_pkgver_alpm(pkg_obj.pkgname)
+            in_staging_repo, pkgrel = in_staging_repo.rsplit('-', 1)
+            logger.debug([staging_repo.name, in_repo, pkgrel])
 
         repo_check = in_repo is not None and in_repo != pkg_obj.pkgver
         staging_repo_check = in_staging_repo is not None and in_staging_repo != pkg_obj.pkgver
 
+        logger.debug([pkg_obj.pkgname, repo_check, staging_repo_check])
         return repo_check and not staging_repo_check
 
 

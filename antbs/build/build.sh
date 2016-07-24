@@ -202,7 +202,8 @@ setup_32bit_env() {
 	cp --copy-contents -t /32build/root/pkg /32bit/***
 	cp /etc/pacman.d/antergos-mirrorlist /32build/root/etc/pacman.d
 
-	for conf in /32bit/pacman.conf /32bit/makepkg.conf /etc/sudoers /etc/passwd /etc/group; do
+	for conf in /32bit/pacman.conf /32bit/makepkg.conf /etc/passwd* /etc/shadow* /etc/group* /etc/sudoers /etc/resolv.conf /etc/locale.gen /etc/inputrc /etc/profile.d/locale.sh
+	do
 		cp "${conf}" /32build/root/etc/
 	done
 
@@ -216,8 +217,8 @@ setup_32bit_env() {
 	chmod 700 /32build/root/usr/lib/sudo
 	chmod 600 /32build/root/usr/lib/sudo/*.so
 
-	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 	arch-chroot /32build/root reflector -l 10 -f 5 --save /etc/pacman.d/mirrorlist
+	arch-chroot /32build/root pacman -Syy --noconfirm --noprogressbar --color never
 }
 
 

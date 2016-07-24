@@ -51,13 +51,19 @@ def remove(src):
         try:
             shutil.rmtree(src)
         except Exception as err:
-            logging.error(err)
+            logging.exception(err)
 
     elif os.path.isfile(src):
         try:
             os.remove(src)
         except Exception as err:
-            logging.error(err)
+            logging.exception(err)
+
+    elif os.path.islink(src):
+        try:
+            os.unlink(src)
+        except Exception as err:
+            logging.exception(err)
 
 
 def set_uid_and_gid():

@@ -85,85 +85,78 @@ def get_live_status_updates():
 
 
 def set_pkg_review_result(bnum=False, dev=False, result=False):
-    if not any([bnum, dev, result]):
-        abort(500)
+    if not all([bnum, dev, result]):
+        err = 'all args required!'
+        logger.error(err)
+        return dict(error=True, msg=err)
 
     errmsg = dict(error=True, msg=None)
     dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
-    try:
-        bld_obj = get_build_object(bnum=bnum)
-        pkg_obj = get_pkg_object(name=bld_obj.pkgname)
+    bld_obj = get_build_object(bnum=bnum)
+    pkg_obj = get_pkg_object(name=bld_obj.pkgname)
 
-        if not pkg_obj and not bld_obj:
-            err = 'Cant move packages to main repo without pkg_obj and bld_obj!.'
-            logger.error(err)
-            return dict(error=True, msg=err)
+    if not pkg_obj or not bld_obj:
+        err = 'Cant move packages to main repo without pkg_obj and bld_obj!.'
+        logger.error(err)
+        return dict(error=True, msg=err)
 
-        if result == 'passed' and 'main' not in pkg_obj.allowed_in:
-            #msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-            #return dict(error=True, msg=msg)
-            pkg_obj.allowed_in.append('main')
+    if 'passed' == result and 'main' not in pkg_obj.allowed_in:
+        #msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
+        #return dict(error=True, msg=msg)
+        pkg_obj.allowed_in.append('main')
 
-        bld_obj.review_dev = dev
-        bld_obj.review_date = dt
-        bld_obj.review_status = result
+    bld_obj.review_dev = dev
+    bld_obj.review_date = dt
+    bld_obj.review_status = result
 
-        if result == 'skip':
-            return dict(error=False, msg=None)
+    if result == 'skip':
+        return dict(error=False, msg=None)
 
-        file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
-        fnames = []
+    file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
+    fnames = []
 
-        files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
+    files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
 
-        if not result or not files_exist or not (file_count % 2 == 0):
-            err = 'While moving to main, invalid number of files found.'
-            logger.error(err)
-            return dict(error=True, msg=err)
+    if not result or not files_exist or not (file_count % 2 == 0):
+        err = 'While moving to main, invalid number of files found.'
+        logger.error(err)
+        return dict(error=True, msg=err)
 
-        for pkg_file in bld_obj.staging_files:
-            if 'i686' in pkg_file:
-                continue
+    for pkg_file in bld_obj.staging_files:
+        if 'i686' in pkg_file:
+            continue
 
-            if 'passed' == result:
-                fname = os.path.basename(pkg_file)
+        if 'passed' == result:
+            fname = os.path.basename(pkg_file)
 
-                copy_or_symlink(pkg_file, status.MAIN_64, logger)
+            copy_or_symlink(pkg_file, status.MAIN_64, logger)
 
-                if '-any.pkg' in pkg_file:
-                    src = os.path.basename(pkg_file)
-                    dst = '../i686/{}'.format(fname)
+            if '-any.pkg' in pkg_file:
+                src = os.path.basename(pkg_file)
+                dst = '../i686/{}'.format(fname)
 
-                    success, res = try_run_command(
-                        ['/bin/ln', '-srf', src, dst],
-                        cwd=status.MAIN_64,
-                        logger=logger
-                    )
-                    if not success:
-                        logger.error(res)
+                success, res = try_run_command(
+                    ['/bin/ln', '-srf', src, dst],
+                    cwd=status.MAIN_64,
+                    logger=logger
+                )
+                if not success:
+                    logger.error(res)
 
-            if 'skip' != result:
-                remove(pkg_file)
+        remove(pkg_file)
 
-        for pkg_file in bld_obj.staging_files:
-            if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
-                continue
+    for pkg_file in bld_obj.staging_files:
+        if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
+            continue
 
-            if 'passed' == result:
-                copy_or_symlink(pkg_file, status.MAIN_32, logger)
+        if 'passed' == result:
+            copy_or_symlink(pkg_file, status.MAIN_32, logger)
 
-            if 'skip' != result:
-                remove(pkg_file)
+        remove(pkg_file)
 
-        if 'skip' != result:
-            repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
-            errmsg = dict(error=False, msg=None)
-
-    except (OSError, Exception) as err:
-        logger.error('Error while moving to main: %s', err)
-        err = str(err)
-        errmsg = dict(error=True, msg=err)
+    repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
+    errmsg = dict(error=False, msg=None)
 
     return errmsg
 
@@ -327,9 +320,8 @@ def dev_package_review():
     dev = payload['dev']
     result = payload['result']
     if len([x for x in (bnum, dev, result) if x]) == 3:
-        logger.debug('fired!')
         set_review = set_pkg_review_result(bnum, dev, result)
-        if set_review.get('error'):
+        if set_review.get('error', False):
             set_rev_error = set_review.get('msg')
             message = dict(msg=set_rev_error)
             return json.dumps(message)

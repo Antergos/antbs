@@ -125,10 +125,12 @@
 						{% set items = [('Status', toggle)] %}
 						{% if pkg.is_monitored %}
 							{% set github = text_with_icon(service_icons_info, 'GitHub') %}
+							{% set project_url = 'https://github.com/%s'|format(pkg.monitored_project) %}
+							{% set repo_url = 'https://github.com/%s/%s'|format(pkg.monitored_project, pkg.monitored_repo) %}
 							{% do items.append(('Service', label_tag_link('/', '#', github, 'default github'))) %}
 							{% do items.append(('Type', pkg.monitored_type)) %}
-							{% do items.append(('Project', pkg.monitored_project)) %}
-							{% do items.append(('Repo', pkg.monitored_repo)) %}
+							{% do items.append(('Project', '<a href="%s" rel="nofollow">%s</a>'|format(project_url, pkg.monitored_project)|safe())) %}
+							{% do items.append(('Repo', '<a href="%s" rel="nofollow">%s</a>'|format(repo_url, pkg.monitored_repo)|safe())) %}
 							{% do items.append(('Last Check', pkg.monitored_last_checked)) %}
 						{% endif %}
 						{{ list_group(items, ['5', '7']) }}
