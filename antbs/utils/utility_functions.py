@@ -47,23 +47,19 @@ def remove(src):
     if not isinstance(src, str):
         raise ValueError('src must be of type(str), type({0}) given.'.format(type(src)))
 
-    if os.path.isdir(src, follow_symlinks=False):
-        try:
-            shutil.rmtree(src)
-        except Exception as err:
-            logging.exception(err)
+    if os.path.islink(src):
+        method_to_call = os.unlink
 
-    elif os.path.isfile(src, follow_symlinks=False):
-        try:
-            os.remove(src)
-        except Exception as err:
-            logging.exception(err)
+    elif os.path.isdir(src):
+        method_to_call = shutil.rmtree
 
-    elif os.path.islink(src):
-        try:
-            os.unlink(src)
-        except Exception as err:
-            logging.exception(err)
+    else:
+        method_to_call = os.remove
+
+    try:
+        method_to_call(src)
+    except Exception as err:
+        logging.exception(err)
 
 
 def set_uid_and_gid():
