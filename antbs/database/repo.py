@@ -329,6 +329,8 @@ class PacmanRepo(RedisHash):
         accounted_for = list(pkgs_fs & pkgs_alpm)
         unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs)
 
+        logger.debug([unaccounted_for])
+
         self.packages.remove_range(0, -1)
         self.unaccounted_for.remove_range(0, -1)
         self.pkgnames.remove_range(-1, -0)
@@ -420,7 +422,7 @@ class PacmanRepo(RedisHash):
     def _update_repo(self):
         self.sync_repo_packages_data(release_lock_after=False)
 
-        if self.pkg_count_alpm != self.pkg_count_fs:
+        if self.unaccounted_for:
             if self.locked and self.db.exists(self._lock_name):
                 self.db.expire(self._lock_name, 300)
 
