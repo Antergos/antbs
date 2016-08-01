@@ -311,7 +311,6 @@ class Monitor(RedisHash):
         return should_not_build_package
 
 
-
 def get_monitor_object(name):
     """
     Gets an existing repo monitor or creates a new one.

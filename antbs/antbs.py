@@ -136,7 +136,7 @@ def rq_dashboard_requires_auth():
 def maybe_check_monitored_repos():
     monitor_obj = get_monitor_object('github')
 
-    if not monitor_obj.checked_recently:
+    if not monitor_obj.check_is_running and not monitor_obj.checked_recently:
         views.repo_queue.enqueue_call(check_repos_for_changes, args=('github', webhook.Webhook))
 
 
