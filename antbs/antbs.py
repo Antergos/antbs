@@ -155,7 +155,7 @@ def rq_dashboard_requires_auth():
 
 
 @app.before_request
-def maybe_check_monitored_repos():
+def maybe_check_mon_repos():
     monitor_obj = get_monitor_object('github')
 
     if not monitor_obj.check_is_running and not monitor_obj.checked_recently:

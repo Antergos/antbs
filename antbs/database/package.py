@@ -27,73 +27,21 @@ import subprocess
 import zipfile
 from glob import glob
 
-import gevent
 import requests
-from gitlab import Gitlab
 from github3 import login
 from github3.exceptions import UnprocessableResponseBody
+from gitlab import Gitlab
 
+from meta.package_meta import PackageMeta
+from utils import Pkgbuild
 from . import (
-    RedisHash,
     status
 )
-
-from utils import Pkgbuild
 
 logger = status.logger
 REPO_DIR = "/var/tmp/antergos-packages"
 GITLAB_TOKEN = status.gitlab_token
 GH_REPO_BASE_URL = 'http://github.com/Antergos/antergos-packages/blob/master/'
-
-
-class PackageMeta(RedisHash):
-    """
-    This is the base class for ::class:`Package`. It initalizes the fields for
-    the package metadata that is stored in the database. You should not use this
-    class directly.
-
-    """
-
-    _s = ['build_path',               'description',           'epoch',             'failure_rate',
-          'gh_path',                  'gh_project',            'gh_repo',           'git_name',
-          'git_url',                  'heat_map',              'iso_md5',           'iso_url',
-          'monitored_last_checked',   'monitored_last_result', 'monitored_project', 'monitored_repo',
-          'monitored_match_pattern',  'monitored_service',     'monitored_type',    'name',
-          'pbpath',                   'pkgbuild',              'pkgdesc',           'pkgname',
-          'pkgrel',                   'pkgver',                'short_name',        'success_rate',
-          'url',                      'version_str']
-
-    _b = ['auto_sum',                 'is_initialized',        'is_iso',            'is_metapkg',
-          'is_monitored',             'is_split_package',      'push_version',      'saved_commit']
-
-    _i = ['pkg_id']
-
-    _l = ['allowed_in',               'builds',                'split_packages',    'tl_events',
-          'transactions']
-
-    _p = []
-
-    _z = ['depends', 'groups', 'makedepends']
-
-    attrib_lists = dict(string=_s, bool=_b, int=_i, list=_l, path=_p, set=_z)
-
-    def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):
-        super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
-
-        self.__namespaceinit__()
-
-        if (not self or not self.pkg_id) and self.is_package_on_github(name=key):
-            # Package is not in the database, so it must be new. Let's initialize it.
-            self.pkgname = key
-            self.name = key
-
-            next_id = self.db.incr('antbs:misc:pkgid:next')
-            self.pkg_id = next_id
-
-            status.all_packages.add(self.name)
-
-    def is_package_on_github(self, name=None):
-        raise NotImplementedError('Subclass must implement this method')
 
 
 class Package(PackageMeta):
@@ -105,33 +53,51 @@ class Package(PackageMeta):
         name (str): The name of the package, AKA the pkgname.
 
     Attributes:
-        (str)
-            name, pkgname, pkgver, epoch, pkgrel, description, pkgdesc: see `man PKGBUILD`
-            version_str: The package's version including pkgrel for displaying on the frontend.
-            short_name: Optional name to use on frontend instead of the pkgname.
-            pbpath: Absolute path to the package's PKGBUILD file (from most recent build).
-            build_path: Absolute path to the the package's most recent build directory.
-            success_rate: The package's rate of successful builds.
-            failure_rate: The package's rate of build failures.
-
-        (bool)
-            push_version: Should version be automatically push to Github? (for monitored package)
-            auto_sum: Does the package's PKGBUILD download checksums when makepkg is called?
-            saved_commit: When pushing to github, do we have any previous commits to be pushed?
-            is_iso: Is this a dummy package for building an install iso image?
-            is_metapkg: Is this a "metapkg" (don't check or download dependencies during build).
-            is_monitored: Are we monitoring this package's releases with a `Monitor` object?
-
-        (int)
-            pkg_id: ID assigned to the package when it is added to our database for the first time.
-
-        (list)
-            allowed_in: The repos that the package is allowed to be in (repo names).
-            builds: The IDs of all builds (completed & failed) for the package.
-            tl_events: The IDs of all timeline events that include this package.
-
-        (set)
-            depends, groups, makedepends: see `man PKGBUILD`
+        allowed_in        (list): The repos that the package is allowed to be in (repo names).
+        auto_sum          (bool): Does the package's PKGBUILD download checksums during build?
+        builds            (list): The IDs of all builds (completed & failed) for the package.
+        depends           (set):  See `man PKGBUILD`.
+        description       (str):  See `Package.pkgdesc`
+        epoch             (str):  See `man PKGBUILD`.
+        failure_rate      (str):  The package's build failure rate.
+        gh_path           (str):  The path to the package's PKGBUILD in `antergos-packages` repo.
+        git_name          (str):  The name of the packages source repo on github.
+        git_url           (str):  The url for the packages source repo on github.
+        groups            (set):  See `man PKGBUILD`.
+        heat_map          (str):  Package's build history heatmap data as `JSON` serialized string.
+        is_initialized    (bool): Has the package been initialized? (This occurs only once).
+        is_iso            (bool): Is this a dummy package for building an install iso image?
+        is_metapkg        (bool): Is this a "metapkg"? (don't check/download deps during build).
+        is_monitored      (bool): Is this package's repo being monitored by `RepoMonitor`.
+        is_split_package  (bool): Is this package a split package (PKGBUILD w/ multiple packages).
+        iso_md5           (str):  If `Package.is_iso` this is the iso image's checksum.
+        iso_url           (str):  If `Package.is_iso` this is the iso image's download URL.
+        makedepends       (set):  See `man PKGBUILD`.
+        mon_last_checked  (str):  Time of the last check for new release by `RepoMonitor`.
+        mon_last_result   (str):  Result of the last check for new release by `RepoMonitor`.
+        mon_match_pattern (str):  Release results must match this pattern (substring or /regex/).
+        mon_project       (str):  The name of the github project for source repo being monitored.
+        mon_repo          (str):  The name of the github source repo being monitored.
+        mon_service       (str):  The name of the service being monitored (currently only github).
+        mon_type          (str):  The type of release result to get (releases, tags, or commits).
+        name              (str):  See `Package.pkgname`.
+        pbpath            (str):  :deprecated:
+        pkg_id            (int):  ID assigned to the package when it is added to the database.
+        pkgbuild          (str):  This package's PKGBUILD (sourced from antergos-packages repo).
+        pkgdesc           (str):  See `man PKGBUILD`.
+        pkgname           (str):  See `man PKGBUILD`.
+        pkgrel            (str):  See `man PKGBUILD`.
+        pkgver            (str):  See `man PKGBUILD`.
+        push_version      (bool): :deprecated: Use `Package.is_monitored` instead.
+        repover           (str):  The version of this package that is currently in main repo.
+        short_name        (str):  An alternate name to represent package on the frontend.
+        split_packages    (list): If `Package.is_split_package`, list of all packages in PKGBUILD.
+        stagingver        (str):  The version of this package that is currently in staging repo.
+        success_rate      (str):  The package's build success rate.
+        tl_events         (list): The IDs of all timeline events that include this package.
+        transactions      (list): The IDs of all build transactions that include this package.
+        url               (str):  See `man PKGBUILD`.
+        version_str       (str):  The full version suituble for display on the frontend.
 
     """
 
@@ -397,7 +363,7 @@ class Package(PackageMeta):
         # TODO: This is still garbage. Rewrite and simplify!
         changed = {'epoch': False, 'pkgrel': False, 'pkgver': False}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
-        version_from_tag = self.is_monitored and self.monitored_type in ['releases', 'tags']
+        version_from_tag = self.is_monitored and self.mon_type in ['releases', 'tags']
 
         if not version_from_tag:
             for key in changed:
@@ -410,8 +376,8 @@ class Package(PackageMeta):
                     changed[key] = new_val
 
         else:
-            if self.monitored_last_result != old_vals['pkgver']:
-                changed['pkgver'] = self.monitored_last_result
+            if self.mon_last_result != old_vals['pkgver']:
+                changed['pkgver'] = self.mon_last_result
                 changed['pkgrel'] = '1'
 
         changes = [k for k in changed if changed[k] is not False]
@@ -489,20 +455,20 @@ class Package(PackageMeta):
             return
 
         service = self.get_from_pkgbuild('_monitored_service')
-        monitored_type = self.get_from_pkgbuild('_monitored_type')
+        mon_type = self.get_from_pkgbuild('_monitored_type')
         project = self.get_from_pkgbuild('_monitored_project')
         repo = self.get_from_pkgbuild('_monitored_repo')
         pattern = self.get_from_pkgbuild('_monitored_match_pattern')
 
-        required_items = [service, monitored_type, project, repo]
+        required_items = [service, mon_type, project, repo]
 
         if len([True for item in required_items if item]) == 4:
             self.is_monitored = True
-            self.monitored_service = service
-            self.monitored_type = monitored_type
-            self.monitored_project = project
-            self.monitored_repo = repo
-            self.monitored_match_pattern = pattern
+            self.mon_service = service
+            self.mon_type = mon_type
+            self.mon_project = project
+            self.mon_repo = repo
+            self.mon_match_pattern = pattern
             self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):

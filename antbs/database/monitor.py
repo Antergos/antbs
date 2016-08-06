@@ -189,7 +189,7 @@ class Monitor(RedisHash):
 
         return exclude_package, latest
 
-    def _sync_monitored_packages_list(self):
+    def _sync_mon_packages_list(self):
         pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
         monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
         new_pkgs = list(set(monitored) - set(list(self.packages)))
@@ -228,18 +228,18 @@ class Monitor(RedisHash):
         if self.gh is None:
             self.gh = login(token=GITHUB_TOKEN)
 
-        project = pkg_obj.monitored_project
-        repo = pkg_obj.monitored_repo
-        last_result = pkg_obj.monitored_last_result
-        monitored_pattern = pkg_obj.monitored_match_pattern
+        project = pkg_obj.mon_project
+        repo = pkg_obj.mon_repo
+        last_result = pkg_obj.mon_last_result
+        mon_pattern = pkg_obj.mon_match_pattern
         gh_repo = self.gh.repository(project, repo)
-        pattern = '.' if not monitored_pattern else monitored_pattern
+        pattern = '.' if not mon_pattern else mon_pattern
         in_mate_group = any([g for g in ['mate', 'mate-extra'] if g in pkg_obj.groups])
         is_mate_pkg = in_mate_group or 'mate-' in pkg_obj.pkgname
 
-        pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
+        pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
 
-        latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.monitored_type, pattern)
+        latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.mon_type, pattern)
 
         if not latest and is_mate_pkg:
             latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
@@ -256,14 +256,14 @@ class Monitor(RedisHash):
 
         build_package, latest = self._should_build_package(pkg_obj, latest, last_result)
 
-        if latest.startswith('v') and 'commits' != pkg_obj.monitored_type:
+        if latest.startswith('v') and 'commits' != pkg_obj.mon_type:
             latest = latest[1:]
 
         if latest != pkg_obj.pkgver and self._not_in_repos(pkg_obj, latest, last_result):
-            pkg_obj.monitored_last_result = latest
+            pkg_obj.mon_last_result = latest
             build_pkgs.append(pkg_obj.name)
 
-            if latest != pkg_obj.pkgver and pkg_obj.monitored_type in ['releases', 'tags']:
+            if latest != pkg_obj.pkgver and pkg_obj.mon_type in ['releases', 'tags']:
                 pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)
 
         return build_pkgs
@@ -271,16 +271,16 @@ class Monitor(RedisHash):
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
         gl.auth()
-        project_id = pkg_obj.monitored_project
-        repo = pkg_obj.monitored_repo
+        project_id = pkg_obj.mon_project
+        repo = pkg_obj.mon_repo
         project = gl.projects.get(project_id)
-        last_result = pkg_obj.monitored_last_result
+        last_result = pkg_obj.mon_last_result
         events = project.events.list()
 
         for event in events:
             if event.action_name == 'pushed to':
                 if event.created_at != last_result:
-                    pkg_obj.monitored_last_result = event.created_at
+                    pkg_obj.mon_last_result = event.created_at
                     build_pkgs.append('numix-icon-theme-square')
 
                 break
@@ -312,7 +312,7 @@ class Monitor(RedisHash):
 
         build_pkgs = []
         quiet_down_noisy_loggers()
-        self._sync_monitored_packages_list()
+        self._sync_mon_packages_list()
         self.repo_obj, self.staging_repo_obj = self._get_repo_objects()
 
         logger.info('Checking github repos for changes...')
@@ -320,9 +320,9 @@ class Monitor(RedisHash):
         for pkg in self.packages:
             pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
 
-            if 'github' == pkg_obj.monitored_service:
+            if 'github' == pkg_obj.mon_service:
                 build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
-            elif 'gitlab' == pkg_obj.monitored_service:
+            elif 'gitlab' == pkg_obj.mon_service:
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
 
             gevent.sleep(1.5)

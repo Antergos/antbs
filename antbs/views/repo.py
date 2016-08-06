@@ -51,7 +51,8 @@ def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
     else:
         rev_pending = []
 
-    if not repo_obj.pkgnames:
+    if not repo_obj.pkgnames and not repo_obj.locked:
+        repo_obj.update_repo()
         return pkgs, rev_pending, all_pages
 
     if filter and 'group' == filter:
@@ -76,7 +77,7 @@ def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
             continue
 
         try:
-            bnum = pkg_obj.builds[0]
+            bnum = pkg_obj.builds[-1]
             if bnum:
                 bld_obj = get_build_object(bnum=bnum)
         except Exception:
