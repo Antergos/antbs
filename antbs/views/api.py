@@ -102,8 +102,8 @@ def set_pkg_review_result(bnum=False, dev=False, result=False):
         return dict(error=True, msg=err)
 
     if 'passed' == result and 'main' not in pkg_obj.allowed_in:
-        #msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-        #return dict(error=True, msg=msg)
+        # msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
+        # return dict(error=True, msg=msg)
         pkg_obj.allowed_in.append('main')
 
     bld_obj.review_dev = dev

@@ -38,6 +38,8 @@ gevent.monkey.patch_all()
 
 import re
 from datetime import timedelta
+from random import choice
+from string import ascii_uppercase
 
 from flask import (
     Flask, abort, render_template, request, url_for
@@ -126,6 +128,26 @@ def initialize_app():
 app = initialize_app()
 
 
+@app.before_first_request
+def generate_and_store_repo_lock_id():
+    if not status.db.setnx(status.generating_lock_id, True):
+        return
+
+    status.db.expire(status.generating_lock_id, 100)
+    logger.debug('Generating repo lock id...')
+
+    status.repo_lock_id = ''.join(choice(ascii_uppercase) for i in range(24))
+    repo_keys = [
+        status.repo_lock_key.replace('@name@', repo).replace('@arch@', arch)
+        for arch in ['x86_64', 'i686']
+        for repo in status.repos
+    ]
+
+    for key in repo_keys:
+        status.db.delete(key)
+        status.db.rpush(key, status.repo_lock_id)
+
+
 @app.before_request
 def rq_dashboard_requires_auth():
     if '/rq' in request.path and not current_user.is_authenticated:
@@ -138,7 +160,9 @@ def maybe_check_monitored_repos():
 
     if not monitor_obj.check_is_running and not monitor_obj.checked_recently:
         monitor_obj.check_is_running = True
-        views.repo_queue.enqueue_call(check_repos_for_changes, args=('github', webhook.Webhook))
+        views.repo_queue.enqueue_call(
+            check_repos_for_changes, args=('github', webhook.Webhook), timeout=9600
+        )
 
 
 @app.context_processor

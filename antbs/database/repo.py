@@ -86,10 +86,10 @@ class PacmanRepo(RedisHash):
     """
 
     attrib_lists = dict(
-        string=['name', 'alpm_db', 'arch'],
+        string=['name', 'alpm_db', 'arch', '_lock_id'],
         bool=['locked'],
         int=['pkg_count_alpm', 'pkg_count_fs'],
-        list=['pkgnames'],
+        list=['pkgnames', '_lock'],
         set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
         path=['path', 'alpm_db_path']
     )
@@ -109,8 +109,7 @@ class PacmanRepo(RedisHash):
             self.alpm_db_path = os.path.join(path, name, self.arch, self.alpm_db)
             status.repos.add(name)
 
-        self._lock_name = '{}:_lock'.format(self.full_key)
-        self.locked = False
+        self._lock_key = '{}:_lock'.format(self.full_key)
 
     def _add_or_remove_package_alpm_database(self, action, pkgname=None, pkg_fname=None):
         action = 'repo-{}'.format(action)
@@ -145,6 +144,13 @@ class PacmanRepo(RedisHash):
                 pkg_fname,
                 res
             )
+
+    def _acquire_lock(self):
+        logger.debug('acquiring repo lock...')
+        lock = self.db.blpop(self._lock_key)
+        self.locked = True
+        self._lock_id = lock[1]
+        return self.locked
 
     def _compare_pkgvers(self, pkgvers):
         if len(pkgvers) == 1:
@@ -318,6 +324,15 @@ class PacmanRepo(RedisHash):
 
         return add_to_db, rm_from_db, rm_from_fs
 
+    def _release_lock(self):
+        if not self.locked or not self._lock_id:
+            logger.error("we're not locked!")
+            return
+
+        logger.debug('releasing repo lock...')
+        self.locked = False
+        self._lock.append(self._lock_id)
+
     @staticmethod
     def _remove_package_from_filesystem(pkg_file):
         sig = '{}{}'.format(pkg_file, SIG_EXT)
@@ -343,21 +358,15 @@ class PacmanRepo(RedisHash):
                 self._remove_package_from_filesystem(pkg)
 
     def _update_repo(self):
-        self.sync_repo_packages_data(release_lock_after=False)
+        self._acquire_lock()
+        self.sync_repo_packages_data()
 
         if self.unaccounted_for:
-            if self.locked and self.db.exists(self._lock_name):
-                self.db.expire(self._lock_name, 300)
+            add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_unaccounted_for()
 
-                add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_unaccounted_for()
+            self._take_action_on_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
 
-                self._take_action_on_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
-
-            else:
-                logger.debug('Repo lock was released. Cannot continue!!')
-
-        self.db.delete(self._lock_name)
-        self.locked = False
+        self._release_lock()
 
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
@@ -385,32 +394,14 @@ class PacmanRepo(RedisHash):
     def has_package_alpm(self, pkgname):
         return self._has_package(pkgname, self.pkgs_alpm)
 
-    def sync_repo_packages_data(self, release_lock_after=True):
-        if not self.locked and self.db.setnx(self._lock_name, True):
-            self.locked = True
-            self.db.expire(self._lock_name, 300)
+    def sync_repo_packages_data(self):
+        if not self.locked:
+            logger.error('Cannot sync repo packages without repo lock!')
+            return
 
-            self._determine_current_repo_state_alpm()
-            self._determine_current_repo_state_fs()
-            self._process_current_repo_states()
-
-            if release_lock_after:
-                self.db.delete(self._lock_name)
-                self.locked = False
-
-        else:
-            logger.debug('repo is locked! waiting for lock to be released...')
-            gevent.sleep(1)
-
-            while self.locked:
-                gevent.sleep(5)
-
-            if release_lock_after:
-                logger.debug('lock has been released!')
-            else:
-                if self.db.setnx(self._lock_name, True):
-                    self.db.expire(self._lock_name, 300)
-                    self.locked = True
+        self._determine_current_repo_state_alpm()
+        self._determine_current_repo_state_fs()
+        self._process_current_repo_states()
 
     def update_repo(self):
         trans_running = status.transactions_running or status.transaction_queue
@@ -434,7 +425,7 @@ class PacmanRepo(RedisHash):
         if building_saved and not status.idle and status.current_status == msg:
             status.current_status = building_saved
 
-        elif status.idle and not trans_running and not status.now_building:
+        elif status.idle or (not trans_running and not status.now_building):
             status.idle = True
             status.current_status = 'Idle.'
 

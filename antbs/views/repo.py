@@ -52,7 +52,6 @@ def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
         rev_pending = []
 
     if not repo_obj.pkgnames:
-        logger.error('repo is empty!')
         return pkgs, rev_pending, all_pages
 
     if filter and 'group' == filter:
