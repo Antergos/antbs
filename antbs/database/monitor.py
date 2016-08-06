@@ -132,7 +132,6 @@ class Monitor(RedisHash):
 
     def _matches_pattern(self, pattern, latest):
         matches = False
-        logger.debug([pattern, latest])
 
         if not pattern or not latest:
             return matches

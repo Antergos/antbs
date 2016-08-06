@@ -94,18 +94,20 @@ class PacmanRepo(RedisHash):
         path=['path', 'alpm_db_path']
     )
 
-    def __init__(self, name, db_key, path=None, prefix='repo'):
-        super().__init__(prefix=prefix, key=db_key)
+    def __init__(self, name, arch, path=None, prefix='repo'):
+        key = '{}:{}'.format(name, arch)
 
-        super().__namespaceinit__()
+        super().__init__(prefix=prefix, key=key)
+
+        self.__namespaceinit__()
 
         if not self or not self.name:
             self.name = name
-            self.arch = 'x86_64' if '32' not in db_key else 'i686'
+            self.arch = arch
             self.path = os.path.join(path, name, self.arch)
             self.alpm_db = '{}.db.tar.gz'.format(self.name)
             self.alpm_db_path = os.path.join(path, name, self.arch, self.alpm_db)
-            status.repos.add(db_key)
+            status.repos.add(name)
 
         self._lock_name = '{}:_lock'.format(self.full_key)
         self.locked = False
@@ -437,32 +439,10 @@ class PacmanRepo(RedisHash):
         self.locked = False
 
 
-class AntergosRepo(PacmanRepo, metaclass=RedisSingleton):
-    def __init__(self, name='antergos', *args, **kwargs):
-        super().__init__(name, name, *args, **kwargs)
-
-
-class AntergosStagingRepo(PacmanRepo, metaclass=RedisSingleton):
-    def __init__(self, name='antergos-staging', *args, **kwargs):
-        super().__init__(name, name, *args, **kwargs)
-
-
-class AntergosRepo32(PacmanRepo, metaclass=RedisSingleton):
-    def __init__(self, name='antergos', *args, **kwargs):
-        super().__init__(name, 'antergos32', *args, **kwargs)
-
-
-class AntergosStagingRepo32(PacmanRepo, metaclass=RedisSingleton):
-    def __init__(self, name='antergos-staging', *args, **kwargs):
-        super().__init__(name, 'antergos-staging32', *args, **kwargs)
-
-
 def get_repo_object(name, arch, path=None):
     path = path if path else status.REPO_BASE_DIR
 
-    if 'antergos' == name:
-        return AntergosRepo(path=path) if 'i686' != arch else AntergosRepo32(path=path)
-    elif 'antergos-staging' == name:
-        return AntergosStagingRepo(path=path) if 'i686' != arch else AntergosStagingRepo32(path=path)
+    if name in ['antergos', 'antergos-staging']:
+        return PacmanRepo(name, arch, path=path)
     else:
-        raise TypeError('name must be one of [antergos, antergos-staging]')
+        raise ValueError('name must be one of [antergos, antergos-staging]')
