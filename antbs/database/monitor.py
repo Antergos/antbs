@@ -132,6 +132,7 @@ class Monitor(RedisHash):
 
     def _matches_pattern(self, pattern, latest):
         matches = False
+        logger.debug([pattern, latest])
 
         if not pattern or not latest:
             return matches
@@ -318,7 +319,7 @@ class Monitor(RedisHash):
         logger.info('Checking github repos for changes...')
 
         for pkg in self.packages:
-            pkg_obj = get_pkg_object(name=pkg)
+            pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
 
             if 'github' == pkg_obj.monitored_service:
                 build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
