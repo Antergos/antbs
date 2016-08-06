@@ -137,6 +137,7 @@ def maybe_check_monitored_repos():
     monitor_obj = get_monitor_object('github')
 
     if not monitor_obj.check_is_running and not monitor_obj.checked_recently:
+        monitor_obj.check_is_running = True
         views.repo_queue.enqueue_call(check_repos_for_changes, args=('github', webhook.Webhook))
 
 

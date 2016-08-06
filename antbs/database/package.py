@@ -54,28 +54,28 @@ class PackageMeta(RedisHash):
 
     """
 
-    attrib_lists = dict(
-        string=['git_name',     'build_path',     'description',    'epoch',
-                'git_url',      'failure_rate',   'gh_project',     'gh_path',
-                'name',         'gh_repo',        'iso_url',        'iso_md5',
-                'pkgdesc',      'heat_map',       'monitored_type', 'monitored_last_checked',
-                'pkgrel',       'monitored_repo', 'pbpath',         'monitored_last_result',
-                'pkgver',       'pkgname',        'pkgbuild',       'monitored_project',
-                'short_name',   'url',            'version_str',    'monitored_service',
-                'success_rate'],
+    _s = ['build_path',               'description',           'epoch',             'failure_rate',
+          'gh_path',                  'gh_project',            'gh_repo',           'git_name',
+          'git_url',                  'heat_map',              'iso_md5',           'iso_url',
+          'monitored_last_checked',   'monitored_last_result', 'monitored_project', 'monitored_repo',
+          'monitored_match_pattern',  'monitored_service',     'monitored_type',    'name',
+          'pbpath',                   'pkgbuild',              'pkgdesc',           'pkgname',
+          'pkgrel',                   'pkgver',                'short_name',        'success_rate',
+          'url',                      'version_str']
 
-        bool=['is_metapkg', 'auto_sum', 'is_split_package', 'is_initialized',
-              'push_version', 'is_monitored', 'saved_commit', 'is_iso'],
+    _b = ['auto_sum',                 'is_initialized',        'is_iso',            'is_metapkg',
+          'is_monitored',             'is_split_package',      'push_version',      'saved_commit']
 
-        int=['pkg_id'],
+    _i = ['pkg_id']
 
-        list=['allowed_in', 'builds', 'tl_events', 'transactions',
-              'split_packages'],
+    _l = ['allowed_in',               'builds',                'split_packages',    'tl_events',
+          'transactions']
 
-        set=['depends', 'groups', 'makedepends'],
+    _p = []
 
-        path=[]
-    )
+    _z = ['depends', 'groups', 'makedepends']
+
+    attrib_lists = dict(string=_s, bool=_b, int=_i, list=_l, path=_p, set=_z)
 
     def __init__(self, namespace='antbs', prefix='pkg', key='', *args, **kwargs):
         super().__init__(namespace=namespace, prefix=prefix, key=key, *args, **kwargs)
@@ -432,7 +432,7 @@ class Package(PackageMeta):
         if version_str and len(version_str) > 3 and 'None' not in version_str:
             self.version_str = version_str
         else:
-            raise ValueError
+            raise ValueError(version_str)
 
         if 'cnchi-dev' == self.name and self.pkgver[-1] not in ['0', '5']:
             if not self.db.exists('CNCHI-DEV-OVERRIDE'):
@@ -492,15 +492,17 @@ class Package(PackageMeta):
         monitored_type = self.get_from_pkgbuild('_monitored_type')
         project = self.get_from_pkgbuild('_monitored_project')
         repo = self.get_from_pkgbuild('_monitored_repo')
+        pattern = self.get_from_pkgbuild('_monitored_match_pattern')
 
-        config_items = [service, monitored_type, project, repo]
+        required_items = [service, monitored_type, project, repo]
 
-        if len([True for item in config_items if item]) == 4:
+        if len([True for item in required_items if item]) == 4:
             self.is_monitored = True
             self.monitored_service = service
             self.monitored_type = monitored_type
             self.monitored_project = project
             self.monitored_repo = repo
+            self.monitored_match_pattern = pattern
             self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):

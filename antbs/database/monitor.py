@@ -34,6 +34,7 @@ Repo Monitor Module:
 """
 
 from datetime import datetime
+import re
 
 import gevent
 import requests
@@ -79,25 +80,13 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-        self.repo_obj = self.staging_repo_obj = None
+        self.repo_obj = self.staging_repo_obj = self.gh = None
 
-    @staticmethod
-    def _get_repo_objects():
-        repo = get_repo_object('antergos', 'x86_64')
-        staging_repo = get_repo_object('antergos-staging', 'x86_64')
-
-        for repo_obj in [repo, staging_repo]:
-            repo_obj.update_repo()
-
-        return repo, staging_repo
-
-    @staticmethod
-    def _get_releases_tags_or_commits(gh_repo, what_to_get, must_contain=None):
+    def _get_latest_release_tag_commit(self, gh_repo, what_to_get, pattern=None):
         git_item = getattr(gh_repo, what_to_get)
         res = git_item()
         latest = ''
         items_checked = 0
-        logger.debug([gh_repo, what_to_get, must_contain, res])
 
         def _get_next_item():
             _latest = ''
@@ -107,7 +96,7 @@ class Monitor(RedisHash):
                 if 'commits' == what_to_get:
                     _latest = item.sha
                 elif 'releases' == what_to_get:
-                    _latest = item.tag_name
+                    _latest = item.tag_name if not item.prerelease else ''
                 elif 'tags' == what_to_get:
                     _latest = str(item)
 
@@ -119,10 +108,9 @@ class Monitor(RedisHash):
             return _latest
 
         latest = _get_next_item()
-        logger.debug(latest)
 
-        if not latest or (must_contain and must_contain not in latest):
-            while not latest or (must_contain not in latest):
+        if not latest or (pattern and not self._matches_pattern(pattern, latest)):
+            while not latest or (pattern and not self._matches_pattern(pattern, latest)):
                 latest = _get_next_item()
                 items_checked += 1
 
@@ -131,6 +119,75 @@ class Monitor(RedisHash):
 
         logger.debug(latest)
         return latest
+
+    @staticmethod
+    def _get_repo_objects():
+        repo = get_repo_object('antergos', 'x86_64')
+        staging_repo = get_repo_object('antergos-staging', 'x86_64')
+
+        for repo_obj in [repo, staging_repo]:
+            repo_obj.update_repo()
+
+        return repo, staging_repo
+
+    def _matches_pattern(self, pattern, latest):
+        matches = False
+
+        if not pattern or not latest:
+            return matches
+
+        matches = pattern in latest
+
+        if not matches and pattern.startswith('/') and pattern.endswith('/'):
+            # Regular Expression
+            pattern = pattern[1:-1]
+            matches = re.fullmatch(pattern, latest)
+            logger.debug('matches is %s', matches)
+
+        return matches
+
+    def _not_in_repos(self, pkg_obj, latest, last_result):
+        latest_is_new = not last_result or latest != last_result
+        latest_not_pkgver = latest != pkg_obj.pkgver
+
+        if latest_is_new or latest_not_pkgver:
+            logger.debug([pkg_obj.pkgname, latest, last_result])
+            return True
+
+        in_repo = in_staging_repo = None
+
+        if self.repo_obj.has_package_alpm(pkg_obj.pkgname):
+            in_repo = self.repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
+            in_repo, pkgrel = in_repo.rsplit('-', 1)
+            logger.debug([self.repo_obj.name, in_repo, pkgrel])
+
+        if self.staging_repo_obj.has_package_alpm(pkg_obj.pkgname):
+            in_staging_repo = self.staging_repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
+            in_staging_repo, pkgrel = in_staging_repo.rsplit('-', 1)
+            logger.debug([self.staging_repo_obj.name, in_repo, pkgrel])
+
+        repo_check = in_repo is not None and in_repo != pkg_obj.pkgver
+        staging_repo_check = in_staging_repo is not None and in_staging_repo != pkg_obj.pkgver
+
+        logger.debug([pkg_obj.pkgname, repo_check, staging_repo_check])
+        return repo_check and not staging_repo_check
+
+    def _should_build_package(self, pkg_obj, latest, last_result):
+        build_package = False
+
+        if 'redis-desktop-manager' == pkg_obj.pkgname and re.search(r'-\d$', latest):
+            build_package = True
+            latest = latest.replace('-', '.')
+
+        return build_package, latest
+
+    def _should_not_build_package(self, pkg_obj, latest, last_result):
+        exclude_package = False
+
+        if 'package-query' == pkg_obj.pkgname and '1.8' == latest:
+            exclude_package = True
+
+        return exclude_package, latest
 
     def _sync_monitored_packages_list(self):
         pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
@@ -168,37 +225,41 @@ class Monitor(RedisHash):
         wh.process_changes()
 
     def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
-        gh = login(token=GITHUB_TOKEN)
+        if self.gh is None:
+            self.gh = login(token=GITHUB_TOKEN)
+
         project = pkg_obj.monitored_project
         repo = pkg_obj.monitored_repo
         last_result = pkg_obj.monitored_last_result
-        gh_repo = gh.repository(project, repo)
-        numbers_only = ['arc-icon-theme', 'gtk-theme-arc']
-        must_contain = '.' if pkg_obj.pkgname not in numbers_only else '2016'
-        is_mate_pkg = 'mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups
+        monitored_pattern = pkg_obj.monitored_match_pattern
+        gh_repo = self.gh.repository(project, repo)
+        pattern = '.' if not monitored_pattern else monitored_pattern
+        in_mate_group = any([g for g in ['mate', 'mate-extra'] if g in pkg_obj.groups])
+        is_mate_pkg = in_mate_group or 'mate-' in pkg_obj.pkgname
 
         pkg_obj.monitored_last_checked = self.datetime_to_string(datetime.now())
 
-        if (is_mate_pkg or 'mate-' in pkg_obj.pkgname) and pkg_obj.pkgname not in ['galculator']:
-            must_contain = '1.14' if 'themes' not in pkg_obj.pkgname else '3.20'
+        latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.monitored_type, pattern)
 
-        latest = self._get_releases_tags_or_commits(gh_repo, pkg_obj.monitored_type, must_contain)
+        if not latest and is_mate_pkg:
+            latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
 
-        if not latest and ('mate' in pkg_obj.groups or 'mate-extra' in pkg_obj.groups):
-            latest = self._get_releases_tags_or_commits(gh_repo, 'tags', must_contain)
+        dont_build_package, latest = self._should_not_build_package(pkg_obj, latest, last_result)
 
-        if not latest or latest in ['None']:
-            logger.error(
-                '%s - latest: %s, last_result: %s, pkgver: %s',
-                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
-            )
+        if not latest or latest in ['None'] or dont_build_package:
+            if not dont_build_package:
+                logger.error(
+                    '%s - latest: %s, last_result: %s, pkgver: %s',
+                    pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
+                )
             return build_pkgs
 
-        if 'v' in latest and 'commits' != pkg_obj.monitored_type:
-            latest = latest.replace('v', '')
+        build_package, latest = self._should_build_package(pkg_obj, latest, last_result)
 
-        logger.debug([latest, last_result])
-        if self.should_build_package(pkg_obj, latest, last_result):
+        if latest.startswith('v') and 'commits' != pkg_obj.monitored_type:
+            latest = latest[1:]
+
+        if latest != pkg_obj.pkgver and self._not_in_repos(pkg_obj, latest, last_result):
             pkg_obj.monitored_last_result = latest
             build_pkgs.append(pkg_obj.name)
 
@@ -275,41 +336,6 @@ class Monitor(RedisHash):
             version = self.db.get('antbs:misc:iso-release:do_check')
             self.check_mirror_for_iso(version)
 
-    def should_build_package(self, pkg_obj, latest, last_result):
-        latest_is_new = not last_result or latest != last_result
-        latest_not_pkgver = latest != pkg_obj.pkgver
-
-        if latest_is_new or latest_not_pkgver:
-            logger.debug([pkg_obj.pkgname, latest, last_result])
-            return True
-
-        in_repo = in_staging_repo = None
-
-        if self.repo_obj.has_package_alpm(pkg_obj.pkgname):
-            in_repo = self.repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
-            in_repo, pkgrel = in_repo.rsplit('-', 1)
-            logger.debug([self.repo_obj.name, in_repo, pkgrel])
-
-        if self.staging_repo_obj.has_package_alpm(pkg_obj.pkgname):
-            in_staging_repo = self.staging_repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
-            in_staging_repo, pkgrel = in_staging_repo.rsplit('-', 1)
-            logger.debug([self.staging_repo_obj.name, in_repo, pkgrel])
-
-        repo_check = in_repo is not None and in_repo != pkg_obj.pkgver
-        staging_repo_check = in_staging_repo is not None and in_staging_repo != pkg_obj.pkgver
-        should_be_excluded = self.should_not_build_package(pkg_obj, latest, last_result)
-
-        logger.debug([pkg_obj.pkgname, repo_check, staging_repo_check])
-        return repo_check and not staging_repo_check and not should_be_excluded
-
-    def should_not_build_package(self, pkg_obj, latest, last_result):
-        should_not_build_package = False
-
-        if 'package-query' == pkg_obj.pkgname and '1.8' == latest:
-            should_not_build_package = True
-
-        return should_not_build_package
-
 
 def get_monitor_object(name):
     """
@@ -331,8 +357,6 @@ def get_monitor_object(name):
 def check_repos_for_changes(name, webhook):
     monitor_obj = get_monitor_object(name)
 
-    if not monitor_obj.check_is_running:
-        monitor_obj.check_is_running = True
-        monitor_obj.check_repos_for_changes(webhook)
-        monitor_obj.check_is_running = False
+    monitor_obj.check_repos_for_changes(webhook)
+    monitor_obj.check_is_running = False
 
