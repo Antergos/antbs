@@ -112,85 +112,6 @@ class PacmanRepo(RedisHash):
         self._lock_name = '{}:_lock'.format(self.full_key)
         self.locked = False
 
-    def get_pkgnames_alpm(self):
-        return self._get_pkgnames(self.pkgs_alpm)
-
-    def get_pkgnames_filesystem(self):
-        return self._get_pkgnames(self.pkgs_fs)
-
-    def get_pkgver_alpm(self, pkgname):
-        pkgver = ''
-        pkgvers = self._get_pkgvers(pkgname, self.pkgs_alpm)
-
-        if pkgvers and len(pkgvers) == 1:
-            pkgver = pkgvers[0]
-        elif pkgvers and len(pkgvers) != 1:
-            logger.error(pkgvers)
-
-        return pkgver
-
-    def get_pkgvers_filesystem(self, pkgname):
-        return self._get_pkgvers(pkgname, self.pkgs_fs)
-
-    def has_package_filesystem(self, pkgname):
-        return self._has_package(pkgname, self.pkgs_fs)
-
-    def has_package_alpm(self, pkgname):
-        return self._has_package(pkgname, self.pkgs_alpm)
-
-    def sync_repo_packages_data(self, release_lock_after=True):
-        if not self.locked and self.db.setnx(self._lock_name, True):
-            self.locked = True
-            self.db.expire(self._lock_name, 300)
-
-            self._determine_current_repo_state_alpm()
-            self._determine_current_repo_state_fs()
-            self._process_current_repo_states()
-
-            if release_lock_after:
-                self.db.delete(self._lock_name)
-                self.locked = False
-
-        else:
-            logger.debug('repo is locked! waiting for lock to be released...')
-            gevent.sleep(1)
-
-            while self.locked:
-                gevent.sleep(5)
-
-            if release_lock_after:
-                logger.debug('lock has been released!')
-            else:
-                if self.db.setnx(self._lock_name, True):
-                    self.db.expire(self._lock_name, 300)
-                    self.locked = True
-
-    def update_repo(self):
-        trans_running = status.transactions_running or status.transaction_queue
-        building_saved = False
-        excluded = ['Updating antergos repo database.',
-                    'Updating antergos-staging repo database.',
-                    'Processing developer review result.']
-
-        if not status.idle and trans_running and status.current_status not in excluded:
-            building_saved = status.current_status
-        elif status.idle:
-            status.idle = False
-
-        msg = excluded[0] if 'antergos' == self.name else excluded[1]
-        status.current_status = msg
-
-        self._update_repo()
-
-        trans_running = status.transactions_running or status.transaction_queue
-
-        if building_saved and not status.idle and status.current_status == msg:
-            status.current_status = building_saved
-
-        elif status.idle and not trans_running and not status.now_building:
-            status.idle = True
-            status.current_status = 'Idle.'
-
     def _add_or_remove_package_alpm_database(self, action, pkgname=None, pkg_fname=None):
         action = 'repo-{}'.format(action)
         cmd = [os.path.join(SCRIPTS_DIR, action)]
@@ -437,6 +358,85 @@ class PacmanRepo(RedisHash):
 
         self.db.delete(self._lock_name)
         self.locked = False
+
+    def get_pkgnames_alpm(self):
+        return self._get_pkgnames(self.pkgs_alpm)
+
+    def get_pkgnames_filesystem(self):
+        return self._get_pkgnames(self.pkgs_fs)
+
+    def get_pkgver_alpm(self, pkgname):
+        pkgver = ''
+        pkgvers = self._get_pkgvers(pkgname, self.pkgs_alpm)
+
+        if pkgvers and len(pkgvers) == 1:
+            pkgver = pkgvers[0]
+        elif pkgvers and len(pkgvers) != 1:
+            logger.error(pkgvers)
+
+        return pkgver
+
+    def get_pkgvers_filesystem(self, pkgname):
+        return self._get_pkgvers(pkgname, self.pkgs_fs)
+
+    def has_package_filesystem(self, pkgname):
+        return self._has_package(pkgname, self.pkgs_fs)
+
+    def has_package_alpm(self, pkgname):
+        return self._has_package(pkgname, self.pkgs_alpm)
+
+    def sync_repo_packages_data(self, release_lock_after=True):
+        if not self.locked and self.db.setnx(self._lock_name, True):
+            self.locked = True
+            self.db.expire(self._lock_name, 300)
+
+            self._determine_current_repo_state_alpm()
+            self._determine_current_repo_state_fs()
+            self._process_current_repo_states()
+
+            if release_lock_after:
+                self.db.delete(self._lock_name)
+                self.locked = False
+
+        else:
+            logger.debug('repo is locked! waiting for lock to be released...')
+            gevent.sleep(1)
+
+            while self.locked:
+                gevent.sleep(5)
+
+            if release_lock_after:
+                logger.debug('lock has been released!')
+            else:
+                if self.db.setnx(self._lock_name, True):
+                    self.db.expire(self._lock_name, 300)
+                    self.locked = True
+
+    def update_repo(self):
+        trans_running = status.transactions_running or status.transaction_queue
+        building_saved = False
+        excluded = ['Updating antergos repo database.',
+                    'Updating antergos-staging repo database.',
+                    'Processing developer review result.']
+
+        if not status.idle and trans_running and status.current_status not in excluded:
+            building_saved = status.current_status
+        elif status.idle:
+            status.idle = False
+
+        msg = excluded[0] if 'antergos' == self.name else excluded[1]
+        status.current_status = msg
+
+        self._update_repo()
+
+        trans_running = status.transactions_running or status.transaction_queue
+
+        if building_saved and not status.idle and status.current_status == msg:
+            status.current_status = building_saved
+
+        elif status.idle and not trans_running and not status.now_building:
+            status.idle = True
+            status.current_status = 'Idle.'
 
 
 def get_repo_object(name, arch, path=None):
