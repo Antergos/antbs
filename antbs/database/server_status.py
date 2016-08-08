@@ -49,7 +49,7 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
 
         bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
               'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging',
-              'debug_toolbar_enabled'],
+              'debug_toolbar_enabled', 'repos_synced_recently', 'repos_syncing'],
 
         int=['building_num'],
 
@@ -63,6 +63,7 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
               'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
               'REPO_BASE_DIR', 'MKARCHISO_DIR', 'GNUPG_DIR', 'PKG_CACHE_DIR', 'PKG_CACHE_DIR32']
     )
+    can_expire = ['repos_synced_recently']
     logger = None
 
     def __init__(self, prefix='status', key='', *args, **kwargs):

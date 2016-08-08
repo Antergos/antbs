@@ -32,7 +32,7 @@ from github3 import login
 from github3.exceptions import UnprocessableResponseBody
 from gitlab import Gitlab
 
-from meta.package_meta import PackageMeta
+from .meta.package_meta import PackageMeta
 from utils import Pkgbuild
 from . import (
     status

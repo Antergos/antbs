@@ -33,6 +33,7 @@ from io import TextIOWrapper
 from pkg_resources import parse_version
 
 import gevent
+import redis_lock
 
 from . import (
     RedisHash,
@@ -86,10 +87,10 @@ class PacmanRepo(RedisHash):
     """
 
     attrib_lists = dict(
-        string=['name', 'alpm_db', 'arch', '_lock_id'],
+        string=['name', 'alpm_db', 'arch'],
         bool=['locked'],
         int=['pkg_count_alpm', 'pkg_count_fs'],
-        list=['pkgnames', '_lock'],
+        list=['pkgnames'],
         set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
         path=['path', 'alpm_db_path']
     )
@@ -104,12 +105,10 @@ class PacmanRepo(RedisHash):
         if not self or not self.name:
             self.name = name
             self.arch = arch
-            self.path = os.path.join(path, name, self.arch)
-            self.alpm_db = '{}.db.tar.gz'.format(self.name)
-            self.alpm_db_path = os.path.join(path, name, self.arch, self.alpm_db)
+            self.path = os.path.join(path, name, arch)
+            self.alpm_db = '{}.db.tar.gz'.format(name)
+            self.alpm_db_path = os.path.join(path, name, arch, self.alpm_db)
             status.repos.add(name)
-
-        self._lock_key = '{}:_lock'.format(self.full_key)
 
     def _add_or_remove_package_alpm_database(self, action, pkgname=None, pkg_fname=None):
         action = 'repo-{}'.format(action)
@@ -144,13 +143,6 @@ class PacmanRepo(RedisHash):
                 pkg_fname,
                 res
             )
-
-    def _acquire_lock(self):
-        logger.debug('acquiring repo lock...')
-        lock = self.db.blpop(self._lock_key)
-        self.locked = True
-        self._lock_id = lock[1]
-        return self.locked
 
     def _compare_pkgvers(self, pkgvers):
         if len(pkgvers) == 1:
@@ -273,7 +265,7 @@ class PacmanRepo(RedisHash):
         for pkg in self._get_pkgnames(accounted_for):
             self.pkgnames.append(pkg)
 
-    def _process_repo_packages_unaccounted_for(self):
+    def _process_repo_packages_data(self):
         unaccounted_for = self._get_packages_unaccounted_for_info()
         add_to_db = []
         rm_from_db = []
@@ -324,15 +316,6 @@ class PacmanRepo(RedisHash):
 
         return add_to_db, rm_from_db, rm_from_fs
 
-    def _release_lock(self):
-        if not self.locked or not self._lock_id:
-            logger.error("we're not locked!")
-            return
-
-        logger.debug('releasing repo lock...')
-        self.locked = False
-        self._lock.append(self._lock_id)
-
     @staticmethod
     def _remove_package_from_filesystem(pkg_file):
         sig = '{}{}'.format(pkg_file, SIG_EXT)
@@ -344,7 +327,7 @@ class PacmanRepo(RedisHash):
     def _split_pkg_info_string(pkg_info_string):
         return pkg_info_string.split('|')
 
-    def _take_action_on_packages_unaccounted_for(self, add_to_db, rm_from_db, rm_from_fs):
+    def _handle_packages_unaccounted_for(self, add_to_db, rm_from_db, rm_from_fs):
         if add_to_db:
             for pkg in add_to_db:
                 self._add_or_remove_package_alpm_database('add', pkg_fname=pkg)
@@ -358,15 +341,15 @@ class PacmanRepo(RedisHash):
                 self._remove_package_from_filesystem(pkg)
 
     def _update_repo(self):
-        self._acquire_lock()
+        if not status.repos_syncing:
+            logger.error('Skipping manual update...')
+            return
+
         self.sync_repo_packages_data()
 
         if self.unaccounted_for:
-            add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_unaccounted_for()
-
-            self._take_action_on_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
-
-        self._release_lock()
+            add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_data()
+            self._handle_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
 
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
@@ -395,10 +378,6 @@ class PacmanRepo(RedisHash):
         return self._has_package(pkgname, self.pkgs_alpm)
 
     def sync_repo_packages_data(self):
-        if not self.locked:
-            logger.error('Cannot sync repo packages without repo lock!')
-            return
-
         self._determine_current_repo_state_alpm()
         self._determine_current_repo_state_fs()
         self._process_current_repo_states()

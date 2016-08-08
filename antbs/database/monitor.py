@@ -121,12 +121,18 @@ class Monitor(RedisHash):
         return latest
 
     @staticmethod
-    def _get_repo_objects():
+    def _get_repo_objects(sync_repos):
         repo = get_repo_object('antergos', 'x86_64')
         staging_repo = get_repo_object('antergos-staging', 'x86_64')
+        repo32 = get_repo_object('antergos', 'i686')
+        staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
-        for repo_obj in [repo, staging_repo]:
-            repo_obj.update_repo()
+        if sync_repos:
+            repo.update_repo()
+            staging_repo.update_repo()
+            repo32.update_repo()
+            staging_repo32.update_repo()
+            status.repos_synced_recently = (True, 600)
 
         return repo, staging_repo
 
@@ -146,50 +152,36 @@ class Monitor(RedisHash):
 
         return matches
 
-    def _not_in_repos(self, pkg_obj, latest, last_result):
-        latest_is_new = not last_result or latest != last_result
-        latest_not_pkgver = latest != pkg_obj.pkgver
+    def _package_version_in_repos(self, pkgname, latest):
+        version_in_repo = version_in_staging = None
 
-        if latest_is_new or latest_not_pkgver:
-            logger.debug([pkg_obj.pkgname, latest, last_result])
-            return True
+        if self.repo_obj.has_package_alpm(pkgname):
+            version_in_repo = self.repo_obj.get_pkgver_alpm(pkgname)
+            version_in_repo, pkgrel = version_in_repo.rsplit('-', 1)
+            logger.debug([self.repo_obj.name, version_in_repo, latest])
 
-        in_repo = in_staging_repo = None
+        if self.staging_repo_obj.has_package_alpm(pkgname):
+            version_in_staging = self.staging_repo_obj.get_pkgver_alpm(pkgname)
+            version_in_staging, pkgrel = version_in_staging.rsplit('-', 1)
+            logger.debug([self.staging_repo_obj.name, version_in_repo, latest])
 
-        if self.repo_obj.has_package_alpm(pkg_obj.pkgname):
-            in_repo = self.repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
-            in_repo, pkgrel = in_repo.rsplit('-', 1)
-            logger.debug([self.repo_obj.name, in_repo, pkgrel])
+        in_repo = version_in_repo is not None and version_in_repo == latest
+        in_staging = version_in_staging is not None and version_in_staging == latest
 
-        if self.staging_repo_obj.has_package_alpm(pkg_obj.pkgname):
-            in_staging_repo = self.staging_repo_obj.get_pkgver_alpm(pkg_obj.pkgname)
-            in_staging_repo, pkgrel = in_staging_repo.rsplit('-', 1)
-            logger.debug([self.staging_repo_obj.name, in_repo, pkgrel])
+        logger.debug([pkgname, in_repo, in_staging])
+        return in_repo or in_staging
 
-        repo_check = in_repo is not None and in_repo != pkg_obj.pkgver
-        staging_repo_check = in_staging_repo is not None and in_staging_repo != pkg_obj.pkgver
-
-        logger.debug([pkg_obj.pkgname, repo_check, staging_repo_check])
-        return repo_check and not staging_repo_check
-
-    def _should_build_package(self, pkg_obj, latest, last_result):
-        build_package = False
+    def _maybe_override_build(self, pkg_obj, latest):
+        build_override = None
 
         if 'redis-desktop-manager' == pkg_obj.pkgname and re.search(r'-\d$', latest):
-            build_package = True
             latest = latest.replace('-', '.')
+        elif 'package-query' == pkg_obj.pkgname and '1.8' == latest:
+            build_override = False
 
-        return build_package, latest
+        return build_override, latest
 
-    def _should_not_build_package(self, pkg_obj, latest, last_result):
-        exclude_package = False
-
-        if 'package-query' == pkg_obj.pkgname and '1.8' == latest:
-            exclude_package = True
-
-        return exclude_package, latest
-
-    def _sync_mon_packages_list(self):
+    def _sync_packages_list(self):
         pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
         monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
         new_pkgs = list(set(monitored) - set(list(self.packages)))
@@ -244,26 +236,26 @@ class Monitor(RedisHash):
         if not latest and is_mate_pkg:
             latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
 
-        dont_build_package, latest = self._should_not_build_package(pkg_obj, latest, last_result)
-
-        if not latest or latest in ['None'] or dont_build_package:
-            if not dont_build_package:
-                logger.error(
-                    '%s - latest: %s, last_result: %s, pkgver: %s',
-                    pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
-                )
+        if not latest or latest in ['None']:
+            logger.error(
+                '%s - latest: %s, last_result: %s, pkgver: %s',
+                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
+            )
             return build_pkgs
-
-        build_package, latest = self._should_build_package(pkg_obj, latest, last_result)
 
         if latest.startswith('v') and 'commits' != pkg_obj.mon_type:
             latest = latest[1:]
 
-        if latest != pkg_obj.pkgver and self._not_in_repos(pkg_obj, latest, last_result):
-            pkg_obj.mon_last_result = latest
+        build_override, latest = self._maybe_override_build(pkg_obj, latest)
+
+        do_build = build_override if build_override is not None else latest != pkg_obj.pkgver
+
+        pkg_obj.mon_last_result = latest
+
+        if do_build or not self._package_version_in_repos(pkg_obj, latest):
             build_pkgs.append(pkg_obj.name)
 
-            if latest != pkg_obj.pkgver and pkg_obj.mon_type in ['releases', 'tags']:
+            if pkg_obj.mon_type in ['releases', 'tags']:
                 pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)
 
         return build_pkgs
@@ -307,13 +299,17 @@ class Monitor(RedisHash):
             else:
                 logger.error('At least one iso was not successfully added to wordpress.')
 
-    def check_repos_for_changes(self, webhook):
+    def check_repos_for_changes(self, check_github, sync_repos, webhook):
+        self.repo_obj, self.staging_repo_obj = self._get_repo_objects(sync_repos)
+
+        if not check_github:
+            return
+
         self.checked_recently = (True, 3600)
 
         build_pkgs = []
         quiet_down_noisy_loggers()
-        self._sync_mon_packages_list()
-        self.repo_obj, self.staging_repo_obj = self._get_repo_objects()
+        self._sync_packages_list()
 
         logger.info('Checking github repos for changes...')
 
@@ -325,7 +321,7 @@ class Monitor(RedisHash):
             elif 'gitlab' == pkg_obj.mon_service:
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
 
-            gevent.sleep(1.5)
+            gevent.sleep(0.5)
 
         build_pkgs = [p for p in build_pkgs if p]
 
@@ -354,9 +350,14 @@ def get_monitor_object(name):
     return monitor_obj
 
 
-def check_repos_for_changes(name, webhook):
-    monitor_obj = get_monitor_object(name)
+def check_repos_for_changes(check_github, sync_repos, webhook):
+    monitor_obj = get_monitor_object('github')
 
-    monitor_obj.check_repos_for_changes(webhook)
-    monitor_obj.check_is_running = False
+    monitor_obj.check_repos_for_changes(check_github, sync_repos, webhook)
+
+    if check_github:
+        monitor_obj.check_is_running = False
+
+    if sync_repos:
+        status.repos_syncing = False
 
