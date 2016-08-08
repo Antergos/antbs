@@ -36,12 +36,12 @@ class RedisObject:
 
     db = db
     _subclass_names = ['RedisList', 'RedisZset']
+    attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
+    all_attribs = []
 
     def __init__(self, full_key=None, *args, **kwargs):
         """ Create or load a RedisObject. """
-        self.attrib_lists = dict(string=[], bool=[], int=[], list=[], set=[], path=[])
         self.item_type = None
-        self.all_attribs = []
 
         if not full_key:
             raise ValueError('A key is required to initialize a redis object.')
@@ -90,7 +90,7 @@ class RedisObject:
     def __iter__(self):
         raise NotImplementedError
 
-    def __jsonable__(self):
+    def __json__(self):
         """
         Returns this object as a python built-in type so it can be serialized by the json module.
 
@@ -115,8 +115,8 @@ class RedisObject:
 
                 val = getattr(self, key)
 
-                if not isinstance(val, (str, dict, bool, int)) and hasattr(val, '__jsonable__'):
-                    as_dict[key] = val.__jsonable__()
+                if not isinstance(val, (str, dict, bool, int)) and hasattr(val, '__json__'):
+                    as_dict[key] = val.__json__()
                 else:
                     as_dict[key] = val
 
@@ -144,7 +144,7 @@ class RedisObject:
         Args:
             key (str):             The redis key for this object.
             item_type (type(str)): The built-in type object for the type of data stored in
-                                    this object.
+                                   this object.
         """
 
         def helper(_=None):
@@ -171,4 +171,4 @@ class RedisObject:
 
     def json(self):
         """ Return this object as a json serialized string. """
-        return json.dumps(self.__jsonable__())
+        return json.dumps(self.__json__())

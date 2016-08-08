@@ -41,7 +41,7 @@ from . import (
 )
 
 
-class RedisHashMeta(type):
+class RedisHashMCS(type):
     def __new__(mcs, cls, bases, cls_dict):
         instance = super().__new__(mcs, cls, bases, cls_dict)
 
@@ -77,11 +77,11 @@ class RedisHashMeta(type):
         return instance
 
 
-class RedisSingleton(Singleton, RedisHashMeta):
+class RedisSingleton(Singleton, RedisHashMCS):
     pass
 
 
-class RedisHash(RedisObject, metaclass=RedisHashMeta):
+class RedisHash(RedisObject, metaclass=RedisHashMCS):
     """
         This is the base class for all of the redis-backed classes in this application.
         The class provides access to predefined keys as class attributes which are stored in redis.

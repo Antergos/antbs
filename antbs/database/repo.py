@@ -342,7 +342,6 @@ class PacmanRepo(RedisHash):
 
     def _update_repo(self):
         if not status.repos_syncing:
-            logger.error('Skipping manual update...')
             return
 
         self.sync_repo_packages_data()

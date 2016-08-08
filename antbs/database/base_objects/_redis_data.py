@@ -114,10 +114,7 @@ class RedisDataHashField(RedisData):
 
         self.field_name = field_name
         self.can_expire = can_expire
-        self.expire_key = ''
-
-        if can_expire:
-            self.expire_key = field_name + '__exp'
+        self.expire_key = field_name + '__exp' if can_expire else ''
 
     def __get__(self, obj, obj_type):
         if self.can_expire:
@@ -183,31 +180,29 @@ class RedisDataRedisObject(RedisData):
 
     def __init__(self, key, default_value):
         super().__init__(default_value, default_value)
+
         self.key = key
 
         if self._instances is None:
             self._instances = {}
 
     def __get__(self, obj, obj_type):
-        name, full_key = self._get_key_info_from_object(obj)
+        full_key = self._get_full_key_for_child_object(obj)
 
-        if name not in self._instances:
-            self._instances[name] = self.default_value.as_child(full_key, str)
+        if full_key not in self._instances:
+            self._instances[full_key] = self.default_value.as_child(full_key, str)
 
-        return self._instances[name]
+        return self._instances[full_key]
 
     def __set__(self, obj, value):
-        name, full_key = self._get_key_info_from_object(obj)
+        full_key = self._get_full_key_for_child_object(obj)
 
         self._type_check(value, self.value_type, self.__class__.__name__, None)
 
-        self._instances[name] = value
+        self._instances[full_key] = value
 
-    def _get_key_info_from_object(self, obj):
-        full_key = '{0}:{1}'.format(obj.full_key, self.key)
-        name = obj.full_key.split(':')[-1]
-
-        return name, full_key
+    def _get_full_key_for_child_object(self, obj):
+        return '{0}:{1}'.format(obj.full_key, self.key)
 
 
 def bool_string_helper(value):

@@ -38,4 +38,4 @@ from ._redis_data import (
 from ._redis_object import RedisObject
 from .redis_list import RedisList
 from .redis_zset import RedisZSet
-from .redis_hash import RedisHashMeta, RedisHash, RedisSingleton
+from .redis_hash import RedisHashMCS, RedisHash, RedisSingleton

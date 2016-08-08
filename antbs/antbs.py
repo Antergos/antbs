@@ -60,34 +60,34 @@ def create_app():
 
     """
 
-    app = Flask('antbs')
+    _app = Flask('antbs')
 
     # Bugsnag Mixin
-    handle_exceptions(app)
+    handle_exceptions(_app)
 
     # Hookup Middlewares
-    with app.app_context():
+    with _app.app_context():
         import_module('middleware')
 
     # Apply Configuration
     antbs_config = AntBSConfig(status, logger)
-    app = antbs_config.apply_all(app)
+    _app = antbs_config.apply_all(_app)
 
     # Init Stormpath Manager
-    stormpath_manager.init_app(app)
+    stormpath_manager.init_app(_app)
 
     # Debug Toolbar
-    debug_toolbar.init_app(app)
+    debug_toolbar.init_app(_app)
 
     # RQ Dashboard
-    app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
+    _app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
 
     # Register Views
     for view_class in all_views:
         view = view_class()
-        view.register(app)
+        view.register(_app)
 
-    return app
+    return _app
 
 app = create_app()
 

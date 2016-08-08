@@ -32,7 +32,7 @@ from .base_objects import (
     RedisHash,
     RedisList,
     RedisZSet,
-    RedisHashMeta,
+    RedisHashMCS,
     RedisSingleton,
     Singleton,
     bool_string_helper

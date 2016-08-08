@@ -67,15 +67,19 @@ class RedisZSet(RedisObject, set):
         return str([x for x in self.__iter__()])
 
     def add(self, *values):
-        """ Add member to sorted set if it doesn't exist. """
+        """ Add member(s) to sorted set. """
         vals = []
+
         for val in values:
-            vals.append(1)
-            vals.append(val)
+            vals.extend([1, val])
+
         self.db.zadd(self.full_key, *vals)
 
     def append(self, val):
         self.add(val)
+
+    def extend(self, vals):
+        self.add(*vals)
 
     def ismember(self, val):
         """ Check if value is a member of set. """
