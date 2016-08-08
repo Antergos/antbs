@@ -277,27 +277,25 @@ class Build(RedisHash):
             self._pkg_obj.setup_pkgbuild_parser()
             generated_pkgs = self._pkg_obj._pkgbuild.get_generates(self.result_dir)
 
-        for gen_pkg in generated_pkgs:
-            if gen_pkg:
-                self.generated_pkgs.add(gen_pkg)
+        self.generated_pkgs.extend(generated_pkgs)
 
     def get_save_generated_files_paths(self):
         generated_files = [
             os.path.join(self.result_dir, f)
             for f in os.listdir(self.result_dir)
-            if f.endswith(PKG_EXT) and f not in self.generated_files
+            if f.endswith(PKG_EXT)
         ]
 
         self.generated_files.extend(generated_files)
 
     def get_save_generated_signatures_paths(self):
-        generated_files = [
+        generated_signature_files = [
             os.path.join(self.result_dir, f)
             for f in os.listdir(self.result_dir)
-            if f.endswith(PKG_EXT + SIG_EXT) and f not in self.generated_files
+            if f.endswith(PKG_EXT + SIG_EXT)
         ]
 
-        self.generated_files.extend(generated_files)
+        self.generated_files.extend(generated_signature_files)
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname

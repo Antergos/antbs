@@ -190,7 +190,8 @@ class PacmanRepo(RedisHash):
             logger.error(err)
 
     def _determine_current_repo_state_fs(self):
-        pkgs = set(p for p in os.listdir(self.path) if '.pkg.' in p and not p.endswith('.sig'))
+        self._maybe_remove_broken_symlinks()
+        pkgs = [p for p in os.listdir(self.path) if '.pkg.' in p and not p.endswith('.sig')]
 
         self.pkgs_fs.remove_range(0, -1)
 
@@ -239,6 +240,17 @@ class PacmanRepo(RedisHash):
 
     def _has_package(self, pkgname, location):
         return pkgname in self._get_pkgnames(location)
+
+    def _maybe_remove_broken_symlinks(self):
+        # If item returned by os.listdir doesn't exist then its a broken symlink.
+        broken_links = [
+            broken_link for broken_link in os.listdir(self.path)
+            if not os.path.exists(os.path.join(self.path, broken_link))
+        ]
+
+        if broken_links:
+            for broken_link in broken_links:
+                remove(broken_link)
 
     @staticmethod
     def _pkgver_is_greater_than(pkgver, compare_to):
