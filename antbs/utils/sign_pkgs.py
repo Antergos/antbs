@@ -44,8 +44,8 @@ PKG_EXT = '.pkg.tar.xz'
 
 
 def batch_sign(paths, db, bnum='', uid='', passphrase='', is_iso=False):
-    if not isinstance(paths, list):
-        logger.error('paths must be a list')
+    if not isinstance(paths, set):
+        logger.error('paths must be a set')
         return False
 
     for path in paths:

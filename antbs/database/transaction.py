@@ -334,7 +334,7 @@ class Transaction(TransactionMeta):
             bld_obj.staging_files.append(staging_file)
 
     def process_packages(self):
-        _pkgs = [p for p in self.packages]
+        _pkgs = [p for p in self.packages if p]
 
         for pkg in self.packages:
             if not pkg:

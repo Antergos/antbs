@@ -252,8 +252,8 @@ class Monitor(RedisHash):
 
         pkg_obj.mon_last_result = latest
 
-        if do_build or not self._package_version_in_repos(pkg_obj, latest):
-            build_pkgs.append(pkg_obj.name)
+        if do_build or not self._package_version_in_repos(pkg_obj.pkgname, latest):
+            build_pkgs.append(pkg_obj.pkgname)
 
             if pkg_obj.mon_type in ['releases', 'tags']:
                 pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)

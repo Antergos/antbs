@@ -81,12 +81,14 @@ class RedisList(RedisObject, list):
 
     def append(self, val):
         """ Append value to the end of this list """
-        self.rpush(val)
+        if val:
+            self.rpush(val)
 
     def extend(self, iterable):
         """ Append values in iterable to the end of this list """
-        for item in iterable:
-            self.append(item)
+        if iterable:
+            for item in iterable:
+                self.append(item)
 
     def lpop(self):
         """ Remove and return a value from the left (low) end of the list. """
@@ -94,7 +96,8 @@ class RedisList(RedisObject, list):
 
     def lpush(self, val):
         """ Add an item to the left (low) end of the list. """
-        self.db.lpush(self.full_key, super().encode_value(val))
+        if val:
+            self.db.lpush(self.full_key, super().encode_value(val))
 
     def remove(self, val):
         self.db.lrem(self.full_key, 0, val)
@@ -112,4 +115,5 @@ class RedisList(RedisObject, list):
 
     def rpush(self, val):
         """ Add an item to the right (high) end of the list. """
-        self.db.rpush(self.full_key, super().encode_value(val))
+        if val:
+            self.db.rpush(self.full_key, super().encode_value(val))
