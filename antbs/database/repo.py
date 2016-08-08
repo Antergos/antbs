@@ -229,7 +229,7 @@ class PacmanRepo(PacmanRepoMeta):
 
         if broken_links:
             for broken_link in broken_links:
-                remove(broken_link)
+                self._remove_package_from_filesystem(broken_link)
 
     @staticmethod
     def _pkgver_is_greater_than(pkgver, compare_to):
@@ -307,12 +307,11 @@ class PacmanRepo(PacmanRepoMeta):
 
         return add_to_db, rm_from_db, rm_from_fs
 
-    @staticmethod
-    def _remove_package_from_filesystem(pkg_file):
+    def _remove_package_from_filesystem(self, pkg_file):
         sig = '{}{}'.format(pkg_file, SIG_EXT)
 
         for file_name in [pkg_file, sig]:
-            remove(file_name)
+            remove(os.path.join(self.path, file_name))
 
     @staticmethod
     def _split_pkg_info_string(pkg_info_string):

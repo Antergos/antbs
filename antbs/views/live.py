@@ -30,6 +30,7 @@ from . import *
 
 
 class LiveView(FlaskView):
+    route_base = '/live'
 
     def index(self):
         return self.get()

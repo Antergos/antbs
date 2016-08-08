@@ -30,6 +30,7 @@ from . import *
 
 
 class BuildView(FlaskView):
+    route_base = '/build'
 
     def _get_builds_with_status(self, page=None, build_status=None, search=None):
         """
@@ -114,7 +115,7 @@ class BuildView(FlaskView):
         )
 
     @route('/<int:bnum>')
-    def build_info(bnum=None):
+    def build_info(self, bnum=None):
         if not bnum:
             abort(404)
 
@@ -144,4 +145,4 @@ class BuildView(FlaskView):
 
 
 class BuildsView(BuildView):
-    pass
+    route_base = '/builds'

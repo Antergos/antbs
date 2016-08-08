@@ -30,6 +30,7 @@ from . import *
 
 
 class RepoView(FlaskView):
+    route_base = '/repo'
 
     def _get_repo_packages(self, repo_name=None, filter=None, filter_by=None, page=1):
         if repo_name is None:

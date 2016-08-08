@@ -30,6 +30,7 @@ from . import *
 
 
 class PackageView(FlaskView):
+    route_base = '/package'
 
     def _get_build_events_timeline(self, pkg_obj, tlpage=1):
         timeline = []

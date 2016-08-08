@@ -30,6 +30,7 @@ from . import *
 
 
 class APIView(FlaskView):
+    route_base = '/api'
 
     def _get_live_build_output(self, bnum):
         psub = db.pubsub()
