@@ -29,36 +29,32 @@
 
 """ AntBS (Antergos Build Server) Main Module """
 
-import re
 from datetime import timedelta
+from importlib import import_module
 
-from flask import (
-    Flask, abort, render_template, request, url_for
-)
-
-from flask_stormpath import StormpathManager, current_user
-from werkzeug.contrib.fixers import ProxyFix
-
-import rq_dashboard
+from flask import Flask
 
 from logging_config import handle_exceptions
-from utils import AntBSDebugToolbar
-from database.server_status import status
-from database.monitor import get_monitor_object, check_repos_for_changes
 
-import views
+from database import (
+    status,
+    get_monitor_object,
+    check_repos_for_changes
+)
+
+from config import AntBSConfig
+from views import all_views
+from extensions import (
+    stormpath_manager,
+    debug_toolbar,
+    rq_dashboard
+)
 import webhook
 
 logger = status.logger
 
 
-def url_for_other_page(page):
-    args = request.view_args.copy()
-    args['page'] = page
-    return url_for(request.endpoint, **args)
-
-
-def initialize_app():
+def create_app():
     """
     Creates global flask app object and initializes settings.
 
@@ -66,139 +62,35 @@ def initialize_app():
 
     app = Flask('antbs')
 
+    # Bugsnag Mixin
     handle_exceptions(app)
 
-    # Configuration
-    app.config.update({'SECRET_KEY': status.sp_session_key,
-                       'STORMPATH_API_KEY_ID': status.sp_api_id,
-                       'STORMPATH_API_KEY_SECRET': status.sp_api_key,
-                       'STORMPATH_APPLICATION': status.sp_app,
-                       'STORMPATH_ENABLE_USERNAME': True,
-                       'STORMPATH_REQUIRE_USERNAME': True,
-                       'STORMPATH_ENABLE_REGISTRATION': False,
-                       'STORMPATH_REDIRECT_URL': '/builds/completed',
-                       'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
-                       'STORMPATH_COOKIE_DURATION': timedelta(days=14),
-                       'STORMPATH_ENABLE_FORGOT_PASSWORD': True,
-                       'DEBUG_TB_PROFILER_ENABLED': True})
+    # Hookup Middlewares
+    with app.app_context():
+        import_module('middleware')
 
-    # Debug Toolbar - only enabled in debug mode and only for logged-in users:
-    # app.debug = True
-    # AntBSDebugToolbar(app)
+    # Apply Configuration
+    antbs_config = AntBSConfig(status, logger)
+    app = antbs_config.apply_all(app)
 
-    # Create Stormpath Manager object.
-    StormpathManager(app)
+    # Init Stormpath Manager
+    stormpath_manager.init_app(app)
 
-    # Jinja2 configuration
-    app.jinja_options = Flask.jinja_options.copy()
-    app.jinja_options['lstrip_blocks'] = True
-    app.jinja_options['trim_blocks'] = True
-    app.jinja_env.globals['url_for_other_page'] = url_for_other_page
-    app.jinja_env.add_extension('jinja2.ext.do')
+    # Debug Toolbar
+    debug_toolbar.init_app(app)
 
-    # Use gunicorn with nginx proxy
-    app.wsgi_app = ProxyFix(app.wsgi_app)
-
-    # Setup rq_dashboard (accessible at '/rq' endpoint)
-    app.config.from_object(rq_dashboard.default_settings)
+    # RQ Dashboard
     app.register_blueprint(rq_dashboard.blueprint, url_prefix='/rq')
 
-    # Register our views
-    app.register_blueprint(views.api_view, url_prefix='/api')
-    app.register_blueprint(views.build_view, url_prefix='/builds')
-    app.register_blueprint(views.build_view, url_prefix='/build')
-    app.register_blueprint(views.home_view)
-    app.register_blueprint(views.live_view, url_prefix='/building')
-    app.register_blueprint(views.package_view, url_prefix='/package')
-    app.register_blueprint(views.repo_view, url_prefix='/repo')
+    # Register Views
+    for view_class in all_views:
+        view = view_class()
+        view.register(app)
 
     return app
 
-
-# Make `app` available to gunicorn
-app = initialize_app()
-
-
-@app.before_request
-def rq_dashboard_requires_auth():
-    if '/rq' in request.path and not current_user.is_authenticated:
-        abort(403)
-
-
-@app.before_request
-def maybe_check_mon_repos():
-    _namespace = 'antbs'
-    _status_key = '{}:status'.format(_namespace)
-    _monitor_key = '{}:monitor:github'.format(_namespace)
-    syncing = synced = checking = checked = None
-    do_sync = do_check = False
-
-    with status.db.pipeline() as pipe:
-        pipe.hget(_status_key, 'repos_syncing')
-        pipe.hget(_status_key, 'repos_synced_recently')
-        pipe.hget(_monitor_key, 'check_is_running')
-        pipe.hget(_monitor_key, 'checked_recently')
-
-        syncing, synced, checking, checked = pipe.execute()
-
-        # logger.debug([syncing, synced, checking, checked])
-
-    if not checking and not checked:
-        status.db.hset(_monitor_key, 'check_is_running', True)
-        do_check = True
-
-    if not syncing and not synced:
-        status.repos_syncing = True
-        do_sync = True
-
-    views.repo_queue.enqueue_call(
-        check_repos_for_changes, args=(do_check, do_sync, webhook.Webhook), timeout=9600
-    )
-
-
-@app.context_processor
-def inject_global_template_variables():
-    return dict(
-        idle=status.idle,
-        current_status=status.current_status,
-        now_building=status.now_building,
-        rev_pending=status.pending_review,
-        user=current_user,
-        current_user=current_user,
-        _all_packages=status.all_packages
-    )
-
-
-@app.template_filter('tpl_name')
-def tpl_name(s):
-    res = re.findall('\'([^\']*)\'', str(s))
-
-    return None if not res else res[0]
-
-
-@app.errorhandler(404)
-def page_not_found(e):
-    return render_template('error/404.html'), 404
-
-
-@app.errorhandler(500)
-def internal_error(e):
-    if e is not None:
-        logger.error(e)
-    return render_template('error/500.html'), 500
-
-
-@app.errorhandler(400)
-def flask_error(e):
-    if e is not None:
-        logger.error(e)
-    return render_template('error/500.html'), 400
-
-
-@app.route('/issues', methods=['GET'])
-def show_issues():
-    return render_template('issues.html')
-
+app = create_app()
 
 if __name__ == "__main__":
-    app.run(host='127.0.0.1', port=8020, debug=True, use_reloader=False)
+    app = create_app()
+    app.run(host='127.0.0.1', port=8020, debug=True, use_reloader=True)

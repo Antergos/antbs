@@ -28,121 +28,120 @@
 
 from . import *
 
-build_view = Blueprint('build', __name__)
+
+class BuildView(FlaskView):
+
+    def _get_builds_with_status(self, page=None, build_status=None, search=None):
+        """
+        Get paginated list of build objects.
+
+        Args:
+            page (int) Page number.
+            build_status (str): Only include builds of this status (completed, failed, etc).
+            query (str): Filter list to include builds where "search" string is found in pkgname.
+
+        Returns:
+             pkglist (list), all_pages (int), rev_pending (list)
+
+        """
+        if page is None or build_status is None:
+            abort(500)
+
+        builds_list = []
+        rev_pending = []
+        all_builds = None
+        all_pages = 0
+
+        try:
+            all_builds = getattr(status, build_status)
+        except Exception as err:
+            logger.error('GET_BUILD_INFO - %s', err)
+            abort(500)
+
+        if not all_builds:
+            return [], 1, []
+
+        if search is not None:
+            search_all_builds = [x for x in all_builds if
+                                 x and match_pkgname_with_build_number(x, search)]
+            all_builds = search_all_builds
+
+        if all_builds:
+            builds, all_pages = get_paginated(all_builds, 10, page)
+            for bnum in builds:
+                try:
+                    bld_obj = get_build_object(bnum=bnum)
+                except Exception as err:
+                    logger.error(err)
+                    continue
+
+                builds_list.append(bld_obj)
+
+            if current_user.is_authenticated:
+                for bld_obj in builds_list:
+                    if 'pending' == bld_obj.review_status:
+                        rev_pending.append(bld_obj)
+
+        return builds_list, int(all_pages), rev_pending
+
+    @route('/<build_status>/search/<query>')
+    @route('/<build_status>/search/<query>/<int:page>')
+    @route('/<build_status>/<int:page>')
+    @route('/<build_status>')
+    def builds_with_status(self, build_status=None, page=None, query=None):
+        if not build_status or build_status not in ['completed', 'failed']:
+            abort(404)
+
+        if page is None:
+            page = 1
+
+        builds, all_pages, rev_pending = self._get_builds_with_status(page, build_status, query)
+        pagination = Pagination(page, 10, all_pages)
+
+        return try_render_template(
+            'build/listing.html',
+            builds=builds,
+            all_pages=all_pages,
+            pagination=pagination,
+            build_status=build_status
+        )
+
+    @route('/queue')
+    def queue(self):
+        return try_render_template(
+            'build/scheduled.html',
+            queued=get_build_queue(status, get_trans_object)
+        )
+
+    @route('/<int:bnum>')
+    def build_info(bnum=None):
+        if not bnum:
+            abort(404)
+
+        bld_obj = None
+
+        try:
+            bld_obj = get_build_object(bnum=bnum)
+        except Exception:
+            abort(500)
+
+        if not bld_obj.log_str:
+            bld_obj.log_str = 'Unavailable'
+
+        if bld_obj.container:
+            container = bld_obj.container[:20]
+        else:
+            container = None
+
+        result = 'completed' if bld_obj.completed else 'failed'
+
+        return try_render_template(
+            'build/build_info.html',
+            bld_obj=bld_obj,
+            container=container,
+            result=result
+        )
 
 
-###
-##
-#   Utility Functions For This View
-##
-###
-
-def get_builds_with_status(page=None, build_status=None, search=None):
-    """
-    Get paginated list of build objects.
-
-    Args:
-        page (int) Page number.
-        build_status (str): Only include builds of this status (completed, failed, etc).
-        query (str): Filter list to include builds where "search" string is found in pkgname.
-
-    Returns:
-         pkglist (list), all_pages (int), rev_pending (list)
-
-    """
-    if page is None or build_status is None:
-        abort(500)
-
-    builds_list = []
-    rev_pending = []
-    all_builds = None
-    all_pages = 0
-
-    try:
-        all_builds = getattr(status, build_status)
-    except Exception as err:
-        logger.error('GET_BUILD_INFO - %s', err)
-        abort(500)
-
-    if not all_builds:
-        return [], 1, []
-
-    if search is not None:
-        search_all_builds = [x for x in all_builds if
-                             x and match_pkgname_with_build_number(x, search)]
-        all_builds = search_all_builds
-
-    if all_builds:
-        builds, all_pages = get_paginated(all_builds, 10, page)
-        for bnum in builds:
-            try:
-                bld_obj = get_build_object(bnum=bnum)
-            except Exception as err:
-                logger.error(err)
-                continue
-
-            builds_list.append(bld_obj)
-
-        if current_user.is_authenticated:
-            for bld_obj in builds_list:
-                if 'pending' == bld_obj.review_status:
-                    rev_pending.append(bld_obj)
-
-    return builds_list, int(all_pages), rev_pending
-
-
-###
-##
-#   Views Start Here
-##
-###
-
-@build_view.route('/<build_status>/search/<query>')
-@build_view.route('/<build_status>/search/<query>/<int:page>')
-@build_view.route('/<build_status>/<int:page>')
-@build_view.route('/<build_status>')
-def builds_with_status(build_status=None, page=None, query=None):
-    if not build_status or build_status not in ['completed', 'failed']:
-        abort(404)
-
-    if page is None:
-        page = 1
-
-    builds, all_pages, rev_pending = get_builds_with_status(page, build_status, query)
-    pagination = Pagination(page, 10, all_pages)
-
-    return try_render_template('build/listing.html', builds=builds, all_pages=all_pages,
-                               pagination=pagination, build_status=build_status)
-
-
-@build_view.route('/queue')
-def build_queue():
-    return try_render_template("build/scheduled.html",
-                               queued=get_build_queue(status, get_trans_object))
-
-
-@build_view.route('/<int:bnum>')
-def build_info(bnum=None):
-    if not bnum:
-        abort(404)
-
-    bld_obj = None
-
-    try:
-        bld_obj = get_build_object(bnum=bnum)
-    except Exception:
-        abort(500)
-
-    if not bld_obj.log_str:
-        bld_obj.log_str = 'Unavailable'
-
-    if bld_obj.container:
-        container = bld_obj.container[:20]
-    else:
-        container = None
-
-    result = 'completed' if bld_obj.completed else 'failed'
-
-    return try_render_template("build/build_info.html", bld_obj=bld_obj, container=container,
-                               result=result)
-
+class BuildsView(BuildView):
+    pass

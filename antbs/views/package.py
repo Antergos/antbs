@@ -28,76 +28,61 @@
 
 from . import *
 
-package_view = Blueprint('package', __name__)
 
+class PackageView(FlaskView):
 
-###
-##
-#   Utility Functions For This View
-##
-###
+    def _get_build_events_timeline(self, pkg_obj, tlpage=1):
+        timeline = []
+        start_at = len(pkg_obj.tl_events) - 300
+        start_at = max(0, start_at)
 
-def get_build_events_timeline(pkg_obj, tlpage=1):
-    timeline = []
-    start_at = len(pkg_obj.tl_events) - 300
-    start_at = max(0, start_at)
+        for event_id in pkg_obj.tl_events[start_at:-1]:
+            event = get_timeline_object(event_id=event_id)
+            timeline.append(event)
 
-    for event_id in pkg_obj.tl_events[start_at:-1]:
-        event = get_timeline_object(event_id=event_id)
-        timeline.append(event)
+        this_page, all_pages = get_paginated(timeline, 6, tlpage)
 
-    this_page, all_pages = get_paginated(timeline, 6, tlpage)
+        return this_page, all_pages
 
-    return this_page, all_pages
+    def _get_build_counts(self, pkg_obj):
+        completed = [b for b in pkg_obj.builds if b and not build_failed(b)]
+        failed = [b for b in pkg_obj.builds if b and build_failed(b)]
 
+        completed = len(completed)
+        failed = len(failed)
 
-def get_build_counts(pkg_obj):
-    completed = [b for b in pkg_obj.builds if b and not build_failed(b)]
-    failed = [b for b in pkg_obj.builds if b and build_failed(b)]
+        counts = [
+            ('Total Builds', completed + failed, ''),
+            ('Completed', completed, 'success'),
+            ('Failed', failed, 'danger')
+        ]
 
-    completed = len(completed)
-    failed = len(failed)
+        return counts
 
-    counts = [
-        ('Total Builds', completed + failed, ''),
-        ('Completed', completed, 'success'),
-        ('Failed', failed, 'danger')
-    ]
+    @route('/<pkgname>', methods=['GET'])
+    @route('/<pkgname>/<int:tlpage>', methods=['GET'])
+    def get_and_show_pkg_profile(self, pkgname=None, tlpage=1):
+        if pkgname is None or not status.all_packages.ismember(pkgname):
+            abort(404)
 
-    return counts
+        pkg_obj = get_pkg_object(name=pkgname)
 
+        if '' == pkg_obj.description:
+            desc = pkg_obj.get_from_pkgbuild('pkgdesc')
+            pkg_obj.description = desc
+            pkg_obj.pkgdesc = desc
 
-###
-##
-#   Views Start Here
-##
-###
+        tl_events, all_pages = self._get_build_events_timeline(pkg_obj, tlpage=tlpage)
+        build_counts = self._get_build_counts(pkg_obj)
+        columns_info_obj = ColumnsInfo(current_user)
+        service_icons_info = columns_info_obj.get_repo_monitor_services_icons_info()
 
-
-@package_view.route('/<pkgname>', methods=['GET'])
-@package_view.route('/<pkgname>/<int:tlpage>', methods=['GET'])
-def get_and_show_pkg_profile(pkgname=None, tlpage=1):
-    if pkgname is None or not status.all_packages.ismember(pkgname):
-        abort(404)
-
-    pkg_obj = get_pkg_object(name=pkgname)
-
-    if '' == pkg_obj.description:
-        desc = pkg_obj.get_from_pkgbuild('pkgdesc')
-        pkg_obj.description = desc
-        pkg_obj.pkgdesc = desc
-
-    tl_events, all_pages = get_build_events_timeline(pkg_obj, tlpage=tlpage)
-    build_counts = get_build_counts(pkg_obj)
-    columns_info_obj = ColumnsInfo(current_user)
-    service_icons_info = columns_info_obj.get_repo_monitor_services_icons_info()
-
-    return try_render_template(
-        'package.html',
-        pkg=pkg_obj,
-        tl_events=tl_events,
-        page=tlpage,
-        all_pages=all_pages,
-        build_counts=build_counts,
-        service_icons_info=service_icons_info
-    )
+        return try_render_template(
+            'package.html',
+            pkg=pkg_obj,
+            tl_events=tl_events,
+            page=tlpage,
+            all_pages=all_pages,
+            build_counts=build_counts,
+            service_icons_info=service_icons_info
+        )

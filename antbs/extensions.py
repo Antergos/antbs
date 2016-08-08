@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #  -*- coding: utf-8 -*-
 #
-#  live.py
+#  extensions.py
 #
-#  Copyright © 2016  Antergos
+#  Copyright © 2016 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
@@ -26,33 +26,21 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-from . import *
+""" Extensions are instantiated here to avoid circular imports with views and create_app(). """
+
+from werkzeug.contrib.fixers import ProxyFix
+from flask import request, url_for
+from flask_stormpath import StormpathManager, current_user
+from flask_classful import FlaskView, route
+import rq_dashboard
+
+from utils import AntBSDebugToolbar
+
+debug_toolbar = AntBSDebugToolbar()
+stormpath_manager = StormpathManager()
 
 
-class LiveView(FlaskView):
-
-    def index(self):
-        return self.get()
-
-    def get(self, bnum=None):
-        bld_objs = {}
-        selected = None
-
-        if bnum and bnum not in status.now_building:
-            abort(400)
-
-        if status.now_building and not status.idle:
-            try:
-                bld_objs = {b: get_build_object(bnum=b) for b in status.now_building if b}
-            except Exception as err:
-                logger.error(err)
-                abort(500)
-
-            if not bnum or bnum not in bld_objs:
-                bnum = sorted(bld_objs.keys())[0]
-
-            selected = dict(bnum=bnum, pkgname=bld_objs[bnum].pkgname,
-                            version=bld_objs[bnum].version_str, start=bld_objs[bnum].start_str,
-                            container=bld_objs[bnum].container)
-
-        return try_render_template('building.html', bld_objs=bld_objs, selected=selected)
+def url_for_other_page(page):
+    args = request.view_args.copy()
+    args['page'] = page
+    return url_for(request.endpoint, **args)

@@ -69,6 +69,7 @@ from utils import *
 from webhook import Webhook
 from transaction_handler import handle_hook, process_dev_review
 from iso_utility import iso_release_job
+from extensions import FlaskView, route
 
 logger = status.logger
 
@@ -201,9 +202,11 @@ def build_failed(bnum):
     return bld_obj.failed
 
 
-from .api import api_view
-from .build import build_view
-from .home import home_view
-from .live import live_view
-from .package import package_view
-from .repo import repo_view
+from .api import APIView
+from .build import BuildView, BuildsView
+from .home import HomeView
+from .live import LiveView
+from .package import PackageView
+from .repo import RepoView
+
+all_views = [APIView, BuildView, BuildsView, HomeView, LiveView, PackageView, RepoView]

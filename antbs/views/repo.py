@@ -28,112 +28,99 @@
 
 from . import *
 
-repo_view = Blueprint('repo', __name__)
 
+class RepoView(FlaskView):
 
-###
-##
-#   Utility Functions For This View
-##
-###
+    def _get_repo_packages(self, repo_name=None, filter=None, filter_by=None, page=1):
+        if repo_name is None:
+            abort(500)
 
-def get_repo_packages(repo_name=None, filter=None, filter_by=None, page=1):
-    if repo_name is None:
-        abort(500)
+        pkgs = []
+        bld_obj = None
+        all_pages = 0
+        repo_obj = get_repo_object(repo_name, 'x86_64')
 
-    pkgs = []
-    bld_obj = None
-    all_pages = 0
-    repo_obj = get_repo_object(repo_name, 'x86_64')
+        if current_user.is_authenticated:
+            rev_pending = []
+        else:
+            rev_pending = []
 
-    if current_user.is_authenticated:
-        rev_pending = []
-    else:
-        rev_pending = []
+        if not repo_obj.pkgnames and not repo_obj.locked:
+            repo_obj.update_repo()
+            return pkgs, rev_pending, all_pages
 
-    if not repo_obj.pkgnames and not repo_obj.locked:
-        repo_obj.update_repo()
+        if filter and 'group' == filter:
+            repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)]
+
+        elif filter and 'search' == filter:
+            repo_packages = [p for p in sorted(repo_obj.pkgnames) if filter_by in p]
+
+        else:
+            repo_packages = [p for p in sorted(repo_obj.pkgnames)]
+
+        packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
+
+        for pkg in packages:
+            if 'dummy' in pkg or 'grub-zfs' in pkg:
+                continue
+
+            try:
+                pkg_obj = get_pkg_object(pkg)
+            except Exception as err:
+                logger.error(err)
+                continue
+
+            try:
+                bnum = pkg_obj.builds[-1]
+                if bnum:
+                    bld_obj = get_build_object(bnum=bnum)
+            except Exception:
+                continue
+
+            pkg_obj._build = bld_obj
+            pkgs.append(pkg_obj)
+
         return pkgs, rev_pending, all_pages
 
-    if filter and 'group' == filter:
-        repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)]
+    @route('/<name>/packages/<filter>/<filter_by>')
+    @route('/<name>/packages/<filter>/<filter_by>/<int:page>')
+    @route('/<name>/packages/<int:page>')
+    @route('/<name>/packages')
+    def repo_packages_listing(self, name=None, filter=None, filter_by=None, page=1):
+        name_ok = name and name in status.repos
+        filter_ok = 'search' == filter or ('group' == filter and filter_by in status.package_groups)
 
-    elif filter and 'search' == filter:
-        repo_packages = [p for p in sorted(repo_obj.pkgnames) if filter_by in p]
+        if not name_ok or (filter and not filter_ok):
+            abort(404)
 
-    else:
-        repo_packages = [p for p in sorted(repo_obj.pkgnames)]
+        packages, rev_pending, all_pages = self._get_repo_packages(name, filter, filter_by, page)
+        _pagination = Pagination(page, 10, all_pages)
+        columns_info_obj = ColumnsInfo(current_user)
+        _columns_info = columns_info_obj.columns_info
 
-    packages, all_pages = get_paginated(repo_packages, 10, page, reverse=False)
+        return try_render_template('repo/packages.html', objs=packages,
+                                   pagination=_pagination, all_pages=all_pages,
+                                   columns_info=_columns_info, rev_pending=rev_pending,
+                                   table_heading=name)
 
-    for pkg in packages:
-        if 'dummy' in pkg or 'grub-zfs' in pkg:
-            continue
+    @route('/browse/<goto>')
+    @route('/browse')
+    def browse(self, goto=None):
+        # TODO: This needs a rewrite.
+        building = status.now_building
+        release = False
+        testing = False
+        main = False
+        template = "repo/repo_browser.html"
+        if goto == 'release':
+            release = True
+        elif goto == 'testing':
+            testing = True
+        elif goto == 'main':
+            main = True
+            template = "repo/repo_browser_main.html"
 
-        try:
-            pkg_obj = get_pkg_object(pkg)
-        except Exception as err:
-            logger.error(err)
-            continue
-
-        try:
-            bnum = pkg_obj.builds[-1]
-            if bnum:
-                bld_obj = get_build_object(bnum=bnum)
-        except Exception:
-            continue
-
-        pkg_obj._build = bld_obj
-        pkgs.append(pkg_obj)
-
-    return pkgs, rev_pending, all_pages
-
-
-###
-##
-#   Views Start Here
-##
-###
-
-@repo_view.route('/<name>/packages/<filter>/<filter_by>')
-@repo_view.route('/<name>/packages/<filter>/<filter_by>/<int:page>')
-@repo_view.route('/<name>/packages/<int:page>')
-@repo_view.route('/<name>/packages')
-def repo_packages_listing(name=None, filter=None, filter_by=None, page=1):
-    name_ok = name and name in status.repos
-    filter_ok = 'search' == filter or ('group' == filter and filter_by in status.package_groups)
-
-    if not name_ok or (filter and not filter_ok):
-        abort(404)
-
-    packages, rev_pending, all_pages = get_repo_packages(name, filter, filter_by, page)
-    _pagination = Pagination(page, 10, all_pages)
-    columns_info_obj = ColumnsInfo(current_user)
-    _columns_info = columns_info_obj.columns_info
-
-    return try_render_template('repo/packages.html', objs=packages,
-                               pagination=_pagination, all_pages=all_pages,
-                               columns_info=_columns_info, rev_pending=rev_pending,
-                               table_heading=name)
-
-
-@repo_view.route('/browse/<goto>')
-@repo_view.route('/browse')
-def repo_browser(goto=None):
-    # TODO: This needs a rewrite.
-    building = status.now_building
-    release = False
-    testing = False
-    main = False
-    template = "repo/repo_browser.html"
-    if goto == 'release':
-        release = True
-    elif goto == 'testing':
-        testing = True
-    elif goto == 'main':
-        main = True
-        template = "repo/repo_browser_main.html"
-
-    return try_render_template(template, building=building, release=release, testing=testing,
-                               main=main)
+        return try_render_template(
+            template, building=building, release=release, testing=testing, main=main
+        )
 

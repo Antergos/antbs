@@ -28,303 +28,278 @@
 
 from . import *
 
-api_view = Blueprint('api', __name__)
 
+class APIView(FlaskView):
 
-###
-##
-#   Utility Functions For This View
-##
-###
+    def _get_live_build_output(self, bnum):
+        psub = db.pubsub()
+        psub.subscribe('live:build_output:{0}'.format(bnum))
+        last_line_key = 'tmp:build_log_last_line:{0}'.format(bnum)
+        first_run = True
+        keep_alive = 0
 
-def get_live_build_output(bnum):
-    psub = db.pubsub()
-    psub.subscribe('live:build_output:{0}'.format(bnum))
-    last_line_key = 'tmp:build_log_last_line:{0}'.format(bnum)
-    first_run = True
-    keep_alive = 0
+        while True:
+            message = psub.get_message()
 
-    while True:
-        message = psub.get_message()
+            if message:
+                if first_run:
+                    message['data'] = db.get(last_line_key)
+                    first_run = False
 
-        if message:
-            if first_run:
-                message['data'] = db.get(last_line_key)
-                first_run = False
+                if message['data'] not in ['1', 1]:
+                    yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
 
-            if message['data'] not in ['1', 1]:
-                yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
+            elif keep_alive > 560:
+                keep_alive = 0
+                yield ':'.encode('UTF-8')
 
-        elif keep_alive > 560:
-            keep_alive = 0
-            yield ':'.encode('UTF-8')
+            keep_alive += 1
+            gevent.sleep(.05)
 
-        keep_alive += 1
-        gevent.sleep(.05)
+        psub.close()
 
-    psub.close()
+    def _get_live_status_updates(self):
+        last_event = None
+        keep_alive = 0
 
+        while True:
+            if status.idle and 'Idle' != last_event:
+                last_event = 'Idle'
+                yield 'event: status\ndata: {0}\n\n'.format('Idle').encode('UTF-8')
+            elif not status.idle and status.current_status != last_event:
+                last_event = status.current_status
+                yield 'event: status\ndata: {0}\n\n'.format(status.current_status).encode('UTF-8')
+            elif keep_alive > 15:
+                keep_alive = 0
+                yield ':'.encode('UTF-8')
 
-def get_live_status_updates():
-    last_event = None
-    keep_alive = 0
+            keep_alive += 1
+            gevent.sleep(1)
 
-    while True:
-        if status.idle and 'Idle' != last_event:
-            last_event = 'Idle'
-            yield 'event: status\ndata: {0}\n\n'.format('Idle').encode('UTF-8')
-        elif not status.idle and status.current_status != last_event:
-            last_event = status.current_status
-            yield 'event: status\ndata: {0}\n\n'.format(status.current_status).encode('UTF-8')
-        elif keep_alive > 15:
-            keep_alive = 0
-            yield ':'.encode('UTF-8')
+    def _set_pkg_review_result(self, bnum=False, dev=False, result=False):
+        # TODO: Simplify this by splitting into multiple methods.
+        if not all([bnum, dev, result]):
+            err = 'all args required!'
+            logger.error(err)
+            return dict(error=True, msg=err)
 
-        keep_alive += 1
-        gevent.sleep(1)
+        errmsg = dict(error=True, msg=None)
+        dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
 
+        bld_obj = get_build_object(bnum=bnum)
+        pkg_obj = get_pkg_object(name=bld_obj.pkgname)
 
-def set_pkg_review_result(bnum=False, dev=False, result=False):
-    if not all([bnum, dev, result]):
-        err = 'all args required!'
-        logger.error(err)
-        return dict(error=True, msg=err)
+        if not pkg_obj or not bld_obj:
+            err = 'Cant move packages to main repo without pkg_obj and bld_obj!.'
+            logger.error(err)
+            return dict(error=True, msg=err)
 
-    errmsg = dict(error=True, msg=None)
-    dt = datetime.now().strftime("%m/%d/%Y %I:%M%p")
+        if 'passed' == result and 'main' not in pkg_obj.allowed_in:
+            # msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
+            # return dict(error=True, msg=msg)
+            pkg_obj.allowed_in.append('main')
 
-    bld_obj = get_build_object(bnum=bnum)
-    pkg_obj = get_pkg_object(name=bld_obj.pkgname)
+        bld_obj.review_dev = dev
+        bld_obj.review_date = dt
+        bld_obj.review_status = result
 
-    if not pkg_obj or not bld_obj:
-        err = 'Cant move packages to main repo without pkg_obj and bld_obj!.'
-        logger.error(err)
-        return dict(error=True, msg=err)
+        if result == 'skip':
+            return dict(error=False, msg=None)
 
-    if 'passed' == result and 'main' not in pkg_obj.allowed_in:
-        # msg = '{0} is not allowed in main repo.'.format(pkg_obj.pkgname)
-        # return dict(error=True, msg=msg)
-        pkg_obj.allowed_in.append('main')
+        file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
+        fnames = []
 
-    bld_obj.review_dev = dev
-    bld_obj.review_date = dt
-    bld_obj.review_status = result
+        files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
 
-    if result == 'skip':
-        return dict(error=False, msg=None)
+        if not result or not files_exist or not (file_count % 2 == 0):
+            err = 'While moving to main, invalid number of files found.'
+            logger.error(err)
+            return dict(error=True, msg=err)
 
-    file_count = len(bld_obj.staging_files) or len(bld_obj.generated_files)
-    fnames = []
+        for pkg_file in bld_obj.staging_files:
+            if 'i686' in pkg_file:
+                continue
 
-    files_exist = bld_obj.staging_files and all_file_paths_exist(bld_obj.staging_files)
+            if 'passed' == result:
+                fname = os.path.basename(pkg_file)
 
-    if not result or not files_exist or not (file_count % 2 == 0):
-        err = 'While moving to main, invalid number of files found.'
-        logger.error(err)
-        return dict(error=True, msg=err)
+                copy_or_symlink(pkg_file, status.MAIN_64, logger)
 
-    for pkg_file in bld_obj.staging_files:
-        if 'i686' in pkg_file:
-            continue
+                if '-any.pkg' in pkg_file:
+                    src = os.path.basename(pkg_file)
+                    dst = '../i686/{}'.format(fname)
 
-        if 'passed' == result:
-            fname = os.path.basename(pkg_file)
+                    success, res = try_run_command(
+                        ['/bin/ln', '-srf', src, dst],
+                        cwd=status.MAIN_64,
+                        logger=logger
+                    )
+                    if not success:
+                        logger.error(res)
 
-            copy_or_symlink(pkg_file, status.MAIN_64, logger)
+            remove(pkg_file)
 
-            if '-any.pkg' in pkg_file:
-                src = os.path.basename(pkg_file)
-                dst = '../i686/{}'.format(fname)
+        for pkg_file in bld_obj.staging_files:
+            if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
+                continue
 
-                success, res = try_run_command(
-                    ['/bin/ln', '-srf', src, dst],
-                    cwd=status.MAIN_64,
-                    logger=logger
-                )
-                if not success:
-                    logger.error(res)
+            if 'passed' == result:
+                copy_or_symlink(pkg_file, status.MAIN_32, logger)
 
-        remove(pkg_file)
+            remove(pkg_file)
 
-    for pkg_file in bld_obj.staging_files:
-        if 'x86_64' in pkg_file or '-any.pkg' in pkg_file:
-            continue
+        repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
+        errmsg = dict(error=False, msg=None)
 
-        if 'passed' == result:
-            copy_or_symlink(pkg_file, status.MAIN_32, logger)
+        return errmsg
 
-        remove(pkg_file)
+    @route('/build_pkg_now', methods=['POST', 'GET'])
+    @groups_required(['admin'])
+    def build_pkg_now(self):
+        if request.method == 'POST':
+            pkgnames = request.form['pkgname']
+            dev = request.form['dev']
+            names = []
 
-    repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
-    errmsg = dict(error=False, msg=None)
-
-    return errmsg
-
-
-###
-##
-#   Views Start Here
-##
-###
-
-@api_view.route('/hook', methods=['POST', 'GET'])
-def receive_webhook():
-    hook = Webhook(request)
-    if hook.result is int:
-        abort(hook.result)
-    else:
-        return json.dumps(hook.result)
-
-
-@api_view.route('/get_log')
-@api_view.route("/get_log/<int:bnum>")
-def get_build_log_stream(bnum=None):
-    if status.idle or not status.now_building:
-        abort(404)
-
-    if not bnum:
-        bnum = status.now_building[0]
-
-    if not bnum:
-        abort(404)
-
-    headers = {
-        'Content-Type': 'text/event-stream',
-        'Cache-Control': 'no-cache',
-    }
-    return Response(get_live_build_output(bnum), direct_passthrough=True,
-                    mimetype='text/event-stream', headers=headers)
-
-
-@api_view.route('/build_pkg_now', methods=['POST', 'GET'])
-@groups_required(['admin'])
-def build_pkg_now():
-    if request.method == 'POST':
-        pkgnames = request.form['pkgname']
-        dev = request.form['dev']
-        names = []
-
-        if not pkgnames:
-            abort(500)
-        elif ',' in pkgnames:
-            names = pkgnames.split(',')
-        else:
-            names = [pkgnames]
-
-        pkgnames = []
-
-        for name in names:
-            if name not in status.all_packages and name in status.groups:
-                pkgnames.extend(get_group_packages(names))
+            if not pkgnames:
+                abort(500)
+            elif ',' in pkgnames:
+                names = pkgnames.split(',')
             else:
-                pkgnames.extend([name])
+                names = [pkgnames]
 
-        if pkgnames:
-            if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
-                status.iso_flag = True
-                if 'minimal' in pkgnames[0]:
-                    status.iso_minimal = True
+            pkgnames = []
+
+            for name in names:
+                if name not in status.all_packages and name in status.groups:
+                    pkgnames.extend(get_group_packages(names))
                 else:
-                    status.iso_minimal = False
+                    pkgnames.extend([name])
 
-            if 'cnchi-dev' == pkgnames[0]:
-                db.set('CNCHI-DEV-OVERRIDE', True)
+            if pkgnames:
+                if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
+                    status.iso_flag = True
+                    if 'minimal' in pkgnames[0]:
+                        status.iso_minimal = True
+                    else:
+                        status.iso_minimal = False
 
-            trans = get_trans_object(packages=list(set(pkgnames)), repo_queue=repo_queue)
-            status.transaction_queue.rpush(trans.tnum)
-            transaction_queue.enqueue_call(handle_hook, timeout=84600)
-            get_timeline_object(
-                msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-                    dev, ' '.join(pkgnames)), tl_type=0)
-        else:
-            flash('Package not found. Has the PKGBUILD been pushed to github?', category='error')
+                if 'cnchi-dev' == pkgnames[0]:
+                    db.set('CNCHI-DEV-OVERRIDE', True)
 
-    return redirect(redirect_url())
+                trans = get_trans_object(packages=list(set(pkgnames)), repo_queue=repo_queue)
+                status.transaction_queue.rpush(trans.tnum)
+                transaction_queue.enqueue_call(handle_hook, timeout=84600)
+                get_timeline_object(
+                    msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
+                        dev, ' '.join(pkgnames)), tl_type=0)
+            else:
+                flash(
+                    'Package not found. Has the PKGBUILD been pushed to github?',
+                    category='error'
+                )
 
+        return redirect(redirect_url())
 
-@api_view.route('/get_status', methods=['GET'])
-@api_view.route('/ajax', methods=['GET', 'POST'])
-def live_status_updates():
-    if 'get_status' in request.path:
+    @route('/ajax', methods=['GET', 'POST'])
+    @groups_required(['admin'])
+    def ajax(self):
+        if not current_user.is_authenticated:
+            abort(403)
+
+        iso_release = bool(request.args.get('do_iso_release', False))
+        reset_queue = bool(request.args.get('reset_build_queue', False))
+        rerun_transaction = int(request.args.get('rerun_transaction', 0))
+        message = dict(msg='Ok')
+
+        if iso_release and current_user.is_authenticated:
+            transaction_queue.enqueue_call(iso_release_job)
+
+        elif reset_queue and current_user.is_authenticated:
+            if transaction_queue.count > 0:
+                transaction_queue.empty()
+            if repo_queue.count > 0:
+                repo_queue.empty()
+            items = len(status.transaction_queue)
+            if items > 0:
+                for item in range(items):
+                    popped = status.transaction_queue.rpop()
+                    logger.debug(popped)
+            status.idle = True
+            status.current_status = 'Idle.'
+
+        elif rerun_transaction and current_user.is_authenticated:
+            event = get_timeline_object(event_id=rerun_transaction)
+            pkgs = event.packages
+            if pkgs:
+                _ = {}
+                for pkg in pkgs:
+                    _[pkg] = get_pkg_object(pkg, fetch_pkgbuild=True)
+                trans_obj = get_trans_object(pkgs, repo_queue=repo_queue)
+                status.transaction_queue.rpush(trans_obj.tnum)
+                transaction_queue.enqueue_call(handle_hook, timeout=84600)
+
+        return json.dumps(message)
+
+    @route('/get_log')
+    @route("/get_log/<int:bnum>")
+    def get_log(self, bnum=None):
+        if status.idle or not status.now_building:
+            abort(204)
+
+        if not bnum:
+            bnum = status.now_building[0]
+
         headers = {
             'Content-Type': 'text/event-stream',
             'Cache-Control': 'no-cache',
         }
-        return Response(get_live_status_updates(), direct_passthrough=True,
-                        mimetype='text/event-stream', headers=headers)
 
-    if not current_user.is_authenticated:
-        abort(403)
+        return Response(
+            self._get_live_build_output(bnum),
+            direct_passthrough=True,
+            mimetype='text/event-stream',
+            headers=headers
+        )
 
-    iso_release = bool(request.args.get('do_iso_release', False))
-    reset_queue = bool(request.args.get('reset_build_queue', False))
-    rerun_transaction = int(request.args.get('rerun_transaction', 0))
-    message = dict(msg='Ok')
+    @route('/get_status')
+    def get_status(self):
+        headers = {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+        }
+        return Response(
+            self._get_live_status_updates(),
+            direct_passthrough=True,
+            mimetype='text/event-stream',
+            headers=headers
+        )
 
-    # if request.method == 'POST':
-    #     payload = json.loads(request.data.decode('UTF-8'))
-    #     pkg = payload.get('pkg', None)
-    #     dev = payload.get('dev', None)
-    #     action = payload.get('result', None)
-    #
-    #     if all(i is not None for i in (pkg, dev, action)):
-    #         if action in ['remove']:
-    #             repo_queue.enqueue_call(
-    #                 transaction_handler.update_main_repo(is_action=True, action=action,
-    #                                                      action_pkg=pkg))
-    #         elif 'rebuild' == action:
-    #             trans_obj = get_trans_object([pkg], repo_queue=repo_queue)
-    #             status.transaction_queue.rpush(trans_obj.tnum)
-    #             transaction_queue.enqueue_call(transaction_handler.handle_hook, timeout=84600)
-    #             get_timeline_object(
-    #                 msg='<strong>%s</strong> added <strong>%s</strong> to the build queue.' % (
-    #                     dev, pkg), tl_type='0')
-    #         return json.dumps(message)
+    @route('/hook', methods=['POST', 'GET'])
+    def hook(self):
+        hook = Webhook(request)
 
-    if iso_release and current_user.is_authenticated:
-        transaction_queue.enqueue_call(iso_release_job)
-        return json.dumps(message)
+        if isinstance(hook.result, int):
+            abort(hook.result)
 
-    elif reset_queue and current_user.is_authenticated:
-        if transaction_queue.count > 0:
-            transaction_queue.empty()
-        if repo_queue.count > 0:
-            repo_queue.empty()
-        items = len(status.transaction_queue)
-        if items > 0:
-            for item in range(items):
-                popped = status.transaction_queue.rpop()
-                logger.debug(popped)
-        status.idle = True
-        status.current_status = 'Idle.'
-        return json.dumps(message)
+        return json.dumps(hook.result)
 
-    elif rerun_transaction and current_user.is_authenticated:
-        event = get_timeline_object(event_id=rerun_transaction)
-        pkgs = event.packages
-        if pkgs:
-            _ = {}
-            for pkg in pkgs:
-                _[pkg] = get_pkg_object(pkg, fetch_pkgbuild=True)
-            trans_obj = get_trans_object(pkgs, repo_queue=repo_queue)
-            status.transaction_queue.rpush(trans_obj.tnum)
-            transaction_queue.enqueue_call(handle_hook, timeout=84600)
-        return json.dumps(message)
+    @route('/ajax/pkg_review', methods=['POST'])
+    @groups_required(['admin'])
+    def pkg_review(self):
+        payload = json.loads(request.data.decode('utf-8'))
+        bnum = payload['bnum']
+        dev = payload['dev']
+        result = payload['result']
 
+        if len([x for x in (bnum, dev, result) if x]) == 3:
+            set_review = self._set_pkg_review_result(bnum, dev, result)
 
-@api_view.route('/ajax/pkg_review', methods=['POST'])
-@groups_required(['admin'])
-def dev_package_review():
-    payload = json.loads(request.data.decode('utf-8'))
-    bnum = payload['bnum']
-    dev = payload['dev']
-    result = payload['result']
-    if len([x for x in (bnum, dev, result) if x]) == 3:
-        set_review = set_pkg_review_result(bnum, dev, result)
-        if set_review.get('error', False):
-            set_rev_error = set_review.get('msg')
-            message = dict(msg=set_rev_error)
-            return json.dumps(message)
-        else:
-            message = dict(msg='ok')
-            return json.dumps(message)
+            if set_review.get('error', False):
+                set_rev_error = set_review.get('msg')
+                message = dict(msg=set_rev_error)
+                return json.dumps(message)
+            else:
+                message = dict(msg='ok')
+                return json.dumps(message)
+
