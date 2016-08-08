@@ -47,6 +47,8 @@ from utils import (
     DockerUtils
 )
 
+from .meta.repo_meta import PacmanRepoMeta
+
 logger = status.logger
 doc_util = DockerUtils(status)
 doc = doc_util.doc
@@ -56,7 +58,7 @@ DB_EXT = '.db.tar.gz'
 SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
 
 
-class PacmanRepo(RedisHash):
+class PacmanRepo(PacmanRepoMeta):
     """
     This class represents a "repo" throughout this application. It is used to
     get/set metadata about the repos that this application manages from/to the database.
@@ -66,49 +68,26 @@ class PacmanRepo(RedisHash):
         path (str): The absolute path to the repo's directory on the server.
 
     Attributes:
-        (str)
-            name: see args description above.
-            path: see args description above.
-
-        (bool)
-            n/a
-
-        (int)
-            pkg_count_alpm: Total number of packages in the repo (as per alpm database).
-            pkg_count_fs: Total number of packages in the repo (files found on server).
-
-        (list)
-            n/a
-
-        (set)
-            pkgs_fs: List of the package files in the repo's directory on the server (pkg names)
-            pkgs_alpm: List of packages that are in the repo's alpm database file (this is what pacman sees).
+        alpm_db         (str):  The name of this repo's alpm database file.
+        alpm_db_path    (str):  Abs path to this repo's alpm database file.
+        arch            (str):  This repo's arch (eg. x86_64 or i686).
+        name            (str):  See Args
+        locked          (bool): Whether or not the repo is locked (repo update is running).
+        packages        (set):  Packages that are in the repo's alpm database and the filesystem.
+                                Each package is represented by a string in the following format:
+                                name|version|arch eg. 'cinnamon-desktop|3.0.2-2|x86_64'
+        pkg_count_alpm  (int):  Total number of packages in the repo (as per alpm database).
+        pkg_count_fs    (int):  Total number of packages in the repo (files found on server).
+        pkgnames        (set):  Just the names of packages in `PacmanRepo.packages`.
+        pkgs_fs         (set):  Packages in the repo's directory on the server. Uses same string
+                                format as `packages`.
+        pkgs_alpm       (set):  Packages that are in the repo's alpm database (what pacman sees).
+                                Uses same string format as `packages`.
+        path            (str):  See Args
+        unaccounted_for (set):  Packages that are in either the alpm database or the
+                                filesystem, but not both. Uses same string format as `packages`.
 
     """
-
-    attrib_lists = dict(
-        string=['name', 'alpm_db', 'arch'],
-        bool=['locked'],
-        int=['pkg_count_alpm', 'pkg_count_fs'],
-        list=['pkgnames'],
-        set=['pkgs_fs', 'pkgs_alpm', 'packages', 'unaccounted_for'],
-        path=['path', 'alpm_db_path']
-    )
-
-    def __init__(self, name, arch, path=None, prefix='repo'):
-        key = '{}:{}'.format(name, arch)
-
-        super().__init__(prefix=prefix, key=key)
-
-        self.__namespaceinit__()
-
-        if not self or not self.name:
-            self.name = name
-            self.arch = arch
-            self.path = os.path.join(path, name, arch)
-            self.alpm_db = '{}.db.tar.gz'.format(name)
-            self.alpm_db_path = os.path.join(path, name, arch, self.alpm_db)
-            status.repos.add(name)
 
     def _add_or_remove_package_alpm_database(self, action, pkgname=None, pkg_fname=None):
         action = 'repo-{}'.format(action)
