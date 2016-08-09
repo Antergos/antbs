@@ -178,6 +178,8 @@ class Monitor(RedisHash):
             latest = latest.replace('-', '.')
         elif 'package-query' == pkg_obj.pkgname and '1.8' == latest:
             build_override = False
+        elif '-extenions' in pkg_obj.pkgname and latest == pkg_obj.mon_last_result:
+            build_override = False
 
         return build_override, latest
 
@@ -252,7 +254,10 @@ class Monitor(RedisHash):
 
         pkg_obj.mon_last_result = latest
 
-        if do_build or not self._package_version_in_repos(pkg_obj.pkgname, latest):
+        if not do_build and build_override is None:
+            do_build = not self._package_version_in_repos(pkg_obj.pkgname, latest)
+
+        if do_build:
             build_pkgs.append(pkg_obj.pkgname)
 
             if pkg_obj.mon_type in ['releases', 'tags']:
