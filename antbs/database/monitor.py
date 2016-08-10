@@ -178,8 +178,6 @@ class Monitor(RedisHash):
             latest = latest.replace('-', '.')
         elif 'package-query' == pkg_obj.pkgname and '1.8' == latest:
             build_override = False
-        elif '-extenions' in pkg_obj.pkgname and latest == pkg_obj.mon_last_result:
-            build_override = False
 
         return build_override, latest
 
@@ -320,6 +318,9 @@ class Monitor(RedisHash):
 
         for pkg in self.packages:
             pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
+
+            if pkg_obj.is_split_package:
+                continue
 
             if 'github' == pkg_obj.mon_service:
                 build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)

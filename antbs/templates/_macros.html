@@ -253,9 +253,6 @@
 			<li><a href="{{ url_for_other_page(pagination.page + 1) }}">Next &raquo;</a></li>
 		{% endif %}
 	</ul>
-	{% if caller is defined %}
-		{{ caller() }}
-	{% endif %}
 {% endmacro %}
 
 
@@ -275,9 +272,6 @@
 			</div>
 		</div>
 	</div>
-	{% if caller is defined %}
-		{{ caller() }}
-	{% endif %}
 {% endmacro %}
 
 
@@ -318,10 +312,6 @@
 				{% endif %}
 			</ul>
 		</div>
-		{% if caller is defined %}
-			{{ caller() }}
-		{% endif %}
-
 	{% endif %}
 {% endmacro %}
 
@@ -336,10 +326,6 @@
  #
  #}
 {% macro text_with_icon(icon_info, text=None) %}
-	{% if text is none %}
-		{% set text = caller() %}
-	{% endif %}
-
 	{% set icon_class = icon_info.class %}
 	{% set icon_color = icon_info.color %}
 
@@ -368,9 +354,7 @@
  #}
 {% macro listing_table(columns_info, objs, pagination, search_enabled=True) %}
 	{% if search_enabled %}
-		{% call table_search_box() %}
-			&nbsp;
-		{% endcall %}
+		{{ table_search_box() }}
 	{% endif %}
 
 	<table class="table no-border hover">
@@ -402,17 +386,14 @@
 									<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
 
 								{% elif 'text_with_icon' == column.content_type %}
-									{%- call text_with_icon(column.icon_info) -%}
-										{{ value }}
-									{%- endcall -%}
+									{{ text_with_icon(column.icon_info, value) }}
 
 								{% elif 'text' == column.content_type %}
 									{{ value }}
 
 								{% elif 'dropdown' == column.content_type and 'dd_info' in column %}
-									{% call table_dropdown(obj, column.dd_info) %}
-										&nbsp;
-									{% endcall %}
+									{{ table_dropdown(obj, column.dd_info) }}
+
 								{% endif %}
 							</td>
 						{% endfor %}
@@ -422,9 +403,7 @@
 		</tbody>
 	</table>
 	{% if all_pages > 1 %}
-		{% call render_pagination(pagination) %}
-			&nbsp;
-		{% endcall %}
+		{{ render_pagination(pagination) }}
 	{% endif %}
 {% endmacro %}
 
