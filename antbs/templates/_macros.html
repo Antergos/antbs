@@ -35,15 +35,23 @@
  #     endpoint (str):   The link url relative to root.
  #     text: (str):      The link text.
  #     icon_class (str): The css class for the menu icon.
- #
+ #     active_class (str): The css class applied to the active menu item.
+ #     _class (str): Optional extra css class to add to the menu item.
  #}
-{% macro nav_link(endpoint, text, icon_class='', active_class='') %}
-	{% if request.path == endpoint %}
+{% macro nav_link(endpoint, text, icon_class='', active_class='', is_heading=False) %}
+	{% if request.path == endpoint and not is_heading %}
 		{% set active_class = 'active' %}
+	{% elif is_heading %}
+		{% set active_class = 'submenu_heading' %}
 	{% endif %}
 
 	<li class="{{ active_class }}">
-		<a href="{{ endpoint }}"><i class="fa fa-{{ icon_class }}"></i> <span>{{ text }}</span></a>
+		<a href="{{ endpoint }}">
+			{% if not is_heading %}
+				<i class="fa fa-{{ icon_class }}"></i>
+			{% endif %}
+			<span>{{ text }}</span>
+		</a>
 	</li>
 {% endmacro %}
 
@@ -371,19 +379,33 @@
 					<tr>
 						{% for column in columns_info %}
 							<td>
-								{% if '.' in column.obj_attr %}
+								{% if column.obj_attr and '.' in column.obj_attr %}
 									{% set obj_attr, nested_obj_attr = column.obj_attr.split('.') %}
 									{% set value = obj|attr(obj_attr) %}
 									{% set value = value|attr(nested_obj_attr) %}
-								{% else %}
+
+								{% elif column.obj_attr is sequence and column.obj_attr is not string %}
+									{% set value = [] %}
+									{% for val in column.obj_attr %}
+										{% do value.append(obj|attr(val)) %}
+									{% endfor %}
+
+								{% elif column.obj_attr %}
 									{% set value = obj|attr(column.obj_attr) %}
+
+								{% elif 'Group' == column.heading_text %}
+									{% set value = column.group %}
 								{% endif %}
 
 								{%- if not value and 'dropdown' != column.content_type -%}
 									-
 
 								{%- elif 'link' == column.content_type %}
-									<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
+									{% if value is not string and value is sequence %}
+										<a href="{{ column.base_url }}{{ value[0] }}/{{ value[1] }}">{{ value[1] }}</a>
+									{% else %}
+										<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
+									{% endif %}
 
 								{% elif 'text_with_icon' == column.content_type %}
 									{{ text_with_icon(column.icon_info, value) }}
@@ -394,6 +416,13 @@
 								{% elif 'dropdown' == column.content_type and 'dd_info' in column %}
 									{{ table_dropdown(obj, column.dd_info) }}
 
+								{% elif 'label_tag_link' == column.content_type %}
+									{% if value is not string and value is sequence %}
+										{% set url_end = '%s/%s'|format(value[0], value[1]) %}
+										{{ label_tag_link(column.base_url, url_end, value, column.color_class) }}
+									{% else %}
+										{{ label_tag_link(column.base_url, value, value, column.color_class) }}
+									{% endif %}
 								{% endif %}
 							</td>
 						{% endfor %}

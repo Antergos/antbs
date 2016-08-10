@@ -66,7 +66,8 @@ def inject_global_template_variables():
         rev_pending=status.pending_review,
         user=current_user,
         current_user=current_user,
-        _all_packages=status.all_packages
+        _all_packages=status.all_packages,
+        pkg_groups=status.package_groups
     )
 
 
@@ -76,7 +77,7 @@ def rq_dashboard_requires_auth():
         abort(403)
 
 
-@current_app.template_filter('tpl_name')
+@current_app.template_filter()
 def tpl_name(s):
     """ Extracts and returns the template name from a url path string. """
     res = re.findall('\'([^\']*)\'', str(s))

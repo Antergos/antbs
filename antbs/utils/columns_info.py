@@ -33,8 +33,9 @@ class ColumnsInfo:
 
     """
 
-    def __init__(self, current_user):
+    def __init__(self, current_user, request):
         self.current_user = current_user
+        self.request = request
 
     @property
     def columns_info(self):
@@ -112,7 +113,7 @@ class ColumnsInfo:
             }
         ]
 
-        if self.current_user.is_authenticated:
+        if self.current_user.is_authenticated and '/monitored' not in self.request.path:
             columns_info.append({
                 'heading_text': 'Manage',
                 'obj_attr': '',
@@ -137,6 +138,60 @@ class ColumnsInfo:
                     'dd_class': 'dd_manage'
                 }
             })
+
+        if '/group/' in self.request.path:
+            group = self.request.path.rsplit('/')[-1]
+            columns_info.insert(3, {
+                'heading_text': 'Group',
+                'obj_attr': '',
+                'content_type': 'label_tag_link',
+                'base_url': self.request.path,
+                'dd_info': '',
+                'color_class': 'info',
+                'group': group
+            })
+
+        elif '/monitored' in self.request.path:
+                columns_info.insert(3, {
+                    'heading_text': 'Monitored Service',
+                    'obj_attr': 'mon_service',
+                    'content_type': 'label_tag_link',
+                    'base_url': '',
+                    'dd_info': '',
+                    'color_class': 'default'
+                })
+                columns_info.insert(4, {
+                    'heading_text': 'Monitored Type',
+                    'obj_attr': 'mon_type',
+                    'content_type': 'text',
+                    'dd_info': ''
+                })
+                columns_info.insert(5, {
+                    'heading_text': 'Monitored Repo',
+                    'obj_attr': ['mon_project', 'mon_repo'],
+                    'content_type': 'link',
+                    'base_url': 'https://github.com/',
+                    'dd_info': '',
+                    'color_class': 'default'
+                })
+                columns_info.insert(6, {
+                    'heading_text': 'Monitor Last Checked',
+                    'obj_attr': 'mon_last_checked',
+                    'content_type': 'text_with_icon',
+                    'icon_info': {
+                        'class': 'calendar',
+                        'color': ''
+                    },
+                    'dd_info': ''
+                })
+                columns_info.insert(7, {
+                    'heading_text': 'Monitored Last Result',
+                    'obj_attr': 'mon_last_result',
+                    'content_type': 'text',
+                    'dd_info': ''
+                })
+
+                columns_info = columns_info[:-3]
 
         return columns_info
 

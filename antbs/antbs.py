@@ -65,10 +65,6 @@ def create_app():
     # Bugsnag Mixin
     handle_exceptions(_app)
 
-    # Hookup Middlewares
-    with _app.app_context():
-        import_module('middleware')
-
     # Apply Configuration
     antbs_config = AntBSConfig(status, logger)
     _app = antbs_config.apply_all(_app)
@@ -77,6 +73,7 @@ def create_app():
     stormpath_manager.init_app(_app)
 
     # Debug Toolbar
+    # _app.debug = True
     debug_toolbar.init_app(_app)
 
     # RQ Dashboard
@@ -86,6 +83,10 @@ def create_app():
     for view_class in all_views:
         view = view_class()
         view.register(_app)
+
+    # Hookup Middlewares
+    with _app.app_context():
+        import_module('middleware')
 
     return _app
 

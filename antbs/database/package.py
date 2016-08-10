@@ -305,7 +305,7 @@ class Package(PackageMeta):
         pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
 
         if not pbfile_contents:
-            logger.error(pbfile_contents)
+            logger.error(self.pkgname)
 
         return pbfile_contents
 

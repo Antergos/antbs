@@ -75,7 +75,7 @@ class PackageView(FlaskView):
 
         tl_events, all_pages = self._get_build_events_timeline(pkg_obj, tlpage=tlpage)
         build_counts = self._get_build_counts(pkg_obj)
-        columns_info_obj = ColumnsInfo(current_user)
+        columns_info_obj = ColumnsInfo(current_user, request)
         service_icons_info = columns_info_obj.get_repo_monitor_services_icons_info()
 
         return try_render_template(

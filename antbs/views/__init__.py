@@ -30,6 +30,7 @@ import gevent
 import json
 import os
 from glob import glob
+import re
 
 from flask import (
     abort,
@@ -131,13 +132,30 @@ def match_pkgname_with_build_number(bnum=None, match=None):
 
 
 def package_in_group(pkg=None, group=None):
-    if not pkg or not group:
+    excluded = ['grub-zfs']
+
+    if not pkg or not group or pkg in excluded:
         return False
 
     pkg_obj = get_pkg_object(pkg)
 
     if pkg_obj:
         return group in pkg_obj.groups
+
+    return False
+
+
+def package_is(pkg, what):
+    excluded = ['grub-zfs']
+
+    if pkg in excluded:
+        return False
+
+    pkg_obj = get_pkg_object(pkg)
+    what = 'is_{}'.format(what)
+
+    if pkg_obj and what in pkg_obj.all_attribs:
+        return getattr(pkg_obj, what)
 
     return False
 

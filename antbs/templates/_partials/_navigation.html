@@ -16,8 +16,15 @@
 	<li class="parent">
 		<a href="#"><i class="fa fa-archive"></i><span>Packages</span></a>
 		<ul class="sub-menu">
+			{{ nav_link('#', 'REPO', is_heading=True) }}
 			{{ nav_link('/repo/antergos/packages', 'Main', 'list') }}
 			{{ nav_link('/repo/antergos-staging/packages', 'Staging', 'list') }}
+			{{ nav_link('#', 'GROUP', is_heading=True) }}
+			{% for pkg_group in pkg_groups %}
+				{{ nav_link('/repo/antergos/packages/group/%s'|format(pkg_group), pkg_group, 'tag') }}
+			{% endfor %}
+			{{ nav_link('#', 'ATTRIBUTE', is_heading=True) }}
+			{{ nav_link('/repo/antergos/packages/monitored', 'monitored', 'rss') }}
 		</ul>
 	</li>
 

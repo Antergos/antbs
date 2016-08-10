@@ -13,6 +13,10 @@ body,
 .sb-collapsed .sidebar-logo { background: url("/static/images/antergos-everyone.png") no-repeat scroll 15px -39px #272930 }
 .sb-collapsed .sidebar-logo .logo { display: initial; margin: initial; }
 .sb-collapsed .sidebar-logo .logo a img { display: none }
+.submenu_heading { font-weight: 700 !important; padding-top: 10px !important; font-size: 11px !important; }
+.submenu_heading:first-child { padding-top: 0px !important; }
+.submenu_heading a { font-weight: 700 !important; font-size: 11px !important; cursor: default; color: rgba(255, 255, 255, 0.6) !important; }
+.submenu_heading a:hover { background-color: transparent !important; }
 
 .pre-scrollable { border: none; margin-top: 0px; white-space: pre-wrap; }
 
