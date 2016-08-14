@@ -323,7 +323,9 @@ class DockerUtils(metaclass=Singleton):
             if build_it:
                 self.push_to_hub('antergos/mkarchiso')
         except Exception as err:
-            self._logger.error('@@-docker_util.py-@@ | Building makepkg failed with error: %s', err)
+            self._logger.error(
+                '@@-docker_util.py-@@ | Building makepkg failed with error: %s', err
+            )
             return False
 
         return True

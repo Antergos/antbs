@@ -51,7 +51,9 @@ class RepoView(FlaskView):
             return pkgs, rev_pending, all_pages
 
         if _filter and 'group' == _filter:
-            repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)]
+            repo_packages = [
+                p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)
+            ]
 
         elif _filter and 'search' == _filter:
             repo_packages = [p for p in sorted(repo_obj.pkgnames) if filter_by in p]

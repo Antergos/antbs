@@ -89,10 +89,12 @@ class ISOUtility:
         raise ValueError
 
     def prep_release(self):
-        status.current_status = 'ISO Release: Step 1/3 - Generating checksum for %s' % self.file_name
+        tpl = 'ISO Release: Step 1/3 - Generating checksum for {}'
+        status.current_status = tpl.format(self.file_name)
         logger.debug(status.current_status)
         self.generate_checksums()
-        status.current_status = 'ISO Release: Step 2/3 - Creating torrent file for %s' % self.file_name
+        tpl = 'ISO Release: Step 2/3 - Creating torrent file for {}'
+        status.current_status = tpl.format(self.file_name)
         logger.debug(status.current_status)
         self.create_torrent_file()
 
@@ -183,9 +185,15 @@ class WordPressBridge:
             if req.get('nonce', False):
                 nonce = req.get('nonce')
                 query = 'json=' + self.dist + '.handle_request&nonce='
-                post_url = 'https://' + self.dist + '.com/?' + query + nonce + '&api_key=' + API_KEY
-                req = session.post(post_url, data=dict(pid=pid, url=iso_obj.iso_url,
-                                                       md5=iso_obj.iso_md5, version=iso_obj.pkgver))
+                url = 'https://' + self.dist + '.com/?' + query + nonce + '&api_key=' + API_KEY
+                post_url = url
+                req = session.post(
+                    post_url,
+                    data=dict(pid=pid,
+                              url=iso_obj.iso_url,
+                              md5=iso_obj.iso_md5,
+                              version=iso_obj.pkgver)
+                )
                 req.raise_for_status()
                 logger.info(req.text)
                 self.success = True

@@ -48,7 +48,8 @@ class APIView(FlaskView):
                     first_run = False
 
                 if message['data'] not in ['1', 1]:
-                    yield 'event: build_output\ndata: {0}\n\n'.format(message['data']).encode('UTF-8')
+                    tpl = 'event: build_output\ndata: {0}\n\n'
+                    yield tpl.format(message['data']).encode('UTF-8')
 
             elif keep_alive > 560:
                 keep_alive = 0
@@ -154,7 +155,7 @@ class APIView(FlaskView):
 
         return errmsg
 
-    @route('/build_pkg_now', methods=['POST', 'GET'], endpoint='build_pkg_now')
+    @route('/build_pkg_now', methods=['POST', 'GET'])
     @groups_required(['admin'])
     def build_pkg_now(self):
         if request.method == 'POST':

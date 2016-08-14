@@ -146,3 +146,25 @@ class BuildView(FlaskView):
 
 class BuildsView(BuildView):
     route_base = '/builds'
+
+    @route('/<build_status>/search/<query>', endpoint='builds_with_status2')
+    @route('/<build_status>/search/<query>/<int:page>', endpoint='builds_with_status2')
+    @route('/<build_status>/<int:page>', endpoint='builds_with_status2')
+    @route('/<build_status>', endpoint='builds_with_status2')
+    def builds_with_status(self, build_status=None, page=None, query=None):
+        if not build_status or build_status not in ['completed', 'failed']:
+            abort(404)
+
+        if page is None:
+            page = 1
+
+        builds, all_pages, rev_pending = self._get_builds_with_status(page, build_status, query)
+        pagination = Pagination(page, 10, all_pages)
+
+        return try_render_template(
+            'build/listing.html',
+            builds=builds,
+            all_pages=all_pages,
+            pagination=pagination,
+            build_status=build_status
+        )

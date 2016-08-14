@@ -168,6 +168,10 @@ def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
 
 
+def datetime_older_than_days(dt, days=371):
+    return dt < (datetime.now() - timedelta(days=days))
+
+
 def get_build_history_chart_data(pkg_obj=None):
     if pkg_obj is None:
         builds = status.completed + status.failed
@@ -191,7 +195,12 @@ def get_build_history_chart_data(pkg_obj=None):
             bld_obj = get_build_object(bnum=bld)
             if not bld_obj.end_str:
                 continue
+
             dt = datetime.strptime(bld_obj.end_str, "%m/%d/%Y %I:%M%p")
+
+            if datetime_older_than_days(dt):
+                continue
+
             key = dt.strftime("%m-%d-%Y")
             if not chart_data.get(key, False):
                 # chart_data[key] = dict(month=dt.month, day=dt.day, year=dt.year, builds=1,

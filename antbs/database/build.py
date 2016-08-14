@@ -354,7 +354,9 @@ class Build(RedisHash):
                 logger.error(tpl, self._pkg_obj.pkgname, result)
             else:
                 self.completed = True
-                logger.info('Container %s exited. Return code was %s', self._pkg_obj.pkgname, result)
+                logger.info(
+                    'Container %s exited. Return code was %s', self._pkg_obj.pkgname, result
+                )
 
         except Exception as err:
             logger.error('Start container failed. Error Msg: %s', err)

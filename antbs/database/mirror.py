@@ -131,7 +131,9 @@ class RepoMirror(RedisHash):
         pkgs_fs = set([p.split('|')[0] for p in self.pkgs_fs if p])
         pkgs_alpm = set([p.split('|')[0] for p in self.pkgs_alpm if p])
         pkgs = list(pkgs_fs & pkgs_alpm)
-        unaccounted_for = [p.split('|')[0] for p in list(pkgs_fs) + list(pkgs_alpm) if p not in pkgs]
+        unaccounted_for = [
+            p.split('|')[0] for p in list(pkgs_fs) + list(pkgs_alpm) if p not in pkgs
+        ]
 
         for pk in self.packages:
             if pk not in pkgs:
