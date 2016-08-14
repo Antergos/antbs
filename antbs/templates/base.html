@@ -80,6 +80,8 @@
 				<script src="/static/js/jquery.js"></script>
 				<script src="/static/js/jquery.cookie/jquery.cookie.js"></script>
 				<script src="/static/js/jquery.pushmenu/js/jPushMenu.js"></script>
+				<script type="text/javascript" src="/static/js/moment-with-locales.min.js"></script>
+				<script type="text/javascript" src="/static/js/moment-timezone-with-data-2010-2020.min.js"></script>
 				<script>
 					(function ($) {
 						$(document).ready(function () {
@@ -229,6 +231,10 @@
 										y = parseFloat(y);
 										return ((x < y || isNaN(x)) ? 1 : ((x > y || isNaN(y) ) ? -1 : 0));
 									};
+
+									if (jQuery('table.no-border').not('#issuetable').length) {
+
+									}
 
 									jQuery('table.no-border').not('#issuetable').on('init.dt', function (e, settings, data) {
 										setTimeout(function () {

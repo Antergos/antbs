@@ -85,10 +85,10 @@ class BuildView(FlaskView):
 
         return builds_list, int(all_pages), rev_pending
 
-    @route('/<build_status>/search/<query>')
-    @route('/<build_status>/search/<query>/<int:page>')
-    @route('/<build_status>/<int:page>')
-    @route('/<build_status>')
+    @route('/<build_status>/search/<query>', endpoint='builds_with_status')
+    @route('/<build_status>/search/<query>/<int:page>', endpoint='builds_with_status')
+    @route('/<build_status>/<int:page>', endpoint='builds_with_status')
+    @route('/<build_status>', endpoint='builds_with_status')
     def builds_with_status(self, build_status=None, page=None, query=None):
         if not build_status or build_status not in ['completed', 'failed']:
             abort(404)

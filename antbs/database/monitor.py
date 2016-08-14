@@ -229,12 +229,12 @@ class Monitor(RedisHash):
         in_mate_group = any([g for g in ['mate', 'mate-extra'] if g in pkg_obj.groups])
         is_mate_pkg = in_mate_group or 'mate-' in pkg_obj.pkgname
 
-        pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
-
         latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.mon_type, pattern)
 
         if not latest and is_mate_pkg:
             latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
+
+        pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
 
         if not latest or latest in ['None']:
             logger.error(

@@ -378,7 +378,8 @@
 				{% for obj in objs %}
 					<tr>
 						{% for column in columns_info %}
-							<td>
+							{% set _class = column.heading_text|replace(' ', '')|lower() %}
+							<td class="{{ _class }}">
 								{% if column.obj_attr and '.' in column.obj_attr %}
 									{% set obj_attr, nested_obj_attr = column.obj_attr.split('.') %}
 									{% set value = obj|attr(obj_attr) %}

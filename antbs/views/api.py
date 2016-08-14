@@ -154,7 +154,7 @@ class APIView(FlaskView):
 
         return errmsg
 
-    @route('/build_pkg_now', methods=['POST', 'GET'])
+    @route('/build_pkg_now', methods=['POST', 'GET'], endpoint='build_pkg_now')
     @groups_required(['admin'])
     def build_pkg_now(self):
         if request.method == 'POST':

@@ -60,8 +60,8 @@ class PackageView(FlaskView):
 
         return counts
 
-    @route('/<pkgname>', methods=['GET'])
-    @route('/<pkgname>/<int:tlpage>', methods=['GET'])
+    @route('/<pkgname>', methods=['GET'], endpoint='get_and_show_pkg_profile')
+    @route('/<pkgname>/<int:tlpage>', methods=['GET'], endpoint='get_and_show_pkg_profile')
     def get_and_show_pkg_profile(self, pkgname=None, tlpage=1):
         if pkgname is None or not status.all_packages.ismember(pkgname):
             abort(404)
