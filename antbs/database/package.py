@@ -108,6 +108,8 @@ class Package(PackageMeta):
 
         if not self.gh_path:
             self.determine_github_path()
+            if not self.gh_path:
+                raise RuntimeError(name)
 
         if fetch_pkgbuild or not self.pkgbuild:
             logger.debug('%s: Fetching pkgbuild from github..', self.pkgname)

@@ -168,7 +168,7 @@ def redirect_url(default='homepage'):
     return request.args.get('next') or request.referrer or url_for(default)
 
 
-def datetime_older_than_days(dt, days=371):
+def datetime_older_than_days(dt, days=364):
     return dt < (datetime.now() - timedelta(days=days))
 
 

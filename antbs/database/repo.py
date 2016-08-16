@@ -245,7 +245,7 @@ class PacmanRepo(PacmanRepoMeta):
 
         self.packages.remove_range(0, -1)
         self.unaccounted_for.remove_range(0, -1)
-        self.pkgnames.remove_range(-1, -0)
+        self.pkgnames.remove_range(-0, -1)
 
         for pkg in accounted_for:
             self.packages.add(pkg)

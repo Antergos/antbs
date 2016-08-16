@@ -200,7 +200,8 @@ def get_build_queue(status_obj, get_transaction):
         trans_obj = get_transaction(tnum=tnum)
 
         if trans_obj.queue:
-            queued.extend(trans_obj.queue)
+            queued_pkgs = [(trans_obj.tnum, p) for p in trans_obj.queue]
+            queued.extend(queued_pkgs)
 
     return queued
 

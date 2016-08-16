@@ -178,6 +178,8 @@ class Monitor(RedisHash):
             latest = latest.replace('-', '.')
         elif 'package-query' == pkg_obj.pkgname and '1.8' == latest:
             build_override = False
+        elif 'pamac-dev' == pkg_obj.pkgname and latest == pkg_obj.mon_last_result:
+            build_override = False
 
         return build_override, latest
 
@@ -308,8 +310,6 @@ class Monitor(RedisHash):
         if not check_github:
             return
 
-        self.checked_recently = (True, 3600)
-
         build_pkgs = []
         quiet_down_noisy_loggers()
         self._sync_packages_list()
@@ -338,6 +338,8 @@ class Monitor(RedisHash):
             version = self.db.get('antbs:misc:iso-release:do_check')
             self.check_mirror_for_iso(version)
 
+        self.checked_recently = (True, 3600)
+
 
 def get_monitor_object(name):
     """
@@ -359,6 +361,7 @@ def get_monitor_object(name):
 def check_repos_for_changes(check_github, sync_repos, webhook):
     monitor_obj = get_monitor_object('github')
 
+    status.cleanup_all_packages_list(get_pkg_object)
     monitor_obj.check_repos_for_changes(check_github, sync_repos, webhook)
 
     if check_github:

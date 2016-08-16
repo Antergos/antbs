@@ -81,6 +81,19 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
         if self.logger is None:
             self.logger = get_logger_object(self)
 
+    def cleanup_all_packages_list(self, get_pkg_object):
+        to_remove = []
+
+        for pkg in self.all_packages:
+            try:
+                pkg_obj = get_pkg_object(name=pkg)
+            except Exception:
+                to_remove.append(pkg)
+
+        if to_remove:
+            for pkg in to_remove:
+                self.all_packages.remove(pkg)
+
 
 class TimelineEvent(RedisHash, DateTimeStrings):
 
