@@ -40,6 +40,8 @@ class PackageMeta(RedisHash):
 
     attrib_lists = dict(
         string=[
+            '_pkgver',
+            '_buildver',
             'description',
             'epoch',
             'failure_rate',
@@ -50,6 +52,7 @@ class PackageMeta(RedisHash):
             'heat_map',
             'iso_md5',
             'iso_url',
+            'mon_etag',
             'mon_last_checked',
             'mon_last_result',
             'mon_project',

@@ -35,6 +35,7 @@ Repo Monitor Module:
 
 from datetime import datetime
 import re
+import xml.etree.ElementTree as ET
 
 import gevent
 import requests
@@ -218,6 +219,43 @@ class Monitor(RedisHash):
 
         wh.process_changes()
 
+    def check_custom_xml_for_changes(self, pkg_obj, build_pkgs):
+        url = pkg_obj.mon_type
+        req = requests.head(url)
+
+        if req.headers['ETag'] == pkg_obj.mon_etag:
+            return build_pkgs
+
+        pkg_obj.mon_etag = req.headers['ETag']
+
+        try:
+            xml_data = requests.get(url).text
+            root = ET.fromstring(xml_data)
+
+            latest_release = root.findall(pkg_obj.mon_project)
+            version = latest_release.get('version')
+            build = latest_release.get('fullNumber')
+
+            if ' ' in version:
+                version = version.split(' ')[0]
+
+            latest = '{}|{}'.format(version, build)
+
+            if pkg_obj.mon_last_reselt and latest != pkg_obj.mon_last_result:
+                build_pkgs.append(pkg_obj.pkgname)
+
+                pkg_obj.update_pkgbuild_and_push_github({
+                    '_pkgver': (pkg_obj._pkgver, version),
+                    '_buildver': (pkg_obj._buildver, build)
+                })
+
+            pkg_obj.mon_last_result = latest
+
+        except Exception as err:
+            logger.exception(err)
+
+        return build_pkgs
+
     def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
         if self.gh is None:
             self.gh = login(token=GITHUB_TOKEN)
@@ -261,7 +299,7 @@ class Monitor(RedisHash):
             build_pkgs.append(pkg_obj.pkgname)
 
             if pkg_obj.mon_type in ['releases', 'tags']:
-                pkg_obj.update_pkgbuild_and_push_github('pkgver', pkg_obj.pkgver, latest)
+                pkg_obj.update_pkgbuild_and_push_github({'pkgver': (pkg_obj.pkgver, latest)})
 
         return build_pkgs
 
@@ -326,6 +364,8 @@ class Monitor(RedisHash):
                 build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
             elif 'gitlab' == pkg_obj.mon_service:
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
+            elif 'custom_xml' == pkg_obj.mon_service:
+                build_pkgs = self.check_custom_xml_for_changes(pkg_obj, build_pkgs)
 
             gevent.sleep(0.5)
 

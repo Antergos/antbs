@@ -176,6 +176,7 @@ class Build(RedisHash):
 
                 if waiting > 300:
                     logger.error('timed out will waiting for this build\'s final status')
+                    self.failed = True
                     break
 
         if self.failed:
@@ -492,7 +493,7 @@ class Build(RedisHash):
                             inspect.get('RestartCount', 0) != 2
                         )
 
-            if inspect['State'].get('ExitCode', 1) == 1:
+            if inspect['State'].get('ExitCode', 1) != 0:
                 logger.error(
                     '[CONTAINER EXIT CODE] Container %s exited. Return code was %s',
                     self._pkg_obj.pkgname,

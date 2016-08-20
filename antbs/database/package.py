@@ -73,6 +73,7 @@ class Package(PackageMeta):
         iso_md5           (str):  If `Package.is_iso` this is the iso image's checksum.
         iso_url           (str):  If `Package.is_iso` this is the iso image's download URL.
         makedepends       (set):  See `man PKGBUILD`.
+        mon_etag          (str):  The HTTP ETag for the monitored resource.
         mon_last_checked  (str):  Time of the last check for new release by `RepoMonitor`.
         mon_last_result   (str):  Result of the last check for new release by `RepoMonitor`.
         mon_match_pattern (str):  Release results must match this pattern (substring or /regex/).
@@ -315,13 +316,16 @@ class Package(PackageMeta):
         pname = name or self.pkgname
         return pname in status.all_packages or self.determine_github_path()
 
-    def update_pkgbuild_and_push_github(self, var=None, old_val=None, new_val=None):
+    def update_pkgbuild_and_push_github(self, changes):
         can_push = self.push_version or self.is_monitored
+        invalid_value = [
+            True for c in changes
+            if any(True for n in [None, 'None', '']
+                   if n == changes[c][1] or changes[c][0] == changes[c][1])
+        ]
 
-        if not can_push or old_val == new_val or new_val in [None, 'None', '']:
-            logger.error(
-                'cant push to github! %s, old_val: %s, new_val: %s', self.pkgname, old_val, new_val
-            )
+        if invalid_value or not can_push:
+            logger.error('cant push to github! %s', changes)
             return
 
         gh = login(token=status.github_token)
@@ -329,37 +333,36 @@ class Package(PackageMeta):
         pb_file = repo.file_contents(self.gh_path)
 
         pb_contents = pb_file.decoded.decode('utf-8')
-        search_str = '{0}={1}'.format(var, old_val)
+        new_pb_contents = pb_contents
+        msg_tpl = '[ANTBS] | [updpkg] {0} {1}'
 
-        if 'pkgver' == var and 'pkgver=None' in pb_contents:
-            search_str = '{0}={1}'.format(var, 'None')
-
-        replace_str = '{0}={1}'.format(var, new_val)
-        new_pb_contents = pb_contents.replace(search_str, replace_str)
-
-        if 'pkgver' == var:
-            commit_msg = '[ANTBS] | [updpkg] {0} {1}'.format(self.pkgname, new_val)
-            search_str = 'pkgrel={0}'.format(self.pkgrel)
-            replace_str = 'pkgrel={0}'.format('1')
-            new_pb_contents = new_pb_contents.replace(search_str, replace_str)
+        if 'pkgver' in changes and not self.autosum:
+            commit_msg = msg_tpl.format(self.pkgname, changes['pkgver'])
+        elif 'pkgver' in changes and self.autosum:
+            _version = '{}.{}'.format(changes['_pkgver'], changes['_buildver'])
+            commit_msg = msg_tpl.format(self.pkgname, _version)
         else:
-            commit_msg = '[ANTBS] | Updated {0} to {1} in PKGBUILD for {2}.'.format(var, new_val,
-                                                                                    self.name)
+            commit_msg = '[ANTBS] | Updated PKGBUILD for {0}.'.format(self.pkgname)
+
+        for key, val in changes.items():
+            search_str = '{0}={1}'.format(key, val[0])
+            replace_str = '{0}={1}'.format(key, val[1])
+            new_pb_contents = new_pb_contents.replace(search_str, replace_str)
+
+            if 'pkgver' == key and '1' != self.pkgrel:
+                search_str = 'pkgrel={0}'.format(self.pkgrel)
+                replace_str = 'pkgrel={0}'.format('1')
+                new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
         if new_pb_contents == pb_contents:
             return
 
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
-        if commit and 'commit' in commit:
-            try:
-                logger.info('commit hash is %s', commit['commit'].sha)
-            except AttributeError:
-                logger.error('commit failed. commit=%s | content=%s', commit, new_pb_contents)
-            return True
+        if commit and 'commit' in commit and 'sha' in commit['commit']:
+            logger.info('commit hash is %s', commit['commit'].sha)
         else:
-            logger.error('commit failed')
-            return False
+            logger.error('commit failed. commit=%s | content=%s', commit, new_pb_contents)
 
     def get_version_str(self):
         # TODO: This is still garbage. Rewrite and simplify!
@@ -378,7 +381,13 @@ class Package(PackageMeta):
                     changed[key] = new_val
 
         else:
-            if self.mon_last_result != old_vals['pkgver']:
+            if self.auto_sum and self.mon_last_result.replace('|', '.') != old_vals['pkgver']:
+                _pkgver, _buildver = self.mon_last_result.split('|')
+                changed['_pkgver'] = _pkgver
+                changed['_buildver'] = _buildver
+                changed['pkgver'] = self.mon_last_result.replace('|', '.')
+                changed['pkgrel'] = '1'
+            elif self.mon_last_result != old_vals['pkgver']:
                 changed['pkgver'] = self.mon_last_result
                 changed['pkgrel'] = '1'
 
