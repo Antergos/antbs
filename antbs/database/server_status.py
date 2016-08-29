@@ -30,6 +30,7 @@
 """ Server Status Module (handles this application's state) """
 
 import datetime
+import contextlib
 
 from . import RedisHash, Singleton, RedisSingleton
 from logging_config import get_logger_object
@@ -93,6 +94,12 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
         if to_remove:
             for pkg in to_remove:
                 self.all_packages.remove(pkg)
+
+    @contextlib.contextmanager
+    def repos_syncing_lock(self):
+        self.repos_syncing = True
+        yield
+        self.repos_syncing = False
 
 
 class TimelineEvent(RedisHash, DateTimeStrings):

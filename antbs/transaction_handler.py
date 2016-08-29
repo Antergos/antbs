@@ -124,10 +124,17 @@ def handle_hook():
 
 
 def process_dev_review(bnum):
+    with Connection(db):
+        current_job = get_current_job()
+        if 'update_repo' != current_job.origin:
+            logger.error('Only the repo worker can update repos!')
+            return
+
     saved_status = set_server_status(True, is_review=True)
     repos = [get_repo_object(repo, arch) for arch in ['x86_64', 'i686'] for repo in status.repos]
 
-    for antergos_repo in repos:
-        antergos_repo.update_repo()
+    with status.repos_syncing_lock():
+        for antergos_repo in repos:
+            antergos_repo.update_repo()
 
     set_server_status(False, saved_status)

@@ -359,8 +359,8 @@ class Package(PackageMeta):
 
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
-        if commit and 'commit' in commit and 'sha' in commit['commit']:
-            logger.info('commit hash is %s', commit['commit'].sha)
+        if commit:
+            logger.info('commit hash is %s', commit)
         else:
             logger.error('commit failed. commit=%s | content=%s', commit, new_pb_contents)
 
