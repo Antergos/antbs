@@ -225,8 +225,8 @@ class Package(PackageMeta):
         if 'cnchi' == self.name:
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
-            repo = gh.repository('antergos', '0.14.x')
-            repo.archive('zipball', zpath, ref='master')
+            repo = gh.repository('antergos', 'cnchi')
+            repo.archive('zipball', zpath, ref='0.14.x')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
             cnchi_dir = glob('{0}/Antergos-Cnchi-*'.format(dirpath))
