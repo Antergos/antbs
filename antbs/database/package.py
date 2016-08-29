@@ -225,7 +225,7 @@ class Package(PackageMeta):
         if 'cnchi' == self.name:
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)
-            repo = gh.repository('antergos', 'cnchi')
+            repo = gh.repository('antergos', 'v0.14.x')
             repo.archive('zipball', zpath, ref='master')
             zfile = zipfile.ZipFile(zpath, 'r')
             zfile.extractall(dirpath)
@@ -336,9 +336,9 @@ class Package(PackageMeta):
         new_pb_contents = pb_contents
         msg_tpl = '[ANTBS] | [updpkg] {0} {1}'
 
-        if 'pkgver' in changes and not self.autosum:
+        if 'pkgver' in changes and not self.auto_sum:
             commit_msg = msg_tpl.format(self.pkgname, changes['pkgver'])
-        elif 'pkgver' in changes and self.autosum:
+        elif 'pkgver' in changes and self.auto_sum:
             _version = '{}.{}'.format(changes['_pkgver'], changes['_buildver'])
             commit_msg = msg_tpl.format(self.pkgname, _version)
         else:
@@ -386,6 +386,10 @@ class Package(PackageMeta):
                 changed['_pkgver'] = _pkgver
                 changed['_buildver'] = _buildver
                 changed['pkgver'] = self.mon_last_result.replace('|', '.')
+                changed['pkgrel'] = '1'
+            elif 'pamac-dev' == self.pkgname:
+                # Hack -- fix later.
+                changed['pkgver'] = old_vals['pkgver']
                 changed['pkgrel'] = '1'
             elif self.mon_last_result != old_vals['pkgver']:
                 changed['pkgver'] = self.mon_last_result
