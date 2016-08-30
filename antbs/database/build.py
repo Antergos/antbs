@@ -303,7 +303,7 @@ class Build(RedisHash):
         self.generated_files.extend(generated_signature_files)
 
     def get_save_pkgbuild_diff(self):
-        if (not self._trans_obj.gh_sha_before or not self._trans_obj.gh_diff_after) and not self._trans_obj.gh_patch:
+        if (not self._trans_obj.gh_sha_before or not self._trans_obj.gh_sha_after) and not self._trans_obj.gh_patch:
             return
 
         patch_file = self._trans_obj.gh_patch if self._trans_obj.gh_patch else None
