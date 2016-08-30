@@ -105,7 +105,7 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
 class TimelineEvent(RedisHash, DateTimeStrings):
 
     attrib_lists = dict(
-        string=['event_type', 'date_str', 'time_str', 'message'],
+        string=['event_type', 'date_str', 'time_str', 'message', 'tnum'],
         int=['event_id', 'tl_type'],
         bool=[],
         list=['packages'],
@@ -113,7 +113,7 @@ class TimelineEvent(RedisHash, DateTimeStrings):
         path=[]
     )
 
-    def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, prefix='timeline'):
+    def __init__(self, msg=None, tl_type=None, event_id=None, packages=None, tnum='', prefix='timeline'):
         if not event_id and any(True for i in [msg, tl_type] if not i and 0 != i):
             raise ValueError('msg and tl_type required when event_id is not provided.')
 
@@ -126,6 +126,7 @@ class TimelineEvent(RedisHash, DateTimeStrings):
 
         if not self or not self.event_id:
             self.event_id = the_id
+            self.tnum = tnum
             status.all_tl_events.append(self.event_id)
             self.tl_type = tl_type
             self.message = msg

@@ -351,25 +351,18 @@ class Webhook(WebhookMeta):
                             item = '<strong>{0}</strong>'.format(pkg_link)
                         html.append(item)
 
-                    if p == last_pkg:
-                        if self.is_gitlab:
-                            source = 'Gitlab'
-                            tltype = 2
-                        elif self.is_monitor or self.is_numix:
-                            source = 'Repo Monitor'
-                            tltype = 1
-                        else:
-                            source = 'Github'
-                            tltype = 1
-                        if len(the_pkgs) > 1:
-                            html.append('</ul>')
+                    if p == last_pkg and len(the_pkgs) > 1:
+                        html.append('</ul>')
 
-                        the_pkgs_str = ''.join(html)
-                        tl_event = get_timeline_object(msg=tpl.format(source, the_pkgs_str),
-                                                       tl_type=tltype,
-                                                       packages=the_pkgs)
-                        p_obj = get_pkg_object(name=p, fetch_pkgbuild=True)
-                        p_obj.tl_events.append(tl_event.event_id)
+                if self.is_gitlab:
+                    source = 'Gitlab'
+                    tltype = 2
+                elif self.is_monitor or self.is_numix:
+                    source = 'Repo Monitor'
+                    tltype = 1
+                else:
+                    source = 'Github'
+                    tltype = 1
 
                 trans_obj = get_trans_object(packages=the_pkgs)
                 initiated_by = 'RepoMonitor' if (self.is_monitor or self.is_numix) else 'Github'
@@ -377,6 +370,17 @@ class Webhook(WebhookMeta):
                 trans_obj.sync_pkgbuilds_only = self.sync_pkgbuilds_only
                 trans_obj.gh_sha_before = self.payload['before']
                 trans_obj.gh_sha_after = self.payload['after']
+
+                the_pkgs_str = ''.join(html)
+                tl_event = get_timeline_object(msg=tpl.format(source, the_pkgs_str),
+                                               tl_type=tltype,
+                                               packages=the_pkgs,
+                                               tnum=trans_obj.tnum)
+
+                p_objs = [get_pkg_object(name=p, fetch_pkgbuild=True) for p in the_pkgs]
+
+                for p_obj in p_objs:
+                    p_obj.tl_events.append(tl_event.event_id)
 
                 status.transaction_queue.append(trans_obj.tnum)
                 queue.enqueue_call(builder.handle_hook, timeout=84600)

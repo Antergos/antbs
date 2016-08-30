@@ -4,15 +4,15 @@
 		<div class="navbar-collapse">
 			{% if current_user.is_authenticated %}
 				<ul class="nav navbar-nav navbar-right user-nav">
-					<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="left">
+					<li id="reset_build_queue" data-toggle="tooltip" title="Reset Build Queue" data-placement="bottom">
 						<a href="#"><i class="fa fa-refresh"></i></a>
 					</li>
-					<li data-toggle="tooltip" title="Do ISO Release" data-placement="left">
+					<li data-toggle="tooltip" title="Do ISO Release" data-placement="bottom">
 						<a href="#" id="do_iso_release" data-toggle="modal" data-target="#do_iso_release_confirm_modal">
 							<i class="fa fa-ship"></i>
 						</a>
 					</li>
-					<li data-toggle="tooltip" title="RQ Dashboard" data-placement="left">
+					<li data-toggle="tooltip" title="RQ Dashboard" data-placement="bottom">
 						<a href="/rq">
 							<i class="fa fa-tasks"></i>
 						</a>
