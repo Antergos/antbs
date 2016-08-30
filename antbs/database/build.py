@@ -35,6 +35,7 @@ from rq import Connection, get_current_job
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import BashLexer
+from unidiff import PatchSet
 
 from . import (
     RedisHash,
@@ -103,7 +104,7 @@ class Build(RedisHash):
         string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
                 'start_str', 'end_str', 'version_str', 'container', 'review_status',
                 'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
-                'repo_container', 'live_output_key', 'last_line_key'],
+                'repo_container', 'live_output_key', 'last_line_key', 'gh_diff', 'gh_patch'],
         bool=['failed', 'completed', 'is_iso'],
         int=[],
         list=['log'],
@@ -111,7 +112,7 @@ class Build(RedisHash):
         path=['build_dir', 'result_dir', '_32build', '_32bit', 'cache', 'cache_i686']
     )
 
-    def __init__(self, pkg_obj=None, bnum=None, tnum=None, prefix='build'):
+    def __init__(self, pkg_obj=None, bnum=None, tnum=None, trans_obj=None, prefix='build'):
         if not pkg_obj and not bnum:
             raise ValueError
 
@@ -124,9 +125,11 @@ class Build(RedisHash):
         self.__namespaceinit__()
 
         self._pkg_obj = None
+        self._trans_obj = None
 
         if pkg_obj and (not self or not self.bnum):
             self._pkg_obj = pkg_obj
+            self._trans_obj = trans_obj
             attribs = [a for a in pkg_obj.all_attribs if a in self.all_attribs]
 
             for attrib in attribs:
@@ -200,6 +203,7 @@ class Build(RedisHash):
             self._pkg_obj = pkg_obj
 
         self.process_and_save_build_metadata(self._pkg_obj.version_str)
+        self.get_save_pkgbuild_diff()
         
         if self.is_iso:
             result = self._build_iso()
@@ -297,6 +301,27 @@ class Build(RedisHash):
         ]
 
         self.generated_files.extend(generated_signature_files)
+
+    def get_save_pkgbuild_diff(self):
+        if (not self._trans_obj.gh_sha_before or not self._trans_obj.gh_diff_after) and not self._trans_obj.gh_patch:
+            return
+
+        patch_file = self._trans_obj.gh_patch if self._trans_obj.gh_patch else None
+
+        if not patch_file:
+            gh, repo = self._pkg_obj.get_github_api_client()
+            compare = repo.compare_commits(self._trans_obj.gh_sha_before, self._trans_obj.gh_diff_after)
+            filtered_files = [f for f in compare.files if f['filename'].split('/')[-2] == self._pkg_obj.pkgname]
+            _file = '' if not filtered_files else filtered_files[0]
+
+            if not _file:
+                logger.error('_file is empty! all files: %s', compare.files)
+                return
+
+            patch_file = _file['patch']
+
+        patch = PatchSet(patch_file)
+        self.gh_diff = str(patch[0])
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname
@@ -532,7 +557,7 @@ class Build(RedisHash):
             return False
 
 
-def get_build_object(pkg_obj=None, bnum=None, tnum=None):
+def get_build_object(pkg_obj=None, bnum=None, tnum=None, trans_obj=None):
     """
     Gets an existing build or creates a new one.
 
@@ -553,6 +578,6 @@ def get_build_object(pkg_obj=None, bnum=None, tnum=None):
     elif all([pkg_obj, bnum]):
         raise ValueError('Only one of [pkg_obj, bnum] can be given, not both.')
 
-    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum, tnum=tnum)
+    bld_obj = Build(pkg_obj=pkg_obj, bnum=bnum, tnum=tnum, trans_obj=trans_obj)
 
     return bld_obj

@@ -137,6 +137,11 @@ class Monitor(RedisHash):
 
         return repo, staging_repo
 
+    def _get_antergos_packages_repo_head_sha(self):
+        repo = self.gh.repository('antergos', 'antergos-packages')
+        latest_commit = [c for c in repo.commits(number=1)]
+        return '' if not latest_commit else latest_commit[0].sha
+
     def _matches_pattern(self, pattern, latest):
         matches = False
 
@@ -209,13 +214,14 @@ class Monitor(RedisHash):
         return all(success)
 
     @staticmethod
-    def add_to_build_queue(pkgs, whook):
+    def add_to_build_queue(pkgs, whook, before, after):
         req = dict(method='POST', args={})
         wh = whook(req)
 
         wh.is_numix = True
         wh.repo = 'antergos-packages'
         wh.changes = [pkgs]
+        wh.payload = dict(before=before, after=after)
 
         wh.process_changes()
 
@@ -256,9 +262,14 @@ class Monitor(RedisHash):
 
         return build_pkgs
 
-    def check_github_repo_for_changes(self, pkg_obj, build_pkgs):
+    def check_github_repo_for_changes(self, pkg_obj, build_pkgs, is_first=False, is_last=False):
+        antergos_packages_sha = None
+
         if self.gh is None:
             self.gh = login(token=GITHUB_TOKEN)
+
+        if is_first:
+            antergos_packages_sha = self._get_antergos_packages_repo_head_sha()
 
         project = pkg_obj.mon_project
         repo = pkg_obj.mon_repo
@@ -301,7 +312,10 @@ class Monitor(RedisHash):
             if pkg_obj.mon_type in ['releases', 'tags']:
                 pkg_obj.update_pkgbuild_and_push_github({'pkgver': (pkg_obj.pkgver, latest)})
 
-        return build_pkgs
+        if is_last:
+            antergos_packages_sha = self._get_antergos_packages_repo_head_sha()
+
+        return build_pkgs, antergos_packages_sha
 
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
@@ -349,19 +363,34 @@ class Monitor(RedisHash):
             return
 
         build_pkgs = []
+        first = list(self.packages)[0]
+        last = list(self.packages)[-1]
+        before = ''
+        after = ''
+
         quiet_down_noisy_loggers()
         self._sync_packages_list()
 
         logger.info('Checking github repos for changes...')
 
         for pkg in self.packages:
+            is_first = pkg == first
+            is_last = pkg == last
             pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
 
             if pkg_obj.is_split_package:
                 continue
 
             if 'github' == pkg_obj.mon_service:
-                build_pkgs = self.check_github_repo_for_changes(pkg_obj, build_pkgs)
+                build_pkgs, sha = self.check_github_repo_for_changes(
+                    pkg_obj, build_pkgs, is_first=is_first, is_last=is_last
+                )
+
+                if is_first:
+                    before = sha
+                elif is_last:
+                    after = sha
+
             elif 'gitlab' == pkg_obj.mon_service:
                 build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
             elif 'custom_xml' == pkg_obj.mon_service:
@@ -372,7 +401,7 @@ class Monitor(RedisHash):
         build_pkgs = [p for p in build_pkgs if p]
 
         if len(build_pkgs) > 0:
-            self.add_to_build_queue(build_pkgs, webhook)
+            self.add_to_build_queue(build_pkgs, webhook, before, after)
 
         if self.db.exists('antbs:misc:iso-release:do_check'):
             version = self.db.get('antbs:misc:iso-release:do_check')

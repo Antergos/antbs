@@ -259,8 +259,6 @@ class Webhook(WebhookMeta):
         if self.is_manual:
             return
 
-        self.payload = json.loads(self.request.data.decode('UTF-8'))
-
         # Save payload in the database temporarily in case we need it later.
         dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
         key = 'antbs:github:payloads:{0}'.format(dt)
@@ -377,6 +375,8 @@ class Webhook(WebhookMeta):
                 initiated_by = 'RepoMonitor' if (self.is_monitor or self.is_numix) else 'Github'
                 trans_obj.initiated_by = initiated_by
                 trans_obj.sync_pkgbuilds_only = self.sync_pkgbuilds_only
+                trans_obj.gh_sha_before = self.payload['before']
+                trans_obj.gh_sha_after = self.payload['after']
 
                 status.transaction_queue.append(trans_obj.tnum)
                 queue.enqueue_call(builder.handle_hook, timeout=84600)

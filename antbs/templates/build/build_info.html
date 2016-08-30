@@ -13,54 +13,73 @@
 {% endblock subheader %}
 {%- block topcontent -%}
 	<div class="row">
-	<div class="col-md-4">
-		<div id="summary"
-			 class="block no-padding block-color {% if result == "completed" %}success{% else %}danger{% endif %}">
-			<div class="header">
-				<div class="actions">
-					<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
-					<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
-					<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+		<div class="col-md-4">
+			<div id="summary"
+				 class="block no-padding block-color {% if result == "completed" %}success{% else %}danger{% endif %}">
+				<div class="header">
+					<div class="actions">
+						<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+						<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+						<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+					</div>
+					<h3>{% if result == "completed" %}
+						<i class="glyphicon glyphicon-thumbs-up"></i>
+					{% else %}
+						<i class="glyphicon glyphicon-thumbs-down"></i>
+					{% endif %}
+						Build Number: {{ bld_obj.bnum }}</h3>
 				</div>
-				<h3>{% if result == "completed" %}
-					<i class="glyphicon glyphicon-thumbs-up"></i>
-				{% else %}
-					<i class="glyphicon glyphicon-thumbs-down"></i>
-				{% endif %}
-					Build Number: {{ bld_obj.bnum }}</h3>
-			</div>
-			<div class="content no-padding">
-				<table id="noDt" class="table no-border hover">
-					<tbody class="no-border-y">
-					<tr>
-						<td>Transaction:</td>
-						<td>{{ bld_obj.tnum }}</td>
-					</tr>
-					<tr>
-						<td>Package:</td>
-						<td><a href="/pkg/{{ bld_obj.pkgname }}">{{ bld_obj.pkgname }}</a></td>
-					</tr>
-					<tr>
-						<td>Version:</td>
-						<td>{{ bld_obj.version_str }}</td>
-					</tr>
-					<tr>
-						<td>Start:</td>
-						<td>{{ bld_obj.start_str }}</td>
-					</tr>
-					<tr>
-						<td>Finish:</td>
-						<td>{{ bld_obj.end_str }}</td>
-					</tr>
-					<tr>
-						<td>Result:</td>
-						<td>{{ result }}</td>
-					</tr>
-					</tbody>
-				</table>
+				<div class="content no-padding">
+					<table id="noDt" class="table no-border hover">
+						<tbody class="no-border-y">
+						<tr>
+							<td>Transaction:</td>
+							<td>{{ bld_obj.tnum }}</td>
+						</tr>
+						<tr>
+							<td>Package:</td>
+							<td><a href="/pkg/{{ bld_obj.pkgname }}">{{ bld_obj.pkgname }}</a></td>
+						</tr>
+						<tr>
+							<td>Version:</td>
+							<td>{{ bld_obj.version_str }}</td>
+						</tr>
+						<tr>
+							<td>Start:</td>
+							<td>{{ bld_obj.start_str }}</td>
+						</tr>
+						<tr>
+							<td>Finish:</td>
+							<td>{{ bld_obj.end_str }}</td>
+						</tr>
+						<tr>
+							<td>Result:</td>
+							<td>{{ result }}</td>
+						</tr>
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
-	</div>
+	{% if bld_obj.gh_diff %}
+		<div class="col-sm-4 col-md-4">
+			<div class="block-flat">
+				<div class="header">
+					<div class="actions">
+						<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
+						<a class="refresh" href="#"><i class="fa fa-repeat"></i></a>
+						<a class="close-down" href="#"><i class="fa fa-times"></i></a>
+					</div>
+					<h3>PKGBUILD Diff</h3>
+				</div>
+				<div id="pkgbuild_diff" class="content"></div>
+				<script>
+					{%  set pkgbuild_diff = pkg_obj.gh_diff|replace("'", "\'") %}
+					window.pkgbuild_diff = '{{ pkgbuild_diff }}';
+				</script>
+			</div>
+		</div>
+	{% endif %}
 	</div>
 
 {%- endblock topcontent -%}
@@ -111,36 +130,31 @@
 		}
 	</style>
 	{{ super() }}
+	{% if bld_obj.gh_diff %}
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.6.0/highlight.min.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.6.0/languages/scala.min.js"></script>
+		<script type="text/javascript" src="assets/diff2html.js"></script>
+		<script type="text/javascript" src="assets/diff2html-ui.js"></script>
+		<script>
+			$(document).ready(function() {
+				var diff2htmlUi = new Diff2HtmlUI({diff: window.pkgbuild_diff});
+				diff2htmlUi.draw('#pkgbuild_diff', {
+					inputFormat: 'json',
+					showFiles: true,
+					matching: 'lines',
+					outputFormat: 'side-by-side',
+					synchronisedScroll: true
+				});
+				diff2htmlUi.fileListCloseable('#pkgbuild_diff', false);
+				diff2htmlUi.highlightCode('#pkgbuild_diff');
+			});
+		</script>
+	{% endif %}
 	<script>
-		$(window).load(function() {
+		$(window).load(function () {
 			$('#data .highlight').addClass('nano');
-		$('.nano pre').addClass('nano-content');
-		$(":not(.dropdown) .nano").nanoScroller();
+			$('.nano pre').addClass('nano-content');
+			$(":not(.dropdown) .nano").nanoScroller();
 		});
 	</script>
-
-
-	{# <script type="text/javascript">
-        $(window).load(
-                function () {
-        sse = new EventSource('/get_log?num={{ bnum }}');
-        var noBuilds = false;
-        sse.onmessage = function (message) {
-            //var msg = data.message;
-            if (message.data.indexOf('ENDOFLOG') >= 0) {
-                sse.close();
-                prettyPrint();
-                return;
-            }
-            $('#data').append(message.data + '<br/>');
-            $('#data').scrollTop($('#data')[0].scrollHeight);
-            if (message.data.indexOf("Unable to retrieve build log.") >= 0) {
-                sse.close();
-                prettyPrint();
-                return;
-            }
-        };
-    });
-</script>#}
-	{#{% endif -%}#}
 {% endblock scripts %}

@@ -69,7 +69,7 @@ class TransactionMeta(RedisHash):
     _staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
     attrib_lists = dict(
-        string=['building', 'start_str', 'end_str', 'initiated_by'],
+        string=['building', 'start_str', 'end_str', 'initiated_by', 'gh_sha_before', 'gh_sha_after'],
         bool=['is_running', 'is_finished', 'sync_pkgbuilds_only'],
         int=['tnum'],
         list=['queue'],
@@ -175,7 +175,7 @@ class Transaction(TransactionMeta):
                     raise RuntimeError('build_dir cannot be None.')
 
                 pkg_obj = get_pkg_object(name=pkg)
-                bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum)
+                bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum, trans_obj=self)
 
                 if pkg_obj.is_iso:
                     self.fetch_and_compile_translations(
