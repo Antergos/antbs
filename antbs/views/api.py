@@ -233,12 +233,22 @@ class APIView(FlaskView):
         elif rerun_transaction and current_user.is_authenticated:
             event = get_timeline_object(event_id=rerun_transaction)
             pkgs = event.packages
+            old_tobj = None
+
+            if event.tnum:
+                old_tobj = get_trans_object(tnum=event.tnum)
+
             if pkgs:
                 _ = {}
                 for pkg in pkgs:
                     _[pkg] = get_pkg_object(pkg, fetch_pkgbuild=True)
-                trans_obj = get_trans_object(pkgs, repo_queue=repo_queue)
-                status.transaction_queue.rpush(trans_obj.tnum)
+                tobj = get_trans_object(pkgs, repo_queue=repo_queue)
+
+                if old_tobj:
+                    vals = (old_tobj.gh_sha_before, old_tobj.gh_sha_after, old_tobj.gh_patch)
+                    (tobj.gh_sha_before, tobj.gh_sha_after, tobj.gh_patch) = vals
+
+                status.transaction_queue.rpush(tobj.tnum)
                 transaction_queue.enqueue_call(handle_hook, timeout=84600)
 
         return json.dumps(message)

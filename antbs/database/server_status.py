@@ -142,8 +142,8 @@ class TimelineEvent(RedisHash, DateTimeStrings):
             self.message = self.message.replace('/pkg/', '/package/')
 
 
-def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None, ret=True):
-    tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type, packages=packages)
+def get_timeline_object(event_id=None, msg=None, tl_type=None, packages=None, ret=True, tnum=''):
+    tl_obj = TimelineEvent(event_id=event_id, msg=msg, tl_type=tl_type, packages=packages, tnum=tnum)
     if ret:
         return tl_obj
 

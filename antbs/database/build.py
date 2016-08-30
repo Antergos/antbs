@@ -27,6 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import io
 from datetime import datetime
 from multiprocessing import Process
 
@@ -104,7 +105,7 @@ class Build(RedisHash):
         string=['pkgname', 'pkgver', 'epoch', 'pkgrel', 'path', 'build_path',
                 'start_str', 'end_str', 'version_str', 'container', 'review_status',
                 'review_dev', 'review_date', 'log_str', 'pkg_id', 'bnum', 'tnum',
-                'repo_container', 'live_output_key', 'last_line_key', 'gh_diff', 'gh_patch'],
+                'repo_container', 'live_output_key', 'last_line_key', 'gh_diff'],
         bool=['failed', 'completed', 'is_iso'],
         int=[],
         list=['log'],
@@ -306,22 +307,19 @@ class Build(RedisHash):
         if (not self._trans_obj.gh_sha_before or not self._trans_obj.gh_sha_after) and not self._trans_obj.gh_patch:
             return
 
-        patch_file = self._trans_obj.gh_patch if self._trans_obj.gh_patch else None
+        patch_file = None if not self._trans_obj.gh_patch else self._trans_obj.gh_patch.encode('utf-8')
 
         if not patch_file:
             gh, repo = self._pkg_obj.get_github_api_client()
-            compare = repo.compare_commits(self._trans_obj.gh_sha_before, self._trans_obj.gh_diff_after)
-            filtered_files = [f for f in compare.files if f['filename'].split('/')[-2] == self._pkg_obj.pkgname]
-            _file = '' if not filtered_files else filtered_files[0]
+            compare = repo.compare_commits(self._trans_obj.gh_sha_before, self._trans_obj.gh_sha_after)
+            patch_file = compare.diff
 
-            if not _file:
-                logger.error('_file is empty! all files: %s', compare.files)
-                return
+        patch_file = io.BytesIO(patch_file)
+        patch = PatchSet(patch_file, encoding='utf-8')
+        filtered_files = [f for f in patch if f.path.split('/')[-2] == self._pkg_obj.pkgname]
+        _file = '' if not filtered_files else filtered_files[0]
 
-            patch_file = _file['patch']
-
-        patch = PatchSet(patch_file)
-        self.gh_diff = str(patch[0])
+        self.gh_diff = str(_file[0])
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname

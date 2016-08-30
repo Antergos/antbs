@@ -259,6 +259,8 @@ class Webhook(WebhookMeta):
         if self.is_manual:
             return
 
+        self.payload = json.loads(self.request.data.decode('UTF-8'))
+
         # Save payload in the database temporarily in case we need it later.
         dt = datetime.datetime.now().strftime("%m%d%Y-%I%M")
         key = 'antbs:github:payloads:{0}'.format(dt)

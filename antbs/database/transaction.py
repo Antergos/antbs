@@ -69,7 +69,7 @@ class TransactionMeta(RedisHash):
     _staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
     attrib_lists = dict(
-        string=['building', 'start_str', 'end_str', 'initiated_by', 'gh_sha_before', 'gh_sha_after'],
+        string=['building', 'start_str', 'end_str', 'initiated_by', 'gh_sha_before', 'gh_sha_after', 'gh_patch'],
         bool=['is_running', 'is_finished', 'sync_pkgbuilds_only'],
         int=['tnum'],
         list=['queue'],
