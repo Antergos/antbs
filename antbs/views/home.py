@@ -50,7 +50,7 @@ class HomeView(FlaskView):
 
         return len(main_repo.pkgs_alpm) if 'antergos' == repo_name else len(staging_repo.pkgs_alpm)
 
-    def before_request(self, name):
+    def before_request(self, name, tlpage=None):
         monitor = get_monitor_object('github')
         do_sync = do_check = False
 

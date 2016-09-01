@@ -74,7 +74,7 @@
 				</div>
 				<div id="pkgbuild_diff" class="content"></div>
 				<script>
-					{%  set pkgbuild_diff = pkg_obj.gh_diff|replace("'", "\'") %}
+					{%  set pkgbuild_diff = bld_obj.gh_diff|replace("'", "\'") %}
 					window.pkgbuild_diff = '{{ pkgbuild_diff }}';
 				</script>
 			</div>
@@ -133,8 +133,8 @@
 	{% if bld_obj.gh_diff %}
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.6.0/highlight.min.js"></script>
 		<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.6.0/languages/scala.min.js"></script>
-		<script type="text/javascript" src="assets/diff2html.js"></script>
-		<script type="text/javascript" src="assets/diff2html-ui.js"></script>
+		<script type="text/javascript" src="/static/js/diff2html.js"></script>
+		<script type="text/javascript" src="/static/js/diff2html-ui.js"></script>
 		<script>
 			$(document).ready(function() {
 				var diff2htmlUi = new Diff2HtmlUI({diff: window.pkgbuild_diff});

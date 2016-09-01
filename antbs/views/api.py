@@ -245,8 +245,7 @@ class APIView(FlaskView):
                 tobj = get_trans_object(pkgs, repo_queue=repo_queue)
 
                 if old_tobj:
-                    vals = (old_tobj.gh_sha_before, old_tobj.gh_sha_after, old_tobj.gh_patch)
-                    (tobj.gh_sha_before, tobj.gh_sha_after, tobj.gh_patch) = vals
+                    tobj.gh_sha_before, tobj.gh_sha_after = old_tobj.gh_sha_before, old_tobj.gh_sha_after
 
                 status.transaction_queue.rpush(tobj.tnum)
                 transaction_queue.enqueue_call(handle_hook, timeout=84600)

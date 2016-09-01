@@ -142,6 +142,24 @@ class Monitor(RedisHash):
         latest_commit = [c for c in repo.commits(number=1)]
         return '' if not latest_commit else latest_commit[0].sha
 
+    def _handle_custom_xml_special_cases(self, elements, pkg_obj):
+        result = None
+
+        for element in elements:
+            if pkg_obj.auto_sum:
+                # JetBrains IDE
+                version = element.get('version')
+                build = element.get('fullNumber')
+
+                if version and build:
+                    result = '{}.{}'.format(version, build)
+
+                    break
+
+        return result
+
+
+
     def _matches_pattern(self, pattern, latest):
         matches = False
 
@@ -176,6 +194,15 @@ class Monitor(RedisHash):
 
         logger.debug([pkgname, in_repo, in_staging])
         return in_repo or in_staging
+
+    # def process_custom_xml_elements(self, elements, pkg_obj):
+    #     result = self._handle_custom_xml_special_cases(elements, pkg_obj)
+    #
+    #     if result:
+    #         return result
+    #
+    #     for index, item in enumerate(elements):
+
 
     def _maybe_override_build(self, pkg_obj, latest):
         build_override = None
@@ -225,42 +252,46 @@ class Monitor(RedisHash):
 
         wh.process_changes()
 
-    def check_custom_xml_for_changes(self, pkg_obj, build_pkgs):
-        url = pkg_obj.mon_type
-        req = requests.head(url)
-
-        if req.headers['ETag'] == pkg_obj.mon_etag:
-            return build_pkgs
-
-        pkg_obj.mon_etag = req.headers['ETag']
-
-        try:
-            xml_data = requests.get(url).text
-            root = ET.fromstring(xml_data)
-
-            latest_release = root.findall(pkg_obj.mon_project)
-            version = latest_release.get('version')
-            build = latest_release.get('fullNumber')
-
-            if ' ' in version:
-                version = version.split(' ')[0]
-
-            latest = '{}|{}'.format(version, build)
-
-            if pkg_obj.mon_last_reselt and latest != pkg_obj.mon_last_result:
-                build_pkgs.append(pkg_obj.pkgname)
-
-                pkg_obj.update_pkgbuild_and_push_github({
-                    '_pkgver': (pkg_obj._pkgver, version),
-                    '_buildver': (pkg_obj._buildver, build)
-                })
-
-            pkg_obj.mon_last_result = latest
-
-        except Exception as err:
-            logger.exception(err)
-
-        return build_pkgs
+    # def check_custom_xml_for_changes(self, pkg_obj, build_pkgs):
+    #     url = pkg_obj.mon_type
+    #     req = requests.head(url)
+    #
+    #     if req.headers['ETag'] == pkg_obj.mon_etag:
+    #         return build_pkgs
+    #
+    #     pkg_obj.mon_etag = req.headers['ETag']
+    #
+    #     try:
+    #         xml_data = requests.get(url).text
+    #         root = ET.fromstring(xml_data)
+    #
+    #         releases = root.findall(pkg_obj.mon_xpath)
+    #         latest_release = None if not releases else releases[0]
+    #
+    #         if latest_release and pkg_obj.mon_match_pattern:
+    #             latest
+    #         version = latest_release.get('version')
+    #         build = latest_release.get('fullNumber')
+    #
+    #         if ' ' in version:
+    #             version = version.split(' ')[0]
+    #
+    #         latest = '{}|{}'.format(version, build)
+    #
+    #         if pkg_obj.mon_last_reselt and latest != pkg_obj.mon_last_result:
+    #             build_pkgs.append(pkg_obj.pkgname)
+    #
+    #             pkg_obj.update_pkgbuild_and_push_github({
+    #                 '_pkgver': (pkg_obj._pkgver, version),
+    #                 '_buildver': (pkg_obj._buildver, build)
+    #             })
+    #
+    #         pkg_obj.mon_last_result = latest
+    #
+    #     except Exception as err:
+    #         logger.exception(err)
+    #
+    #     return build_pkgs
 
     def check_github_repo_for_changes(self, pkg_obj, build_pkgs, is_first=False, is_last=False):
         antergos_packages_sha = None

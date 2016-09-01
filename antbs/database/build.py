@@ -307,19 +307,15 @@ class Build(RedisHash):
         if (not self._trans_obj.gh_sha_before or not self._trans_obj.gh_sha_after) and not self._trans_obj.gh_patch:
             return
 
-        patch_file = None if not self._trans_obj.gh_patch else self._trans_obj.gh_patch.encode('utf-8')
+        gh, repo = self._pkg_obj.get_github_api_client()
+        compare = repo.compare_commits(self._trans_obj.gh_sha_before, self._trans_obj.gh_sha_after)
+        patch_file = io.StringIO(compare.diff().decode('UTF-8'))
 
-        if not patch_file:
-            gh, repo = self._pkg_obj.get_github_api_client()
-            compare = repo.compare_commits(self._trans_obj.gh_sha_before, self._trans_obj.gh_sha_after)
-            patch_file = compare.diff
-
-        patch_file = io.BytesIO(patch_file)
-        patch = PatchSet(patch_file, encoding='utf-8')
+        patch = PatchSet(patch_file)
         filtered_files = [f for f in patch if f.path.split('/')[-2] == self._pkg_obj.pkgname]
         _file = '' if not filtered_files else filtered_files[0]
 
-        self.gh_diff = str(_file[0])
+        self.gh_diff = str(_file)
 
     def _build_package(self):
         self.building = self._pkg_obj.pkgname
