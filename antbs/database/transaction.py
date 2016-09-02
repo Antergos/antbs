@@ -280,10 +280,10 @@ class Transaction(TransactionMeta):
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
             logger.info(status.current_status)
             cnchi_dir = self.get_build_directory(pkg)
-            pkg_obj.prepare_package_source(cnchi_dir)
+            # pkg_obj.prepare_package_source(cnchi_dir)
             self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
-            remove(os.path.join(cnchi_dir, 'cnchi/.git'))
-            subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
+            #remove(os.path.join(cnchi_dir, 'cnchi/.git'))
+            #subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
 
         elif 'numix-icon-theme-square' == pkg:
             src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
@@ -396,9 +396,7 @@ class Transaction(TransactionMeta):
             name = pkg_obj.name or pkg_obj.pkgname
 
         pbdir = self.get_build_directory(name)
-        dest_dir = os.path.join(pbdir, 'cnchi/po')
-        logger.debug(pbdir)
-        logger.debug(dest_dir)
+        dest_dir = os.path.join(pbdir, 'po')
 
         trans = {
             "cnchi": {
