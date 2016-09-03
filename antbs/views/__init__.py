@@ -68,7 +68,7 @@ from database import (
 from utils import *
 
 from webhook import Webhook
-from transaction_handler import handle_hook, process_dev_review
+from transaction_handler import handle_hook, update_repo_databases
 from iso_utility import iso_release_job
 from extensions import FlaskView, route
 

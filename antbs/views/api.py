@@ -150,7 +150,7 @@ class APIView(FlaskView):
 
             remove(pkg_file)
 
-        repo_queue.enqueue_call(process_dev_review, args=(bld_obj.bnum,), timeout=9600)
+        repo_queue.enqueue_call(update_repo_databases, timeout=9600)
         errmsg = dict(error=False, msg=None)
 
         return errmsg
@@ -212,12 +212,13 @@ class APIView(FlaskView):
         iso_release = bool(request.args.get('do_iso_release', False))
         reset_queue = bool(request.args.get('reset_build_queue', False))
         rerun_transaction = int(request.args.get('rerun_transaction', 0))
+        update_repos = bool(request.args.get('update_repos', False))
         message = dict(msg='Ok')
 
-        if iso_release and current_user.is_authenticated:
+        if iso_release:
             transaction_queue.enqueue_call(iso_release_job)
 
-        elif reset_queue and current_user.is_authenticated:
+        elif reset_queue:
             if transaction_queue.count > 0:
                 transaction_queue.empty()
             if repo_queue.count > 0:
@@ -230,7 +231,7 @@ class APIView(FlaskView):
             status.idle = True
             status.current_status = 'Idle.'
 
-        elif rerun_transaction and current_user.is_authenticated:
+        elif rerun_transaction:
             event = get_timeline_object(event_id=rerun_transaction)
             pkgs = event.packages
             old_tobj = None
@@ -249,6 +250,9 @@ class APIView(FlaskView):
 
                 status.transaction_queue.rpush(tobj.tnum)
                 transaction_queue.enqueue_call(handle_hook, timeout=84600)
+
+        elif update_repos:
+            repo_queue.enqueue_call(update_repo_databases, timeout=9600)
 
         return json.dumps(message)
 

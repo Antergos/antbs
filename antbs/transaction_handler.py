@@ -123,7 +123,7 @@ def handle_hook():
         logger.info('All builds completed.')
 
 
-def process_dev_review(bnum):
+def update_repo_databases():
     with Connection(db):
         current_job = get_current_job()
         if 'update_repo' != current_job.origin:
