@@ -62,7 +62,8 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
 
         path=['APP_DIR', 'STAGING_REPO', 'MAIN_REPO', 'STAGING_64', 'STAGING_32',
               'MAIN_64', 'MAIN_32', 'PKGBUILDS_DIR', 'BUILD_BASE_DIR', 'ISO_DIR',
-              'REPO_BASE_DIR', 'MKARCHISO_DIR', 'GNUPG_DIR', 'PKG_CACHE_DIR', 'PKG_CACHE_DIR32']
+              'REPO_BASE_DIR', 'MKARCHISO_DIR', 'GNUPG_DIR', 'PKG_CACHE_DIR', 'PKG_CACHE_DIR32',
+              'OLD_ISO_IMAGES_DIR']
     )
     can_expire = ['repos_synced_recently']
     logger = None

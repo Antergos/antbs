@@ -145,7 +145,7 @@ class ISOUtility:
 
     def sign_with_gnupg(self):
         """ Create a detached signature using GNUPG. """
-        batch_sign([self.file_path], db, passphrase=PASSWORD, is_iso=True)
+        batch_sign({self.file_path}, db, passphrase=PASSWORD, is_iso=True)
 
 
 class WordPressBridge:
@@ -211,15 +211,15 @@ def clean_up_after_release(version):
     all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
 
-    if len(all_files) <= 8:
+    if len(all_files) <= 5:
         return
     for f in all_files:
         files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
-        if version not in f and len(files) > 8:
-            shutil.move(f, '/opt/old-iso-images')
+        if version not in f and len(files) > 5:
+            shutil.move(f, status.OLD_ISO_IMAGES_DIR)
             moved.append(os.path.basename(f))
 
-    old_imgs = '/opt/old-iso-images'
+    old_imgs = status.OLD_ISO_IMAGES_DIR
     all_old_files = [os.path.join(old_imgs, f) for f in os.listdir(old_imgs)]
     if len(moved) > 0:
         for f in all_old_files:
@@ -259,13 +259,10 @@ def iso_release_job():
             logger.error(err)
 
     if version and db and iso_obj:
+        shutil.move(iso_obj.md5sums_path, RELEASE_DIR)
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
         db.set('antbs:misc:iso-release:do_check', version)
-        batch_sign([iso_obj.md5sums_path], db, passphrase=PASSWORD, is_iso=True)
-        _files = [iso_obj.md5sums_path, iso_obj.md5sums_path + '.sig']
-        for f in _files:
-            shutil.move(f, RELEASE_DIR)
 
     if saved_status and not status.idle:
         status.current_status = saved_status
