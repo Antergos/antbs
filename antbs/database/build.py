@@ -186,8 +186,10 @@ class Build(RedisHash):
         if self.failed:
             self.db.publish(self.live_output_key, 'ENDOFLOG')
 
-        if len(content) > 3001:
+        if len(content) > 9001:
             content = content[:3000] + content[-3000:]
+        elif len(content) > 6001:
+            content = content[:1500] + content[-1500:]
 
         for line in content:
             self.log.rpush(line)

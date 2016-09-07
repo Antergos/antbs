@@ -60,9 +60,11 @@
 				</div>
 			</div>
 		</div>
+	</div>
+	<div class="row">
 	{% if bld_obj.gh_diff %}
-		<div class="col-sm-6 col-md-6">
-			<div class="block no-padding block-color pkgbuild_diff">
+		<div class="col-sm-10 col-md-10">
+			<div class="block no-padding block-color pkgbuild_diff closed">
 				<div class="header">
 					<div class="actions">
 						<a class="minimize" href="#"><i class="fa fa-chevron-down"></i></a>
@@ -71,7 +73,7 @@
 					</div>
 					<i class="fa fa-file-text-o"></i> &nbsp;{{ bld_obj.pkgname }}/PKGBUILD <span class="label label-warning">CHANGED</span>
 				</div>
-				<div id="pkgbuild_diff" class="content no-padding"></div>
+				<div id="pkgbuild_diff" class="content no-padding" style="display:none;"></div>
 				<script>
 					{%  set pkgbuild_diff = bld_obj.gh_diff|replace("'", "\\'")|replace("\n", "\\n") %}
 					window.pkgbuild_diff = '{{ pkgbuild_diff|safe() }}';
@@ -171,7 +173,9 @@
 				diff2htmlUi.draw('#pkgbuild_diff', {
 					inputFormat: 'json',
 					showFiles: false,
-					matching: 'words'
+					matching: 'words',
+					outputFormat: 'side-by-side',
+					synchronisedScroll: true
 				});
 				diff2htmlUi.fileListCloseable('#pkgbuild_diff', false);
 				diff2htmlUi.highlightCode('#pkgbuild_diff');
