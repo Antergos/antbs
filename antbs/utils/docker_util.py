@@ -148,7 +148,7 @@ class DockerUtils(metaclass=Singleton):
         binds[result_dir] = {'bind': '/result', 'ro': False}
 
         pkgs_hconfig = self.doc.create_host_config(
-            binds=binds, privileged=True, mem_limit='2G', memswap_limit='-1'
+            binds=binds, privileged=True, mem_limit='5G', memswap_limit='-1'
         )
         return pkgs_hconfig
 

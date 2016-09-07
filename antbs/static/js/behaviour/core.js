@@ -275,6 +275,8 @@ $(function(){
       p.toggleClass('closed');
       
       e.preventDefault();
+
+      updateHeight();
     });
     
     $('.refresh:not(.ant-disabled)').click(function(e){
