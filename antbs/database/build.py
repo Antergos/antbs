@@ -351,7 +351,6 @@ class Build(RedisHash):
                          '/32build', '/result',
                          '/var/cache/pacman_i686'],
                 environment=build_env,
-                cpuset='0-3',
                 name=self._pkg_obj.pkgname,
                 host_config=hconfig
             )

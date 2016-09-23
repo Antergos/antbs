@@ -48,3 +48,4 @@ errorlog = '-'
 def on_starting(server):
     _db.hset(_monitor_key, 'check_is_running', False)
     _db.hset(_status_key, 'repos_syncing', False)
+

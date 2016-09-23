@@ -158,8 +158,6 @@ class Monitor(RedisHash):
 
         return result
 
-
-
     def _matches_pattern(self, pattern, latest):
         matches = False
 
@@ -311,9 +309,12 @@ class Monitor(RedisHash):
         in_mate_group = any([g for g in ['mate', 'mate-extra'] if g in pkg_obj.groups])
         is_mate_pkg = in_mate_group or 'mate-' in pkg_obj.pkgname
 
+        if is_mate_pkg:
+            pattern = '1.16'
+
         latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.mon_type, pattern)
 
-        if not latest and is_mate_pkg:
+        if (not latest and is_mate_pkg) or is_mate_pkg and '1.16' not in latest:
             latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
 
         pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
@@ -323,7 +324,7 @@ class Monitor(RedisHash):
                 '%s - latest: %s, last_result: %s, pkgver: %s',
                 pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
             )
-            return build_pkgs
+            return build_pkgs, antergos_packages_sha
 
         if latest.startswith('v') and 'commits' != pkg_obj.mon_type:
             latest = latest[1:]

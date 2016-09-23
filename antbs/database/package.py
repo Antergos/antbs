@@ -336,6 +336,9 @@ class Package(PackageMeta):
         new_pb_contents = pb_contents
         msg_tpl = '[ANTBS] | [updpkg] {0} {1}'
 
+        if '1.14' == self.mon_match_pattern:
+            changes['_monitored_match_pattern'] = ('1.14', '1.16')
+
         if 'pkgver' in changes and not self.auto_sum:
             commit_msg = msg_tpl.format(self.pkgname, changes['pkgver'])
         elif 'pkgver' in changes and self.auto_sum:
@@ -389,7 +392,10 @@ class Package(PackageMeta):
                 changed['pkgrel'] = '1'
             elif 'pamac-dev' == self.pkgname:
                 # Hack -- fix later.
-                changed['pkgver'] = old_vals['pkgver']
+                changed['pkgver'] = get_pkg_object('pamac').pkgver
+                self.update_pkgbuild_and_push_github(
+                    {'pkgver': (old_vals['pkgver'], changed['pkgver'])}
+                )
                 changed['pkgrel'] = '1'
             elif self.mon_last_result != old_vals['pkgver']:
                 changed['pkgver'] = self.mon_last_result
