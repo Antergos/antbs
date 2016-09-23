@@ -1,0 +1,282 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+#
+# monitors.py
+#
+# Copyright © 2016 Antergos
+#
+# This file is part of The Antergos Build Server, (AntBS).
+#
+# AntBS is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# AntBS is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# The following additional terms are in effect as per Section 7 of the license:
+#
+# The preservation of all legal notices and author attributions in
+# the material or in the Appropriate Legal Notices displayed
+# by works containing it is required.
+#
+# You should have received a copy of the GNU General Public License
+# along with AntBS; If not, see <http://www.gnu.org/licenses/>.
+
+import re
+
+import requests
+from github3 import login
+
+
+class PackageSourceMonitor:
+    """
+    Base class for all monitors.
+
+    Class Attributes:
+        logger           (Logging.Handler) Current logging handler (status.logger)
+        status           (ServerStatus)    Current ServerStatus instance.
+
+    """
+
+    status = None
+    logger = None
+
+    def __init__(self, status):
+        if self.status is None:
+            self.status = status
+            self.logger = status.logger
+
+    @staticmethod
+    def _not_empty(value):
+        return value not in ['', 'None', None, False]
+
+    def _matches_pattern(self, pattern, latest):
+        matches = False
+        pattern = pattern or '.'
+
+        if not latest:
+            return matches
+
+        matches = pattern in latest
+
+        if not matches and pattern.startswith('/') and pattern.endswith('/'):
+            # Regular Expression
+            pattern = pattern[1:-1]
+            matches = re.fullmatch(pattern, latest)
+            self.logger.debug('matches is %s', matches)
+
+        return matches
+
+    def package_source_changed(self, pkg_obj, result):
+        last_result = pkg_obj.mon_last_result
+        return self._not_empty(result) and last_result and result != last_result
+
+
+class WebMonitor(PackageSourceMonitor):
+    """
+    Base class for monitors which watch a remote HTTP resource for changes.
+
+    Attributes:
+        changed          (bool)            Whether or not the current etag equals the one provided.
+        url              (str)             The url for the monitored web resource.
+        remote_resource  (dict)            Remote resource content and metadata.
+
+    See Also:
+        PackageSourceMonitor.__doc__()
+    """
+
+    def __init__(self, url, etag, status):
+        super().__init__(status)
+
+        self.url = url
+        self.remote_resource = {}
+        self.changed = self._get_etag() != etag
+
+        if self.changed:
+            self.download_and_process_remote_resource()
+
+    def _get_etag(self):
+        req = None
+
+        try:
+            req = requests.head(self.url)
+        except Exception as err:
+            self.logger.exception(err)
+
+        return req or req.headers['ETag']
+
+    def _process_remote_resource(self):
+        raise NotImplementedError
+
+    def download_and_process_remote_resource(self):
+        resource = None
+
+        try:
+            resource = requests.get(self.url)
+        except Exception as err:
+            self.logger.exception(err)
+
+        if resource:
+            self.remote_resource['text'] = resource.text
+            self.remote_resource['etag'] = resource.headers['ETag']
+            self.remote_resource['lines'] = resource.text.split('\n')
+
+        self._process_remote_resource()
+
+    def package_source_changed(self, pkg_obj, result):
+        raise NotImplementedError
+
+
+class CheckSumsMonitor(WebMonitor):
+    """
+    Monitors a remote HTTP resource containing a list of files and their checksums.
+
+    Attributes:
+        files (dict) Files listed in the monitored resource.
+
+    See Also:
+        WebMonitor.__doc__
+    """
+
+    def __init__(self, url, etag, status):
+        super().__init__(url, etag, status)
+
+        self.files = {}
+
+    @staticmethod
+    def _get_file_extension_with_compression_type(file):
+        parts = file.partition('.tar.')
+        return '{}{}'.format(parts[1], parts[2])
+
+    def _get_file_name_and_version(self, file):
+        extension = self._get_file_extension_with_compression_type(file)
+        file = file.replace(extension, '')
+        has_pkgrel = '-' == file[-2]
+
+        if has_pkgrel:
+            name, version, pkgrel = file.rsplit('-', 2)
+            version = '{}-{}'.format(version, pkgrel)
+        else:
+            name, version = file.rsplit('-', 1)
+
+        return name, version
+
+    def _process_remote_resource(self):
+        for line in self.remote_resource['lines']:
+            file, checksum = line.split(' ')
+            name, version = self._get_file_extension_with_compression_type(file)
+
+            self.files[file] = {
+                'name': name,
+                'version': version,
+                'checksum': checksum
+            }
+
+    def get_file_info_by_name(self, name):
+        if name not in self.files:
+            return {}
+
+        match = [
+            self.files[file]
+            for file in self.files
+            if name == self.files[file]['name']
+        ]
+
+        return {} if not match else match[0]
+
+    def get_file_version_by_name(self, name):
+        info = self.get_file_info_by_name(name)
+        return '' if not info else info['version']
+
+    def package_source_changed(self, pkg_obj, result=None):
+        change_id = self.get_file_version_by_name(pkg_obj.pkgname)
+        return super().package_source_changed(pkg_obj, change_id)
+
+
+class GithubMonitor(PackageSourceMonitor):
+
+    def __init__(self, token, project=None, repo=None, mon_type='release', status=None):
+        super().__init__(status)
+        self.type = mon_type
+        self.gh = login(token=token)
+        self.project_name = project
+        self.repo_name = repo
+        self.repo = None
+        self.latest = None
+
+        if project and repo:
+            self.set_repo(project=project, repo=repo)
+
+    def _get_latest(self, what_to_get, pattern=None):
+        if self.repo is None:
+            self._repo_not_set_error()
+
+        git_item = getattr(self.repo, what_to_get)
+        res = git_item()
+        items_checked = 0
+
+        def _get_next_item():
+            _latest = ''
+
+            try:
+                item = res.next()
+
+                if 'commits' == what_to_get:
+                    _latest = item.sha
+                elif 'releases' == what_to_get:
+                    _latest = item.tag_name if not item.prerelease else ''
+                elif 'tags' == what_to_get:
+                    _latest = str(item)
+
+            except StopIteration:
+                pass
+            except Exception as err:
+                self.logger.exception(err)
+
+            return _latest
+
+        latest = _get_next_item()
+
+        if not latest or (pattern and not self._matches_pattern(pattern, latest)):
+            while not latest or (pattern and not self._matches_pattern(pattern, latest)):
+                latest = _get_next_item()
+                items_checked += 1
+
+                if items_checked > 5:
+                    break
+
+        self.logger.debug(latest)
+
+        return latest
+
+    @staticmethod
+    def _repo_not_set_error():
+        raise AttributeError('repo is not set!')
+
+    def get_latest_commit(self, pattern=None):
+        return self._get_latest('commits', pattern)
+
+    def get_latest_release(self, pattern=None):
+        return self._get_latest('releases', pattern)
+
+    def get_latest_tag(self, pattern=None):
+        return self._get_latest('tags', pattern)
+
+    def package_source_changed(self, pkg_obj, change_type=None, change_id=None):
+        change_type = change_type or pkg_obj.mon_type
+        self.latest = change_id or self._get_latest(change_type, pkg_obj.mon_match_pattern)
+        return super().package_source_changed(pkg_obj, self.latest)
+
+    def set_repo(self, project=None, repo=None):
+        _project = project or self.project_name
+        _repo = repo or self.repo_name
+
+        if not (_project and _repo):
+            raise ValueError('Both project and repo are required in order to set repo!')
+
+        self.repo = self.gh.repository(_project, _repo)
+

@@ -48,3 +48,8 @@ from .pkgbuild import Pkgbuild
 from .pagination import Pagination
 from .debug import AntBSDebugToolbar
 from .columns_info import ColumnsInfo
+
+from .monitors import (
+    CheckSumsMonitor,
+    GithubMonitor
+)

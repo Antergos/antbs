@@ -56,7 +56,7 @@ with Connection(db):
     w2 = Worker([repo_queue])
 
 
-def set_server_status(first=True, saved_status=False, is_review=False):
+def set_server_status(first=True, saved_status=False, is_review=False, is_monitor=False):
     ret = None
     if first:
         saved = False
@@ -68,6 +68,8 @@ def set_server_status(first=True, saved_status=False, is_review=False):
 
         if is_review:
             status.current_status = 'Processing developer review result.'
+        elif is_monitor:
+            status.current_status = 'Checking remote package sources for changes.'
         else:
             status.current_status = 'Build hook was triggered. Checking docker images.'
 

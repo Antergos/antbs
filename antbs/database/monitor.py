@@ -49,8 +49,14 @@ from . import (
     get_repo_object
 )
 
-from utils import quiet_down_noisy_loggers
+from utils import (
+    quiet_down_noisy_loggers,
+    CheckSumsMonitor,
+    GithubMonitor
+)
+
 import iso_utility
+from transaction_handler import set_server_status
 
 logger = status.logger
 GITLAB_TOKEN = status.gitlab_token
@@ -64,7 +70,7 @@ class Monitor(RedisHash):
     """
 
     attrib_lists = dict(
-        string=['name'],
+        string=['name', 'mate_last_etag'],
         bool=['checked_recently', 'check_is_running'],
         int=[],
         list=[],
@@ -81,45 +87,7 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-        self.repo_obj = self.staging_repo_obj = self.gh = None
-
-    def _get_latest_release_tag_commit(self, gh_repo, what_to_get, pattern=None):
-        git_item = getattr(gh_repo, what_to_get)
-        res = git_item()
-        latest = ''
-        items_checked = 0
-
-        def _get_next_item():
-            _latest = ''
-            try:
-                item = res.next()
-
-                if 'commits' == what_to_get:
-                    _latest = item.sha
-                elif 'releases' == what_to_get:
-                    _latest = item.tag_name if not item.prerelease else ''
-                elif 'tags' == what_to_get:
-                    _latest = str(item)
-
-            except StopIteration:
-                pass
-            except Exception as err:
-                logger.exception(err)
-
-            return _latest
-
-        latest = _get_next_item()
-
-        if not latest or (pattern and not self._matches_pattern(pattern, latest)):
-            while not latest or (pattern and not self._matches_pattern(pattern, latest)):
-                latest = _get_next_item()
-                items_checked += 1
-
-                if items_checked > 5:
-                    break
-
-        logger.debug(latest)
-        return latest
+        self.repo_obj = self.staging_repo_obj = self.gh = self.mate = None
 
     @staticmethod
     def _get_repo_objects(sync_repos):
@@ -138,8 +106,8 @@ class Monitor(RedisHash):
         return repo, staging_repo
 
     def _get_antergos_packages_repo_head_sha(self):
-        repo = self.gh.repository('antergos', 'antergos-packages')
-        latest_commit = [c for c in repo.commits(number=1)]
+        self.gh.set_repo('antergos', 'antergos-packages')
+        latest_commit = [c for c in self.gh.repo.commits(number=1)]
         return '' if not latest_commit else latest_commit[0].sha
 
     def _handle_custom_xml_special_cases(self, elements, pkg_obj):
@@ -158,21 +126,6 @@ class Monitor(RedisHash):
 
         return result
 
-    def _matches_pattern(self, pattern, latest):
-        matches = False
-
-        if not pattern or not latest:
-            return matches
-
-        matches = pattern in latest
-
-        if not matches and pattern.startswith('/') and pattern.endswith('/'):
-            # Regular Expression
-            pattern = pattern[1:-1]
-            matches = re.fullmatch(pattern, latest)
-            logger.debug('matches is %s', matches)
-
-        return matches
 
     def _package_version_in_repos(self, pkgname, latest):
         version_in_repo = version_in_staging = None
@@ -291,63 +244,13 @@ class Monitor(RedisHash):
     #
     #     return build_pkgs
 
-    def check_github_repo_for_changes(self, pkg_obj, build_pkgs, is_first=False, is_last=False):
-        antergos_packages_sha = None
-
+    def check_github_repo_for_changes(self, pkg_obj):
         if self.gh is None:
-            self.gh = login(token=GITHUB_TOKEN)
+            self.gh = GithubMonitor(token=GITHUB_TOKEN)
 
-        if is_first:
-            antergos_packages_sha = self._get_antergos_packages_repo_head_sha()
+        self.gh.set_repo(pkg_obj.mon_project, pkg_obj.mon_repo)
 
-        project = pkg_obj.mon_project
-        repo = pkg_obj.mon_repo
-        last_result = pkg_obj.mon_last_result
-        mon_pattern = pkg_obj.mon_match_pattern
-        gh_repo = self.gh.repository(project, repo)
-        pattern = '.' if not mon_pattern else mon_pattern
-        in_mate_group = any([g for g in ['mate', 'mate-extra'] if g in pkg_obj.groups])
-        is_mate_pkg = in_mate_group or 'mate-' in pkg_obj.pkgname
-
-        if is_mate_pkg:
-            pattern = '1.16'
-
-        latest = self._get_latest_release_tag_commit(gh_repo, pkg_obj.mon_type, pattern)
-
-        if (not latest and is_mate_pkg) or is_mate_pkg and '1.16' not in latest:
-            latest = self._get_latest_release_tag_commit(gh_repo, 'tags', pattern)
-
-        pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
-
-        if not latest or latest in ['None']:
-            logger.error(
-                '%s - latest: %s, last_result: %s, pkgver: %s',
-                pkg_obj.pkgname, latest, last_result, pkg_obj.pkgver
-            )
-            return build_pkgs, antergos_packages_sha
-
-        if latest.startswith('v') and 'commits' != pkg_obj.mon_type:
-            latest = latest[1:]
-
-        build_override, latest = self._maybe_override_build(pkg_obj, latest)
-
-        do_build = build_override if build_override is not None else latest != pkg_obj.pkgver
-
-        pkg_obj.mon_last_result = latest
-
-        if not do_build and build_override is None:
-            do_build = not self._package_version_in_repos(pkg_obj.pkgname, latest)
-
-        if do_build:
-            build_pkgs.append(pkg_obj.pkgname)
-
-            if pkg_obj.mon_type in ['releases', 'tags']:
-                pkg_obj.update_pkgbuild_and_push_github({'pkgver': (pkg_obj.pkgver, latest)})
-
-        if is_last:
-            antergos_packages_sha = self._get_antergos_packages_repo_head_sha()
-
-        return build_pkgs, antergos_packages_sha
+        return self.gh.package_source_changed(pkg_obj)
 
     def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
@@ -367,6 +270,13 @@ class Monitor(RedisHash):
                 break
 
         return build_pkgs
+
+    def check_mate_desktop_server_for_changes(self, pkg_obj):
+        if self.mate is None:
+            url = 'http://pub.mate-desktop.org/releases/{}'.format(pkg_obj.mon_match_pattern)
+            self.mate = CheckSumsMonitor(url, self.mate_last_etag, status)
+
+        return self.mate.package_source_changed(pkg_obj)
 
     def check_mirror_for_iso(self, version):
         synced = []
@@ -394,6 +304,8 @@ class Monitor(RedisHash):
         if not check_github:
             return
 
+        saved_status = set_server_status(first=True, is_monitor=True)
+
         build_pkgs = []
         first = list(self.packages)[0]
         last = list(self.packages)[-1]
@@ -403,34 +315,49 @@ class Monitor(RedisHash):
         quiet_down_noisy_loggers()
         self._sync_packages_list()
 
-        logger.info('Checking github repos for changes...')
-
         for pkg in self.packages:
-            is_first = pkg == first
-            is_last = pkg == last
             pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
+            changed = monitor_obj = False
 
             if pkg_obj.is_split_package:
                 continue
 
             if 'github' == pkg_obj.mon_service:
-                build_pkgs, sha = self.check_github_repo_for_changes(
-                    pkg_obj, build_pkgs, is_first=is_first, is_last=is_last
-                )
+                changed = self.check_github_repo_for_changes(pkg_obj)
+                monitor_obj = self.gh
 
-                if is_first:
-                    before = sha
-                elif is_last:
-                    after = sha
+                if pkg == first:
+                    before = self._get_antergos_packages_repo_head_sha()
+                elif pkg == last:
+                    after = self._get_antergos_packages_repo_head_sha()
 
             elif 'gitlab' == pkg_obj.mon_service:
-                build_pkgs = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
+                changed = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
+                monitor_obj = ''
+
             elif 'custom_xml' == pkg_obj.mon_service:
-                build_pkgs = self.check_custom_xml_for_changes(pkg_obj, build_pkgs)
+                changed = self.check_custom_xml_for_changes(pkg_obj, build_pkgs)
+                monitor_obj = ''
+
+            elif 'mate-desktop' == pkg_obj.mon_service:
+                changed = self.check_mate_desktop_server_for_changes(pkg_obj)
+                monitor_obj = self.mate
+
+            pkg_obj.mon_last_checked = self.datetime_to_string(datetime.now())
+
+            logger.debug(
+                '%s - latest: %s, last_result: %s, pkgver: %s',
+                pkg_obj.pkgname, self.gh.latest, pkg_obj.mon_last_result, pkg_obj.pkgver
+            )
+
+            if changed:
+                build_pkgs = self.process_package_source_change(pkg_obj, monitor_obj, build_pkgs)
 
             gevent.sleep(0.5)
 
         build_pkgs = [p for p in build_pkgs if p]
+
+        set_server_status(first=False, saved_status=saved_status)
 
         if len(build_pkgs) > 0:
             self.add_to_build_queue(build_pkgs, webhook, before, after)
@@ -440,6 +367,27 @@ class Monitor(RedisHash):
             self.check_mirror_for_iso(version)
 
         self.checked_recently = (True, 3600)
+
+    def process_package_source_change(self, pkg_obj, monitor_obj, build_pkgs):
+        if monitor_obj.latest.startswith('v') and 'commits' != pkg_obj.mon_type:
+            monitor_obj.latest = monitor_obj.latest[1:]
+
+        build_override, monitor_obj.latest = self._maybe_override_build(pkg_obj, monitor_obj.latest)
+
+        do_build = build_override if build_override is not None else monitor_obj.latest != pkg_obj.pkgver
+
+        pkg_obj.mon_last_result = monitor_obj.latest
+
+        if not do_build and build_override is None:
+            do_build = not self._package_version_in_repos(pkg_obj.pkgname, monitor_obj.latest)
+
+        if do_build:
+            build_pkgs.append(pkg_obj.pkgname)
+
+            if pkg_obj.mon_type in ['releases', 'tags']:
+                pkg_obj.update_pkgbuild_and_push_github({'pkgver': (pkg_obj.pkgver, monitor_obj.latest)})
+
+        return build_pkgs
 
 
 def get_monitor_object(name):
