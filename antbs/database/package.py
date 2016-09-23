@@ -357,6 +357,9 @@ class Package(PackageMeta):
                 replace_str = 'pkgrel={0}'.format('1')
                 new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
+            elif 'checksum' == key:
+                new_pb_contents = new_pb_contents.replace(val[0], val[1])
+
         if new_pb_contents == pb_contents:
             return
 

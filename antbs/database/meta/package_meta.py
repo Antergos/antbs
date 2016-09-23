@@ -42,6 +42,7 @@ class PackageMeta(RedisHash):
         string=[
             '_pkgver',
             '_buildver',
+            'checksum',
             'description',
             'epoch',
             'failure_rate',

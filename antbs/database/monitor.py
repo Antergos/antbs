@@ -385,7 +385,13 @@ class Monitor(RedisHash):
             build_pkgs.append(pkg_obj.pkgname)
 
             if pkg_obj.mon_type in ['releases', 'tags']:
-                pkg_obj.update_pkgbuild_and_push_github({'pkgver': (pkg_obj.pkgver, monitor_obj.latest)})
+                changes = {'pkgver': (pkg_obj.pkgver, monitor_obj.latest)}
+
+                if 'mate-desktop' == pkg_obj.mon_type:
+                    info = monitor_obj.get_file_info_by_name(pkg_obj.pkgname)
+                    changes['checksum'] = (pkg_obj.checksum, info['checksum'])
+
+                pkg_obj.update_pkgbuild_and_push_github(changes)
 
         return build_pkgs
 

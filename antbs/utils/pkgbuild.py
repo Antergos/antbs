@@ -56,7 +56,7 @@ class Pkgbuild:
 
             list=['pkgname', 'license', 'source', 'groups', 'arch', 'backup', 'depends',
                   'makedepends', 'checkdepends', 'optdepends', 'conflicts', 'provides',
-                  'replaces', '_allowed_in']
+                  'replaces', '_allowed_in', 'sha1sums', 'md5sums']
         )
 
         self.all_keys = [item for sublist in self.key_lists.values() for item in sublist]
