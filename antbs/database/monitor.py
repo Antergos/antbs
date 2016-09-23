@@ -126,7 +126,6 @@ class Monitor(RedisHash):
 
         return result
 
-
     def _package_version_in_repos(self, pkgname, latest):
         version_in_repo = version_in_staging = None
 
@@ -153,7 +152,6 @@ class Monitor(RedisHash):
     #         return result
     #
     #     for index, item in enumerate(elements):
-
 
     def _maybe_override_build(self, pkg_obj, latest):
         build_override = None
@@ -248,7 +246,8 @@ class Monitor(RedisHash):
         if self.gh is None:
             self.gh = GithubMonitor(token=GITHUB_TOKEN)
 
-        self.gh.set_repo(pkg_obj.mon_project, pkg_obj.mon_repo)
+        self.gh.set_repo(pkg_obj.mon_project, pkg_obj.mon_repo, pkg_obj.mon_etag)
+        pkg_obj.mon_etag = self.gh.etag
 
         return self.gh.package_source_changed(pkg_obj)
 
@@ -274,7 +273,8 @@ class Monitor(RedisHash):
     def check_mate_desktop_server_for_changes(self, pkg_obj):
         if self.mate is None:
             url = 'http://pub.mate-desktop.org/releases/{}'.format(pkg_obj.mon_match_pattern)
-            self.mate = CheckSumsMonitor(url, self.mate_last_etag, status)
+            self.mate = CheckSumsMonitor(url, self.mate_last_etag, status=status)
+            self.mate_last_etag = self.mate.etag
 
         return self.mate.package_source_changed(pkg_obj)
 

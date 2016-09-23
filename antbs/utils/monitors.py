@@ -89,12 +89,13 @@ class WebMonitor(PackageSourceMonitor):
         PackageSourceMonitor.__doc__()
     """
 
-    def __init__(self, url, etag, status):
+    def __init__(self, url, last_etag, status):
         super().__init__(status)
 
         self.url = url
         self.remote_resource = {}
-        self.changed = self._get_etag() != etag
+        self.etag = self._get_etag()
+        self.changed = self.etag != last_etag
 
         if self.changed:
             self.download_and_process_remote_resource()
@@ -193,6 +194,9 @@ class CheckSumsMonitor(WebMonitor):
         return '' if not info else info['version']
 
     def package_source_changed(self, pkg_obj, result=None):
+        if not self.changed:
+            return False
+
         change_id = self.get_file_version_by_name(pkg_obj.pkgname)
         return super().package_source_changed(pkg_obj, change_id)
 
@@ -205,8 +209,11 @@ class GithubMonitor(PackageSourceMonitor):
         self.gh = login(token=token)
         self.project_name = project
         self.repo_name = repo
+        self.last_etag = None
+        self.etag = None
         self.repo = None
         self.latest = None
+        self.changed = False
 
         if project and repo:
             self.set_repo(project=project, repo=repo)
@@ -216,7 +223,7 @@ class GithubMonitor(PackageSourceMonitor):
             self._repo_not_set_error()
 
         git_item = getattr(self.repo, what_to_get)
-        res = git_item()
+        res = git_item(etag=self.last_etag)
         items_checked = 0
 
         def _get_next_item():
@@ -271,12 +278,16 @@ class GithubMonitor(PackageSourceMonitor):
         self.latest = change_id or self._get_latest(change_type, pkg_obj.mon_match_pattern)
         return super().package_source_changed(pkg_obj, self.latest)
 
-    def set_repo(self, project=None, repo=None):
-        _project = project or self.project_name
-        _repo = repo or self.repo_name
+    def set_repo(self, project=None, repo=None, last_etag=None):
+        self.project_name = project if project is not None else self.project_name
+        self.repo_name = repo if repo is not None else self.repo_name
+        self.last_etag = last_etag if last_etag is not None else self.last_etag
 
-        if not (_project and _repo):
+        if not (self.project_name and self.repo_name):
             raise ValueError('Both project and repo are required in order to set repo!')
 
-        self.repo = self.gh.repository(_project, _repo)
+        self.repo = self.gh.repository(self.project_name, self.repo_name, etag=self.last_etag)
+
+        if self.repo.etag != self.last_etag:
+            self.etag = self.repo.etag
 
