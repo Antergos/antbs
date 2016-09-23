@@ -247,9 +247,11 @@ class Package(PackageMeta):
             logger.error(err.output)
 
     def determine_github_path(self):
-        paths = ['cinnamon/{0}'.format(self.pkgname),
-                 'mate/{0}'.format(self.pkgname),
-                 self.pkgname]
+        paths = [
+            os.path.join('antergos', 'cinnamon', self.pkgname),
+            os.path.join('antergos', 'mate', self.pkgname),
+            os.path.join('antergos', self.pkgname)
+        ]
         gh_path = ''
 
         for path in paths:
@@ -289,11 +291,16 @@ class Package(PackageMeta):
             logger.debug('not self.gh_path!')
             self.determine_github_path()
 
-        if 'PKGBUILD' not in self.gh_path:
+        pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+
+        if not pbfile_contents:
+            self.determine_github_path()
             gh_path = repo.file_contents(self.gh_path)
 
             if isinstance(gh_path, UnprocessableResponseBody):
-                pbpath = '{0}/PKGBUILD'.format(self.gh_path)
+                # Path is a directory
+                pbpath = os.path.join(self.gh_path, 'PKGBUILD')
+
             elif 'symlink' == gh_path.type:
                 pbpath = os.path.join(
                     self.gh_path.rsplit('/', 1)[0],

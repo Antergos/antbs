@@ -230,7 +230,7 @@ class Transaction(TransactionMeta):
         os.chmod(path, 0o777)
         self.result_dir = os.path.join(path, 'result')
         self.upd_repo_result = os.path.join(path, 'upd_result')
-        self.path = os.path.join(path, 'antergos-packages')
+        self.path = os.path.join(path, 'antergos', 'antergos-packages')
 
         os.mkdir(self.result_dir, mode=0o777)
         os.mkdir(self.upd_repo_result, mode=0o777)
@@ -241,10 +241,13 @@ class Transaction(TransactionMeta):
             raise RuntimeError(err.output)
 
     def get_build_directory(self, pkg):
-        paths = [os.path.join(self.path, 'mate', pkg),
-                 os.path.join(self.path, 'cinnamon', pkg),
-                 os.path.join(self.path, pkg)]
         pbpath = None
+        paths = [
+            os.path.join(self.path, 'mate', pkg),
+            os.path.join(self.path, 'cinnamon', pkg),
+            os.path.join(self.path, pkg)
+        ]
+
         for p in paths:
             if os.path.exists(p):
                 pbpath = p
