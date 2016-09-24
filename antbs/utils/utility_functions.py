@@ -31,6 +31,8 @@ import os
 import shutil
 import subprocess
 
+from database import status
+
 
 def truncate_middle(s, n):
     if len(s) <= n:
@@ -216,3 +218,31 @@ def recursive_chown(path, uid, gid):
             os.chown(os.path.join(root, item), uid, gid)
         for item in files:
             os.chown(os.path.join(root, item), uid, gid)
+
+
+def set_server_status(first=True, saved_status=False, is_review=False, is_monitor=False):
+    ret = None
+    if first:
+        saved = False
+        do_save = status.transactions_running and 'Idle' not in status.current_status
+        if not status.idle and do_save:
+            saved = status.current_status
+
+        status.idle = False
+
+        if is_review:
+            status.current_status = 'Processing developer review result.'
+        elif is_monitor:
+            status.current_status = 'Checking remote package sources for changes.'
+        else:
+            status.current_status = 'Build hook was triggered. Checking docker images.'
+
+        ret = saved
+
+    elif not saved_status and not status.transactions_running:
+        status.idle = True
+        status.current_status = 'Idle'
+    elif saved_status and status.transactions_running and not status.idle:
+        status.current_status = saved_status
+
+    return ret

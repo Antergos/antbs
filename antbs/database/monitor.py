@@ -52,11 +52,11 @@ from . import (
 from utils import (
     quiet_down_noisy_loggers,
     CheckSumsMonitor,
-    GithubMonitor
+    GithubMonitor,
+    set_server_status
 )
 
 import iso_utility
-from transaction_handler import set_server_status
 
 logger = status.logger
 GITLAB_TOKEN = status.gitlab_token
