@@ -154,7 +154,7 @@ class RedisDataHashField(RedisData):
 
         if self.is_cached(cache_key):
             # Flush previous value from cache
-            del self.cache[cache_key]
+            del self.cache[cache_key][self.field_name]
 
     def _check_expire(self, obj):
         if self._will_expire(obj, self.expire_key) and self._is_expired(obj):
