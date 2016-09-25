@@ -58,6 +58,7 @@ class AntBSConfig:
 
     def _flask(self):
         config = {'DEBUG_TB_PROFILER_ENABLED': True,
+                  'DEBUG': True,
                   'SECRET_KEY': self.status.sp_session_key,
                   'TEMPLATES_AUTO_RELOAD': True}
         self.app.config.update(config)
@@ -91,8 +92,6 @@ class AntBSConfig:
 
     def apply_all(self, app):
         self.app = app
-
-        self.logger.debug(self.configs)
 
         for config in self.configs:
             self.__apply_config(config)

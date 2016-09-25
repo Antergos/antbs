@@ -58,6 +58,7 @@ class PackageSourceMonitor:
         matches = False
         pattern = pattern or '.'
 
+        self.logger.debug(latest)
         if not latest:
             return matches
 
@@ -93,6 +94,7 @@ class WebMonitor(PackageSourceMonitor):
         super().__init__(status)
 
         self.url = url
+        self.files = {}
         self.remote_resource = {}
         self.etag = self._get_etag()
         self.changed = self.etag != last_etag
@@ -123,13 +125,11 @@ class WebMonitor(PackageSourceMonitor):
 
         if resource:
             self.remote_resource['text'] = resource.text
-            self.remote_resource['etag'] = resource.headers['ETag']
+            self.logger.debug(resource.text)
+            self.remote_resource['etag'] = resource.headers['etag']
             self.remote_resource['lines'] = resource.text.split('\n')
 
         self._process_remote_resource()
-
-    def package_source_changed(self, pkg_obj, result):
-        raise NotImplementedError
 
 
 class CheckSumsMonitor(WebMonitor):
@@ -158,6 +158,8 @@ class CheckSumsMonitor(WebMonitor):
         file = file.replace(extension, '')
         has_pkgrel = '-' == file[-2]
 
+        self.logger.debug([extension, file, has_pkgrel])
+
         if has_pkgrel:
             name, version, pkgrel = file.rsplit('-', 2)
             version = '{}-{}'.format(version, pkgrel)
@@ -168,8 +170,14 @@ class CheckSumsMonitor(WebMonitor):
 
     def _process_remote_resource(self):
         for line in self.remote_resource['lines']:
-            file, checksum = line.split(' ')
-            name, version = self._get_file_extension_with_compression_type(file)
+            line = line.strip()
+
+            if not line:
+                continue
+
+            checksum, file = line.split('  ')
+            self.logger.debug([file, checksum])
+            name, version = self._get_file_name_and_version(file)
 
             self.files[file] = {
                 'name': name,
@@ -218,19 +226,22 @@ class GithubMonitor(PackageSourceMonitor):
         if project and repo:
             self.set_repo(project=project, repo=repo)
 
-    def _get_latest(self, what_to_get, pattern=None):
+    def _get_latest(self, what_to_get, pkg_obj=None):
         if self.repo is None:
             self._repo_not_set_error()
 
         git_item = getattr(self.repo, what_to_get)
-        res = git_item(etag=self.last_etag)
+        res = git_item(etag=pkg_obj.mon_etag)
         items_checked = 0
+        pattern = pkg_obj.mon_match_pattern or '.'
+        self.logger.debug([git_item, res, pattern])
 
         def _get_next_item():
-            _latest = ''
+            _latest = etag = ''
 
             try:
                 item = res.next()
+                etag = item.etag
 
                 if 'commits' == what_to_get:
                     _latest = item.sha
@@ -244,20 +255,21 @@ class GithubMonitor(PackageSourceMonitor):
             except Exception as err:
                 self.logger.exception(err)
 
-            return _latest
+            return _latest, etag
 
-        latest = _get_next_item()
+        latest, etag = _get_next_item()
+        self.logger.debug([latest, etag])
 
         if not latest or (pattern and not self._matches_pattern(pattern, latest)):
             while not latest or (pattern and not self._matches_pattern(pattern, latest)):
-                latest = _get_next_item()
+                latest, etag = _get_next_item()
                 items_checked += 1
 
                 if items_checked > 5:
                     break
 
         self.logger.debug(latest)
-
+        pkg_obj.mon_etag = etag
         return latest
 
     @staticmethod
@@ -275,19 +287,16 @@ class GithubMonitor(PackageSourceMonitor):
 
     def package_source_changed(self, pkg_obj, change_type=None, change_id=None):
         change_type = change_type or pkg_obj.mon_type
-        self.latest = change_id or self._get_latest(change_type, pkg_obj.mon_match_pattern)
+        self.latest = change_id or self._get_latest(change_type, pkg_obj)
         return super().package_source_changed(pkg_obj, self.latest)
 
-    def set_repo(self, project=None, repo=None, last_etag=None):
+    def set_repo(self, project=None, repo=None):
         self.project_name = project if project is not None else self.project_name
         self.repo_name = repo if repo is not None else self.repo_name
-        self.last_etag = last_etag if last_etag is not None else self.last_etag
 
         if not (self.project_name and self.repo_name):
             raise ValueError('Both project and repo are required in order to set repo!')
 
-        self.repo = self.gh.repository(self.project_name, self.repo_name, etag=self.last_etag)
+        self.repo = self.gh.repository(self.project_name, self.repo_name)
 
-        if self.repo.etag != self.last_etag:
-            self.etag = self.repo.etag
 

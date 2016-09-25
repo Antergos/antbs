@@ -493,14 +493,13 @@ class Package(PackageMeta):
 
         required_items = [service, mon_type, project, repo]
 
-        if len([True for item in required_items if item]) == 4:
-            self.is_monitored = True
-            self.mon_service = service
-            self.mon_type = mon_type
-            self.mon_project = project
-            self.mon_repo = repo
-            self.mon_match_pattern = pattern
-            self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
+        self.is_monitored = True
+        self.mon_service = service
+        self.mon_type = mon_type
+        self.mon_project = project
+        self.mon_repo = repo
+        self.mon_match_pattern = pattern
+        self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):
         if 'None' in self.version_str and 'None' not in self.pkgver:

@@ -31,8 +31,6 @@ import os
 import shutil
 import subprocess
 
-from database import status
-
 
 def truncate_middle(s, n):
     if len(s) <= n:
@@ -222,6 +220,12 @@ def recursive_chown(path, uid, gid):
 
 def set_server_status(first=True, saved_status=False, is_review=False, is_monitor=False):
     ret = None
+
+    try:
+        _ = status.current_status
+    except Exception:
+        from database import status
+
     if first:
         saved = False
         do_save = status.transactions_running and 'Idle' not in status.current_status

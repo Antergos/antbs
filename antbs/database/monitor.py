@@ -244,10 +244,9 @@ class Monitor(RedisHash):
 
     def check_github_repo_for_changes(self, pkg_obj):
         if self.gh is None:
-            self.gh = GithubMonitor(token=GITHUB_TOKEN)
+            self.gh = GithubMonitor(token=GITHUB_TOKEN, status=status)
 
-        self.gh.set_repo(pkg_obj.mon_project, pkg_obj.mon_repo, pkg_obj.mon_etag)
-        pkg_obj.mon_etag = self.gh.etag
+        self.gh.set_repo(pkg_obj.mon_project, pkg_obj.mon_repo)
 
         return self.gh.package_source_changed(pkg_obj)
 
@@ -272,7 +271,7 @@ class Monitor(RedisHash):
 
     def check_mate_desktop_server_for_changes(self, pkg_obj):
         if self.mate is None:
-            url = 'http://pub.mate-desktop.org/releases/{}'.format(pkg_obj.mon_match_pattern)
+            url = 'http://pub.mate-desktop.org/releases/{}/SHA1SUMS'.format(pkg_obj.mon_match_pattern)
             self.mate = CheckSumsMonitor(url, self.mate_last_etag, status=status)
             self.mate_last_etag = self.mate.etag
 

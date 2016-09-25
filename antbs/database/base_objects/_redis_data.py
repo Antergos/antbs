@@ -38,7 +38,7 @@ logger = logging.getLogger('antbs')
 
 class RedisData:
     """
-       Base class for descriptors that faciliate attribute access to data stored in redis.
+       Base class for descriptors that facilitate attribute access to data stored in redis.
 
        Attributes:
            default_value (mixed): The default value for the bound attribute.
@@ -102,7 +102,7 @@ class RedisData:
 
 class RedisDataHashField(RedisData):
     """
-       Descriptor that faciliates attribute access to data stored in redis hashes.
+       Descriptor that facilitates attribute access to data stored in redis hashes.
 
        Attributes:
            field_name (str): The name of the redis hash field for the bound attribute.
@@ -115,15 +115,27 @@ class RedisDataHashField(RedisData):
         self.field_name = field_name
         self.can_expire = can_expire
         self.expire_key = field_name + '__exp' if can_expire else ''
+        self.cache = {}
 
     def __get__(self, obj, obj_type):
         if self.can_expire:
             self._check_expire(obj)
 
-        val = db.hget(obj.full_key, self.field_name)
-        value = self._decode_value(val, self.default_value, self.value_type)
+        cache_key = obj.full_key.replace(':', '')
 
-        self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
+        if self.is_cached(cache_key):
+            # Only get value from database once per request (http request).
+            value = self.cache[cache_key][self.field_name]
+        else:
+            val = db.hget(obj.full_key, self.field_name)
+            value = self._decode_value(val, self.default_value, self.value_type)
+
+            self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
+
+            if cache_key not in self.cache:
+                self.cache[cache_key] = {}
+
+            self.cache[cache_key][self.field_name] = value
 
         return value
 
@@ -134,10 +146,15 @@ class RedisDataHashField(RedisData):
             self._expire_in(obj, self.expire_key, expire_time)
 
         val = self._encode_value(value, self.default_value)
+        cache_key = obj.full_key.replace(':', '')
 
         self._type_check(val, str, self.__class__.__name__, self.field_name)
 
         db.hset(obj.full_key, self.field_name, val)
+
+        if self.is_cached(cache_key):
+            # Flush previous value from cache
+            del self.cache[cache_key]
 
     def _check_expire(self, obj):
         if self._will_expire(obj, self.expire_key) and self._is_expired(obj):
@@ -156,6 +173,9 @@ class RedisDataHashField(RedisData):
         val = db.hget(key, field)
         return val if val is not None else default_value
 
+    def is_cached(self, cache_key):
+        return cache_key in self.cache and self.field_name in self.cache[cache_key]
+
     def _is_expired(self, obj):
         expire_time = self._hget(obj.full_key, self.expire_key, 0)
         now = int(time.time())
@@ -169,7 +189,7 @@ class RedisDataHashField(RedisData):
 
 class RedisDataRedisObject(RedisData):
     """
-       Descriptor that faciliates attribute access to other redis objects from a redis object.
+       Descriptor that facilitates attribute access to other redis objects from a redis object.
 
        Attributes:
            key (str): The name for the bound attribute (redis key = parent_key:name)

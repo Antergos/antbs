@@ -232,7 +232,8 @@ build_32bit_pkg() {
 			'/usr/bin/bash' \
 			-c "cd /pkg; export IS_32BIT=i686; sudo -u antbs /usr/bin/makepkg -m -f -L ${DEPS} --noconfirm --needed" 2>&1 \
 		&& cp /32build/root/pkg/*-i686.pkg.* /result \
-		&& return 0; } || return 1
+		&& rm -rf /32build/root \
+		&& return 0; } || rm -rf /32build/root; return 1
 }
 
 

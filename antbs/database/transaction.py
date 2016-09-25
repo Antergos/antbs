@@ -230,7 +230,7 @@ class Transaction(TransactionMeta):
         os.chmod(path, 0o777)
         self.result_dir = os.path.join(path, 'result')
         self.upd_repo_result = os.path.join(path, 'upd_result')
-        self.path = os.path.join(path, 'antergos', 'antergos-packages')
+        self.path = os.path.join(path, 'antergos-packages', 'antergos')
 
         os.mkdir(self.result_dir, mode=0o777)
         os.mkdir(self.upd_repo_result, mode=0o777)
