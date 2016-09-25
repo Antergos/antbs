@@ -57,8 +57,7 @@ class AntBSConfig:
         return '__' in item or not item.startswith('_')
 
     def _flask(self):
-        config = {'DEBUG_TB_PROFILER_ENABLED': True,
-                  'DEBUG': True,
+        config = {'DEBUG_TB_PROFILER_ENABLED': False,
                   'SECRET_KEY': self.status.sp_session_key,
                   'TEMPLATES_AUTO_RELOAD': True}
         self.app.config.update(config)

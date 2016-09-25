@@ -73,7 +73,7 @@ def create_app():
     stormpath_manager.init_app(_app)
 
     # Debug Toolbar
-    _app.debug = True
+    # _app.debug = True
     debug_toolbar.init_app(_app)
 
     # RQ Dashboard
