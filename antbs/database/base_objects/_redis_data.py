@@ -115,25 +115,15 @@ class RedisDataHashField(RedisData):
         self.field_name = field_name
         self.can_expire = can_expire
         self.expire_key = field_name + '__exp' if can_expire else ''
-        self.cache = {}
 
     def __get__(self, obj, obj_type):
         if self.can_expire:
             self._check_expire(obj)
 
-        if self.is_cached:
-            # Only get value from database once per request (http request).
-            value = self.cache[obj.full_key][self.field_name]
-        else:
             val = db.hget(obj.full_key, self.field_name)
             value = self._decode_value(val, self.default_value, self.value_type)
 
             self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
-
-            if obj.full_key not in self.cache:
-                self.cache[obj.full_key] = {}
-
-            self.cache[obj.full_key][self.field_name] = value
 
         return value
 
@@ -148,10 +138,6 @@ class RedisDataHashField(RedisData):
         self._type_check(val, str, self.__class__.__name__, self.field_name)
 
         db.hset(obj.full_key, self.field_name, val)
-
-        if self.is_cached:
-            # Flush previous value from cache
-            self.cache[obj.full_key].de
 
     def _check_expire(self, obj):
         if self._will_expire(obj, self.expire_key) and self._is_expired(obj):
@@ -169,9 +155,6 @@ class RedisDataHashField(RedisData):
     def _hget(key, field, default_value):
         val = db.hget(key, field)
         return val if val is not None else default_value
-
-    def is_cached(self, obj):
-        return obj.full_key in self.cache and self.field_name in self.cache[obj.full_key]
 
     def _is_expired(self, obj):
         expire_time = self._hget(obj.full_key, self.expire_key, 0)
