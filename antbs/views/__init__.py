@@ -221,7 +221,7 @@ def get_build_history_chart_data(pkg_obj=None):
     for key in chart_data:
         timestamps.append(chart_data[key])
 
-    return chart_data, json.dumps(timestamps)
+    return json.dumps(timestamps)
 
 
 def build_failed(bnum):

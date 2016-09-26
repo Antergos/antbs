@@ -110,7 +110,7 @@ class WebMonitor(PackageSourceMonitor):
         except Exception as err:
             self.logger.exception(err)
 
-        return req or req.headers['ETag']
+        return req.headers['ETag']
 
     def _process_remote_resource(self):
         raise NotImplementedError

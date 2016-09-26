@@ -121,21 +121,19 @@ class RedisDataHashField(RedisData):
         if self.can_expire:
             self._check_expire(obj)
 
-        cache_key = obj.full_key.replace(':', '')
-
-        if self.is_cached(cache_key):
+        if self.is_cached:
             # Only get value from database once per request (http request).
-            value = self.cache[cache_key][self.field_name]
+            value = self.cache[obj.full_key][self.field_name]
         else:
             val = db.hget(obj.full_key, self.field_name)
             value = self._decode_value(val, self.default_value, self.value_type)
 
             self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
 
-            if cache_key not in self.cache:
-                self.cache[cache_key] = {}
+            if obj.full_key not in self.cache:
+                self.cache[obj.full_key] = {}
 
-            self.cache[cache_key][self.field_name] = value
+            self.cache[obj.full_key][self.field_name] = value
 
         return value
 
@@ -146,15 +144,14 @@ class RedisDataHashField(RedisData):
             self._expire_in(obj, self.expire_key, expire_time)
 
         val = self._encode_value(value, self.default_value)
-        cache_key = obj.full_key.replace(':', '')
 
         self._type_check(val, str, self.__class__.__name__, self.field_name)
 
         db.hset(obj.full_key, self.field_name, val)
 
-        if self.is_cached(cache_key):
+        if self.is_cached:
             # Flush previous value from cache
-            del self.cache[cache_key][self.field_name]
+            self.cache[obj.full_key].de
 
     def _check_expire(self, obj):
         if self._will_expire(obj, self.expire_key) and self._is_expired(obj):
@@ -173,8 +170,8 @@ class RedisDataHashField(RedisData):
         val = db.hget(key, field)
         return val if val is not None else default_value
 
-    def is_cached(self, cache_key):
-        return cache_key in self.cache and self.field_name in self.cache[cache_key]
+    def is_cached(self, obj):
+        return obj.full_key in self.cache and self.field_name in self.cache[obj.full_key]
 
     def _is_expired(self, obj):
         expire_time = self._hget(obj.full_key, self.expire_key, 0)

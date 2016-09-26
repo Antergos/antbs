@@ -62,9 +62,10 @@ class HomeView(FlaskView):
             status.repos_syncing = True
             do_sync = True
 
-        repo_queue.enqueue_call(
-            check_repos_for_changes, args=(do_check, do_sync, Webhook), timeout=9600
-        )
+        if do_check or do_sync:
+            repo_queue.enqueue_call(
+                check_repos_for_changes, args=(do_check, do_sync, Webhook), timeout=9600
+            )
 
     @route('/timeline/<int:tlpage>')
     @route('/')
@@ -78,7 +79,7 @@ class HomeView(FlaskView):
         if tlpage > all_pages:
             abort(404)
 
-        build_history, timestamps = get_build_history_chart_data()
+        timestamps = get_build_history_chart_data()
         stats = {
             'build_queue': len(get_build_queue(status, get_trans_object)),
             'repo_main': self._get_number_of_packages_in_repo('antergos'),
@@ -107,7 +108,6 @@ class HomeView(FlaskView):
             stats[stat] = len(within)
 
         return try_render_template(
-            'home.html', stats=stats, tl_events=tl_events, all_pages=all_pages, page=tlpage,
-            build_history=build_history, timestamps=timestamps
+            'home.html', stats=stats, tl_events=tl_events, all_pages=all_pages, page=tlpage, timestamps=timestamps
         )
 
