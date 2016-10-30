@@ -35,7 +35,7 @@ class HomeView(FlaskView):
     def _get_timeline(self, tlpage=1):
         timeline = []
 
-        for event_id in status.all_tl_events[-250:]:
+        for event_id in status.all_tl_events[-250:-1]:
             event = get_timeline_object(event_id=event_id)
             timeline.append(event)
 
@@ -88,7 +88,7 @@ class HomeView(FlaskView):
         for stat in check_stats:
             builds = getattr(status, stat)
             res = len(builds) or '0'
-            builds = [x for x in builds[1500:] if x]
+            builds = [x for x in builds[1500:-1] if x]
             within = []
             for bnum in builds:
                 try:

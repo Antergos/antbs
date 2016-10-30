@@ -120,10 +120,10 @@ class RedisDataHashField(RedisData):
         if self.can_expire:
             self._check_expire(obj)
 
-            val = db.hget(obj.full_key, self.field_name)
-            value = self._decode_value(val, self.default_value, self.value_type)
+        val = db.hget(obj.full_key, self.field_name)
+        value = self._decode_value(val, self.default_value, self.value_type)
 
-            self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
+        self._type_check(value, self.value_type, self.__class__.__name__, self.field_name)
 
         return value
 

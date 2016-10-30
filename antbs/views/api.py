@@ -173,7 +173,7 @@ class APIView(FlaskView):
             pkgnames = []
 
             for name in names:
-                if name not in status.all_packages and name in status.groups:
+                if name not in status.all_packages and name in status.package_groups:
                     pkgnames.extend(get_group_packages(names))
                 else:
                     pkgnames.extend([name])

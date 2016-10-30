@@ -217,7 +217,7 @@ class Package(PackageMeta):
             zpath = os.path.join(dirpath, self.name + '.zip')
             gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
             gl.auth()
-            nxsq = gl.projects(id='61284')
+            nxsq = gl.projects.get(61284)
             source = nxsq.archive()
             with open(zpath, 'wb') as fd:
                 fd.write(source)
@@ -271,7 +271,7 @@ class Package(PackageMeta):
             logger.error('Could not determine gh_path for %s', self.pkgname)
             return False
         else:
-            self.gh_path = gh_path
+            self.gh_path = os.path.join(gh_path, 'PKGBUILD')
             return True
 
     @staticmethod

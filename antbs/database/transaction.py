@@ -278,6 +278,11 @@ class Transaction(TransactionMeta):
         return bld_obj
 
     def handle_special_cases(self, pkg, pkg_obj):
+        if pkg not in ['cnchi-dev', 'numix-icon-theme-square' 'cnchi']:
+            return
+
+        pkg_obj.prepare_package_source(self.get_build_directory(pkg))
+
         if 'cnchi' in pkg:
             logger.info('cnchi package detected.')
             status.current_status = 'Fetching latest translations for %s from Transifex.' % pkg
@@ -287,11 +292,6 @@ class Transaction(TransactionMeta):
             self.fetch_and_compile_translations(translations_for=["cnchi"], pkg_obj=pkg_obj)
             #remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             #subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
-
-        elif 'numix-icon-theme-square' == pkg:
-            src = os.path.join('/var/tmp/antergos-packages/', pkg, pkg + '.zip')
-            dest = os.path.join(self.path, pkg)
-            shutil.move(src, dest)
 
     def move_files_to_staging_repo(self, bld_obj):
         file_count = len(bld_obj.generated_files)
@@ -351,7 +351,7 @@ class Transaction(TransactionMeta):
             pkg_obj = get_pkg_object(name=pkg)
             version = pkg_obj.get_version_str()
 
-            if not version:
+            if not version and not pkg_obj.is_monitored:
                 self.packages.remove(pkg)
                 logger.debug('Skipping cnchi-dev build: {0}'.format(pkg))
                 continue
@@ -403,19 +403,19 @@ class Transaction(TransactionMeta):
 
         trans = {
             "cnchi": {
-                'trans_dir': "/opt/cnchi-translations/",
-                'trans_files_dir': '/opt/cnchi-translations/translations/antergos.cnchi',
+                'trans_dir': status.CNCHI_TRANSLATIONS_DIR,
+                'trans_files_dir': os.path.join(status.CNCHI_TRANSLATIONS_DIR, '/translations/antergos.cnchi'),
                 'dest_dir': dest_dir
             },
             "cnchi_updater": {
-                'trans_dir': "/opt/antergos-iso-translations/",
-                'trans_files_dir': "/opt/antergos-iso-translations/translations/antergos.cnchi_updaterpot",
-                'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/cnchi_updater'
+                'trans_dir': status.ISO_TRANSLATIONS_DIR,
+                'trans_files_dir': os.path.join(status.ISO_TRANSLATIONS_DIR, '/translations/antergos.cnchi_updaterpot'),
+                'dest_dir': os.path.join(status.ISO_TRANSLATIONS_DESTDIR, '/cnchi_updater')
             },
             "antergos-gfxboot": {
-                'trans_dir': "/opt/antergos-iso-translations/",
-                'trans_files_dir': '/opt/antergos-iso-translations/translations/antergos.antergos-gfxboot',
-                'dest_dir': '/srv/antergos.info/repo/iso/testing/trans/antergos-gfxboot'
+                'trans_dir': status.ISO_TRANSLATIONS_DIR,
+                'trans_files_dir': os.path.join(status.ISO_TRANSLATIONS_DIR, '/translations/antergos.antergos-gfxboot'),
+                'dest_dir': os.path.join(status.ISO_TRANSLATIONS_DESTDIR, '/antergos-gfxboot')
             }
         }
 

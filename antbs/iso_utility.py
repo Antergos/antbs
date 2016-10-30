@@ -56,21 +56,23 @@ API_KEY = db.get(status.ANTERGOS_API_DB_KEY_NAME)
 
 
 class ISOUtility:
-
     def __init__(self, pkg_obj):
         self.version = pkg_obj.pkgver
         self.pkgname = pkg_obj.pkgname
-        self.file_name = (pkg_obj.pkgname.rsplit('-', 1)[-2] + '-' + self.version + '-' +
-                          pkg_obj.pkgname.rsplit('-', 1)[-1] + '.iso')
+        self.file_name = self.get_file_name(pkg_obj)
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
         self.md5sums_path = os.path.join(TESTING_DIR, 'MD5SUMS')
-        self.mirror_url = 'http://mirrors.antergos.com/iso/release/' + self.file_name
-        self.files = [self.file_path, self.file_path + '.sig', self.file_path + '.torrent']
+        self.mirror_url = 'http://mirrors.antergos.com/iso/release/{0}'.format(self.file_name)
+        self.files = [
+            self.file_path,
+            '{0}.sig'.format(self.file_path),
+            '{0}.torrent'.format(self.file_path)
+        ]
         self.md5 = None
         self.webseeds = self.get_webseeds()
-        logger.debug(self.webseeds)
 
-    def get_webseeds(self):
+    @staticmethod
+    def get_webseeds():
         webseeds = []
 
         with open(os.path.join(SCRIPTS_DIR, 'webseeds.list'), 'r') as seeds_list:
@@ -80,13 +82,13 @@ class ISOUtility:
         return webseeds
 
     @staticmethod
-    def get_version():
-        iso = [x for x in os.listdir(TESTING_DIR) if x.endswith('.iso')]
-        match = re.match('\d{4}(\.\d{1,2}){2}', iso[0])
-        if match:
-            logger.info(match)
-            return match.group(0)
-        raise ValueError
+    def get_file_name(pkgobj):
+        if 'minimal' in pkgobj.pkgname:
+            file_name = 'antergos-minimal-{0}-x86_64.iso'.format(pkgobj.pkgver)
+        else:
+            file_name = 'antergos-{0}-x86_64.iso'.format(pkgobj.pkgver)
+
+        return file_name
 
     def prep_release(self):
         tpl = 'ISO Release: Step 1/3 - Generating checksum for {}'
@@ -211,11 +213,12 @@ def clean_up_after_release(version):
     all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
 
-    if len(all_files) <= 5:
+    if len(all_files) <= 7:
         return
+
     for f in all_files:
         files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
-        if version not in f and len(files) > 5:
+        if version not in f and len(files) > 7:
             shutil.move(f, status.OLD_ISO_IMAGES_DIR)
             moved.append(os.path.basename(f))
 
@@ -231,9 +234,8 @@ def iso_release_job():
     saved_status = False
     if not status.idle and 'Idle' not in status.current_status:
         saved_status = status.current_status
-    else:
-        status.idle = False
 
+    status.idle = False
     status.current_status = 'Starting ISO Release Job...'
     iso_names = ['antergos-x86_64', 'antergos-minimal-x86_64']
     version = iso_obj = None
