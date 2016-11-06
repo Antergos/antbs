@@ -339,8 +339,8 @@ class Build(RedisHash):
         # else:
         build_env.append('_ALEXPKG=False')
 
-        hconfig = doc_util.get_host_config('packages', self.build_dir, self.result_dir, self.cache,
-                                           self.cache_i686, self._32build, self._32bit)
+        hconfig = doc_util.get_host_config('packages', self.build_dir, self.result_dir, None,
+                                           None, self._32build, self._32bit)
         container = {}
         try:
             container = doc.create_container(
