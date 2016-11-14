@@ -213,15 +213,6 @@ class Package(PackageMeta):
             logger.error('dirpath cannot be None')
             raise ValueError
 
-        if 'numix-icon-theme-square' == self.name:
-            zpath = os.path.join(dirpath, self.name + '.zip')
-            gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
-            gl.auth()
-            nxsq = gl.projects.get(61284)
-            source = nxsq.archive()
-            with open(zpath, 'wb') as fd:
-                fd.write(source)
-            return
         if 'cnchi-dev' == self.name:
             zpath = os.path.join(dirpath, self.name + '.zip')
             gh = login(token=status.github_token)

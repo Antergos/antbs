@@ -278,7 +278,7 @@ class Transaction(TransactionMeta):
         return bld_obj
 
     def handle_special_cases(self, pkg, pkg_obj):
-        if pkg not in ['cnchi-dev', 'numix-icon-theme-square', 'cnchi']:
+        if pkg not in ['cnchi-dev', 'cnchi']:
             return
 
         pkg_obj.prepare_package_source(self.get_build_directory(pkg))
