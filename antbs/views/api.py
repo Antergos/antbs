@@ -28,6 +28,8 @@
 
 from . import *
 
+EMPTY_RESPONSE = json.dumps({})
+
 
 class APIView(FlaskView):
     route_base = '/api'
@@ -164,7 +166,7 @@ class APIView(FlaskView):
             names = []
 
             if not pkgnames:
-                abort(500)
+                return EMPTY_RESPONSE, 500
             elif ',' in pkgnames:
                 names = pkgnames.split(',')
             else:
@@ -207,7 +209,7 @@ class APIView(FlaskView):
     @groups_required(['admin'])
     def ajax(self):
         if not current_user.is_authenticated:
-            abort(403)
+            return EMPTY_RESPONSE, 403
 
         iso_release = bool(request.args.get('do_iso_release', False))
         reset_queue = bool(request.args.get('reset_build_queue', False))
@@ -260,7 +262,7 @@ class APIView(FlaskView):
     @route("/get_log/<int:bnum>")
     def get_log(self, bnum=None):
         if status.idle or not status.now_building:
-            abort(204)
+            return EMPTY_RESPONSE, 204
 
         if not bnum:
             bnum = status.now_building[0]
