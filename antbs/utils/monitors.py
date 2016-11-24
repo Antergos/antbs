@@ -234,7 +234,7 @@ class GithubMonitor(PackageSourceMonitor):
         res = git_item(etag=pkg_obj.mon_etag)
         items_checked = 0
         pattern = pkg_obj.mon_match_pattern or '.'
-        self.logger.debug([git_item, res, pattern])
+        # self.logger.debug([git_item, res, pattern])
 
         def _get_next_item():
             _latest = etag = ''
@@ -265,7 +265,7 @@ class GithubMonitor(PackageSourceMonitor):
                 latest, etag = _get_next_item()
                 items_checked += 1
 
-                if items_checked > 5:
+                if items_checked > 50:
                     break
 
         self.logger.debug(latest)
