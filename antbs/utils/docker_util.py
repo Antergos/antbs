@@ -347,9 +347,8 @@ class DockerUtils(metaclass=Singleton):
         except Exception as err:
             self._logger.exception('Pushing to docker hub failed with error: %s', err)
 
-    def get_pkgbuild_generates(self, pkgname, hconfig, build_env, result_dir):
-        result_dirname = result_dir.split('/')[-2:-1]
-        name = '{0}-PBUILD_GENERATES-{1}'.format(pkgname, os.path.basename(result_dirname))
+    def get_pkgbuild_generates(self, pkgname, build_env='', result_dir='/tmp'):
+        name = '{0}-PKGBUILD_GENERATES'.format(pkgname)
 
         try:
             container = self.doc.create_container(
@@ -361,7 +360,7 @@ class DockerUtils(metaclass=Singleton):
                 environment=build_env,
                 cpuset='0-3',
                 name=name,
-                host_config=hconfig
+                host_config=self.create_unprivileged_host_config('', '')
             )
 
             if container.get('Warnings', False):

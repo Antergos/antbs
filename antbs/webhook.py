@@ -305,8 +305,7 @@ class Webhook(WebhookMeta):
 
         elif self.pusher != "antbs":
             for commit in self.commits:
-                self.changes.append(commit['modified'])
-                self.changes.append(commit['added'])
+                self.changes.extend([commit['modified'], commit['added']])
 
     def process_changes(self):
         tpl = 'Webhook triggered by <strong>{0}.</strong> Packages added to the build queue: {1}'
@@ -317,21 +316,23 @@ class Webhook(WebhookMeta):
             no_dups = []
 
             for changed in self.changes:
-                if len(changed) > 0:
-                    for item in changed:
-                        if item and (self.is_gitlab or self.is_numix or self.is_cnchi):
-                            pak = item
-                        elif item and "PKGBUILD" in item:
-                            pak, pkb = item.rsplit('/', 1)
-                            pak = pak.rsplit('/', 1)[-1]
-                        else:
-                            pak = None
+                if not changed:
+                    continue
 
-                        if pak and 'antergos-iso' != pak:
-                            logger.info('Adding %s to the build queue.' % pak)
-                            no_dups.append(pak)
-                            status.all_packages.add(pak)
-                            has_pkgs = True
+                for item in changed:
+                    if item and (self.is_gitlab or self.is_numix or self.is_cnchi):
+                        pak = item
+                    elif item and item.endswith('PKGBUILD'):
+                        pak, pkb = item.rsplit('/', 1)
+                        pak = pak.rsplit('/', 1)[-1]
+                    else:
+                        pak = None
+
+                    if pak and 'antergos-iso' != pak:
+                        logger.info('Adding %s to the build queue.' % pak)
+                        no_dups.append(pak)
+                        status.all_packages.add(pak)
+                        has_pkgs = True
 
             if has_pkgs:
                 if self.is_monitor or self.is_numix:

@@ -373,8 +373,9 @@ class Package(PackageMeta):
         changed = {'epoch': False, 'pkgrel': False, 'pkgver': False}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
         version_from_tag = self.is_monitored and self.mon_type in ['releases', 'tags']
+        version_from_commit = self.is_monitored and 'commits' == self.mon_type
 
-        if not version_from_tag:
+        if not version_from_tag and not version_from_commit:
             for key in changed:
                 new_val = self.get_from_pkgbuild(key)
 
@@ -384,7 +385,10 @@ class Package(PackageMeta):
                 elif new_val and (new_val != old_vals[key] or new_val not in self.version_str):
                     changed[key] = new_val
 
-        else:
+        elif version_from_tag:
+            if not self.mon_last_result:
+                self.mon_last_result = ''
+
             if self.auto_sum and self.mon_last_result.replace('|', '.') != old_vals['pkgver']:
                 _pkgver, _buildver = self.mon_last_result.split('|')
                 changed['_pkgver'] = _pkgver

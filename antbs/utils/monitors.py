@@ -268,7 +268,7 @@ class GithubMonitor(PackageSourceMonitor):
                 if items_checked > 50:
                     break
 
-        self.logger.debug(latest)
+        # self.logger.debug(latest)
         pkg_obj.mon_etag = etag
         return latest
 

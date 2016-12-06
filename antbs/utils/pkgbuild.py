@@ -157,6 +157,9 @@ class Pkgbuild:
     def maybe_fix_pkgver(self):
         if 'pkgver' not in self.values:
             self.get_value('pkgver')
+        if 'pkgver' not in self.values:
+            self.get_value('_pkgver')
+            self.values['pkgver'] = self.values['_pkgver']
         if '$' not in self.values['pkgver']:
             return
 
@@ -179,7 +182,7 @@ class Pkgbuild:
 
     def get_line_with_current_key(self, get_next_line=False):
         for line in self.contents.splitlines():
-            if get_next_line or line.startswith(self.current_key):
+            if get_next_line or (line.startswith(self.current_key) and '=' in line):
                 get_next_line = yield line.strip()
         else:
             yield ' = '
