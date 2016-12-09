@@ -74,7 +74,7 @@ class PackageSourceMonitor:
 
     def package_source_changed(self, pkg_obj, result):
         last_result = pkg_obj.mon_last_result
-        return self._not_empty(result) and last_result and result != last_result
+        return self._not_empty(result) and result != last_result
 
 
 class WebMonitor(PackageSourceMonitor):

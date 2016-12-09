@@ -39,7 +39,7 @@ from . import (
 )
 
 logger = status.logger
-REPO_DIR = "/var/tmp/antergos-packages"
+REPO_DIR = status.PKGBUILDS_DIR
 GITLAB_TOKEN = status.gitlab_token
 GH_REPO_BASE_URL = 'http://github.com/Antergos/antergos-packages/blob/master/'
 
@@ -101,7 +101,6 @@ class Package(PackageMeta):
         version_str       (str):  The full version suituble for display on the frontend.
 
     """
-
     def __init__(self, name, fetch_pkgbuild=False):
         super().__init__(key=name)
 

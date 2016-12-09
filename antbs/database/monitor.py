@@ -29,8 +29,8 @@
 
 """
 Repo Monitor Module:
-    Monitors commit activity on 3rd-party repos and schedules builds
-    when new commits are detected.
+    Monitors activity on 3rd-party repos and schedules builds
+    when new commits|tags|releases are detected.
 """
 
 from datetime import datetime
@@ -142,7 +142,6 @@ class Monitor(RedisHash):
         in_repo = version_in_repo is not None and version_in_repo == latest
         in_staging = version_in_staging is not None and version_in_staging == latest
 
-        logger.debug([pkgname, in_repo, in_staging])
         return in_repo or in_staging
 
     # def process_custom_xml_elements(self, elements, pkg_obj):
