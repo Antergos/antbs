@@ -52,5 +52,6 @@ from .columns_info import ColumnsInfo
 
 from .monitors import (
     CheckSumsMonitor,
-    GithubMonitor
+    GithubMonitor,
+    RemoteFileMonitor
 )

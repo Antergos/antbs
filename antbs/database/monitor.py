@@ -53,6 +53,7 @@ from utils import (
     quiet_down_noisy_loggers,
     CheckSumsMonitor,
     GithubMonitor,
+    RemoteFileMonitor,
     set_server_status
 )
 
@@ -87,7 +88,7 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-        self.repo_obj = self.staging_repo_obj = self.gh = self.mate = None
+        self.repo_obj = self.staging_repo_obj = self.gh = self.mate = self.remote_file = None
 
     @staticmethod
     def _get_repo_objects(sync_repos):
@@ -299,6 +300,12 @@ class Monitor(RedisHash):
 
         return self.mate.package_source_changed(pkg_obj)
 
+    def check_remote_http_resource_for_changes(self, pkg_obj, ):
+        if self.remote_file is None:
+            self.remote_file = RemoteFileMonitor(pkg_obj, status)
+
+        return self.remote_file.package_source_changed(pkg_obj)
+
     def check_mirror_for_iso(self, version):
         synced = []
         for iso_pkg in status.iso_pkgs:
@@ -356,8 +363,8 @@ class Monitor(RedisHash):
                 changed = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
                 monitor_obj = ''
 
-            elif 'custom_xml' == pkg_obj.mon_service:
-                changed = self.check_custom_xml_for_changes(pkg_obj, build_pkgs)
+            elif 'http' == pkg_obj.mon_service:
+                changed = self.check_remote_http_resource_for_changes(pkg_obj)
                 monitor_obj = ''
 
             elif 'mate-desktop' == pkg_obj.mon_service:

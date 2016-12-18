@@ -74,6 +74,7 @@ class Package(PackageMeta):
         iso_url           (str):  If `Package.is_iso` this is the iso image's download URL.
         makedepends       (set):  See `man PKGBUILD`.
         mon_etag          (str):  The HTTP ETag for the monitored resource.
+        mon_file_url      (str):  The url of the file to monitor with `RemoteFileMonitor`.
         mon_last_checked  (str):  Time of the last check for new release by `RepoMonitor`.
         mon_last_result   (str):  Result of the last check for new release by `RepoMonitor`.
         mon_match_pattern (str):  Release results must match this pattern (substring or /regex/).
@@ -81,6 +82,8 @@ class Package(PackageMeta):
         mon_repo          (str):  The name of the github source repo being monitored.
         mon_service       (str):  The name of the service being monitored (currently only github).
         mon_type          (str):  The type of release result to get (releases, tags, or commits).
+        mon_version_url   (str):  The url to get version from with `RemoteFileMonitor`.
+        mon_version_pattern (str): The regex pattern for the version with `RemoteFileMonitor`.
         name              (str):  See `Package.pkgname`.
         pbpath            (str):  :deprecated:
         pkg_id            (int):  ID assigned to the package when it is added to the database.
@@ -371,7 +374,7 @@ class Package(PackageMeta):
         # TODO: This is still garbage. Rewrite and simplify!
         changed = {'epoch': False, 'pkgrel': False, 'pkgver': False}
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
-        version_from_tag = self.is_monitored and self.mon_type in ['releases', 'tags']
+        version_from_tag = self.is_monitored and self.mon_type in ['releases', 'tags', 'file']
         version_from_commit = self.is_monitored and 'commits' == self.mon_type
 
         if not version_from_tag and not version_from_commit:
@@ -401,9 +404,30 @@ class Package(PackageMeta):
                     {'pkgver': (old_vals['pkgver'], changed['pkgver'])}
                 )
                 changed['pkgrel'] = '1'
-            elif self.mon_last_result != old_vals['pkgver']:
+            elif self.mon_last_result and self.mon_last_result != old_vals['pkgver']:
                 changed['pkgver'] = self.mon_last_result
                 changed['pkgrel'] = '1'
+
+        elif version_from_commit:
+            with open('/tmp/PKGBUILD', 'w') as pkgbuild:
+                pkgbuild.write(self.pkgbuild)
+
+            cmd = status.makepkg_pkglist_cmd.split(' ')
+            pkgver = ''
+
+            try:
+                pkglist = subprocess.check_output(cmd, cwd='/tmp', universal_newlines=True)
+                pkg = pkglist.readlines()[0]
+                name, pkgver, pkgrel, arch = pkg.split('-')
+            except Exception as err:
+                logger.exception(err)
+                return self.version_str
+
+            if not pkgver:
+                return self.version_str
+
+            changed['pkgver'] = pkgver
+            changed['pkgrel'] = '1'
 
         changes = [k for k in changed if changed[k] is not False]
         if not changes:
@@ -472,6 +496,7 @@ class Package(PackageMeta):
             attrib.append(new_val)
 
     def sync_repo_monitor_config(self):
+        # TODO: Come up with more robust solution for repo monitor metadata
         is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
 
         if not is_monitored:
@@ -484,8 +509,9 @@ class Package(PackageMeta):
         project = self.get_from_pkgbuild('_monitored_project')
         repo = self.get_from_pkgbuild('_monitored_repo')
         pattern = self.get_from_pkgbuild('_monitored_match_pattern')
-
-        required_items = [service, mon_type, project, repo]
+        file_url = self.get_from_pkgbuild('_monitored_file_url')
+        ver_url = self.get_from_pkgbuild('_monitored_version_url')
+        ver_pattern = self.get_from_pkgbuild('_monitored_version_pattern')
 
         self.is_monitored = True
         self.mon_service = service
@@ -493,6 +519,9 @@ class Package(PackageMeta):
         self.mon_project = project
         self.mon_repo = repo
         self.mon_match_pattern = pattern
+        self.mon_file_url = file_url
+        self.mon_version_url = ver_url
+        self.mon_version_pattern = ver_pattern
         self.db.zadd(status.MONITOR_PKGS_KEY, 1, self.pkgname)
 
     def sync_database_with_pkgbuild(self):

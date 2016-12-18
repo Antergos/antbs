@@ -26,6 +26,7 @@
 # You should have received a copy of the GNU General Public License
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
+import xml.etree.ElementTree as ET
 import re
 
 import requests
@@ -82,14 +83,13 @@ class WebMonitor(PackageSourceMonitor):
     Base class for monitors which watch a remote HTTP resource for changes.
 
     Attributes:
-        changed          (bool)            Whether or not the current etag equals the one provided.
-        url              (str)             The url for the monitored web resource.
-        remote_resource  (dict)            Remote resource content and metadata.
+        changed         (bool) Whether or not the current etag equals the one provided.
+        url             (str)  The url for the monitored web resource.
+        remote_resource (dict) Remote resource content and metadata.
 
     See Also:
         PackageSourceMonitor.__doc__()
     """
-
     def __init__(self, url, last_etag, status):
         super().__init__(status)
 
@@ -103,12 +103,12 @@ class WebMonitor(PackageSourceMonitor):
             self.download_and_process_remote_resource()
 
     def _get_etag(self):
-        req = None
-
         try:
             req = requests.head(self.url)
+            req.raise_for_status()
         except Exception as err:
             self.logger.exception(err)
+            return ''
 
         return req.headers['ETag']
 
@@ -116,17 +116,17 @@ class WebMonitor(PackageSourceMonitor):
         raise NotImplementedError
 
     def download_and_process_remote_resource(self):
-        resource = None
-
         try:
             resource = requests.get(self.url)
+            resource.raise_for_status()
         except Exception as err:
             self.logger.exception(err)
+            return
 
         if resource:
             self.remote_resource['text'] = resource.text
             self.logger.debug(resource.text)
-            self.remote_resource['etag'] = resource.headers['etag']
+            self.remote_resource['etag'] = resource.headers['ETag']
             self.remote_resource['lines'] = resource.text.split('\n')
 
         self._process_remote_resource()
@@ -299,4 +299,40 @@ class GithubMonitor(PackageSourceMonitor):
 
         self.repo = self.gh.repository(self.project_name, self.repo_name)
 
+
+class RemoteFileMonitor(WebMonitor):
+
+    def __init__(self, pkg_obj, status):
+        super().__init__(pkg_obj.mon_file_url, pkg_obj.mon_etag, status)
+
+        self.page_url = pkg_obj.mon_version_url
+
+    def _get_version(self, pkg_obj):
+        matches = re.search(pkg_obj.mon_version_pattern, self.remote_resource['text'])
+        return '' if not matches else matches.group(0)
+
+    def _process_remote_resource(self):
+        pass
+
+    def download_and_process_remote_resource(self):
+        try:
+            resource = requests.get(self.page_url)
+            resource.raise_for_status()
+        except Exception as err:
+            self.logger.exception(err)
+            return
+
+        if resource:
+            self.remote_resource['text'] = resource.text
+            self.logger.debug(resource.text)
+            self.remote_resource['lines'] = resource.text.split('\n')
+
+        self._process_remote_resource()
+
+    def package_source_changed(self, pkg_obj, result=None):
+        if not self.changed:
+            return False
+
+        change_id = self._get_version(pkg_obj)
+        return super().package_source_changed(pkg_obj, change_id)
 

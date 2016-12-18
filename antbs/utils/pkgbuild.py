@@ -52,7 +52,8 @@ class Pkgbuild:
             string=['pkgver', 'pkgrel', 'epoch', 'pkgdesc', 'url', 'install', 'changelog',
                     '_pkgver', '_buildver', '_is_monitored', '_monitored_service',
                     '_monitored_type', '_monitored_repo', '_monitored_project',
-                    '_monitored_match_pattern'],
+                    '_monitored_match_pattern', '_monitored_version_pattern',
+                    '_monitored_file_url', '_monitored_version_url'],
 
             list=['pkgname', 'license', 'source', 'groups', 'arch', 'backup', 'depends',
                   'makedepends', 'checkdepends', 'optdepends', 'conflicts', 'provides',
