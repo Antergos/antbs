@@ -258,6 +258,14 @@ class APIView(FlaskView):
 
         return json.dumps(message)
 
+    @route('/get_et_stats')
+    def get_et_stats(self):
+        stats = status.db.hgetall(status.et_count_key) or '{}'
+        stats = [{'date': int(k), 'total_customers': int(v)} for k, v in stats.items()]
+        stats.sort(key=lambda k: k['date'])
+
+        return json.dumps(stats)
+
     @route('/get_log')
     @route("/get_log/<int:bnum>")
     def get_log(self, bnum=None):

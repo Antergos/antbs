@@ -71,13 +71,13 @@ class Monitor(RedisHash):
 
     attrib_lists = dict(
         string=['name', 'mate_last_etag'],
-        bool=['checked_recently', 'check_is_running'],
+        bool=['checked_recently', 'check_is_running', 'et_stats_checked_today'],
         int=[],
         list=[],
         set=['packages'],
         path=[]
     )
-    can_expire = ['checked_recently']
+    can_expire = ['checked_recently', 'et_stats_checked_today']
 
     def __init__(self, name):
         super().__init__(prefix='monitor', key=name)
@@ -199,6 +199,29 @@ class Monitor(RedisHash):
         wh.payload = dict(before=before, after=after)
 
         wh.process_changes()
+
+    def check_et_stats(self):
+        try:
+            response = requests.get(status.ethemes_url)
+            response.raise_for_status()
+        except Exception as err:
+            status.logger.exception(err)
+            return
+
+        if not response.text:
+            status.logger.error('Response text empty!')
+            return
+
+        matches = re.search(r'et_count">(\d{3,})<\/spa', response.text)
+
+        if not matches:
+            status.logger.error('No match found!')
+            return
+
+        today = datetime.now().strftime("%Y%m%d")
+        self.et_stats_checked_today = (True, 86400)
+
+        self.db.hset(status.et_count_key, int(today), int(matches.group(1)))
 
     # def check_custom_xml_for_changes(self, pkg_obj, build_pkgs):
     #     url = pkg_obj.mon_type
@@ -416,6 +439,9 @@ def check_repos_for_changes(check_github, sync_repos, webhook):
 
     status.cleanup_all_packages_list(get_pkg_object)
     monitor_obj.check_repos_for_changes(check_github, sync_repos, webhook)
+
+    if not monitor_obj.et_stats_checked_today:
+        monitor_obj.check_et_stats()
 
     if check_github:
         monitor_obj.check_is_running = False
