@@ -51,8 +51,8 @@ class PackageSourceMonitor:
             self.logger = status.logger
 
     @staticmethod
-    def _not_empty(value):
-        return value not in ['', 'None', None, False]
+    def _empty(value):
+        return value in ['', 'None', None, False]
 
     def _matches_pattern(self, pattern, latest):
         matches = False
@@ -74,7 +74,7 @@ class PackageSourceMonitor:
 
     def package_source_changed(self, pkg_obj, result):
         last_result = pkg_obj.mon_last_result
-        return self._not_empty(result) and result != last_result
+        return self._empty(result) or result != last_result
 
 
 class WebMonitor(PackageSourceMonitor):
