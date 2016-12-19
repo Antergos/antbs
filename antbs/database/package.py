@@ -357,7 +357,7 @@ class Package(PackageMeta):
                 replace_str = 'pkgrel={0}'.format('1')
                 new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
-            elif 'checksum' == key:
+            elif 'checksum' == key and val[0] in new_pb_contents:
                 new_pb_contents = new_pb_contents.replace(val[0], val[1])
 
         if new_pb_contents == pb_contents:
@@ -376,8 +376,9 @@ class Package(PackageMeta):
         old_vals = {'pkgver': self.pkgver, 'pkgrel': self.pkgrel, 'epoch': self.epoch}
         version_from_tag = self.is_monitored and self.mon_type in ['releases', 'tags', 'file']
         version_from_commit = self.is_monitored and 'commits' == self.mon_type
+        is_mate_pkg = self.is_monitored and 'mate-desktop' == self.mon_service
 
-        if not version_from_tag and not version_from_commit:
+        if not version_from_tag and not version_from_commit and not is_mate_pkg:
             for key in changed:
                 new_val = self.get_from_pkgbuild(key)
 
@@ -387,9 +388,9 @@ class Package(PackageMeta):
                 elif new_val and (new_val != old_vals[key] or new_val not in self.version_str):
                     changed[key] = new_val
 
-        elif version_from_tag:
+        elif version_from_tag or is_mate_pkg:
             if not self.mon_last_result:
-                self.mon_last_result = ''
+                self.mon_last_result = self.get_from_pkgbuild('pkgver')
 
             if self.auto_sum and self.mon_last_result.replace('|', '.') != old_vals['pkgver']:
                 _pkgver, _buildver = self.mon_last_result.split('|')
@@ -404,7 +405,7 @@ class Package(PackageMeta):
                     {'pkgver': (old_vals['pkgver'], changed['pkgver'])}
                 )
                 changed['pkgrel'] = '1'
-            elif self.mon_last_result and self.mon_last_result != old_vals['pkgver']:
+            elif self.mon_last_result != old_vals['pkgver']:
                 changed['pkgver'] = self.mon_last_result
                 changed['pkgrel'] = '1'
 
@@ -418,7 +419,7 @@ class Package(PackageMeta):
             if os.path.exists(tmp_dir):
                 shutil.rmtree(tmp_dir)
 
-            shutil.copytree(pkgbuild_dir, '/tmp')
+            shutil.copytree(pkgbuild_dir, tmp_dir)
 
             with open(pkgbuild, 'w') as pkgbuild:
                 pkgbuild.write(self.pkgbuild)

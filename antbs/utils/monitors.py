@@ -60,7 +60,6 @@ class PackageSourceMonitor:
         matches = False
         pattern = pattern or '.'
 
-        self.logger.debug(latest)
         if not latest:
             return matches
 
@@ -70,13 +69,12 @@ class PackageSourceMonitor:
             # Regular Expression
             pattern = pattern[1:-1]
             matches = re.fullmatch(pattern, latest)
-            self.logger.debug('matches is %s', matches)
 
         return matches
 
     def package_source_changed(self, pkg_obj):
         last_result = pkg_obj.mon_last_result
-        return self._empty(self.latest) or self.latest != last_result
+        return not self._empty(self.latest) and self.latest != last_result
 
 
 class WebMonitor(PackageSourceMonitor):
@@ -126,7 +124,6 @@ class WebMonitor(PackageSourceMonitor):
 
         if resource:
             self.remote_resource['text'] = resource.text
-            self.logger.debug(resource.text)
             self.remote_resource['etag'] = resource.headers['ETag']
             self.remote_resource['lines'] = resource.text.split('\n')
 
@@ -143,31 +140,20 @@ class CheckSumsMonitor(WebMonitor):
     See Also:
         WebMonitor.__doc__
     """
-
-    def __init__(self, url, etag, status):
-        super().__init__(url, etag, status)
-
-        self.files = {}
-
     @staticmethod
     def _get_file_extension_with_compression_type(file):
         parts = file.partition('.tar.')
         return '{}{}'.format(parts[1], parts[2])
 
-    def _get_file_name_and_version(self, file):
+    def _get_pkgname_and_pkgver_from_file_name(self, file):
         extension = self._get_file_extension_with_compression_type(file)
         file = file.replace(extension, '')
-        has_pkgrel = '-' == file[-2]
 
-        self.logger.debug([extension, file, has_pkgrel])
+        if '-' == file[-2]:
+            # Hyphens are not allowed in pkgver
+            file[-2] = '_'
 
-        if has_pkgrel:
-            name, version, pkgrel = file.rsplit('-', 2)
-            version = '{}-{}'.format(version, pkgrel)
-        else:
-            name, version = file.rsplit('-', 1)
-
-        return name, version
+        return file.rsplit('-', 1)
 
     def _process_remote_resource(self):
         for line in self.remote_resource['lines']:
@@ -177,36 +163,21 @@ class CheckSumsMonitor(WebMonitor):
                 continue
 
             checksum, file = line.split('  ')
-            self.logger.debug([file, checksum])
-            name, version = self._get_file_name_and_version(file)
+            name, version = self._get_pkgname_and_pkgver_from_file_name(file)
 
-            self.files[file] = {
-                'name': name,
+            self.files[name] = {
                 'version': version,
                 'checksum': checksum
             }
 
-    def get_file_info_by_name(self, name):
-        if name not in self.files:
-            return {}
-
-        match = [
-            self.files[file]
-            for file in self.files
-            if name == self.files[file]['name']
-        ]
-
-        return {} if not match else match[0]
-
-    def get_file_version_by_name(self, name):
-        info = self.get_file_info_by_name(name)
-        return '' if not info else info['version']
+    def get_latest_version_for_package(self, pkg_obj):
+        return '' if pkg_obj.pkgname not in self.files else self.files[pkg_obj.pkgname]['version']
 
     def package_source_changed(self, pkg_obj, result=None):
         if not self.changed:
             return False
 
-        self.latest = self.get_file_version_by_name(pkg_obj.pkgname)
+        self.latest = self.get_latest_version_for_package(pkg_obj)
         return super().package_source_changed(pkg_obj)
 
 
@@ -258,7 +229,6 @@ class GithubMonitor(PackageSourceMonitor):
             return _latest, etag
 
         latest, etag = _get_next_item()
-        self.logger.debug([latest, etag])
 
         if not latest or (pattern and not self._matches_pattern(pattern, latest)):
             while not latest or (pattern and not self._matches_pattern(pattern, latest)):
@@ -325,7 +295,6 @@ class RemoteFileMonitor(WebMonitor):
 
         if resource:
             self.remote_resource['text'] = resource.text
-            self.logger.debug(resource.text)
             self.remote_resource['lines'] = resource.text.split('\n')
 
         self._process_remote_resource()

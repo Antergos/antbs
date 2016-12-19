@@ -381,6 +381,9 @@ class Monitor(RedisHash):
             if changed:
                 build_pkgs = self.process_package_source_change(pkg_obj, monitor_obj, build_pkgs)
 
+            elif not pkg_obj.mon_last_result:
+                pkg_obj.mon_last_result = monitor_obj.latest
+
             gevent.sleep(0.5)
 
         build_pkgs = [p for p in build_pkgs if p]
@@ -412,14 +415,13 @@ class Monitor(RedisHash):
         if do_build:
             build_pkgs.append(pkg_obj.pkgname)
 
-            if pkg_obj.mon_type in ['releases', 'tags']:
-                changes = {'pkgver': (pkg_obj.pkgver, monitor_obj.latest)}
+            changes = {'pkgver': (pkg_obj.pkgver, monitor_obj.latest)}
 
-                if 'mate-desktop' == pkg_obj.mon_type:
-                    info = monitor_obj.get_file_info_by_name(pkg_obj.pkgname)
-                    changes['checksum'] = (pkg_obj.checksum, info['checksum'])
+            if 'mate-desktop' == pkg_obj.mon_service:
+                checksum = monitor_obj.files[pkg_obj.pkgname]['checksum']
+                changes['checksum'] = (pkg_obj.checksum, checksum)
 
-                pkg_obj.update_pkgbuild_and_push_github(changes)
+            pkg_obj.update_pkgbuild_and_push_github(changes)
 
         return build_pkgs
 
