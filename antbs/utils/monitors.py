@@ -50,6 +50,7 @@ class PackageSourceMonitor:
         if self.status is None:
             self.status = status
             self.logger = status.logger
+            self.latest = None
 
     @staticmethod
     def _empty(value):
@@ -73,9 +74,9 @@ class PackageSourceMonitor:
 
         return matches
 
-    def package_source_changed(self, pkg_obj, result):
+    def package_source_changed(self, pkg_obj):
         last_result = pkg_obj.mon_last_result
-        return self._empty(result) or result != last_result
+        return self._empty(self.latest) or self.latest != last_result
 
 
 class WebMonitor(PackageSourceMonitor):
@@ -205,8 +206,8 @@ class CheckSumsMonitor(WebMonitor):
         if not self.changed:
             return False
 
-        change_id = self.get_file_version_by_name(pkg_obj.pkgname)
-        return super().package_source_changed(pkg_obj, change_id)
+        self.latest = self.get_file_version_by_name(pkg_obj.pkgname)
+        return super().package_source_changed(pkg_obj)
 
 
 class GithubMonitor(PackageSourceMonitor):
@@ -220,7 +221,6 @@ class GithubMonitor(PackageSourceMonitor):
         self.last_etag = None
         self.etag = None
         self.repo = None
-        self.latest = None
         self.changed = False
 
         if project and repo:
@@ -288,7 +288,7 @@ class GithubMonitor(PackageSourceMonitor):
     def package_source_changed(self, pkg_obj, change_type=None, change_id=None):
         change_type = change_type or pkg_obj.mon_type
         self.latest = change_id or self._get_latest(change_type, pkg_obj)
-        return super().package_source_changed(pkg_obj, self.latest)
+        return super().package_source_changed(pkg_obj)
 
     def set_repo(self, project=None, repo=None):
         self.project_name = project if project is not None else self.project_name
@@ -303,13 +303,14 @@ class GithubMonitor(PackageSourceMonitor):
 class RemoteFileMonitor(WebMonitor):
 
     def __init__(self, pkg_obj, status):
-        super().__init__(pkg_obj.mon_file_url, pkg_obj.mon_etag, status)
-
         self.page_url = pkg_obj.mon_version_url
 
+        super().__init__(pkg_obj.mon_file_url, pkg_obj.mon_etag, status)
+
     def _get_version(self, pkg_obj):
-        matches = re.search(pkg_obj.mon_version_pattern, self.remote_resource['text'])
-        return '' if not matches else matches.group(0)
+        flags = re.MULTILINE
+        matches = re.search(pkg_obj.mon_version_pattern, self.remote_resource['text'], flags=flags)
+        return '' if not matches else matches.group(1)
 
     def _process_remote_resource(self):
         pass
@@ -333,6 +334,6 @@ class RemoteFileMonitor(WebMonitor):
         if not self.changed:
             return False
 
-        change_id = self._get_version(pkg_obj)
-        return super().package_source_changed(pkg_obj, change_id)
+        self.latest = self._get_version(pkg_obj)
+        return super().package_source_changed(pkg_obj)
 

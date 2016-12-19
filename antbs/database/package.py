@@ -409,14 +409,22 @@ class Package(PackageMeta):
                 changed['pkgrel'] = '1'
 
         elif version_from_commit:
-            with open('/tmp/PKGBUILD', 'w') as pkgbuild:
-                pkgbuild.write(self.pkgbuild)
-
             cmd = status.makepkg_pkglist_cmd.split(' ')
             pkgver = ''
+            pkgbuild_dir = os.path.join(status.PKGBUILDS_DIR, 'antergos', self.pkgname)
+            tmp_dir = os.path.join('/tmp', self.pkgname)
+            pkgbuild = os.path.join(tmp_dir, 'PKGBUILD')
+
+            if os.path.exists(tmp_dir):
+                shutil.rmtree(tmp_dir)
+
+            shutil.copytree(pkgbuild_dir, '/tmp')
+
+            with open(pkgbuild, 'w') as pkgbuild:
+                pkgbuild.write(self.pkgbuild)
 
             try:
-                pkglist = subprocess.check_output(cmd, cwd='/tmp', universal_newlines=True)
+                pkglist = subprocess.check_output(cmd, cwd=tmp_dir, universal_newlines=True)
                 pkg = pkglist.readlines()[0]
                 name, pkgver, pkgrel, arch = pkg.split('-')
             except Exception as err:

@@ -365,7 +365,7 @@ class Monitor(RedisHash):
 
             elif 'http' == pkg_obj.mon_service:
                 changed = self.check_remote_http_resource_for_changes(pkg_obj)
-                monitor_obj = ''
+                monitor_obj = self.remote_file
 
             elif 'mate-desktop' == pkg_obj.mon_service:
                 changed = self.check_mate_desktop_server_for_changes(pkg_obj)
@@ -375,7 +375,7 @@ class Monitor(RedisHash):
 
             logger.debug(
                 '%s - latest: %s, last_result: %s, pkgver: %s',
-                pkg_obj.pkgname, self.gh.latest, pkg_obj.mon_last_result, pkg_obj.pkgver
+                pkg_obj.pkgname, monitor_obj.latest, pkg_obj.mon_last_result, pkg_obj.pkgver
             )
 
             if changed:
