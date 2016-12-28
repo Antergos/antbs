@@ -38,7 +38,7 @@ class RepoView(FlaskView):
 
         args = [repo_name, _filter, filter_by]
 
-        if any(True for arg in args if arg.isdigit() or not arg.isalpha()):
+        if any(True for arg in args if arg and arg.isdigit() or not arg.isalpha()):
             abort(404)
 
         pkgs = []
