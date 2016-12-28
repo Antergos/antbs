@@ -132,7 +132,7 @@ def match_pkgname_with_build_number(bnum=None, match=None):
 
 
 def package_in_group(pkg=None, group=None):
-    excluded = ['grub-zfs']
+    excluded = ['grub-zfs', 'plymouth-theme-antergos']
 
     if not pkg or not group or pkg in excluded:
         return False
@@ -146,7 +146,7 @@ def package_in_group(pkg=None, group=None):
 
 
 def package_is(pkg, what):
-    excluded = ['grub-zfs']
+    excluded = ['grub-zfs', 'plymouth-theme-antergos']
 
     if pkg in excluded:
         return False
