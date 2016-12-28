@@ -115,7 +115,7 @@ class RepoView(FlaskView):
         name_ok = name and name in status.repos
         filter_ok = _filter and self._filter_is_valid(_filter, filter_by)
 
-        if not name_ok or (_filter and not filter_ok):
+        if not name_ok or (_filter and not filter_ok) or page > 500:
             abort(404)
 
         packages, rev_pending, all_pages = self._get_repo_packages(name, _filter, filter_by, page)
