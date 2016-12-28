@@ -162,6 +162,8 @@ class Monitor(RedisHash):
             build_override = False
         elif 'pamac-dev' == pkg_obj.pkgname and latest == pkg_obj.mon_last_result:
             build_override = False
+        elif 'beta' in pkg_obj.mon_last_result or 'alpha' in pkg_obj.mon_last_result:
+            build_override = False
 
         return build_override, latest
 
@@ -393,8 +395,8 @@ class Monitor(RedisHash):
         if len(build_pkgs) > 0:
             self.add_to_build_queue(build_pkgs, webhook, before, after)
 
-        if self.db.exists('antbs:misc:iso-release:do_check'):
-            version = self.db.get('antbs:misc:iso-release:do_check')
+        if self.db.exists(status.iso_release_check_key):
+            version = self.db.get(status.iso_release_check_key)
             self.check_mirror_for_iso(version)
 
         self.checked_recently = (True, 3600)
@@ -415,7 +417,13 @@ class Monitor(RedisHash):
         if do_build:
             build_pkgs.append(pkg_obj.pkgname)
 
-            changes = {'pkgver': (pkg_obj.pkgver, monitor_obj.latest)}
+            if 'commits' == pkg_obj.mon_type:
+                version_str = pkg_obj.get_version_str()
+                latest = version_str.split('-')[0]
+            else:
+                latest = monitor_obj.latest
+
+            changes = {'pkgver': (pkg_obj.pkgver, latest)}
 
             if 'mate-desktop' == pkg_obj.mon_service:
                 checksum = monitor_obj.files[pkg_obj.pkgname]['checksum']

@@ -61,7 +61,7 @@ class ISOUtility:
         self.pkgname = pkg_obj.pkgname
         self.file_name = self.get_file_name(pkg_obj)
         self.file_path = os.path.join(TESTING_DIR, self.file_name)
-        self.md5sums_path = os.path.join(TESTING_DIR, 'MD5SUMS')
+        self.md5sums_path = os.path.join(TESTING_DIR, 'MD5SUMS-{}'.format(self.version))
         self.mirror_url = 'http://mirrors.antergos.com/iso/release/{0}'.format(self.file_name)
         self.files = [
             self.file_path,
@@ -264,7 +264,7 @@ def iso_release_job():
         shutil.move(iso_obj.md5sums_path, RELEASE_DIR)
         # We will use the repo monitor class to check propagation of the new files
         # before deleting the old files.
-        db.set('antbs:misc:iso-release:do_check', version)
+        db.set(status.iso_release_check_key, version)
 
     if saved_status and not status.idle:
         status.current_status = saved_status

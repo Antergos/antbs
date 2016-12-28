@@ -341,9 +341,6 @@ class Package(PackageMeta):
 
         if 'pkgver' in changes and not self.auto_sum:
             commit_msg = msg_tpl.format(self.pkgname, changes['pkgver'])
-        elif 'pkgver' in changes and self.auto_sum:
-            _version = '{}.{}'.format(changes['_pkgver'], changes['_buildver'])
-            commit_msg = msg_tpl.format(self.pkgname, _version)
         else:
             commit_msg = '[ANTBS] | Updated PKGBUILD for {0}.'.format(self.pkgname)
 
@@ -378,7 +375,7 @@ class Package(PackageMeta):
         version_from_commit = self.is_monitored and 'commits' == self.mon_type
         is_mate_pkg = self.is_monitored and 'mate-desktop' == self.mon_service
 
-        if not version_from_tag and not version_from_commit and not is_mate_pkg:
+        if not any([version_from_tag, version_from_commit, is_mate_pkg]):
             for key in changed:
                 new_val = self.get_from_pkgbuild(key)
 
@@ -410,7 +407,7 @@ class Package(PackageMeta):
                 changed['pkgrel'] = '1'
 
         elif version_from_commit:
-            cmd = status.makepkg_pkglist_cmd.split(' ')
+            cmd = ['/usr/bin/makepkg', '--packagelist']
             pkgver = ''
             pkgbuild_dir = os.path.join(status.PKGBUILDS_DIR, 'antergos', self.pkgname)
             tmp_dir = os.path.join('/tmp', self.pkgname)
@@ -426,7 +423,7 @@ class Package(PackageMeta):
 
             try:
                 pkglist = subprocess.check_output(cmd, cwd=tmp_dir, universal_newlines=True)
-                pkg = pkglist.readlines()[0]
+                pkg = pkglist.split('\n')[0]
                 name, pkgver, pkgrel, arch = pkg.split('-')
             except Exception as err:
                 logger.exception(err)
