@@ -36,7 +36,9 @@ class RepoView(FlaskView):
         if repo_name is None:
             abort(500)
 
-        if any(True for arg in [repo_name, _filter, filter_by] if arg.isdigit()):
+        args = [repo_name, _filter, filter_by]
+
+        if any(True for arg in args if arg.isdigit() or not arg.isalpha()):
             abort(404)
 
         pkgs = []
