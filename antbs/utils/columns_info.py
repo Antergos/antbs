@@ -33,7 +33,7 @@ class ColumnsInfo:
 
     """
 
-    def __init__(self, current_user, request, _filter, filter_by):
+    def __init__(self, current_user, request, _filter=None, filter_by=None):
         self.current_user = current_user
         self.request = request
         self.filter = _filter
