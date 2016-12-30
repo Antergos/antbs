@@ -293,7 +293,8 @@ class Transaction(TransactionMeta):
             #remove(os.path.join(cnchi_dir, 'cnchi/.git'))
             #subprocess.check_output(['tar', '-cf', 'cnchi.tar', 'cnchi'], cwd=cnchi_dir)
 
-    def move_files_to_staging_repo(self, bld_obj):
+    @staticmethod
+    def move_files_to_staging_repo(bld_obj):
         file_count = len(bld_obj.generated_files)
         files_exist = bld_obj.generated_files and all_file_paths_exist(bld_obj.generated_files)
 

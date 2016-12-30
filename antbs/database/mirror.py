@@ -149,11 +149,13 @@ class RepoMirror(RedisHash):
         for pak in unaccounted_for:
             self.unaccounted_for.add(pak)
 
-    def _pkgname_matches(self, pkgname, match_in):
+    @staticmethod
+    def _pkgname_matches(pkgname, match_in):
         pattern = r'{}\|'.format(pkgname)
         return re.match(pattern, match_in)
 
-    def _get_pkgnames(self, location):
+    @staticmethod
+    def _get_pkgnames(location):
         return [p.split('|')[0] for p in location if p]
 
     def get_pkgnames_filesystem(self):

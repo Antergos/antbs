@@ -32,5 +32,6 @@ from flask_stormpath import current_user
 
 
 class AntBSDebugToolbar(DebugToolbarExtension):
-    def _show_toolbar(self):
+    @staticmethod
+    def _show_toolbar():
         return current_user.is_authenticated and '/rq' not in request.path

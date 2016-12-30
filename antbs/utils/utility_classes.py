@@ -169,7 +169,7 @@ class MyLock:
         else:
             raise LockError('Cannot release an unlocked lock')
 
-    def __exit__(self, type, value, tb):
+    def __exit__(self, _type, value, tb):
         if self.locked:
             self.lock.release()
 

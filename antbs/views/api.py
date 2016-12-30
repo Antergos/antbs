@@ -62,7 +62,7 @@ class APIView(FlaskView):
 
         psub.close()
 
-    def _get_live_status_updates(self):
+    def _get_live_status_updates():
         last_event = None
         keep_alive = 0
 
@@ -183,10 +183,7 @@ class APIView(FlaskView):
             if pkgnames:
                 if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
                     status.iso_flag = True
-                    if 'minimal' in pkgnames[0]:
-                        status.iso_minimal = True
-                    else:
-                        status.iso_minimal = False
+                    status.iso_minimal = 'minimal' in pkgnames[0]
 
                 if 'cnchi-dev' == pkgnames[0]:
                     db.set('CNCHI-DEV-OVERRIDE', True)

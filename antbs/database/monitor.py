@@ -153,7 +153,8 @@ class Monitor(RedisHash):
     #
     #     for index, item in enumerate(elements):
 
-    def _maybe_override_build(self, pkg_obj, latest):
+    @staticmethod
+    def _maybe_override_build(pkg_obj, latest):
         build_override = None
 
         if 'redis-desktop-manager' == pkg_obj.pkgname and re.search(r'-\d$', latest):

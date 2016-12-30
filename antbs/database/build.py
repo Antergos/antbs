@@ -210,7 +210,7 @@ class Build(RedisHash):
 
         self.process_and_save_build_metadata(self._pkg_obj.version_str)
         self.get_save_pkgbuild_diff()
-        
+
         if self.is_iso:
             result = self._build_iso()
         else:

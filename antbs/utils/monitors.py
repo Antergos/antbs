@@ -56,7 +56,8 @@ class PackageSourceMonitor:
     def _empty(value):
         return value in ['', 'None', None, False]
 
-    def _matches_pattern(self, pattern, latest):
+    @staticmethod
+    def _matches_pattern(pattern, latest):
         matches = False
         pattern = pattern or '.'
 
