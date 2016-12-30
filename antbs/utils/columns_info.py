@@ -33,9 +33,11 @@ class ColumnsInfo:
 
     """
 
-    def __init__(self, current_user, request):
+    def __init__(self, current_user, request, _filter, filter_by):
         self.current_user = current_user
         self.request = request
+        self.filter = _filter
+        self.filter_by = filter_by
 
     @property
     def columns_info(self):
@@ -139,8 +141,7 @@ class ColumnsInfo:
                 }
             })
 
-        if '/group/' in self.request.path:
-            group = self.request.path.rsplit('/')[-1]
+        if 'group' == self.filter:
             columns_info.insert(3, {
                 'heading_text': 'Group',
                 'obj_attr': '',
@@ -148,7 +149,7 @@ class ColumnsInfo:
                 'base_url': self.request.path,
                 'dd_info': '',
                 'color_class': 'info',
-                'group': group
+                'group': self.filter_by
             })
 
         elif '/monitored' in self.request.path:

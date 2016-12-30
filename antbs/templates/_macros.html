@@ -331,7 +331,6 @@
  #     icon_info  (dict): Dict which maps one or more icon_class(es) & icon_color(s) to possible `text` values.
  #     text       (str):  The text to display next to the icon. Not required when calling this
  #                        macro from another macro. You should place text inside call block instead.
- #
  #}
 {% macro text_with_icon(icon_info, text=None) %}
 	{% set icon_class = icon_info.class %}
@@ -358,7 +357,6 @@
  #     objs           (list[Package|Build|Mirror]): List of `Package`|`Build`|`Mirror` objects to be listed in table.
  #     pagination     (Pagination):                 The `Pagination` object for the table.
  #     search_enabled (bool):                       Whether or not search box should be output for the table.
- #
  #}
 {% macro listing_table(columns_info, objs, pagination, search_enabled=True) %}
 	{% if search_enabled %}

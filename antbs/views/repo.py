@@ -55,15 +55,15 @@ class RepoView(FlaskView):
             logger.error('Repo has no packages!')
             return pkgs, rev_pending, all_pages
 
-        if _filter and 'group' == _filter:
+        if 'group' == _filter:
             repo_packages = [
                 p for p in sorted(repo_obj.pkgnames) if package_in_group(p, filter_by)
             ]
 
-        elif _filter and 'search' == _filter:
+        elif 'search' == _filter:
             repo_packages = [p for p in sorted(repo_obj.pkgnames) if filter_by in p]
 
-        elif _filter and 'monitored' == _filter:
+        elif 'monitored' == _filter:
             repo_packages = [p for p in sorted(repo_obj.pkgnames) if package_is(p, _filter)]
 
         else:
@@ -94,33 +94,34 @@ class RepoView(FlaskView):
         return pkgs, rev_pending, all_pages
 
     def _filter_is_valid(self, _filter, filter_by):
-        filters = ['search', 'group', 'monitored']
-        is_valid = _filter in filters
+        if _filter not in ['search', 'group', 'monitored']:
+            return False
 
         if filter_by and not re.fullmatch(r'\w+$', filter_by):
-            is_valid = False
+            return False
 
-        if is_valid and 'group' == _filter and filter_by not in status.package_groups:
-            is_valid = False
+        if 'group' == _filter and filter_by not in status.package_groups:
+            return False
 
-        return is_valid
+        return True
 
     @route('/<name>/packages/<_filter>/<filter_by>/<int:page>', endpoint='repo_packages')
     @route('/<name>/packages/<_filter>/<filter_by>', endpoint='repo_packages')
-    @route('/<name>/packages/<_filter>/<int:page>', endpoint='repo_packages')
-    @route('/<name>/packages/<_filter>', endpoint='repo_packages')
     @route('/<name>/packages/<int:page>', endpoint='repo_packages')
     @route('/<name>/packages', endpoint='repo_packages')
     def repo_packages(self, name=None, _filter=None, filter_by=None, page=1):
-        name_ok = name and name in status.repos
-        filter_ok = _filter and self._filter_is_valid(_filter, filter_by)
+        if page > 500:
+            abort(404)
 
-        if not name_ok or (_filter and not filter_ok) or page > 500:
+        if not (name and name in status.repos):
+            abort(404)
+
+        if _filter and not self._filter_is_valid(_filter, filter_by):
             abort(404)
 
         packages, rev_pending, all_pages = self._get_repo_packages(name, _filter, filter_by, page)
         _pagination = Pagination(page, 10, all_pages)
-        columns_info_obj = ColumnsInfo(current_user, request)
+        columns_info_obj = ColumnsInfo(current_user, request, _filter, filter_by)
         _columns_info = columns_info_obj.columns_info
 
         return try_render_template('repo/packages.html', objs=packages,
