@@ -6,3 +6,5 @@ antbs/templates/builds/*.html linguist-vendored
 antbs/templates/package.html linguist-vendored
 antbs/templates/repo/*.html linguist-vendored
 antbs/templates/scheduled.html linguist-vendored
+
+*.py text eol=lf

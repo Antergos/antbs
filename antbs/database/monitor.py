@@ -111,7 +111,8 @@ class Monitor(RedisHash):
         latest_commit = [c for c in self.gh.repo.commits(number=1)]
         return '' if not latest_commit else latest_commit[0].sha
 
-    def _handle_custom_xml_special_cases(self, elements, pkg_obj):
+    @staticmethod
+    def _handle_custom_xml_special_cases(elements, pkg_obj):
         result = None
 
         for element in elements:
@@ -276,7 +277,8 @@ class Monitor(RedisHash):
 
         return self.gh.package_source_changed(pkg_obj)
 
-    def check_gitlab_repo_for_changes(self, pkg_obj, build_pkgs):
+    @staticmethod
+    def check_gitlab_repo_for_changes(pkg_obj, build_pkgs):
         gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
         gl.auth()
         project_id = pkg_obj.mon_project
