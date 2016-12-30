@@ -62,7 +62,7 @@ class APIView(FlaskView):
 
         psub.close()
 
-    def _get_live_status_updates():
+    def _get_live_status_updates(self):
         last_event = None
         keep_alive = 0
 
