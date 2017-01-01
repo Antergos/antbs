@@ -107,6 +107,8 @@ class RepoView(FlaskView):
 
     @route('/<name>/packages/<_filter>/<filter_by>/<int:page>', endpoint='repo_packages')
     @route('/<name>/packages/<_filter>/<filter_by>', endpoint='repo_packages')
+    @route('/<name>/packages/<_filter>/<int:page>', endpoint='repo_packages')
+    @route('/<name>/packages/<_filter>', endpoint='repo_packages')
     @route('/<name>/packages/<int:page>', endpoint='repo_packages')
     @route('/<name>/packages', endpoint='repo_packages')
     def repo_packages(self, name=None, _filter=None, filter_by=None, page=1):
