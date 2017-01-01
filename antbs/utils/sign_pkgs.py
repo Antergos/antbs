@@ -3,7 +3,7 @@
 #
 # sign_pkgs.py
 #
-# Copyright © 2014-2016 Antergos
+# Copyright © 2014-2017 Antergos
 #
 # The code in this module was originally written by Xyne (Arch Linux TU)
 # and was modified to suit the needs of this application.

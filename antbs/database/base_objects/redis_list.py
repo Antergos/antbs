@@ -3,7 +3,7 @@
 #
 #  redis_list.py
 #
-#  Copyright © 2014-2016 Antergos
+#  Copyright © 2014-2017 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #

@@ -3,7 +3,7 @@
 #
 #  geo_ip.py
 #
-#  Copyright © 2016 Antergos
+#  Copyright © 2016-2017 Antergos
 #
 #  This file is part of Antergos Build Server, (AntBS).
 #

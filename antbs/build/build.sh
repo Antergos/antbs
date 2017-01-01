@@ -3,7 +3,7 @@
 #
 #  build.sh
 #
-#  Copyright © 2014-2016 Antergos
+#  Copyright © 2014-2017 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
@@ -77,7 +77,7 @@ prepare_makepkg_and_pacman_configs() {
 	sed -i 's|CheckSpace||g;
 			/\[antergos-staging/,+1 d;
 			/\[antergos/,+1 d;' "${_PACMAN_CONF}"
-	
+
 	if [[ -z "${_32bit}" ]]; then
 		sed -i '1s%^%[antergos]\nSigLevel = PackageRequired\nServer = file:///main/$arch\n%;
 				1s%^%[antergos-staging]\nSigLevel = PackageRequired\nServer = file:///staging/$arch\n%;' "${_PACMAN_CONF}"

@@ -3,7 +3,7 @@
 #
 #  repo.py
 #
-#  Copyright © 2015-2016 Antergos
+#  Copyright © 2015-2017 Antergos
 #
 #  This file is part of The Antergos Build Server, (AntBS).
 #
