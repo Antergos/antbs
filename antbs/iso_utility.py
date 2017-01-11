@@ -83,10 +83,13 @@ class ISOUtility:
 
     @staticmethod
     def get_file_name(pkgobj):
+        pkgver = pkgobj.pkgver.split('.')[1]
+        pkgver = pkgver if '0' not in pkgver else pkgver[-1]
+        pkgver = '17.{}'.format(pkgver)
         if 'minimal' in pkgobj.pkgname:
-            file_name = 'antergos-minimal-{0}-x86_64.iso'.format(pkgobj.pkgver)
+            file_name = 'antergos-minimal-{0}-x86_64.iso'.format(pkgver)
         else:
-            file_name = 'antergos-{0}-x86_64.iso'.format(pkgobj.pkgver)
+            file_name = 'antergos-{0}-x86_64.iso'.format(pkgver)
 
         return file_name
 
@@ -154,8 +157,8 @@ class WordPressBridge:
 
     def __init__(self, auth):
         self.post_id_map = {
-            'antergos-x86_64': '2563',
-            'antergos-minimal-x86_64': '2565'
+            'antergos-x86_64': '26386',
+            'antergos-minimal-x86_64': '26387'
         }
         self.auth = auth
         logger.info('WordPressBridge Object Initialized')
@@ -213,12 +216,12 @@ def clean_up_after_release(version):
     all_files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
     moved = []
 
-    if len(all_files) <= 7:
+    if len(all_files) <= 5:
         return
 
     for f in all_files:
         files = [os.path.join(RELEASE_DIR, f) for f in os.listdir(RELEASE_DIR)]
-        if version not in f and len(files) > 7:
+        if version not in f and len(files) > 5:
             shutil.move(f, status.OLD_ISO_IMAGES_DIR)
             moved.append(os.path.basename(f))
 

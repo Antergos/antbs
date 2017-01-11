@@ -284,20 +284,19 @@ class Package(PackageMeta):
             logger.debug('not self.gh_path!')
             self.determine_github_path()
 
-        pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+        try:
+            pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+        except Exception:
+            at_path = repo.file_contents(self.gh_path)
 
-        if not pbfile_contents:
-            self.determine_github_path()
-            gh_path = repo.file_contents(self.gh_path)
-
-            if isinstance(gh_path, UnprocessableResponseBody):
+            if isinstance(at_path, UnprocessableResponseBody):
                 # Path is a directory
                 pbpath = os.path.join(self.gh_path, 'PKGBUILD')
 
-            elif 'symlink' == gh_path.type:
+            elif 'symlink' == at_path.type:
                 pbpath = os.path.join(
                     self.gh_path.rsplit('/', 1)[0],
-                    gh_path.target,
+                    at_path.target,
                     'PKGBUILD'
                 )
 

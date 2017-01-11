@@ -540,7 +540,7 @@ class Build(RedisHash):
         stream_process.join()
 
         if not self.failed:
-            remove('/opt/archlinux-mkarchiso/antergos-iso')
+            remove(status.ANTERGOS_ISO_DIR)
             doc_util.do_docker_clean(self._pkg_obj.pkgname)
 
         in_dir = len(

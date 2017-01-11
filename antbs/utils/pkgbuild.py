@@ -169,7 +169,7 @@ class Pkgbuild:
         elif '_pkgver' in self.values['pkgver']:
             pkgver = self.values['_pkgver']
         elif 'date' in self.values['pkgver']:
-            pkgver = datetime.now().strftime('%Y.%m.%d')
+            pkgver = datetime.now().strftime('%y.%-m')
         else:
             pkgver = self.values['pkgver'] if 'None' not in self.values['pkgver'] else ''
 
