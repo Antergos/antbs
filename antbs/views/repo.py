@@ -36,10 +36,11 @@ class RepoView(FlaskView):
         if repo_name is None:
             abort(500)
 
-        args = [repo_name, _filter, filter_by]
+        args = [arg for arg in [_filter, filter_by] if arg is not None]
 
-        if any(True for arg in args if arg and (arg.isdigit() or not arg.isalpha())):
-            abort(404)
+        for arg in args:
+            if arg.isdigit() or not arg.isalpha():
+                abort(404)
 
         pkgs = []
         bld_obj = None
@@ -112,7 +113,7 @@ class RepoView(FlaskView):
     @route('/<name>/packages/<int:page>', endpoint='repo_packages')
     @route('/<name>/packages', endpoint='repo_packages')
     def repo_packages(self, name=None, _filter=None, filter_by=None, page=1):
-        if page > 500:
+        if page > 100:
             abort(404)
 
         if not (name and name in status.repos):
