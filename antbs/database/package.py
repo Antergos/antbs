@@ -449,7 +449,7 @@ class Package(PackageMeta):
         if self.epoch:
             version_str = '{0}:{1}'.format(self.epoch, version_str)
 
-        if version_str and len(version_str) > 3 and 'None' not in version_str:
+        if version_str and len(version_str) > 2 and 'None' not in version_str:
             self.version_str = version_str
         else:
             raise ValueError(version_str)
