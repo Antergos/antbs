@@ -38,7 +38,7 @@ reader = geoip2.database.Reader('GeoLite2-Country.mmdb')
 countries = dict()
 counted = []
 
-for key in db.scan_iter('antbs:cnchi:user:*'):
+for key in db.scan_iter(''):
     ip = db.hget(key, 'ip')
     if ip and ip not in counted:
         counted.append(ip)
