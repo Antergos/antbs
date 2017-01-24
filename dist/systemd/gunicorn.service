@@ -1,0 +1,25 @@
+[Unit]
+Description=Gunicorn Server
+Requires=gunicorn.socket redis-server.service docker.service rq-builder1.service rq-builder2.service rq-repo-manager.service
+After=network.target redis-server.service docker.service
+Before=rq-builder1.service rq-builder2.service rq-repo-manager.service
+
+[Service]
+PIDFile=/var/run/gunicorn/pid
+User=antbs
+Group=antbs
+WorkingDirectory=/PATH/TO/antbs/antbs
+EnvironmentFile=/PATH/TO/antbs/dist/systemd/gunicorn.env
+# Hack to prevent app from trying to access redis before its ready (on a fresh boot)
+ExecStartPre=/bin/bash -c '[[ -e /tmp/.gunicorn_started_once ]] || { /bin/sleep 20 && touch /tmp/.gunicorn_started_once; }'
+# If not using New Relic monitoring, remove its wrapper script from the start command.
+ExecStart=/usr/bin/newrelic-admin run-program /usr/bin/gunicorn -c ../dist/gunicorn_conf.py antbs:app
+ExecReload=/bin/kill -s HUP $MAINPID
+ExecStop=/bin/kill -s TERM $MAINPID
+PrivateTmp=false
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

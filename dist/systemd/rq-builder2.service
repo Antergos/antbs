@@ -1,0 +1,18 @@
+[Unit]
+Description=RQ Builder-2
+Requires=redis-server.service gunicorn.service
+After=redis-server.service gunicorn.service
+BindsTo=gunicorn.service
+
+[Service]
+Type=simple
+User=antbs
+Group=antbs
+ExecStart=/usr/bin/rqworker transactions webhook
+TimeoutStopSec=10
+WorkingDirectory=/PATH/TO/antbs/antbs
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
