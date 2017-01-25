@@ -1,9 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 #
-#  geo_ip.py
+#  rqworker
 #
-#  Copyright © 2016-2017 Antergos
+#  Copyright © 2013-2017 Antergos
 #
 #  This file is part of Antergos Build Server, (AntBS).
 #
@@ -26,25 +26,11 @@
 #  You should have received a copy of the GNU General Public License
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
-import geoip2.database
-import redis
+import re
+import sys
 
-db = redis.StrictRedis(unix_socket_path='/var/run/redis/redis.sock', decode_responses=True)
+from rq.cli import worker
 
-reader = geoip2.database.Reader('GeoLite2-Country.mmdb')
-
-countries = dict()
-counted = []
-
-for key in db.scan_iter(''):
-    ip = db.hget(key, 'ip')
-    if ip and ip not in counted:
-        counted.append(ip)
-        response = reader.country(ip)
-        country = response.country.name
-        if country not in countries.keys():
-            countries[country] = 0
-
-        countries[country] += 1
-
-print(countries)
+if __name__ == '__main__':
+    sys.argv[0] = re.sub(r'(-script\.pyw|\.exe)?$', '', sys.argv[0])
+    sys.exit(worker())
