@@ -325,3 +325,28 @@ class APIView(FlaskView):
                 message = dict(msg='ok')
                 return json.dumps(message)
 
+    @route('/package/<pkgname>', methods=['POST'])
+    @groups_required(['admin'])
+    def update_package_meta(self, pkgname):
+        if not pkgname or not pkgname.isalpha() or pkgname not in status.all_packages:
+            abort(400)
+
+        payload = request.form
+        pkg_obj = get_pkg_object(pkgname)
+        to_update = {
+            attr: (getattr(pkg_obj, attr), value)
+            for attr, value in payload.items()
+            if hasattr(pkg_obj, attr)
+        }
+
+        if not to_update:
+            abort(400)
+
+        if pkg_obj.update_pkgbuild_and_push_github(to_update):
+            for attr, value in payload.items():
+                setattr(pkg_obj, attr, value)
+
+            return json.dumps(dict(msg='ok'))
+
+        else:
+            abort(500)

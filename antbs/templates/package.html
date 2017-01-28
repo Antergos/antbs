@@ -157,4 +157,57 @@
 	{{ super() }}
 	{{ toggles_init() }}
 
+	{% if user.is_authenticated %}
+		<style>
+			#monitor .bootstrap-switch-wrapper + .fa {
+				font-size: 18px;
+				margin-left: 10px;
+			}
+		</style>
+		<script>
+			$( window ).on( 'load', function() {
+				$( '#monitor .switch' ).on( 'switchChange.bootstrapSwitch', function( event, state ) {
+					var $wrapper = $(event.target).parents('.bootstrap-switch-wrapper'),
+						$spinner = $('<span class="fa fa-spinner fa-pulse">').insertAfter( $wrapper );
+
+					state = state ? 'True' : 'False';
+
+					$.ajax( '/api/package/{{ pkg.pkgname }}', {
+						method: 'POST',
+						data: {is_monitored: state},
+						success: function( result ) {
+							setTimeout(function() {
+								$spinner
+									.fadeOut()
+									.addClass('fa-check')
+									.removeClass('fa-spin fa-pulse')
+									.css('color', '#19B698')
+									.fadeIn( setTimeout( function() {
+										$spinner
+											.fadeOut()
+											.remove();
+									}, 2000 ));
+							}, 2000 );
+
+						},
+						error: function ( result ) {
+							setTimeout( function () {
+								$spinner
+									.fadeOut()
+									.addClass( 'fa-times' )
+									.removeClass( 'fa-spin fa-pulse' )
+									.css( 'color', '#EA6153' )
+									.fadeIn( setTimeout( function () {
+										$spinner
+											.fadeOut()
+											.remove();
+									}, 2000 ) );
+							}, 2000 );
+						}
+					});
+				});
+			});
+		</script>
+	{% endif %}
+
 {% endblock scripts %}

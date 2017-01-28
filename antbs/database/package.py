@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import zipfile
 from glob import glob
+from typing import Dict
 
 import requests
 from github3 import login
@@ -315,8 +316,9 @@ class Package(PackageMeta):
         pname = name or self.pkgname
         return pname in status.all_packages or self.determine_github_path()
 
-    def update_pkgbuild_and_push_github(self, changes):
-        can_push = self.push_version or self.is_monitored
+    def update_pkgbuild_and_push_github(self, changes: Dict[str, tuple]) -> bool:
+        change_monitored = [True for key in changes if 'monitored' in key]
+        can_push = change_monitored or self.push_version or self.is_monitored
         invalid_value = [
             True for c in changes
             if any(True for n in [None, 'None', '']
@@ -325,7 +327,7 @@ class Package(PackageMeta):
 
         if invalid_value or not can_push:
             logger.error('cant push to github! %s', changes)
-            return
+            return False
 
         gh = login(token=status.github_token)
         repo = gh.repository('antergos', 'antergos-packages')
@@ -346,6 +348,11 @@ class Package(PackageMeta):
         for key, val in changes.items():
             search_str = '{0}={1}'.format(key, val[0])
             replace_str = '{0}={1}'.format(key, val[1])
+
+            if 'monitored' in key:
+                search_str = "{0}='{1}'".format(key, val[0])
+                replace_str = "{0}='{1}'".format(key, val[1])
+
             new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
             if 'pkgver' == key and '1' != self.pkgrel:
@@ -357,14 +364,16 @@ class Package(PackageMeta):
                 new_pb_contents = new_pb_contents.replace(val[0], val[1])
 
         if new_pb_contents == pb_contents:
-            return
+            return True
 
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))
 
         if commit:
             logger.info('commit hash is %s', commit)
+            return True
         else:
             logger.error('commit failed. commit=%s | content=%s', commit, new_pb_contents)
+            return False
 
     def get_version_str(self):
         # TODO: This is still garbage. Rewrite and simplify!
