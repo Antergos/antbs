@@ -331,14 +331,18 @@ class PacmanRepo(PacmanRepoMeta):
                 self._remove_package_from_filesystem(pkg)
 
     def _update_repo(self):
-        if not status.repos_syncing:
+        if status.repos_syncing:
             return
+
+        status.repos_syncing = True
 
         self.sync_repo_packages_data()
 
         if self.unaccounted_for:
             add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_data()
             self._handle_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
+
+        status.repos_syncing = False
 
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
