@@ -182,6 +182,8 @@
 									.addClass('fa-check')
 									.removeClass('fa-spin fa-pulse')
 									.css('color', '#19B698')
+									.detach()
+									.insertAfter( $wrapper )
 									.fadeIn( setTimeout( function() {
 										$spinner
 											.fadeOut()
@@ -197,6 +199,8 @@
 									.addClass( 'fa-times' )
 									.removeClass( 'fa-spin fa-pulse' )
 									.css( 'color', '#EA6153' )
+									.detach()
+									.insertAfter( $wrapper )
 									.fadeIn( setTimeout( function () {
 										$spinner
 											.fadeOut()
