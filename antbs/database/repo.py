@@ -241,11 +241,11 @@ class PacmanRepo(PacmanRepoMeta):
         accounted_for = list(pkgs_fs & pkgs_alpm)
         unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs)
 
-        logger.debug([unaccounted_for])
+        # logger.debug([unaccounted_for])
 
         self.packages.remove_range(0, -1)
         self.unaccounted_for.remove_range(0, -1)
-        self.pkgnames.remove_range(-0, -1)
+        self.pkgnames.remove_range(0, -1)
 
         for pkg in accounted_for:
             self.packages.add(pkg)
