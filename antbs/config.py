@@ -27,6 +27,7 @@
 #  along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 from datetime import timedelta
+import os
 
 from flask import Flask
 
@@ -57,9 +58,13 @@ class AntBSConfig:
         return '__' in item or not item.startswith('_')
 
     def _flask(self):
+        if not self.status.sp_session_key:
+            self.status.sp_session_key = os.environ.get('SP_SESSION_KEY')
+
         config = {'DEBUG_TB_PROFILER_ENABLED': False,
                   'SECRET_KEY': self.status.sp_session_key,
                   'TEMPLATES_AUTO_RELOAD': True}
+
         self.app.config.update(config)
 
     def _jinja(self):
@@ -76,6 +81,10 @@ class AntBSConfig:
         self.app.config.from_object(rq_dashboard.default_settings)
 
     def _stormpath(self):
+        if not self.status.sp_api_id:
+            for item in ('SP_API_ID', 'SP_API_KEY', 'SP_APP'):
+                setattr(self.status, item.lower(), os.environ.get(item))
+
         config = {'STORMPATH_API_KEY_ID': self.status.sp_api_id,
                   'STORMPATH_API_KEY_SECRET': self.status.sp_api_key,
                   'STORMPATH_APPLICATION': self.status.sp_app,
