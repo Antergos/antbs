@@ -33,18 +33,22 @@ from io import TextIOWrapper
 from pkg_resources import parse_version
 
 import gevent
-import redis_lock
+from rq import (
+    Connection,
+    get_current_job,
+)
 
 from . import (
     RedisHash,
     status,
-    RedisSingleton
+    RedisSingleton,
+    db,
 )
 
 from utils import (
     remove,
     try_run_command,
-    DockerUtils
+    DockerUtils,
 )
 
 from .meta.repo_meta import PacmanRepoMeta
@@ -331,18 +335,11 @@ class PacmanRepo(PacmanRepoMeta):
                 self._remove_package_from_filesystem(pkg)
 
     def _update_repo(self):
-        if status.repos_syncing:
-            return
-
-        status.repos_syncing = True
-
         self.sync_repo_packages_data()
 
         if self.unaccounted_for:
             add_to_db, rm_from_db, rm_from_fs = self._process_repo_packages_data()
             self._handle_packages_unaccounted_for(add_to_db, rm_from_db, rm_from_fs)
-
-        status.repos_syncing = False
 
     def get_pkgnames_alpm(self):
         return self._get_pkgnames(self.pkgs_alpm)
@@ -371,11 +368,18 @@ class PacmanRepo(PacmanRepoMeta):
         return self._has_package(pkgname, self.pkgs_alpm)
 
     def sync_repo_packages_data(self):
+        logger.debug('sync repo packages data!')
         self._determine_current_repo_state_alpm()
         self._determine_current_repo_state_fs()
         self._process_current_repo_states()
 
     def update_repo(self):
+        with Connection(db):
+            current_job = get_current_job()
+            if 'update_repo' != current_job.origin:
+                logger.error('Only the repo worker can update repos!')
+                return
+
         trans_running = status.transactions_running or status.transaction_queue
         building_saved = False
         excluded = ['Updating antergos repo database.',

@@ -194,14 +194,14 @@ class Package(PackageMeta):
             self.pkgbuild = self.fetch_pkgbuild_from_github()
 
         if var not in self.pkgbuild:
-            logger.debug('%s not found in PKGBUILD for %s.', var, self.pkgname)
+            # logger.debug('%s not found in PKGBUILD for %s.', var, self.pkgname)
             return val
 
         if not self._pkgbuild:
             self.setup_pkgbuild_parser()
 
         if var not in self._pkgbuild.values:
-            logger.debug('%s not found in parsed PKGBUILD for %s.', var, self.pkgname)
+            # logger.debug('%s not found in parsed PKGBUILD for %s.', var, self.pkgname)
             return val
 
         if self._pkgbuild.values[var]:
