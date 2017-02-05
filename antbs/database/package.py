@@ -244,6 +244,7 @@ class Package(PackageMeta):
         paths = [
             os.path.join('antergos', 'cinnamon', self.pkgname),
             os.path.join('antergos', 'mate', self.pkgname),
+            os.path.join('antergos', 'liri', self.pkgname),
             os.path.join('antergos', self.pkgname)
         ]
         gh_path = ''
@@ -337,9 +338,6 @@ class Package(PackageMeta):
         new_pb_contents = pb_contents
         msg_tpl = '[ANTBS] | [updpkg] {0} {1}'
 
-        if '1.14' == self.mon_match_pattern:
-            changes['_monitored_match_pattern'] = ('1.14', '1.16')
-
         if 'pkgver' in changes and not self.auto_sum:
             commit_msg = msg_tpl.format(self.pkgname, changes['pkgver'])
         else:
@@ -353,15 +351,21 @@ class Package(PackageMeta):
                 search_str = "{0}='{1}'".format(key, val[0])
                 replace_str = "{0}='{1}'".format(key, val[1])
 
+            elif 'sums' in key:
+                if val[0] and val[0] in new_pb_contents:
+                    new_pb_contents = new_pb_contents.replace(val[0], val[1])
+
+                else:
+                    pattern = r'^{0}=\(["\']([\w\d]+)["\']'.format(key)
+                    replace_with = "{0}=('{1}'".format(key, val[1])
+                    re.sub(pattern, replace_with, new_pb_contents)
+
             new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
             if 'pkgver' == key and '1' != self.pkgrel:
                 search_str = 'pkgrel={0}'.format(self.pkgrel)
                 replace_str = 'pkgrel={0}'.format('1')
                 new_pb_contents = new_pb_contents.replace(search_str, replace_str)
-
-            elif 'checksum' == key and val[0] in new_pb_contents:
-                new_pb_contents = new_pb_contents.replace(val[0], val[1])
 
         if new_pb_contents == pb_contents:
             return True

@@ -245,6 +245,7 @@ class Transaction(TransactionMeta):
         paths = [
             os.path.join(self.path, 'mate', pkg),
             os.path.join(self.path, 'cinnamon', pkg),
+            os.path.join(self.path, 'liri', pkg),
             os.path.join(self.path, pkg)
         ]
 

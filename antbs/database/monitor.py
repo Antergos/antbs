@@ -430,7 +430,7 @@ class Monitor(RedisHash):
 
             if 'mate-desktop' == pkg_obj.mon_service:
                 checksum = monitor_obj.files[pkg_obj.pkgname]['checksum']
-                changes['checksum'] = (pkg_obj.checksum, checksum)
+                changes['sha1sums'] = (pkg_obj.checksum, checksum)
 
             pkg_obj.update_pkgbuild_and_push_github(changes)
 

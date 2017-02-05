@@ -76,7 +76,7 @@ class PackageMeta(RedisHash):
             'url',
             'version_antergos',
             'version_antergos_staging',
-            'version_str'
+            'version_str',
         ],
 
         bool=[
@@ -86,7 +86,7 @@ class PackageMeta(RedisHash):
             'is_metapkg',
             'is_monitored',
             'is_split_package',
-            'push_version'
+            'push_version',
         ],
 
         int=['pkg_id'],
@@ -96,7 +96,9 @@ class PackageMeta(RedisHash):
             'builds',
             'split_packages',
             'tl_events',
-            'transactions'
+            'transactions',
+            'md5sums',
+            'sha1sums',
         ],
 
         path=[],
@@ -104,7 +106,7 @@ class PackageMeta(RedisHash):
         set=[
             'depends',
             'groups',
-            'makedepends'
+            'makedepends',
         ]
     )
 

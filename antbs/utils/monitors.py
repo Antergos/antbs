@@ -100,7 +100,7 @@ class WebMonitor(PackageSourceMonitor):
         self.changed = self.etag != last_etag
 
         if self.changed:
-            self.download_and_process_remote_resource()
+            self.download_remote_resource()
 
     def _get_etag(self):
         try:
@@ -115,7 +115,7 @@ class WebMonitor(PackageSourceMonitor):
     def _process_remote_resource(self):
         raise NotImplementedError
 
-    def download_and_process_remote_resource(self):
+    def download_remote_resource(self):
         try:
             resource = requests.get(self.url)
             resource.raise_for_status()
@@ -163,7 +163,7 @@ class CheckSumsMonitor(WebMonitor):
             if not line:
                 continue
 
-            checksum, file = line.split('  ')
+            checksum, file = line.split()
             name, version = self._get_pkgname_and_pkgver_from_file_name(file)
 
             self.files[name] = {
@@ -286,7 +286,7 @@ class RemoteFileMonitor(WebMonitor):
     def _process_remote_resource(self):
         pass
 
-    def download_and_process_remote_resource(self):
+    def download_remote_resource(self):
         try:
             resource = requests.get(self.page_url)
             resource.raise_for_status()
