@@ -457,6 +457,7 @@ class Package(PackageMeta):
 
         if same_pkgver and same_pkgrel:
             changed['pkgrel'] = str(int(self.pkgrel) + 1)
+            self.update_pkgbuild_and_push_github({'pkgrel': (self.pkgrel, changed['pkgrel'])})
 
         for key in changes:
             if changed[key] is False:
