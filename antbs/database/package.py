@@ -387,7 +387,7 @@ class Package(PackageMeta):
         version_from_commit = self.is_monitored and 'commits' == self.mon_type
         is_mate_pkg = self.is_monitored and 'mate-desktop' == self.mon_service
 
-        if not any([version_from_tag, version_from_commit, is_mate_pkg]):
+        if not any((version_from_tag, version_from_commit, is_mate_pkg)):
             for key in changed:
                 new_val = self.get_from_pkgbuild(key)
 
@@ -451,6 +451,12 @@ class Package(PackageMeta):
         if not changes:
             is_valid = self.version_str and 'None' not in self.version_str
             return self.version_str if is_valid else self.pkgver
+
+        same_pkgver = self.pkgver == changed.get('pkgver', self.pkgver)
+        same_pkgrel = self.pkgrel == changed.get('pkgver', self.pkgrel)
+
+        if same_pkgver and same_pkgrel:
+            changed['pkgrel'] = str(int(self.pkgrel) + 1)
 
         for key in changes:
             if changed[key] is False:

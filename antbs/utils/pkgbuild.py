@@ -107,6 +107,7 @@ class Pkgbuild:
             line = line.strip()
 
             if self.in_array:
+                # We're in a multi-line array
                 self.current_value = line
                 self.process_list_value()
                 continue
@@ -135,10 +136,10 @@ class Pkgbuild:
 
     def process_string_value(self):
         val = self.current_value.strip("'\"")
-        self.values[self.current_key] = val if 'None' not in val else ''
+        self.values[self.current_key] = val if val and 'None' not in val else ''
 
     def process_list_value(self):
-        self.in_array_check()
+        self.maybe_toggle_in_array_status()
 
         vals = [i.strip("'\"") for i in self.current_value.strip('()').split(' ')]
 
@@ -146,14 +147,17 @@ class Pkgbuild:
             self.array_values.extend(vals)
 
         if not self.in_array:
+            # We just processed either a single-line array or the last line in a multi-line array.
             self.values[self.current_key] = self.array_values or []
             self.array_values = []
 
-    def in_array_check(self):
+    def maybe_toggle_in_array_status(self):
         if not self.in_array and self.current_value.startswith('('):
+            # Current line has the start of an array (it might also have the end of the array)
             self.in_array = True
         if self.in_array and self.current_value.endswith(')'):
-            self. in_array = False
+            # Current line has the end of an array.
+            self.in_array = False
 
     def maybe_fix_pkgver(self):
         if 'pkgver' not in self.values:
