@@ -319,7 +319,12 @@ class Package(PackageMeta):
 
     def update_pkgbuild_and_push_github(self, changes: Dict[str, tuple]) -> bool:
         change_monitored = [True for key in changes if 'monitored' in key]
-        can_push = change_monitored or self.push_version or self.is_monitored
+        can_push = (
+            change_monitored
+            or self.push_version
+            or self.is_monitored
+            or 'pkgrel' in changes
+        )
         invalid_value = [
             True for c in changes
             if any(True for n in [None, 'None', '']
