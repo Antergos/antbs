@@ -453,7 +453,7 @@ class Package(PackageMeta):
             return self.version_str if is_valid else self.pkgver
 
         same_pkgver = self.pkgver == changed.get('pkgver', self.pkgver)
-        same_pkgrel = self.pkgrel == changed.get('pkgver', self.pkgrel)
+        same_pkgrel = self.pkgrel == changed.get('pkgrel', self.pkgrel)
 
         if same_pkgver and same_pkgrel:
             changed['pkgrel'] = str(int(self.pkgrel) + 1)
