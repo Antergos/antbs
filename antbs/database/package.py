@@ -441,7 +441,7 @@ class Package(PackageMeta):
             try:
                 pkglist = subprocess.check_output(cmd, cwd=tmp_dir, universal_newlines=True)
                 pkg = pkglist.split('\n')[0]
-                name, pkgver, pkgrel, arch = pkg.split('-')
+                name, pkgver, pkgrel, arch = pkg.split('-', 3)
             except Exception as err:
                 logger.exception(err)
                 return self.version_str
