@@ -30,6 +30,14 @@ import logging
 import os
 import shutil
 import subprocess
+from functools import wraps
+
+from flask import (
+    redirect,
+    abort,
+    _request_ctx_stack,
+    session,
+)
 
 
 def truncate_middle(s, n):
@@ -142,8 +150,7 @@ def symlink(src, dst, relative_to=None):
 
 def quiet_down_noisy_loggers():
     noisy_loggers = ["github3",
-                     "requests",
-                     "stormpath.http"]
+                     "requests"]
 
     for logger_name in noisy_loggers:
         noisy_logger = logging.getLogger(logger_name)
@@ -251,3 +258,38 @@ def set_server_status(first=True, saved_status=False, is_review=False, is_monito
 
     return ret
 
+
+def get_current_user():
+    try:
+        return _request_ctx_stack.top.user
+    except AttributeError:
+        user = type('User', (object,), {'profile': None, 'is_authenticated': False})
+
+        try:
+            user.profile = session['user']
+            user.is_authenticated = user.profile['app_metadata']['antbs'] is True
+        except Exception:
+            user.profile = {}
+            user.is_authenticated = False
+
+        if 'username' not in user.profile:
+            user.profile['username'] = user.profile['nickname']
+
+        _request_ctx_stack.top.user = user
+
+    return _request_ctx_stack.top.user
+
+
+def auth_required(func):
+    @wraps(func)
+    def view_method(*args, **kwargs):
+        if get_current_user().is_authenticated:
+            return func(*args, **kwargs)
+
+        if '/api/' in request.path:
+            abort(403)
+
+        # Redirect to Login
+        return redirect('/auth/login')
+
+    return view_method

@@ -46,7 +46,7 @@ class LoggingConfig(metaclass=Singleton):
 
     def __init__(self, status):
         if self._noisy_loggers is None:
-            self._noisy_loggers = ['github3', 'requests', 'stormpath.http', 'docker']
+            self._noisy_loggers = ['github3', 'requests', 'docker']
 
         if self._db is None:
             self._db = status.db

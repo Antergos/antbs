@@ -80,24 +80,6 @@ class AntBSConfig:
     def _rq_dashboard(self):
         self.app.config.from_object(rq_dashboard.default_settings)
 
-    def _stormpath(self):
-        if not self.status.sp_api_id:
-            for item in ('SP_API_ID', 'SP_API_KEY', 'SP_APP'):
-                setattr(self.status, item.lower(), os.environ.get(item))
-
-        config = {'STORMPATH_API_KEY_ID': self.status.sp_api_id,
-                  'STORMPATH_API_KEY_SECRET': self.status.sp_api_key,
-                  'STORMPATH_APPLICATION': self.status.sp_app,
-                  'STORMPATH_COOKIE_DURATION': timedelta(days=14),
-                  'STORMPATH_ENABLE_FORGOT_PASSWORD': True,
-                  'STORMPATH_ENABLE_REGISTRATION': False,
-                  'STORMPATH_ENABLE_USERNAME': True,
-                  'STORMPATH_LOGIN_TEMPLATE': 'admin/login.html',
-                  'STORMPATH_REDIRECT_URL': '/builds/completed',
-                  'STORMPATH_REQUIRE_USERNAME': True}
-
-        self.app.config.update(config)
-
     def apply_all(self, app):
         self.app = app
 

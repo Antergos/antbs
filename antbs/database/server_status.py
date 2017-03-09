@@ -46,7 +46,8 @@ class ServerStatus(RedisHash, metaclass=RedisSingleton):
                 'bugsnag_key', 'sp_session_key', 'sp_api_id', 'sp_api_key',
                 'sp_app', 'gh_repo_url', 'request_from', 'ANTERGOS_API_DB_KEY_NAME',
                 'MONITOR_PKGS_KEY', 'smtp_pass', 'email', 'repo_lock_id', 'repo_lock_key',
-                'generating_lock_id', 'ethemes_url', 'et_count_key', 'iso_release_check_key'],
+                'generating_lock_id', 'ethemes_url', 'et_count_key', 'iso_release_check_key',
+                'auth0_id', 'auth0_secret', 'auth0_domain'],
 
         bool=['status', 'idle', 'iso_flag', 'iso_building', 'iso_minimal',
               'docker_image_building', 'repo_locked_antergos', 'repo_locked_staging',

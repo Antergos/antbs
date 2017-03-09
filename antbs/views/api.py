@@ -158,7 +158,7 @@ class APIView(FlaskView):
         return errmsg
 
     @route('/build_pkg_now', methods=['POST', 'GET'])
-    @groups_required(['admin'])
+    @auth_required
     def build_pkg_now(self):
         if request.method == 'POST':
             pkgnames = request.form['pkgname']
@@ -203,7 +203,7 @@ class APIView(FlaskView):
         return redirect(redirect_url())
 
     @route('/ajax', methods=['GET', 'POST'])
-    @groups_required(['admin'])
+    @auth_required
     def ajax(self):
         if not current_user.is_authenticated:
             return EMPTY_RESPONSE, 403
@@ -255,14 +255,6 @@ class APIView(FlaskView):
 
         return json.dumps(message)
 
-    @route('/get_et_stats')
-    def get_et_stats(self):
-        stats = status.db.hgetall(status.et_count_key) or '{}'
-        stats = [{'date': int(k), 'total_customers': int(v)} for k, v in stats.items()]
-        stats.sort(key=lambda k: k['date'])
-
-        return json.dumps(stats)
-
     @route('/get_log')
     @route("/get_log/<int:bnum>")
     def get_log(self, bnum=None):
@@ -307,7 +299,7 @@ class APIView(FlaskView):
         return json.dumps(hook.result)
 
     @route('/ajax/pkg_review', methods=['POST'])
-    @groups_required(['admin'])
+    @auth_required
     def pkg_review(self):
         payload = json.loads(request.data.decode('utf-8'))
         bnum = payload['bnum']
@@ -326,7 +318,7 @@ class APIView(FlaskView):
                 return json.dumps(message)
 
     @route('/package/<pkgname>', methods=['POST'])
-    @groups_required(['admin'])
+    @auth_required
     def update_package_meta(self, pkgname):
         if not pkgname or not pkgname.isalpha() or pkgname not in status.all_packages:
             abort(400)

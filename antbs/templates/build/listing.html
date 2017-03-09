@@ -173,7 +173,7 @@
 					var data = {
 						bnum: jQuery( this ).attr( 'data-bnum' ),
 						result: jQuery( this ).attr( 'id' ),
-						dev: '{{ user.username }}'
+						dev: '{{ user.profile['username'] }}'
 					};
 					jQuery.ajax( {
 						type: 'POST',

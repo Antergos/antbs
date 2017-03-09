@@ -40,7 +40,8 @@ from flask import (
     render_template,
     request,
     Response,
-    url_for
+    url_for,
+    session,
 )
 
 from rq import (
@@ -49,8 +50,11 @@ from rq import (
     Worker
 )
 
-from datetime import datetime, timedelta
-from flask_stormpath import current_user, groups_required
+from datetime import (
+    datetime,
+    timedelta,
+)
+
 from jinja2 import TemplateNotFound
 
 from database import (
@@ -70,7 +74,11 @@ from utils import *
 from webhook import Webhook
 from transaction_handler import handle_hook, update_repo_databases
 from iso_utility import iso_release_job
-from extensions import FlaskView, route
+from extensions import (
+    FlaskView,
+    route,
+    current_user,
+)
 
 logger = status.logger
 
@@ -131,10 +139,10 @@ def match_pkgname_with_build_number(bnum=None, match=None):
     return False
 
 
-def package_in_group(pkg=None, group=None):
+def package_in_group(pkg, group):
     excluded = ['grub-zfs', 'plymouth-theme-antergos']
 
-    if not pkg or not group or pkg in excluded:
+    if pkg in excluded:
         return False
 
     pkg_obj = get_pkg_object(pkg)
@@ -235,5 +243,6 @@ from .home import HomeView
 from .live import LiveView
 from .package import PackageView
 from .repo import RepoView
+from .auth0 import Auth0View
 
-all_views = [APIView, BuildView, BuildsView, HomeView, LiveView, PackageView, RepoView]
+all_views = [Auth0View, APIView, BuildView, BuildsView, HomeView, LiveView, PackageView, RepoView]

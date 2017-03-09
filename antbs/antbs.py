@@ -45,7 +45,6 @@ from database import (
 from config import AntBSConfig
 from views import all_views
 from extensions import (
-    stormpath_manager,
     debug_toolbar,
     rq_dashboard
 )
@@ -69,9 +68,6 @@ def create_app():
     antbs_config = AntBSConfig(status, logger)
     _app = antbs_config.apply_all(_app)
 
-    # Init Stormpath Manager
-    stormpath_manager.init_app(_app)
-
     # Debug Toolbar
     # _app.debug = True
     debug_toolbar.init_app(_app)
@@ -91,6 +87,7 @@ def create_app():
     return _app
 
 app = create_app()
+
 
 if __name__ == "__main__":
     app = create_app()

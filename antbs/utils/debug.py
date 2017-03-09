@@ -28,7 +28,6 @@
 
 from flask import request
 from flask_debugtoolbar import DebugToolbarExtension
-from flask_stormpath import current_user
 
 
 class AntBSDebugToolbar(DebugToolbarExtension):

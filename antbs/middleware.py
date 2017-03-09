@@ -35,11 +35,12 @@ from flask import (
     render_template,
     request,
     url_for,
-    abort
+    abort,
+    session,
 )
 
-from extensions import current_user
 from database import status
+from utils import get_current_user
 
 
 @current_app.errorhandler(400)
@@ -64,8 +65,8 @@ def inject_global_template_variables():
         current_status=status.current_status,
         now_building=status.now_building,
         rev_pending=status.pending_review,
-        user=current_user,
-        current_user=current_user,
+        user=get_current_user(),
+        current_user=get_current_user(),
         _all_packages=status.all_packages,
         pkg_groups=status.package_groups
     )
@@ -73,7 +74,7 @@ def inject_global_template_variables():
 
 @current_app.before_request
 def rq_dashboard_requires_auth():
-    if '/rq' in request.path and not current_user.is_authenticated:
+    if '/rq' in request.path and not get_current_user().is_authenticated:
         abort(403)
 
 

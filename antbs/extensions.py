@@ -29,15 +29,25 @@
 """ Extensions are instantiated here to avoid circular imports with views and create_app(). """
 
 from werkzeug.contrib.fixers import ProxyFix
-from flask import request, url_for
-from flask_stormpath import StormpathManager, current_user
-from flask_classful import FlaskView, route
+from werkzeug.local import LocalProxy
+from flask import (
+    request,
+    url_for,
+    _request_ctx_stack,
+)
+from flask_classful import (
+    FlaskView,
+    route,
+)
 import rq_dashboard
 
-from utils import AntBSDebugToolbar
+from utils import (
+    AntBSDebugToolbar,
+    get_current_user,
+)
 
 debug_toolbar = AntBSDebugToolbar()
-stormpath_manager = StormpathManager()
+current_user = LocalProxy(lambda: get_current_user())
 
 
 def url_for_other_page(page):
