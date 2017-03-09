@@ -268,11 +268,12 @@ def get_current_user():
         try:
             user.profile = session['user']
             user.is_authenticated = user.profile['app_metadata']['antbs'] is True
+            session.permanent = True
         except Exception:
             user.profile = {}
             user.is_authenticated = False
 
-        if 'username' not in user.profile:
+        if user.profile and 'username' not in user.profile:
             user.profile['username'] = user.profile['nickname']
 
         _request_ctx_stack.top.user = user

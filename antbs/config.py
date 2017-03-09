@@ -61,9 +61,13 @@ class AntBSConfig:
         if not self.status.sp_session_key:
             self.status.sp_session_key = os.environ.get('SP_SESSION_KEY')
 
-        config = {'DEBUG_TB_PROFILER_ENABLED': False,
-                  'SECRET_KEY': self.status.sp_session_key,
-                  'TEMPLATES_AUTO_RELOAD': True}
+        config = {
+            'DEBUG_TB_PROFILER_ENABLED': False,
+            'SECRET_KEY': self.status.sp_session_key,
+            'TEMPLATES_AUTO_RELOAD': True,
+            'SESSION_COOKIE_SECURE': True,
+            'PREFERRED_URL_SCHEME': 'https',
+        }
 
         self.app.config.update(config)
 
