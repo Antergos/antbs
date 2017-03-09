@@ -23,8 +23,8 @@ cd /var/tmp/archbuild
 VERSION=$(curl https://mirrors.kernel.org/archlinux/iso/latest/ | grep -Poh '(?<=archlinux-bootstrap-)\d*\.\d*\.\d*(?=\-x86_64)' | head -n 1)
 curl http://mirror.us.leaseweb.net/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz > archlinux-bootstrap-$VERSION-x86_64.tar.gz
 curl http://mirror.us.leaseweb.net/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig > archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
- #Pull Pierre Schmitz PGP Key.
- http://pgp.mit.edu:11371/pks/lookup?op=vindex&fingerprint=on&exact=on&search=0x4AA4767BBC9C4B1D18AE28B77F2D434B9741E8AC
+##Pull Pierre Schmitz PGP Key.
+# http://pgp.mit.edu:11371/pks/lookup?op=vindex&fingerprint=on&exact=on&search=0x4AA4767BBC9C4B1D18AE28B77F2D434B9741E8AC
 gpg --keyserver pgp.mit.edu --recv-keys 9741E8AC
  #Verify its integrity.
 gpg --verify archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
@@ -51,7 +51,7 @@ sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	# linux jfsutils lvm2 cryptsetup groff man-db man-pages mdadm pciutils pcmciautils reiserfsprogs s-nail xfsprogs vi
 	pacman -Syyu --noconfirm wget bash bzip2 coreutils dhcpcd gawk gcc-libs gettext git glibc grep gzip inetutils iproute2 iputils less libutil-linux licenses logrotate psmisc sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux which nano
 	# Pacman doesn't let us force ignore files, so clean up.
-	pacman -S --noconfirm base-devel git gcc arch-install-scripts reflector lzo2
+	pacman -S --noconfirm base-devel make git gcc arch-install-scripts reflector lzo2 fakeroot
 	reflector -l 30 -f 15 --save /etc/pacman.d/mirrorlist
 	pacman -Rcc --noconfirm reflector python
 	pacman -Scc --noconfirm
