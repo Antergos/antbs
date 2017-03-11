@@ -130,7 +130,7 @@ class Package(PackageMeta):
 
     def initialize_once(self):
         allowed_in = self.get_from_pkgbuild('_allowed_in')
-        auto_sum = self.get_from_pkgbuild('_auto_sum')
+        auto_sum = self.get_from_pkgbuild('_auto_sum') or self.get_from_pkgbuild('_autosums')
         is_metapkg = self.get_from_pkgbuild('_is_metapkg') in ['True', 'yes']
         is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
         patterns = ['pkgname=(', 'pkgbase=']
