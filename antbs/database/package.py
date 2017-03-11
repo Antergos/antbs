@@ -134,7 +134,7 @@ class Package(PackageMeta):
         is_metapkg = self.get_from_pkgbuild('_is_metapkg') in ['True', 'yes']
         is_monitored = self.get_from_pkgbuild('_is_monitored') in ['True', 'yes']
         patterns = ['pkgname=(', 'pkgbase=']
-        is_split_package = [True for pattern in patterns if pattern in self.pkgbuild]
+        is_split_package = any(True for pattern in patterns if pattern in self.pkgbuild)
 
         if '-x86_64' in self.name or '-i686' in self.name:
             self.is_iso = True
@@ -563,6 +563,7 @@ class Package(PackageMeta):
         self.pkgdesc = self.get_from_pkgbuild('pkgdesc')
         self.description = self.pkgdesc
         self.url = self.get_from_pkgbuild('url')
+        self.auto_sum = self.get_from_pkgbuild('_auto_sum') or self.get_from_pkgbuild('_autosums')
 
         if self.is_split_package:
             self.sync_pkgbuild_array_by_key('pkgname')
