@@ -39,6 +39,8 @@ class RepoView(FlaskView):
         args = [arg for arg in [_filter, filter_by] if arg is not None]
 
         for arg in args:
+            if arg in status.package_groups:
+                continue
             if arg.isdigit() or not arg.isalpha():
                 abort(404)
 
