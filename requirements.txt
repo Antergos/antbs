@@ -3,8 +3,6 @@ docker-py==1.10.3
 Flask==0.12
 Flask_Classful==0.13.1
 Flask_DebugToolbar==0.10.0
-Flask_Stormpath==0.4.5
-geoip2==2.2.0
 gevent==1.1.2
 github3.py==1.0.0a4
 gunicorn==19.6.0

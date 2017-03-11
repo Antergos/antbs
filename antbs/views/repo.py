@@ -98,7 +98,7 @@ class RepoView(FlaskView):
         if _filter not in ['search', 'group', 'monitored']:
             return False
 
-        if filter_by and not re.fullmatch(r'\w+$', filter_by):
+        if filter_by and not re.fullmatch(r'[\w-]+$', filter_by):
             return False
 
         if 'group' == _filter and filter_by not in status.package_groups:

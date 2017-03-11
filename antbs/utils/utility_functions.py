@@ -263,18 +263,15 @@ def get_current_user():
     try:
         return _request_ctx_stack.top.user
     except AttributeError:
-        user = type('User', (object,), {'profile': None, 'is_authenticated': False})
+        user = type('User', (object,), {'username': None, 'is_authenticated': False})
 
         try:
-            user.profile = session['user']
-            user.is_authenticated = user.profile['app_metadata']['antbs'] is True
+            user.username = session['user']['username']
+            user.is_authenticated = session['user']['is_authenticated'] is True
             session.permanent = True
         except Exception:
-            user.profile = {}
+            user.username = ''
             user.is_authenticated = False
-
-        if user.profile and 'username' not in user.profile:
-            user.profile['username'] = user.profile['nickname']
 
         _request_ctx_stack.top.user = user
 
@@ -288,7 +285,7 @@ def auth_required(func):
             return func(*args, **kwargs)
 
         if '/api/' in request.path:
-            abort(403)
+            return abort(403)
 
         # Redirect to Login
         return redirect('/auth/login')

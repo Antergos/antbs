@@ -56,7 +56,13 @@ class Auth0View(FlaskView):
         user_info = requests.get(user_url).json()
 
         if user_info:
-            session['user'] = user_info
+            is_authenticated = user_info['app_metadata'].get('antbs', False) is True
+            user = dict(username=user_info['nickname'], is_authenticated=is_authenticated)
+            if 'user' in session:
+                status.logger.debug(session['user'])
+            session['user'] = user
+            session.permanent = is_authenticated
+
             return redirect('/builds/completed')
 
         return redirect('/')
