@@ -255,7 +255,7 @@
 									}).dataTable({
 										"aoColumns": [
 											{% if '/repo/' in request.path and '/packages' in request.path %}
-												{"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null, null{% if '/group/' in request.path %},null{% endif %}{% if '/monitored' in request.path %}, null, null{% endif %}
+												{"sType": "num-html"}, null, null, {"sType": "num-html"}, null, null, null{% if '/group/' in request.path %}, null{% endif %}{% if '/monitored' in request.path %}, null, null{% endif %}{% if current_user.is_authenticated %}, null{% endif %}
 
 											{% elif '/builds/' in request.path and '/completed' in request.path %}
 												{"sType": "num-html"}, {"sType": "num-html"}, null, null, null, null, null, null, null

@@ -45,8 +45,15 @@
 		</div>
 
 		<div class="content">
-			<iframe id="filesFrame" style="border:none; background: #F0F0F0;" src="//repo.antergos.info/antergos/" width="100%" height="100%"
-					seamless="seamless" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+			<iframe
+				id="filesFrame"
+				style="border:none; background: #F0F0F0;"
+				src="https://repo.antergos.info/antergos/"
+				width="100%"
+				height="100%"
+				seamless="seamless"
+				sandbox="allow-scripts allow-same-origin allow-forms"
+				referrerpolicy="origin-when-cross-origin"></iframe>
 		</div>
 	</div>
 {% endblock maincontainer %}
@@ -72,10 +79,10 @@
 				});
 
 				if (jQuery(this).attr('id') == 'antergos') {
-					jQuery('#filesFrame').attr('src', '//repo.antergos.info/antergos');
+					jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/antergos');
 				}
 				else if (jQuery(this).attr('id') == 'repo') {
-					jQuery('#filesFrame').attr('src', '//repo.antergos.info/');
+					jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/');
 				}
 
 			});
@@ -103,18 +110,18 @@
 
 			if (jQuery(this).children('#i686').length) {
 
-				jQuery('#filesFrame').attr('src', '//repo.antergos.info/antergos/i686');
+				jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/antergos/i686');
 			} else if (jQuery(this).children('#x86_64').length) {
-				jQuery('#filesFrame').attr('src', '//repo.antergos.info/antergos/x86_64');
+				jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/antergos/x86_64');
 			}
 		});
 
 
 		function goToi686() {
-			jQuery('#filesFrame').attr('src', '//repo.antergos.info/antergos/i686');
+			jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/antergos/i686');
 		}
 		function goTox86_64() {
-			jQuery('#filesFrame').attr('src', '//repo.antergos.info/antergos/x86_64');
+			jQuery('#filesFrame').attr('src', 'https://repo.antergos.info/antergos/x86_64');
 		}
 
 	</script>

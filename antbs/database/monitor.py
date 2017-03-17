@@ -276,7 +276,8 @@ class Monitor(RedisHash):
 
     def check_mate_desktop_server_for_changes(self, pkg_obj):
         if self.mate is None:
-            url = 'http://pub.mate-desktop.org/releases/{}/SHA1SUMS'.format(pkg_obj.mon_match_pattern)
+            url = 'http://pub.mate-desktop.org/releases/1.18/SHA1SUMS'
+            # url = 'http://pub.mate-desktop.org/releases/{}/SHA1SUMS'.format()
             self.mate = CheckSumsMonitor(url, self.mate_last_etag, status=status)
             self.mate_last_etag = self.mate.etag
 
@@ -404,10 +405,6 @@ class Monitor(RedisHash):
                 latest = monitor_obj.latest
 
             changes = {'pkgver': (pkg_obj.pkgver, latest)}
-
-            if 'mate-desktop' == pkg_obj.mon_service:
-                checksum = monitor_obj.files[pkg_obj.pkgname]['checksum']
-                changes['sha1sums'] = (pkg_obj.checksum, checksum)
 
             pkg_obj.update_pkgbuild_and_push_github(changes)
 

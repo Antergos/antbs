@@ -66,7 +66,17 @@ class ColumnsInfo:
             {
                 'heading_text': 'Last Build',
                 'obj_attr': '_build.bnum',
-                'content_type': 'link',
+                'content_type': 'link_with_icon',
+                'icon_info': {
+                    'class': {
+                        'completed': 'check',
+                        'failed': 'times',
+                    },
+                    'color':  {
+                        'completed': '#2CC36B',
+                        'failed': '#EA6153',
+                    },
+                },
                 'base_url': '/build/',
                 'dd_info': ''
             },
@@ -115,7 +125,7 @@ class ColumnsInfo:
             }
         ]
 
-        if self.current_user.is_authenticated and self.request.path.endswith('/packages'):
+        if self.current_user.is_authenticated and '/packages' in self.request.path:
             columns_info.append({
                 'heading_text': 'Manage',
                 'obj_attr': '',

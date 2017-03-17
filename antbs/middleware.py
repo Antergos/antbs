@@ -39,7 +39,10 @@ from flask import (
     session,
 )
 
-from database import status
+from database import (
+    status,
+    get_build_object,
+)
 from utils import get_current_user
 
 
@@ -68,7 +71,7 @@ def inject_global_template_variables():
         user=get_current_user(),
         current_user=get_current_user(),
         _all_packages=status.all_packages,
-        pkg_groups=status.package_groups
+        pkg_groups=status.package_groups,
     )
 
 
@@ -84,3 +87,9 @@ def tpl_name(s):
     res = re.findall('\'([^\']*)\'', str(s))
 
     return None if not res else res[0]
+
+
+@current_app.template_filter()
+def build_failed(bnum):
+    build = get_build_object(bnum=int(bnum))
+    return build.failed

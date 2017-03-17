@@ -406,12 +406,6 @@ class Package(PackageMeta):
             if not self.mon_last_result:
                 self.mon_last_result = self.get_from_pkgbuild('pkgver')
 
-            if self.auto_sum and self.mon_last_result.replace('|', '.') != old_vals['pkgver']:
-                _pkgver, _buildver = self.mon_last_result.split('|')
-                changed['_pkgver'] = _pkgver
-                changed['_buildver'] = _buildver
-                changed['pkgver'] = self.mon_last_result.replace('|', '.')
-                changed['pkgrel'] = '1'
             elif 'pamac-dev' == self.pkgname:
                 # Hack -- fix later.
                 changed['pkgver'] = get_pkg_object('pamac').pkgver

@@ -332,15 +332,19 @@
  #     text       (str):  The text to display next to the icon. Not required when calling this
  #                        macro from another macro. You should place text inside call block instead.
  #}
-{% macro text_with_icon(icon_info, text=None) %}
+{% macro text_with_icon(icon_info, text=None, icon_class_key=None) %}
 	{% set icon_class = icon_info.class %}
 	{% set icon_color = icon_info.color %}
 
-	{% if icon_info.class is mapping %}
+	{% if icon_info.class is mapping and icon_class_key is not none %}
+		{% set icon_class = icon_info.class[icon_class_key] %}
+	{% elif icon_info.class is mapping %}
 		{% set icon_class = icon_info.class[text] %}
 	{% endif %}
 
-	{% if icon_info.color is mapping %}
+	{% if icon_info.color is mapping and icon_class_key is not none %}
+		{% set icon_color = icon_info.color[icon_class_key] %}
+	{% elif icon_info.color is mapping %}
 		{% set icon_color = icon_info.color[text] %}
 	{% endif %}
 
@@ -405,6 +409,18 @@
 									{% else %}
 										<a href="{{ column.base_url }}{{ value }}">{{ value }}</a>
 									{% endif %}
+
+								{% elif 'link_with_icon' == column.content_type %}
+									{% if 'Last Build' == column.heading_text and True == value|int()|build_failed() %}
+										{% set class_name_key = 'failed' %}
+									{% elif 'Last Build' == column.heading_text %}
+										{% set class_name_key = 'completed' %}
+									{% else %}
+										{% set class_name_key = None %}
+									{% endif %}
+									<a href="{{ '/build/%s'|format(value) }}">
+										{{ text_with_icon(column.icon_info, value, class_name_key) }}
+									</a>
 
 								{% elif 'text_with_icon' == column.content_type %}
 									{{ text_with_icon(column.icon_info, value) }}
