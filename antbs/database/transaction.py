@@ -361,6 +361,12 @@ class Transaction(TransactionMeta):
             pkg_obj.version_str = version
             self._pkgvers[pkg] = version
 
+            if pkg_obj.is_split_package and pkg_obj.pkgname == pkg_obj.gh_path.rsplit('/')[1]:
+                for split_pkg in pkg_obj.split_packages:
+                    split_pkg_obj = get_pkg_object(split_pkg)
+                    split_pkg_obj.version_str = version
+                    split_pkg_obj.pkgver = pkg_obj.pkgver
+
             log_msg = 'Updating pkgver in database for {0} to {1}'.format(pkg, version)
             logger.info(log_msg)
             status.current_status = log_msg

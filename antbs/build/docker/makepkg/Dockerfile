@@ -9,4 +9,4 @@ echo "[antergos]" >> /etc/pacman.conf; echo "Include = /etc/pacman.d/antergos-mi
 pacman-key --init; pacman-key --populate archlinux antergos; \
 pacman -Syyu --needed --noconfirm base-devel sudo yaourt openssh xdelta3 reflector expect devtools arch-install-scripts fakeroot; pacman -Scc --noconfirm
 RUN echo 'antbs ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/10-builder
-RUN echo 'antbs:x:1001:100:antbs:/:/usr/bin/nologin' >> /etc/passwd
+RUN echo 'antbs:x:1001:100:antbs:/tmp/antbs:/usr/bin/nologin' >> /etc/passwd
