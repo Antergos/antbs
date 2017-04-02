@@ -241,23 +241,23 @@ class Package(PackageMeta):
             logger.error(err.output)
 
     def determine_github_path(self):
+        gh_repo_base_url = '{}/blob/master'.format(status.gh_repo_url)
+        gh_path = ''
         paths = [
             os.path.join('antergos', 'cinnamon', self.pkgname),
             os.path.join('antergos', 'mate', self.pkgname),
             os.path.join('antergos', 'liri', self.pkgname),
             os.path.join('antergos', self.pkgname)
         ]
-        gh_path = ''
 
         for path in paths:
-            url = '{0}{1}'.format(GH_REPO_BASE_URL, path)
+            url = '{0}/{1}'.format(gh_repo_base_url, path)
             req = requests.head(url, allow_redirects=True)
 
             try:
                 req.raise_for_status()
                 gh_path = path
             except Exception:
-                logger.info('path: %s not found for %s', path, self.pkgname)
                 continue
 
             break
@@ -265,9 +265,10 @@ class Package(PackageMeta):
         if not gh_path:
             logger.error('Could not determine gh_path for %s', self.pkgname)
             return False
-        else:
-            self.gh_path = os.path.join(gh_path, 'PKGBUILD')
-            return True
+
+        self.gh_path = os.path.join(gh_path, 'PKGBUILD')
+
+        return True
 
     @staticmethod
     def get_github_api_client(project='antergos', repo='antergos-packages'):
