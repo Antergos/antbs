@@ -239,7 +239,7 @@ class GithubMonitor(PackageSourceMonitor):
                 if items_checked > 50:
                     break
 
-        # self.logger.debug(latest)
+        latest = latest if 'commits' == what_to_get else latest.replace('v', '')
         pkg_obj.mon_etag = etag
         return latest
 
