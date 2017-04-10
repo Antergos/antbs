@@ -120,8 +120,7 @@ class PackageMeta(RedisHash):
             self.pkgname = key
             self.name = key
 
-            next_id = self.db.incr('antbs:misc:pkgid:next')
-            self.pkg_id = next_id
+            self.pkg_id = self.db.incr('antbs:misc:pkgid:next')
 
             status.all_packages.add(self.name)
 

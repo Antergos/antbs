@@ -38,7 +38,7 @@ from utils import (
 )
 
 from database.base_objects import RedisHash
-from database.server_status import status
+from database.status import status
 
 doc_util = DockerUtils(status)
 doc = doc_util.doc

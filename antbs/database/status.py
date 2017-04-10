@@ -27,7 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 
-""" Server Status Module (handles this application's state) """
+""" Server Status Module (handles the application's state) """
 
 import datetime
 import contextlib

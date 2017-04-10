@@ -42,7 +42,6 @@ from . import (
 logger = status.logger
 REPO_DIR = status.PKGBUILDS_DIR
 GITLAB_TOKEN = status.gitlab_token
-GH_REPO_BASE_URL = 'http://github.com/Antergos/antergos-packages/blob/master/'
 
 
 class Package(PackageMeta):

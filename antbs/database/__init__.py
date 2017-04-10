@@ -38,7 +38,7 @@ from .base_objects import (
     bool_string_helper
 )
 
-from .server_status import status, get_timeline_object
+from .status import status, get_timeline_object
 from .build import get_build_object
 from .package import get_pkg_object
 from .repo import get_repo_object
