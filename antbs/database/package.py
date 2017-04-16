@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # package.py
@@ -33,7 +32,7 @@ from github3 import login
 from github3.exceptions import UnprocessableResponseBody
 from gitlab import Gitlab
 
-from .meta.package_meta import PackageMeta
+from .metadata.package import PackageMetadata
 from utils import Pkgbuild
 from . import (
     status
@@ -44,7 +43,7 @@ REPO_DIR = status.PKGBUILDS_DIR
 GITLAB_TOKEN = status.gitlab_token
 
 
-class Package(PackageMeta):
+class Package(PackageMetadata):
     """
     This class represents a "package" throughout this application. It is used to
     get and set package data from/to the database as well as from PKGBUILDs.
@@ -102,7 +101,6 @@ class Package(PackageMeta):
         transactions      (list): The IDs of all build transactions that include this package.
         url               (str):  See `man PKGBUILD`.
         version_str       (str):  The full version suituble for display on the frontend.
-
     """
     def __init__(self, name, fetch_pkgbuild=False):
         super().__init__(key=name)
@@ -111,15 +109,10 @@ class Package(PackageMeta):
 
         if not self.gh_path:
             self.determine_github_path()
-            if not self.gh_path:
-                raise RuntimeError(name)
 
         if fetch_pkgbuild or not self.pkgbuild:
             logger.debug('%s: Fetching pkgbuild from github..', self.pkgname)
             self.pkgbuild = self.fetch_pkgbuild_from_github()
-
-        if not self.pkgbuild:
-            raise RuntimeError(name)
 
         if not self.is_initialized:
             self.is_initialized = self.initialize_once()
@@ -262,8 +255,7 @@ class Package(PackageMeta):
             break
 
         if not gh_path:
-            logger.error('Could not determine gh_path for %s', self.pkgname)
-            return False
+            raise RuntimeError('Could not determine gh_path for {}'.format(self.pkgname))
 
         self.gh_path = os.path.join(gh_path, 'PKGBUILD')
 
@@ -302,14 +294,14 @@ class Package(PackageMeta):
                     'PKGBUILD'
                 )
 
+            if not pbpath:
+                raise RuntimeError('Unable to determine gh_path for {}!'.format(self.pkgname))
+
             self.gh_path = pbpath
-
-            logger.debug(pbpath)
-
-        pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+            pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
 
         if not pbfile_contents:
-            logger.error(self.pkgname)
+            raise RuntimeError('Unable to fetch pkgbuild for {}!'.format(self.pkgname))
 
         return pbfile_contents
 

@@ -51,7 +51,7 @@ from utils import (
     DockerUtils,
 )
 
-from .meta.repo_meta import PacmanRepoMeta
+from .metadata.repo import PacmanRepoMeta
 
 logger = status.logger
 doc_util = DockerUtils(status)

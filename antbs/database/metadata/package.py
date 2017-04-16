@@ -30,12 +30,14 @@
 from database import RedisHash, status
 
 
-class PackageMeta(RedisHash):
+class PackageMetadata(RedisHash):
     """
-    This is the base class for ::class:`Package`. It initalizes the fields for
+    This is the base class for ::class:`Package`. It initializes the fields for
     the package metadata that is stored in the database. You should not use this
     class directly.
-
+    
+    Attributes:
+        attrib_lists (dict[str, list[str]])
     """
 
     attrib_lists = dict(
