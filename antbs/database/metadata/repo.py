@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #  -*- coding: utf-8 -*-
 #
 #  repo_meta.py
@@ -31,12 +30,14 @@ import os
 from database import RedisHash, status
 
 
-class PacmanRepoMeta(RedisHash):
+class PacmanRepoMetadata(RedisHash):
     """
-    This is the base class for ::class:`PacmanRepo`. It initalizes the fields for
+    This is the base class for ::class:`PacmanRepo`. It initializes the fields for
     the package metadata that is stored in the database. You should not use this
     class directly.
-
+    
+    Attributes:
+        attrib_lists (dict[str, list[str]])
     """
 
     attrib_lists = dict(

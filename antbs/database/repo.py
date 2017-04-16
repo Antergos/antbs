@@ -51,7 +51,7 @@ from utils import (
     DockerUtils,
 )
 
-from .metadata.repo import PacmanRepoMeta
+from .metadata.repo import PacmanRepoMetadata
 
 logger = status.logger
 doc_util = DockerUtils(status)
@@ -62,7 +62,7 @@ DB_EXT = '.db.tar.gz'
 SCRIPTS_DIR = os.path.join(status.APP_DIR, 'scripts')
 
 
-class PacmanRepo(PacmanRepoMeta):
+class PacmanRepo(PacmanRepoMetadata):
     """
     This class represents a "repo" throughout this application. It is used to
     get/set metadata about the repos that this application manages from/to the database.
