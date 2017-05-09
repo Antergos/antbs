@@ -281,7 +281,12 @@ class RemoteFileMonitor(WebMonitor):
         super().__init__(pkg_obj.mon_file_url, pkg_obj.mon_etag, status)
 
     def _get_version(self, pkg_obj):
-        matches = re.search(pkg_obj.mon_version_pattern, self.remote_resource['text'], flags=re.M)
+        pattern = pkg_obj.mon_version_pattern
+
+        if '/' == pattern[0] and '/' == pattern[-1]:
+            pattern = pattern[1:-2]
+
+        matches = re.search(pattern, self.remote_resource['text'], flags=re.M)
         return '' if not matches else matches.group(1)
 
     def _process_remote_resource(self):
