@@ -284,7 +284,7 @@ class RemoteFileMonitor(WebMonitor):
         pattern = pkg_obj.mon_version_pattern
 
         if '/' == pattern[0] and '/' == pattern[-1]:
-            pattern = pattern[1:-2]
+            pattern = pattern[1:-1]
 
         matches = re.search(pattern, self.remote_resource['text'], flags=re.M)
         return '' if not matches else matches.group(1)
