@@ -164,7 +164,8 @@ class Transaction(TransactionMeta):
 
         status.current_status = 'Cleaning pacman package cache.'
 
-        PacmanPackageCache().maybe_do_cache_cleanup()
+        if len(status.transactions_running) == 1:
+            PacmanPackageCache().maybe_do_cache_cleanup()
 
         if self.queue:
             while self.queue:

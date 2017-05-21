@@ -65,20 +65,15 @@ class DateTimeStrings:
 
 class PacmanPackageCache(metaclass=Singleton):
 
+    doing_cache_cleanup = False
+
     def __init__(self, cache_dir='/var/tmp/pkg_cache/pkg'):
         self.cache = cache_dir
         self.cache_i686 = cache_dir.replace('cache', 'cache_i686')
         self.all_caches = [self.cache, self.cache_i686]
-        self.doing_cache_cleanup = False
 
     def maybe_do_cache_cleanup(self):
         if self.doing_cache_cleanup:
-            waiting = 0
-            while self.doing_cache_cleanup:
-                if waiting > 300:
-                    break
-                gevent.sleep(5)
-                waiting += 5
             return
 
         self.doing_cache_cleanup = True
