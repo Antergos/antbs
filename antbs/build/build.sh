@@ -143,7 +143,7 @@ fetch_upstream_pgp_keys() {
 	)
 
 	install -dm777 "${fake_home}" # gpg needs $HOME to exist and be writable
-	sudo -H -u antbs gpg --keyserver hkp://pool.sks-keyservers.net:80 --recv-keys "${mozilla[@]}" "${nodejs[@]}" 2>&1
+	sudo -H -u antbs gpg --keyserver hkp://keyserver.kjsl.com:80 --recv-keys "${mozilla[@]}" "${nodejs[@]}" 2>&1
 }
 
 in_array() {

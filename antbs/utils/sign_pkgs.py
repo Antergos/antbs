@@ -55,17 +55,7 @@ def batch_sign(paths, db, bnum='', uid='', passphrase='', is_iso=False):
             'Creating detached signature for %s' % path
         )
 
-        # Verify existing signatures. This fails if the sig is invalid or
-        # non-existent. Either way a new one will be needed.
-        cmd = [GPG_BIN, '--verify', path + SIG_EXT]
-
-        with open(os.devnull, 'w') as f:
-            p = subprocess.Popen(cmd, stdout=f, stderr=f)
-            e = p.wait()
-            if e == 0:
-                continue
-
-        sigpath = path + '.sig'
+        sigpath = path + SIG_EXT
 
         try:
             os.remove(sigpath)
