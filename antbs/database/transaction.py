@@ -26,6 +26,11 @@ import subprocess
 import tempfile
 import gevent
 
+from rq import (
+    Connection,
+    Queue,
+)
+
 from utils import (
     all_file_paths_exist,
     copy_or_symlink,
@@ -48,6 +53,9 @@ doc_util = DockerUtils(status)
 doc = doc_util.doc
 
 pkg_cache_obj = PacmanPackageCache()
+
+with Connection(status.db):
+    repo_queue = Queue('update_repo')
 
 
 class TransactionMeta(RedisHash):
@@ -167,58 +175,57 @@ class Transaction(TransactionMeta):
         if len(status.transactions_running) == 1:
             PacmanPackageCache().maybe_do_cache_cleanup()
 
-        if self.queue:
-            while self.queue:
-                pkg = self.queue.lpop()
-                build_dir = self.get_build_directory(pkg)
+        while self.queue:
+            pkg = self.queue.lpop()
+            build_dir = self.get_build_directory(pkg)
 
-                if not build_dir:
-                    raise RuntimeError('build_dir cannot be None.')
+            if not build_dir:
+                raise RuntimeError('build_dir cannot be None.')
 
-                pkg_obj = get_pkg_object(name=pkg)
-                bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum, trans_obj=self)
+            pkg_obj = get_pkg_object(name=pkg)
+            bld_obj = get_build_object(pkg_obj=pkg_obj, tnum=self.tnum, trans_obj=self)
 
-                if pkg_obj.is_iso:
-                    self.fetch_and_compile_translations(
-                        translations_for=["cnchi_updater", "antergos-gfxboot"]
-                    )
-                    result = bld_obj.start(pkg_obj)
-                else:
-                    bld_obj = self.setup_build_directory(bld_obj, build_dir)
-                    result = bld_obj.start(pkg_obj)
+            if pkg_obj.is_iso:
+                self.fetch_and_compile_translations(
+                    translations_for=["cnchi_updater", "antergos-gfxboot"]
+                )
+                result = bld_obj.start(pkg_obj)
+            else:
+                bld_obj = self.setup_build_directory(bld_obj, build_dir)
+                result = bld_obj.start(pkg_obj)
 
-                logger.debug(result)
-                if result in [True, False]:
-                    blds = pkg_obj.builds
-                    total = len(blds)
+            if result in [True, False]:
+                blds = pkg_obj.builds
+                total = len(blds)
 
-                    if total > 0:
-                        success = len([x for x in blds if x in status.completed])
-                        failure = len([x for x in blds if x in status.failed])
+                if total > 0:
+                    success = len([x for x in blds if x in status.completed])
+                    failure = len([x for x in blds if x in status.failed])
 
-                        if success > 0:
-                            success = 100 * success / total
+                    if success > 0:
+                        success = 100 * success / total
 
-                        if failure > 0:
-                            failure = 100 * failure / total
+                    if failure > 0:
+                        failure = 100 * failure / total
 
-                        pkg_obj.success_rate = success
-                        pkg_obj.failure_rate = failure
+                    pkg_obj.success_rate = success
+                    pkg_obj.failure_rate = failure
 
-                    if result is True:
-                        if not pkg_obj.is_iso:
-                            gevent.sleep(2)
-                            self.move_files_to_staging_repo(bld_obj)
-                            self._staging_repo.update_repo()
-                            self._staging_repo32.update_repo()
+                if result is True:
+                    if not pkg_obj.is_iso:
+                        gevent.sleep(2)
+                        self.move_files_to_staging_repo(bld_obj)
+                        repo_queue.enqueue_call(self._staging_repo.update_repo)
+                        repo_queue.enqueue_call(self._staging_repo32.update_repo)
+                        gevent.sleep(12)
 
-                        self.completed.append(bld_obj.bnum)
-                        doc_util.do_docker_clean(pkg_obj.name)
+                    self.completed.append(bld_obj.bnum)
+                    doc_util.do_docker_clean(pkg_obj.name)
 
-                    elif result is False:
-                        self.failed.append(bld_obj.bnum)
+                elif result is False:
+                    self.failed.append(bld_obj.bnum)
 
-                status.now_building.remove(bld_obj.bnum)
+            status.now_building.remove(bld_obj.bnum)
 
         self.is_running = False
         self.is_finished = True
