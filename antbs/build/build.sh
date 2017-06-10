@@ -126,7 +126,7 @@ setup_environment() {
 }
 
 fetch_upstream_pgp_keys() {
-	local fake_home=/tmp/antbs
+	local fake_home=/tmp/antbs/.gnupg
 	[[ -n $1 ]] && fake_home="$1"
 
 	# Mozilla Software Releases <release@mozilla.com>
@@ -143,7 +143,8 @@ fetch_upstream_pgp_keys() {
 	)
 
 	install -dm777 "${fake_home}" # gpg needs $HOME to exist and be writable
-	sudo -H -u antbs gpg --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys "${mozilla[@]}" "${nodejs[@]}" 2>&1
+	echo standard-resolver >> "${fake_home}/dirmngr.conf"
+	sudo -H -u antbs gpg --keyserver hkp://pgp.mit.edu --recv-keys "${mozilla[@]}" "${nodejs[@]}"
 }
 
 in_array() {
