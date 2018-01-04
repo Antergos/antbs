@@ -181,7 +181,7 @@ class APIView(FlaskView):
                     pkgnames.extend([name])
 
             if pkgnames:
-                if '-x86_64' in pkgnames[0] or '-i686' in pkgnames[0]:
+                if '-x86_64' in pkgnames[0]:
                     status.iso_flag = True
                     status.iso_minimal = 'minimal' in pkgnames[0]
 

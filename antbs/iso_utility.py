@@ -83,9 +83,8 @@ class ISOUtility:
 
     @staticmethod
     def get_file_name(pkgobj):
-        pkgver = pkgobj.pkgver.split('.')[1]
-        pkgver = pkgver if '.0' not in pkgver else pkgver[-1]
-        pkgver = '17.{}'.format(pkgver)
+        pkgver = pkgobj.pkgver
+
         if 'minimal' in pkgobj.pkgname:
             file_name = 'antergos-minimal-{0}-x86_64.iso'.format(pkgver)
         else:
