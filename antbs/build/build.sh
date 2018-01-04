@@ -96,6 +96,8 @@ setup_environment() {
 	export HOME=/pkg
 
 	if [[ -f /pkg/PKGBUILD ]]; then
+		for file in /etc/profile.d/*.sh; do source $file; done
+
 		source /pkg/PKGBUILD && export PKGNAME="${pkgname}"
 
 		if [[ "${_is_metapkg}" = 'yes' ]]; then

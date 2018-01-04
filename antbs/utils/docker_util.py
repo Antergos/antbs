@@ -139,7 +139,12 @@ class DockerUtils(metaclass=Singleton):
                 {
                     'bind': '/root/.gnupg',
                     'ro': False
-                }
+                },
+            self._status.TRANSIFEXRC:
+                {
+                    'bind': '/tmp/antbs/.transifexrc',
+                    'ro': False,
+                },
         }
         if 'pkgver' not in result_dir:
             binds[_32bit] = {'bind': '/32bit', 'ro': False}

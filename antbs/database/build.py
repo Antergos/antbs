@@ -348,7 +348,7 @@ class Build(RedisHash):
                 command='/makepkg/build.sh',
                 volumes=['/var/cache/pacman', '/makepkg', '/antergos',
                          '/pkg', '/root/.gnupg', '/staging', '/32bit',
-                         '/32build', '/result',
+                         '/32build', '/result', '/tmp/antbs/.transifexrc',
                          '/var/cache/pacman_i686'],
                 environment=build_env,
                 name=self._pkg_obj.pkgname,

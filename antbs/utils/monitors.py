@@ -28,6 +28,7 @@
 
 import xml.etree.ElementTree as ET
 import re
+from random import randrange
 
 import requests
 from github3 import login
@@ -110,7 +111,7 @@ class WebMonitor(PackageSourceMonitor):
             self.logger.exception(err)
             return ''
 
-        return req.headers['ETag']
+        return req.headers.get('ETag', str(randrange(0, 1000000)))
 
     def _process_remote_resource(self):
         raise NotImplementedError
