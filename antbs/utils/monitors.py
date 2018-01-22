@@ -70,7 +70,7 @@ class PackageSourceMonitor:
         if not matches and pattern.startswith('/') and pattern.endswith('/'):
             # Regular Expression
             pattern = pattern[1:-1]
-            matches = re.fullmatch(pattern, latest)
+            matches = re.search(pattern, latest)
 
         return matches
 
@@ -239,6 +239,17 @@ class GithubMonitor(PackageSourceMonitor):
 
                 if items_checked > 50:
                     break
+
+        if latest and pattern and pattern.startswith('/') and pattern.endswith('/'):
+            pattern = pattern[1:-1]
+            matches = re.search(pattern, latest)
+
+            try:
+                latest = matches.group(1)
+            except IndexError:
+                latest = matches.group(0)
+            except Exception:
+                pass
 
         if 'commits' != what_to_get and latest.startswith('v'):
             latest = latest[1:]
