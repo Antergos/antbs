@@ -276,7 +276,7 @@ class Monitor(RedisHash):
 
     def check_mate_desktop_server_for_changes(self, pkg_obj):
         if self.mate is None:
-            url = 'http://pub.mate-desktop.org/releases/1.18/SHA1SUMS'
+            url = 'http://pub.mate-desktop.org/releases/1.20/SHA1SUMS'
             # url = 'http://pub.mate-desktop.org/releases/{}/SHA1SUMS'.format()
             self.mate = CheckSumsMonitor(url, self.mate_last_etag, status=status)
             self.mate_last_etag = self.mate.etag

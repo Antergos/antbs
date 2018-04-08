@@ -382,9 +382,12 @@ class PacmanRepo(PacmanRepoMetadata):
 
         trans_running = status.transactions_running or status.transaction_queue
         building_saved = False
-        excluded = ['Updating antergos repo database.',
-                    'Updating antergos-staging repo database.',
-                    'Processing developer review result.']
+        excluded = [
+            'Updating antergos repo database.',
+            'Updating antergos-staging repo database.',
+            'Processing developer review result.',
+            'Checking remote package sources for changes.',
+        ]
 
         if not status.idle and trans_running and status.current_status not in excluded:
             building_saved = status.current_status
@@ -401,7 +404,7 @@ class PacmanRepo(PacmanRepoMetadata):
         if building_saved and not status.idle and status.current_status == msg:
             status.current_status = building_saved
 
-        elif status.idle or (not trans_running and not status.now_building):
+        elif status.idle or not trans_running:
             status.idle = True
             status.current_status = 'Idle.'
 

@@ -152,6 +152,33 @@
 
 								});
 							});
+
+							$( '.content' ).on( 'click', '.manage a', function ( e ) {
+								e.preventDefault();
+								jQuery( this ).addClass( 'clicked' );
+								{#var data = {
+									pkg:    jQuery( this ).attr( 'data-pkg' ),
+									result: jQuery( this ).attr( 'id' ),
+									dev:    '{{ user.username }}'
+								};
+								jQuery.ajax( {
+									type:        'POST',
+									url:         '/api/ajax',
+									data:        JSON.stringify( data, null, '\t' ),
+									contentType: 'application/json;charset=UTF-8',
+									dataType:    'json',
+									success:     function ( result ) {
+										console.log( result );
+										var res = $( '.clicked' ).attr( 'id' ) == 'passed' ? 'span.passed' : 'span.failed';
+										if ( result['msg'] == 'ok' ) {
+											jQuery( '.clicked' ).parents( 'tr' ).remove();
+										} else {
+											alert( 'Unable to save result. Server Error Msg:\n' + result['msg'] );
+										}
+									}
+
+								} );#}
+							} );
 						{% endif %}
 
 						{% if current_user.is_authenticated %}
