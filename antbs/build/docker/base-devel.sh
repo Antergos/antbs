@@ -20,9 +20,9 @@ cd /var/tmp/archbuild
 ###
 # Get the Image
 ###
-VERSION=$(curl https://mirrors.kernel.org/archlinux/iso/latest/ | grep -Poh '(?<=archlinux-bootstrap-)\d*\.\d*\.\d*(?=\-x86_64)' | head -n 1)
-curl http://mirror.us.leaseweb.net/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz > archlinux-bootstrap-$VERSION-x86_64.tar.gz
-curl http://mirror.us.leaseweb.net/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig > archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
+VERSION=$(curl https://mirrors.edge.kernel.org/archlinux/iso/latest/md5sums.txt | grep -Poh '(?<=archlinux-bootstrap-)\d*\.\d*\.\d*(?=\-x86_64)' | head -n 1)
+curl https://mirrors.edge.kernel.org/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz > archlinux-bootstrap-$VERSION-x86_64.tar.gz
+curl https://mirrors.edge.kernel.org/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig > archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
 ##Pull Pierre Schmitz PGP Key.
 # http://pgp.mit.edu:11371/pks/lookup?op=vindex&fingerprint=on&exact=on&search=0x4AA4767BBC9C4B1D18AE28B77F2D434B9741E8AC
 gpg --keyserver pgp.mit.edu --recv-keys 9741E8AC
@@ -41,9 +41,11 @@ tar xf archlinux-bootstrap-$VERSION-x86_64.tar.gz > /dev/null
 # Do necessary install steps.
 ###
 #while true ; do mandb ; done
+sed -i 's|CheckSpace|#CheckSpace|g' root.x86_64/etc/pacman.conf
+
 sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	# Setup a mirror.
-	echo 'Server = https://mirrors.kernel.org/archlinux/\$repo/os/\$arch' > /etc/pacman.d/mirrorlist
+	echo 'Server = https://mirrors.edge.kernel.org/archlinux/\$repo/os/\$arch' > /etc/pacman.d/mirrorlist
 	# Setup Keys
 	pacman-key --init
 	pacman-key --populate archlinux
@@ -51,7 +53,7 @@ sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	# linux jfsutils lvm2 cryptsetup groff man-db man-pages mdadm pciutils pcmciautils reiserfsprogs s-nail xfsprogs vi
 	pacman -Syyu --noconfirm --force wget bash bzip2 coreutils dhcpcd gawk gcc-libs gettext git glibc grep gzip inetutils iproute2 iputils less libutil-linux licenses logrotate psmisc sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux which nano
 	# Pacman doesn't let us force ignore files, so clean up.
-	pacman -S --noconfirm --force base-devel make git gcc arch-install-scripts reflector lzo2 fakeroot
+	pacman -S --noconfirm --force base-devel make git gcc arch-install-scripts reflector lzo fakeroot
 	reflector -l 30 -f 15 --save /etc/pacman.d/mirrorlist
 	pacman -Rcc --noconfirm reflector python
 	pacman -Scc --noconfirm
