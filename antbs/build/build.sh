@@ -282,10 +282,12 @@ try_build() {
 	else
 		cd /pkg && _log 'UPDATING SOURCE CHECKSUMS';
 
-		check_pkg_sums &&
-		{ sudo -u antbs makepkg -m -f -L ${DEPS} --noconfirm --needed 2>&1 \
-			&& _output_pkgbuild_generates \
-			&& return 0; } || { cd /result && rm **.pkg.**; return 1; }
+		makepkg -V \
+			&& check_pkg_sums \
+			&& { sudo -u antbs makepkg -f -L ${DEPS} --noconfirm --needed 2>&1 \
+				&& _output_pkgbuild_generates \
+				&& return 0; } \
+			|| { cd /result && rm **.pkg.**; return 1; }
 	fi
 }
 
