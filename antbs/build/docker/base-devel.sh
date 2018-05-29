@@ -53,7 +53,7 @@ sudo ./root.x86_64/bin/arch-chroot root.x86_64 << EOF
 	# linux jfsutils lvm2 cryptsetup groff man-db man-pages mdadm pciutils pcmciautils reiserfsprogs s-nail xfsprogs vi
 	pacman -Syyu --noconfirm --force wget bash bzip2 coreutils dhcpcd gawk gcc-libs gettext git glibc grep gzip inetutils iproute2 iputils less libutil-linux licenses logrotate psmisc sed shadow sysfsutils systemd-sysvcompat tar texinfo usbutils util-linux which nano
 	# Pacman doesn't let us force ignore files, so clean up.
-	pacman -S --noconfirm --force base-devel make git gcc arch-install-scripts reflector lzo fakeroot
+	pacman -S --noconfirm --force base-devel pacman-contrib make git gcc arch-install-scripts reflector lzo fakeroot
 	reflector -l 30 -f 15 --save /etc/pacman.d/mirrorlist
 	pacman -Rcc --noconfirm reflector python
 	pacman -Scc --noconfirm
