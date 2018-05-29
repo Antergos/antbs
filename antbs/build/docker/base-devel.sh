@@ -14,7 +14,7 @@ check curl
 ###
 # Make some space
 ###
-mkdir /var/tmp/archbuild || { rm -rf /var/tmp/archbuild && mkdir /var/tmp/archbuild; }
+mkdir /var/tmp/archbuild >/dev/null || { rm -rf /var/tmp/archbuild && mkdir /var/tmp/archbuild; }
 cd /var/tmp/archbuild
 
 ###
@@ -25,7 +25,7 @@ curl https://mirrors.edge.kernel.org/archlinux/iso/latest/archlinux-bootstrap-$V
 curl https://mirrors.edge.kernel.org/archlinux/iso/latest/archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig > archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
 ##Pull Pierre Schmitz PGP Key.
 # http://pgp.mit.edu:11371/pks/lookup?op=vindex&fingerprint=on&exact=on&search=0x4AA4767BBC9C4B1D18AE28B77F2D434B9741E8AC
-gpg --keyserver pgp.mit.edu --recv-keys 9741E8AC
+gpg --keyserver hkp://pgp.mit.edu --recv-keys 9741E8AC
  #Verify its integrity.
 gpg --verify archlinux-bootstrap-$VERSION-x86_64.tar.gz.sig
 VALID=$?

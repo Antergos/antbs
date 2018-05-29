@@ -271,6 +271,7 @@ try_build() {
 	_log 'TRYING BUILD';
 	chmod -R a+rw /pkg
 	chmod 777 /pkg
+	chown -R antbs:users /pkg
 
 	if [[ "$1" = "i686" ]]; then
 
