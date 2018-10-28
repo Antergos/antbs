@@ -34,6 +34,23 @@ from importlib import import_module
 
 from flask import Flask
 
+import re
+
+from flask import (
+    current_app,
+    render_template,
+    request,
+    url_for,
+    abort,
+    session,
+)
+
+from database import (
+    status,
+    get_build_object,
+)
+from utils import get_current_user
+
 from logging_config import handle_exceptions
 
 from database import (
@@ -82,9 +99,52 @@ def create_app():
 
     # Hookup Middlewares
     with _app.app_context():
-        import_module('middleware')
+        @current_app.errorhandler(400)
+        @current_app.errorhandler(403)
+        @current_app.errorhandler(404)
+        @current_app.errorhandler(500)
+        def error_handler(err):
+            """ Setup default error templates. """
+            code = getattr(err, 'code', 500)  # If 500, err == the exception.
+            error_tpl = 'error/error.html'
+
+            if code in [403, 404, 500]:
+                error_tpl = 'error/{}.html'.format(str(code))
+
+            return render_template(error_tpl, code=code), code
+
+        @current_app.context_processor
+        def inject_global_template_variables():
+            return dict(
+                idle=status.idle,
+                current_status=status.current_status,
+                now_building=status.now_building,
+                rev_pending=status.pending_review,
+                user=get_current_user(),
+                current_user=get_current_user(),
+                _all_packages=status.all_packages,
+                pkg_groups=status.package_groups,
+            )
+
+        @current_app.before_request
+        def rq_dashboard_requires_auth():
+            if '/rq' in request.path and not get_current_user().is_authenticated:
+                abort(403)
+
+        @current_app.template_filter()
+        def tpl_name(s):
+            """ Extracts and returns the template name from a url path string. """
+            res = re.findall('\'([^\']*)\'', str(s))
+
+            return None if not res else res[0]
+
+        @current_app.template_filter()
+        def build_failed(bnum):
+            build = get_build_object(bnum=int(bnum))
+            return build.failed
 
     return _app
+
 
 app = create_app()
 

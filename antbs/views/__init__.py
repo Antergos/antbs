@@ -215,7 +215,7 @@ def get_build_history_chart_data(pkg_obj=None):
                 #                      timestamp=key)
                 chart_data[key] = dict(date=key, builds=1)
             else:
-                if chart_data[key]['builds'] > 35:
+                if chart_data[key]['builds'] > 20:
                     continue
                 chart_data[key]['builds'] += 1
 

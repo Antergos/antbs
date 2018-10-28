@@ -27,6 +27,7 @@
 # along with AntBS; If not, see <http://www.gnu.org/licenses/>.
 
 import requests
+from urllib.parse import urlencode
 
 from views import *
 
@@ -56,6 +57,7 @@ class Auth0View(FlaskView):
         user_info = requests.get(user_url).json()
 
         if user_info:
+            status.logger.debug(user_info)
             is_authenticated = user_info['app_metadata'].get('antbs', False) is True
             user = dict(username=user_info['nickname'], is_authenticated=is_authenticated)
             if 'user' in session:
@@ -69,8 +71,11 @@ class Auth0View(FlaskView):
 
     @route('/login')
     def login(self):
-        return try_render_template(
-            'admin/login.html',
-            auth0_id=status.auth0_id,
-            auth0_domain=status.auth0_domain
-        )
+        query_args = urlencode({
+            'client_id': status.auth0_id,
+            'redirect_uri': url_for('Auth0View:callback', _external=True),
+            'response_type': 'code',
+            'state': 'antbs',
+        })
+
+        return redirect('https://{0}/authorize?{1}'.format(status.auth0_domain, query_args))
