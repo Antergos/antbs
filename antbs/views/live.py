@@ -37,7 +37,7 @@ class LiveView(FlaskView):
 
     def get(self, bnum=None):
         bld_objs = {}
-        selected = None
+        selected = dict(bnum=0, pkgname='', version='', start='', container='')
 
         if bnum and bnum not in status.now_building:
             abort(400)
