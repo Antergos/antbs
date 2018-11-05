@@ -215,7 +215,7 @@ class APIView(FlaskView):
         message = dict(msg='Ok')
 
         if iso_release:
-            transaction_queue.enqueue_call(iso_release_job)
+            transaction_queue.enqueue_call(iso_release_job, timeout=900)
 
         elif reset_queue:
             if transaction_queue.count > 0:
