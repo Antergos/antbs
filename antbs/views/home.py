@@ -87,8 +87,9 @@ class HomeView(FlaskView):
 
         for stat in check_stats:
             builds = getattr(status, stat)
+            builds = builds[2500:-1] if 'failed' == stat else builds[5000:-1]
             res = len(builds) or '0'
-            builds = [x for x in builds[1500:-1] if x]
+            builds = [x for x in builds if x]
             within = []
             for bnum in builds:
                 try:
