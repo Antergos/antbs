@@ -156,8 +156,8 @@ class WordPressBridge:
 
     def __init__(self, auth):
         self.post_id_map = {
-            'antergos-x86_64': '29406',
-            'antergos-minimal-x86_64': '29407'
+            'antergos-x86_64': '30742',
+            'antergos-minimal-x86_64': '30743'
         }
         self.auth = auth
         logger.info('WordPressBridge Object Initialized')
