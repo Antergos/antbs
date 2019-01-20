@@ -214,7 +214,7 @@ class GithubMonitor(PackageSourceMonitor):
             _latest = etag = ''
 
             try:
-                item = res.next()
+                item = next(res)
                 etag = item.etag
 
                 if 'commits' == what_to_get:
