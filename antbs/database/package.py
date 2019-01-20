@@ -355,7 +355,7 @@ class Package(PackageMetadata):
                 else:
                     pattern = r'^{0}=\(["\']([\w\d]+)["\']'.format(key)
                     replace_with = "{0}=('{1}'".format(key, val[1])
-                    re.sub(pattern, replace_with, new_pb_contents)
+                    new_pb_contents = re.sub(pattern, replace_with, new_pb_contents)
 
             new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
@@ -365,6 +365,7 @@ class Package(PackageMetadata):
                 new_pb_contents = new_pb_contents.replace(search_str, replace_str)
 
         if new_pb_contents == pb_contents:
+            logger.debug('pkgbuild content unchanged!')
             return True
 
         commit = pb_file.update(commit_msg, new_pb_contents.encode('utf-8'))

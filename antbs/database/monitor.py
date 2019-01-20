@@ -39,8 +39,6 @@ import xml.etree.ElementTree as ET
 
 import gevent
 import requests
-from github3 import login
-from gitlab import Gitlab
 
 from . import (
     RedisHash,
@@ -53,6 +51,7 @@ from utils import (
     quiet_down_noisy_loggers,
     CheckSumsMonitor,
     GithubMonitor,
+    GitlabMonitor,
     RemoteFileMonitor,
     set_server_status
 )
@@ -88,7 +87,7 @@ class Monitor(RedisHash):
         if not self or not self.name:
             self.name = name
 
-        self.repo_obj = self.staging_repo_obj = self.gh = self.mate = self.remote_file = None
+        self.repo_obj = self.staging_repo_obj = self.gh = self.mate = self.remote_file = self.gl = None
 
     @staticmethod
     def _get_repo_objects(sync_repos):
@@ -107,6 +106,9 @@ class Monitor(RedisHash):
         return repo, staging_repo
 
     def _get_antergos_packages_repo_head_sha(self):
+        if self.gh is None:
+            self.gh = GithubMonitor(token=GITHUB_TOKEN, status=status)
+
         self.gh.set_repo('antergos', 'antergos-packages')
         latest_commit = [c for c in self.gh.repo.commits(number=1)]
         return '' if not latest_commit else latest_commit[0].sha
@@ -254,25 +256,20 @@ class Monitor(RedisHash):
 
         return self.gh.package_source_changed(pkg_obj)
 
-    @staticmethod
-    def check_gitlab_repo_for_changes(pkg_obj, build_pkgs):
-        gl = Gitlab('https://gitlab.com', GITLAB_TOKEN)
-        gl.auth()
-        project_id = pkg_obj.mon_project
-        repo = pkg_obj.mon_repo
-        project = gl.projects.get(project_id)
-        last_result = pkg_obj.mon_last_result
-        events = project.events.list()
+    def check_gitlab_repo_for_changes(self, pkg_obj):
+        if pkg_obj.pkgname.startswith('pamac'):
+            url = 'https://gitlab.manjaro.org'
+            token = status.gitlab_manajaro_token
+        else:
+            url = 'https://gitlab.com'
+            token = GITLAB_TOKEN
 
-        for event in events:
-            if event.action_name == 'pushed to':
-                if event.created_at != last_result:
-                    pkg_obj.mon_last_result = event.created_at
-                    build_pkgs.append('numix-icon-theme-square')
+        if self.gl is None:
+            self.gl = GitlabMonitor(url=url, token=token, status=status)
 
-                break
+        self.gl.set_project(pkg_obj.mon_project, url, token)
 
-        return build_pkgs
+        return self.gl.package_source_changed(pkg_obj)
 
     def check_mate_desktop_server_for_changes(self, pkg_obj):
         if self.mate is None:
@@ -343,8 +340,8 @@ class Monitor(RedisHash):
                     after = self._get_antergos_packages_repo_head_sha()
 
             elif 'gitlab' == pkg_obj.mon_service:
-                changed = self.check_gitlab_repo_for_changes(pkg_obj, build_pkgs)
-                monitor_obj = ''
+                changed = self.check_gitlab_repo_for_changes(pkg_obj)
+                monitor_obj = self.gl
 
             elif 'http' == pkg_obj.mon_service:
                 changed = self.check_remote_http_resource_for_changes(pkg_obj)
