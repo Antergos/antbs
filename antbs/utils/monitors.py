@@ -308,7 +308,7 @@ class GitlabMonitor(PackageSourceMonitor):
             what_to_get = 'tags'
 
         git_item = getattr(self.project, what_to_get)
-        res = [i for i in git_item.list()]
+        res = iter(git_item.list())
         items_checked = 0
         pattern = pkg_obj.mon_match_pattern or '.'
 
@@ -318,7 +318,7 @@ class GitlabMonitor(PackageSourceMonitor):
             _latest = etag = ''
 
             try:
-                item = res.next()
+                item = next(res).attributes
 
                 if 'commits' == what_to_get:
                     _latest = item['sha']
@@ -328,7 +328,7 @@ class GitlabMonitor(PackageSourceMonitor):
                     etag = item.commit['created_at']
                 elif 'tags' == what_to_get:
                     _latest = item['release']['tag_name']
-                    etag = item.commit['created_at']
+                    etag = item['commit']['created_at']
 
             except StopIteration:
                 pass
