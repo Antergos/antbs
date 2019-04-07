@@ -259,7 +259,23 @@ class Package(PackageMetadata):
 
         self.gh_path = os.path.join(gh_path, 'PKGBUILD')
 
-        return True
+        try:
+            req = requests.head(f'{gh_repo_base_url}/{self.gh_path}', allow_redirects=True)
+            req.raise_for_status()
+            return True
+        except Exception:
+            pass
+
+        try:
+            req = requests.head(f'{gh_repo_base_url}/{self.gh_path}.inactive', allow_redirects=True)
+            req.raise_for_status()
+            self.allowed_in.delete()
+            status.logger.debug(f'Inactive package found: {self.name}, {len(self.allowed_in)}')
+            return True
+        except Exception as err:
+            status.logger.debug(err)
+
+        # raise RuntimeError('Could not determine gh_path for {}'.format(self.pkgname))
 
     @staticmethod
     def get_github_api_client(project='antergos', repo='antergos-packages'):
@@ -281,27 +297,35 @@ class Package(PackageMetadata):
         try:
             pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
         except Exception:
-            at_path = repo.file_contents(self.gh_path)
-
-            if isinstance(at_path, UnprocessableResponseBody):
-                # Path is a directory
-                pbpath = os.path.join(self.gh_path, 'PKGBUILD')
-
-            elif 'symlink' == at_path.type:
-                pbpath = os.path.join(
-                    self.gh_path.rsplit('/', 1)[0],
-                    at_path.target,
-                    'PKGBUILD'
-                )
-
-            if not pbpath:
-                raise RuntimeError('Unable to determine gh_path for {}!'.format(self.pkgname))
-
-            self.gh_path = pbpath
-            pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+            pbfile_contents = ''
 
         if not pbfile_contents:
-            raise RuntimeError('Unable to fetch pkgbuild for {}!'.format(self.pkgname))
+            try:
+                pbfile_contents = repo.file_contents(f'{self.gh_path}.inactive').decoded.decode('utf-8')
+                self.gh_path = f'{self.gh_path}.inactive'
+            except Exception:
+                at_path = repo.file_contents(self.gh_path)
+
+                if isinstance(at_path, UnprocessableResponseBody):
+                    # Path is a directory
+                    pbpath = os.path.join(self.gh_path, 'PKGBUILD')
+
+                elif 'symlink' == at_path.type:
+                    pbpath = os.path.join(
+                        self.gh_path.rsplit('/', 1)[0],
+                        at_path.target,
+                        'PKGBUILD'
+                    )
+
+                if not pbpath:
+                    raise RuntimeError('Unable to determine gh_path for {}!'.format(self.pkgname))
+
+                self.gh_path = pbpath
+                pbfile_contents = repo.file_contents(self.gh_path).decoded.decode('utf-8')
+
+        if not pbfile_contents:
+            pass
+            # raise RuntimeError('Unable to fetch pkgbuild for {}!'.format(self.pkgname))
 
         return pbfile_contents
 

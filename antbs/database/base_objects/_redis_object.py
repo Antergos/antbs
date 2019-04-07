@@ -171,4 +171,4 @@ class RedisObject:
 
     def json(self):
         """ Return this object as a json serialized string. """
-        return json.dumps(self.__json__())
+        return json.dumps(self.__json__(), sort_keys=True, indent=4)

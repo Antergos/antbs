@@ -43,6 +43,7 @@ from . import (
     status,
     RedisSingleton,
     db,
+    get_pkg_object,
 )
 
 from utils import (
@@ -119,6 +120,8 @@ class PacmanRepo(PacmanRepoMetadata):
                     logger.error('repo-add script timed out!')
                     break
 
+        logger.debug(res)
+
         if not success:
             logger.error(
                 '%s command on alpm database failed for %s! Output was: %s',
@@ -152,7 +155,7 @@ class PacmanRepo(PacmanRepoMetadata):
         return _pkgvers
 
     def _determine_current_repo_state_alpm(self):
-        self.pkgs_alpm.remove_range(0, -1)
+        self.pkgs_alpm.delete()
 
         try:
             with tarfile.open(self.alpm_db_path, 'r') as alpm_db:
@@ -176,7 +179,7 @@ class PacmanRepo(PacmanRepoMetadata):
         self._maybe_remove_broken_symlinks()
         pkgs = [p for p in os.listdir(self.path) if '.pkg.' in p and not p.endswith('.sig')]
 
-        self.pkgs_fs.remove_range(0, -1)
+        self.pkgs_fs.delete()
 
         for pkg_file_name in pkgs:
             pkg_file_name = pkg_file_name.replace('.pkg', '-pkg')
@@ -190,6 +193,13 @@ class PacmanRepo(PacmanRepoMetadata):
             self.pkgs_fs.add('{0}|{1}-{2}|{3}'.format(pkg, version, rel, arch))
 
         self.pkg_count_fs = len(self.pkgs_fs)
+
+    def _get_force_remove_packages(self):
+        pkgs_fs = set(list(self.pkgs_fs))
+        pkgs_alpm = set(list(self.pkgs_alpm))
+        pkgs = list(pkgs_fs & pkgs_alpm)
+
+        return [p for p in pkgs if get_pkg_object(p.split('|').pop(0)).gh_path.endswith('.inactive')]
 
     def _get_packages_unaccounted_for_info(self):
         unaccounted_for = {}
@@ -243,13 +253,12 @@ class PacmanRepo(PacmanRepoMetadata):
         pkgs_fs = set(list(self.pkgs_fs))
         pkgs_alpm = set(list(self.pkgs_alpm))
         accounted_for = list(pkgs_fs & pkgs_alpm)
-        unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs)
+        force_remove = self._get_force_remove_packages()
+        unaccounted_for = list(pkgs_fs - pkgs_alpm) + list(pkgs_alpm - pkgs_fs) + force_remove
 
-        # logger.debug([unaccounted_for])
-
-        self.packages.remove_range(0, -1)
-        self.unaccounted_for.remove_range(0, -1)
-        self.pkgnames.remove_range(0, -1)
+        self.packages.delete()
+        self.unaccounted_for.delete()
+        self.pkgnames.delete()
 
         for pkg in accounted_for:
             self.packages.add(pkg)
@@ -276,7 +285,11 @@ class PacmanRepo(PacmanRepoMetadata):
                 logger.error('nothing to compare')
                 continue
 
-            if locations['fs']:
+            if locations['fs'] and locations['alpm']:
+                rm_from_db.append(pkgname)
+                rm_from_fs.append(locations['alpm'][0][1])
+
+            elif locations['fs']:
                 versions = [p_info[0].split('|')[1] for p_info in locations['fs']]
                 latest = ''
                 latest_fs = self._compare_pkgvers(versions)
@@ -300,7 +313,7 @@ class PacmanRepo(PacmanRepoMetadata):
                 for fname in filenames:
                     rm_from_fs.append(fname)
 
-            elif locations['alpm'] and not locations['fs']:
+            elif locations['alpm']:
                 rm_from_db.append(pkgname)
 
         logger.debug([
@@ -315,7 +328,8 @@ class PacmanRepo(PacmanRepoMetadata):
         sig = '{}{}'.format(pkg_file, SIG_EXT)
 
         for file_name in [pkg_file, sig]:
-            remove(os.path.join(self.path, file_name))
+            if os.path.exists(os.path.join(self.path, file_name)):
+                remove(os.path.join(self.path, file_name))
 
     @staticmethod
     def _split_pkg_info_string(pkg_info_string):

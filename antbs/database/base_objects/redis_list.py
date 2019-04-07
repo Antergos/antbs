@@ -102,9 +102,6 @@ class RedisList(RedisObject, list):
     def remove(self, val):
         self.db.lrem(self.full_key, 0, val)
 
-    def remove_range(self, start, stop):
-        self.db.ltrim(self.full_key, start, stop)
-
     def reverse(self):
         cp = list(self.db.lrange(self.full_key, 0, -1))
         return cp.reverse()

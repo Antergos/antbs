@@ -93,14 +93,10 @@ class Monitor(RedisHash):
     def _get_repo_objects(sync_repos):
         repo = get_repo_object('antergos', 'x86_64')
         staging_repo = get_repo_object('antergos-staging', 'x86_64')
-        repo32 = get_repo_object('antergos', 'i686')
-        staging_repo32 = get_repo_object('antergos-staging', 'i686')
 
         if sync_repos:
             repo.update_repo()
             staging_repo.update_repo()
-            repo32.update_repo()
-            staging_repo32.update_repo()
             status.repos_synced_recently = (True, 600)
 
         return repo, staging_repo
@@ -173,7 +169,7 @@ class Monitor(RedisHash):
 
     def _sync_packages_list(self):
         pkg_objs = [get_pkg_object(name=p) for p in status.all_packages if p]
-        monitored = [p.pkgname for p in pkg_objs if p.is_monitored]
+        monitored = [p.pkgname for p in pkg_objs if p.is_monitored and not p.gh_path.endswith('.inactive')]
         new_pkgs = list(set(monitored) - set(list(self.packages)))
         rm_pkgs = list(set(list(self.packages)) - set(monitored))
 
@@ -307,6 +303,9 @@ class Monitor(RedisHash):
                 logger.error('At least one iso was not successfully added to wordpress.')
 
     def check_repos_for_changes(self, check_github, sync_repos, webhook):
+        quiet_down_noisy_loggers()
+        self._sync_packages_list()
+
         self.repo_obj, self.staging_repo_obj = self._get_repo_objects(sync_repos)
 
         if not check_github:
@@ -319,9 +318,6 @@ class Monitor(RedisHash):
         last = list(self.packages)[-1]
         before = ''
         after = ''
-
-        quiet_down_noisy_loggers()
-        self._sync_packages_list()
 
         for pkg in self.packages:
             pkg_obj = get_pkg_object(name=pkg, fetch_pkgbuild=True)
